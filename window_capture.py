@@ -93,7 +93,13 @@ def capture_window(hwnd: int) -> np.ndarray | None:
         )
         # BGRA -> RGB
         return np.ascontiguousarray(arr[:, :, [2, 1, 0]])
-    except Exception:
+    except (OSError, ValueError):
+        # Window may have just closed, DC is invalid, or bitmap size 0 —
+        # these are expected transient failures.
+        return None
+    except Exception as e:
+        # Unexpected — log so it's diagnosable instead of silently returning None.
+        print(f"[window_capture] unexpected error: {e!r}", flush=True)
         return None
     finally:
         if bitmap is not None:
