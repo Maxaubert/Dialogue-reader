@@ -126,7 +126,8 @@ class KokoroTTS:
         `speed` is a proper time-stretch (pitch-preserved): 1.0 = normal,
         1.5 = 50% faster, 0.8 = 20% slower."""
         self._ensure_loaded()
-        assert self._kokoro is not None
+        if self._kokoro is None:
+            raise RuntimeError("KokoroTTS.synth called before _ensure_loaded")
         audio, sample_rate = self._kokoro.create(
             text, voice=voice, speed=float(speed), lang="en-us"
         )
