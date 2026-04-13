@@ -18,8 +18,10 @@ import numpy as np
 
 # Voices added in the latest round — edit this list as we add more.
 NEW_VOICES = [
-    "sherpa:vctk:0",
-    "sherpa:vctk:30",
+    "sherpa:melo_en:0",
+    "sherpa:libritts_r:0",
+    "sherpa:libritts_r:100",
+    "sherpa:libritts_r:500",
 ]
 
 TEST_TEXT = (

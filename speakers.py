@@ -15,6 +15,7 @@ restarts and re-runs.
 from __future__ import annotations
 
 import json
+import random
 import threading
 from pathlib import Path
 
@@ -143,9 +144,12 @@ class SpeakerManager:
                 if match:
                     self.current_speaker = match
                     return self.assignments[match]
-            # New speaker — auto-assign next voice in pool.
+            # New speaker — pick a random voice from the pool. Random is
+            # preferred over round-robin when the pool is very large and we
+            # want variety across runs / sessions. The assignment persists
+            # in speakers.json so the same character keeps their voice.
             self.current_speaker = name
-            idx = self._next_auto_index % len(self.voice_pool)
+            idx = random.randrange(len(self.voice_pool))
             self.assignments[name] = self.voice_pool[idx]
             self.cycle_index[name] = idx
             self._next_auto_index += 1
@@ -153,19 +157,27 @@ class SpeakerManager:
             return self.assignments[name]
 
     def cycle_current_voice(self, direction: int = 1) -> tuple[str, str] | None:
-        """Cycle the current speaker's voice along the pool. When no speaker
-        is set, cycles the special 'no-speaker' default voice instead.
-        Returns (display_name, new_voice_name)."""
+        """Reroll the current speaker's voice. With a 1000+ voice pool, linear
+        cycling takes forever to sweep, so we pick a random one instead (but
+        still avoid re-picking the exact current voice). `direction` is kept
+        in the signature for compatibility with the CycleVoicePrev hotkey but
+        is ignored — both next and prev simply re-roll."""
         with self._lock:
             name = self.current_speaker or DEFAULT_SPEAKER_KEY
-            current_idx = self.cycle_index.get(name, -1)
-            # Python's % wraps negatives correctly: (-1) % 10 == 9
-            new_idx = (current_idx + direction) % len(self.voice_pool)
-            new_voice = self.voice_pool[new_idx]
+            current_voice = self.assignments.get(name)
+            if len(self.voice_pool) == 1:
+                new_voice = self.voice_pool[0]
+                new_idx = 0
+            else:
+                # Sample until we land on something different from current.
+                for _ in range(10):
+                    new_idx = random.randrange(len(self.voice_pool))
+                    if self.voice_pool[new_idx] != current_voice:
+                        break
+                new_voice = self.voice_pool[new_idx]
             self.assignments[name] = new_voice
             self.cycle_index[name] = new_idx
             self._save()
-            # Present the pseudo-speaker as "(no speaker)" for display.
             display = "(no speaker)" if name == DEFAULT_SPEAKER_KEY else name
             return (display, new_voice)
 

@@ -17,18 +17,44 @@ Usage:
 
 from __future__ import annotations
 
+import os
+import sys
 import tarfile
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 
 import numpy as np
 
 
-# Model descriptors: name -> {url, archive_subdir, onnx, lexicon, tokens}.
-# archive_subdir is the top-level dir inside the .tar.bz2 that extracts next
-# to the archive (sherpa releases all nest under a subdir named after the
-# model).
+@contextmanager
+def _suppress_native_stderr():
+    """Silence stderr written by native (C++) code — sherpa-onnx writes
+    'Unknown token' and 'OOV' warnings directly to fd 2, which Python-level
+    sys.stderr filters can't intercept. We temporarily redirect the OS-level
+    file descriptor to NUL (Windows) / /dev/null (Unix)."""
+    sys.stderr.flush()
+    try:
+        saved_fd = os.dup(2)
+    except OSError:
+        # Some environments (e.g. packaged GUIs) detach fd 2. Bail gracefully.
+        yield
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(devnull)
+        os.close(saved_fd)
+
+
+# Model descriptors. Two file-layout flavours:
+#   VCTK/Coqui-style:  model + lexicon + tokens.
+#   Piper-style:       model + data_dir (espeak-ng) + tokens.
+# Mutually exclusive — each spec sets exactly one of `lexicon` or `data_dir`.
 _MODELS = {
     "vctk": {
         "url": (
@@ -39,8 +65,38 @@ _MODELS = {
         "onnx": "vits-vctk.onnx",
         "lexicon": "lexicon.txt",
         "tokens": "tokens.txt",
+        "num_speakers": 109,
+    },
+    "melo_en": {
+        "url": (
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+            "tts-models/vits-melo-tts-en.tar.bz2"
+        ),
+        "archive_subdir": "vits-melo-tts-en",
+        "onnx": "model.onnx",
+        "lexicon": "lexicon.txt",
+        "tokens": "tokens.txt",
+        "num_speakers": 1,
+    },
+    "libritts_r": {
+        "url": (
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+            "tts-models/vits-piper-en_US-libritts_r-medium.tar.bz2"
+        ),
+        "archive_subdir": "vits-piper-en_US-libritts_r-medium",
+        "onnx": "en_US-libritts_r-medium.onnx",
+        "data_dir": "espeak-ng-data",
+        "tokens": "tokens.txt",
+        "num_speakers": 904,
     },
 }
+
+
+def get_known_models() -> dict[str, int]:
+    """Return {model_name: num_speakers} for every registered sherpa model.
+    Used by the pool expander so `sherpa:<model>:all` knows how many to
+    emit without downloading the model archive."""
+    return {name: spec["num_speakers"] for name, spec in _MODELS.items()}
 
 # File-size floor to detect partial/corrupt downloads.
 _MIN_ARCHIVE_BYTES = 50_000_000
@@ -126,18 +182,26 @@ class SherpaTTS:
             # Import lazily so the module loads even if sherpa_onnx isn't
             # installed until first use.
             import sherpa_onnx
+            vits_kwargs = {
+                "model": str(model_dir / spec["onnx"]),
+                "tokens": str(model_dir / spec["tokens"]),
+            }
+            # Piper-style models use espeak-ng data_dir; others use a lexicon.
+            if "data_dir" in spec:
+                vits_kwargs["data_dir"] = str(model_dir / spec["data_dir"])
+            if "lexicon" in spec:
+                vits_kwargs["lexicon"] = str(model_dir / spec["lexicon"])
             cfg = sherpa_onnx.OfflineTtsConfig(
                 model=sherpa_onnx.OfflineTtsModelConfig(
-                    vits=sherpa_onnx.OfflineTtsVitsModelConfig(
-                        model=str(model_dir / spec["onnx"]),
-                        lexicon=str(model_dir / spec["lexicon"]),
-                        tokens=str(model_dir / spec["tokens"]),
-                    ),
+                    vits=sherpa_onnx.OfflineTtsVitsModelConfig(**vits_kwargs),
                     num_threads=2,
                 ),
             )
             print(f"[sherpa] loading {model_name}...", flush=True)
-            tts = sherpa_onnx.OfflineTts(cfg)
+            # OfflineTts constructor spams 'Unknown token' to native stderr
+            # while parsing the lexicon. Suppress; those messages are noise.
+            with _suppress_native_stderr():
+                tts = sherpa_onnx.OfflineTts(cfg)
             print(f"[sherpa] {model_name} ready ({tts.num_speakers} speakers)", flush=True)
             self._cache[model_name] = (tts, tts.num_speakers)
             return self._cache[model_name]
@@ -166,6 +230,9 @@ class SherpaTTS:
                 f"sherpa '{model_name}' has {num_speakers} speakers; "
                 f"id {speaker_id} out of range"
             )
-        audio_obj = tts.generate(text, sid=speaker_id, speed=float(speed))
+        # generate() spams 'OOV' for any out-of-vocabulary token (parens,
+        # punctuation, etc.). Suppress; the missing tokens just get skipped.
+        with _suppress_native_stderr():
+            audio_obj = tts.generate(text, sid=speaker_id, speed=float(speed))
         audio = np.asarray(audio_obj.samples, dtype=np.float32)
         return audio, int(audio_obj.sample_rate)
