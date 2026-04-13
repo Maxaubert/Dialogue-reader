@@ -23,10 +23,10 @@ Voice files download once on first use:
   - Kokoro model + voices → voices/kokoro/{kokoro-v1.0.onnx, voices-v1.0.bin}
 
 Recommended voices:
-  Piper (fast, ~60 MB each):
-    en_US-amy-medium, en_US-ryan-medium, en_US-lessac-medium,
-    en_US-lessac-high, en_US-hfc_female-medium, en_US-hfc_male-medium,
-    en_GB-alan-medium, en_GB-jenny_dioco-medium
+  Piper (fast, ~60 MB each; -high variants ~110 MB):
+    en_US-amy-medium, en_US-ryan-high, en_US-hfc_female-medium,
+    en_US-hfc_male-medium, en_GB-alan-medium, en_GB-alba-medium,
+    en_GB-jenny_dioco-medium, en_GB-northern_english_male-medium
   Kokoro (natural, share one ~310 MB model):
     af_heart, af_bella, af_sarah (US female)
     am_michael, am_adam (US male)
