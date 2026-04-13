@@ -608,6 +608,15 @@ def handle_command(
             speaker, new_voice = result
             print(f"[dialogue-reader] {speaker} -> {new_voice} (back)")
             tts.speak(f"Voice changed for {speaker}", voice=new_voice)
+    elif cmd.startswith("SET_SPEAKER:"):
+        name = cmd[len("SET_SPEAKER:"):].strip()
+        if name:
+            voice = speaker_mgr.set_current(name)
+            if voice:
+                _safe_print(
+                    "[speakers] current = ",
+                    f"{speaker_mgr.current_speaker!r} voice={voice} (manual SET_SPEAKER)",
+                )
     elif cmd == "PAUSE":
         if not state["paused"]:
             state["paused"] = True
