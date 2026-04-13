@@ -73,19 +73,12 @@ class SpeakerManager:
         self.cycle_index = {k: int(v) for k, v in data.get("cycle_index", {}).items()}
         self._next_auto_index = int(data.get("next_auto_index", len(self.assignments)))
 
-        # Drop any stored assignment whose voice isn't in the current pool
-        # (user edited the Pool in the ini). These speakers will be
-        # reassigned on next speak() via set_current()'s round-robin.
-        pool_set = set(self.voice_pool)
-        stale = [
-            name for name, voice in self.assignments.items()
-            if voice not in pool_set
-        ]
-        for name in stale:
-            del self.assignments[name]
-            self.cycle_index.pop(name, None)
-        if stale:
-            self._save()
+        # Note: we intentionally do NOT prune assignments whose voice is no
+        # longer in the pool. If the user removes a voice from the Pool in
+        # the ini, characters already assigned that voice keep it — the
+        # Pool only governs NEW auto-assignments and F2 cycling. Use F2 to
+        # reassign a character from the current pool if you want to move
+        # them off an out-of-pool voice.
 
     def _save(self) -> None:
         try:
