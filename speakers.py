@@ -15,6 +15,7 @@ restarts and re-runs.
 from __future__ import annotations
 
 import json
+import random
 import threading
 from pathlib import Path
 
@@ -143,9 +144,12 @@ class SpeakerManager:
                 if match:
                     self.current_speaker = match
                     return self.assignments[match]
-            # New speaker — auto-assign next voice in pool.
+            # New speaker — pick a random voice from the pool. Random is
+            # preferred over round-robin when the pool is very large and we
+            # want variety across runs / sessions. The assignment persists
+            # in speakers.json so the same character keeps their voice.
             self.current_speaker = name
-            idx = self._next_auto_index % len(self.voice_pool)
+            idx = random.randrange(len(self.voice_pool))
             self.assignments[name] = self.voice_pool[idx]
             self.cycle_index[name] = idx
             self._next_auto_index += 1
