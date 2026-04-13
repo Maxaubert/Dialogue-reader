@@ -58,6 +58,14 @@ PER_REGION_DEDUP = 0.85
 POLL_HZ = 12.0
 STABLE_MS = 350
 
+# Dialogue text stabilization: require this many consecutive identical OCR
+# results (on fresh snapshots, taken ~100ms apart) before speaking. Prevents
+# reading partial typewriter text. User-configurable via dialogue_reader.ini
+# [Polling] TextConfirmPolls=<n>.  1 = no extra confirmation (old behavior).
+TEXT_CONFIRM_POLLS = 3
+TEXT_CONFIRM_INTERVAL = 0.10  # seconds between confirmation polls
+TEXT_CONFIRM_MAX_MULTIPLIER = 4  # max attempts = polls * this
+
 _PUNCT_RE = re.compile(r"[^\w\s]")
 
 
@@ -102,6 +110,28 @@ def _load_voice_config() -> tuple[list[str], str]:
     if default not in pool:
         pool.insert(0, default)
     return pool, default
+
+
+def _load_text_confirm_polls() -> int:
+    """Read [Polling] TextConfirmPolls from dialogue_reader.ini.
+    Returns TEXT_CONFIRM_POLLS if missing, unparseable, or < 1."""
+    ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not ini_path.exists():
+        return TEXT_CONFIRM_POLLS
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return TEXT_CONFIRM_POLLS
+    raw = cp.get("Polling", "TextConfirmPolls", fallback="").strip()
+    if not raw:
+        return TEXT_CONFIRM_POLLS
+    try:
+        n = int(raw)
+    except ValueError:
+        return TEXT_CONFIRM_POLLS
+    return max(1, n)
 
 
 # ---- singleton enforcement ------------------------------------------------
@@ -527,6 +557,9 @@ def main() -> int:
     # Read voice config from the ini file (if present). The launcher's INI
     # is the canonical source so the AHK side and Python side stay in sync.
     voice_pool, default_voice = _load_voice_config()
+    text_confirm_polls = _load_text_confirm_polls()
+    if debug:
+        print(f"[dialogue-reader] TextConfirmPolls = {text_confirm_polls}")
 
     print("[dialogue-reader] Loading OCR engine...")
     ocr = OCR(debug=debug)
@@ -635,6 +668,35 @@ def main() -> int:
                     if not r.has_pending_frame:
                         continue
                     new_text = ocr.read(r.pending_frame)
+
+                    # Text-level confirmation for dialogue regions:
+                    # require `text_confirm_polls` consecutive identical
+                    # OCR results (on fresh snapshots) before accepting.
+                    # Prevents reading partial typewriter text.
+                    if r.mode == "dialogue" and text_confirm_polls > 1:
+                        confirmed = new_text.strip()
+                        matches = 1
+                        max_attempts = text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER
+                        attempts = 0
+                        while matches < text_confirm_polls and attempts < max_attempts:
+                            attempts += 1
+                            time.sleep(TEXT_CONFIRM_INTERVAL)
+                            fresh = r.capture.snapshot()
+                            fresh_text = ocr.read(fresh).strip()
+                            if fresh_text == confirmed:
+                                matches += 1
+                            else:
+                                confirmed = fresh_text
+                                matches = 1
+                            r.pending_frame = fresh
+                        new_text = confirmed
+                        if debug:
+                            print(
+                                f"[ocr {r.name}] text-confirm: "
+                                f"{matches}/{text_confirm_polls} matches "
+                                f"in {attempts} attempts"
+                            )
+
                     cosmetic = _is_cosmetic_change(new_text, r.last_spoken_text)
                     if debug:
                         print(
