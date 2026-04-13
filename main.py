@@ -320,12 +320,13 @@ def _is_cosmetic_change(new_text: str, baseline: str) -> bool:
 
     Rules, in order:
     1. Identical after normalize -> cosmetic.
-    2. One is a strict prefix of the other -> NOT cosmetic. This is the
-       unambiguous signature of typing or progressive dialogue reveal —
-       characters were added at (or removed from) the end. We always want
-       to speak the latest version in this case.
-    3. Otherwise: small length delta + high similarity -> cosmetic; anything
-       else is treated as real content change.
+    2. Very high similarity (>= 0.92) -> cosmetic. This catches OCR jitter
+       that inserts/removes/moves small fragments (stray glyphs, "c)",
+       partial words) anywhere in the text.
+    3. One is a prefix of the other with a substantial difference -> NOT
+       cosmetic. This is typing or progressive dialogue reveal.
+    4. Moderate similarity (>= PER_REGION_DEDUP) with small length delta
+       -> cosmetic.
     """
     if not baseline or not new_text:
         return False
@@ -336,15 +337,22 @@ def _is_cosmetic_change(new_text: str, baseline: str) -> bool:
     if a == b:
         return True
 
-    # Prefix extension/contraction = real change (typing or backspacing).
+    sim = SequenceMatcher(None, a, b).ratio()
+
+    # Very high similarity = OCR jitter regardless of where the diff is.
+    if sim >= 0.92:
+        return True
+
+    # Prefix extension/contraction with substantial difference = real
+    # change (typing or progressive dialogue reveal).
     if a.startswith(b) or b.startswith(a):
         return False
 
-    # Otherwise allow small jitter: <=3 chars length delta, high similarity.
-    if abs(len(a) - len(b)) > 3:
-        return False
-    sim = SequenceMatcher(None, a, b).ratio()
-    return sim >= PER_REGION_DEDUP
+    # Moderate similarity with small length delta = cosmetic jitter.
+    if abs(len(a) - len(b)) <= 3 and sim >= PER_REGION_DEDUP:
+        return True
+
+    return False
 
 
 def _safe_print(prefix: str, value: str) -> None:
@@ -468,18 +476,6 @@ def handle_command(
             speaker, new_voice = result
             print(f"[dialogue-reader] {speaker} -> {new_voice} (back)")
             tts.speak(f"Voice changed for {speaker}", voice=new_voice)
-    elif cmd.startswith("SET_SPEAKER:"):
-        name = cmd[len("SET_SPEAKER:"):].strip()
-        if not name:
-            print("[dialogue-reader] SET_SPEAKER: empty name, ignored")
-        else:
-            voice = speaker_mgr.set_current(name)
-            _safe_print(
-                "[dialogue-reader] manually set current = ",
-                f"'{name}' voice={voice}",
-            )
-            if voice:
-                tts.speak(f"Speaker set to {name}", voice=voice)
     elif cmd == "PAUSE":
         if not state["paused"]:
             state["paused"] = True
@@ -569,7 +565,10 @@ def main() -> int:
             return 1
 
     regions: list[WatchedRegion] = []
-    state = {"paused": False, "last_spoken": ""}
+    state = {"paused": False, "last_spoken": "", "candidate": ""}
+    # Speaker two-poll confirmation: must see the same name twice before
+    # accepting it. Prevents OCR jitter from creating phantom speakers.
+    speaker_candidate: str = ""
 
     print("[dialogue-reader] Ready. Use the AHK script (or send UDP commands) to control.")
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
@@ -636,13 +635,23 @@ def main() -> int:
                 for r in regions:
                     if not r.has_pending_frame:
                         continue
-                    new_text = ocr.read(r.pending_frame)
+                    new_text = ocr.read(
+                        r.pending_frame, speaker=(r.mode == "speaker")
+                    )
                     cosmetic = _is_cosmetic_change(new_text, r.last_spoken_text)
                     if debug:
                         print(
                             f"[ocr {r.name} mode={r.mode}] {new_text!r} "
                             f"(cosmetic vs last-spoken={cosmetic})"
                         )
+                        # Save speaker captures to disk for diagnosis.
+                        if r.mode == "speaker":
+                            suffix = "empty" if not new_text.strip() else "hit"
+                            _debug_path = Path(__file__).parent / f"debug_{r.name}_{suffix}.png"
+                            try:
+                                Image.fromarray(r.pending_frame).save(_debug_path)
+                            except Exception:
+                                pass
                     if r.mode == "speaker":
                         text_clean = new_text.strip()
                         if not text_clean:
@@ -656,17 +665,30 @@ def main() -> int:
                                     f"{speaker_mgr.current_speaker!r}) — pixels changed but OCR returned nothing",
                                 )
                                 speaker_mgr.current_speaker = ""
+                            speaker_candidate = ""
                             r.last_spoken_text = ""
                         elif not cosmetic:
-                            voice = speaker_mgr.set_current(text_clean)
-                            if voice:
-                                _safe_print(
-                                    "[speakers] current = ",
-                                    f"{speaker_mgr.current_speaker!r} voice={voice}",
-                                )
-                            # Lock the dedup baseline so we don't keep
-                            # "discovering" the same name every poll.
-                            r.last_spoken_text = text_clean
+                            # Two-poll confirmation: require the same name
+                            # on consecutive reads before accepting it.
+                            if text_clean != speaker_candidate:
+                                speaker_candidate = text_clean
+                                if debug:
+                                    _safe_print(
+                                        "[speakers] candidate = ",
+                                        f"{text_clean!r} (waiting for confirmation)",
+                                    )
+                            else:
+                                # Confirmed — look up with fuzzy matching.
+                                speaker_candidate = ""
+                                voice = speaker_mgr.set_current(text_clean)
+                                if voice:
+                                    _safe_print(
+                                        "[speakers] current = ",
+                                        f"{speaker_mgr.current_speaker!r} voice={voice}",
+                                    )
+                                # Lock the dedup baseline so we don't keep
+                                # "discovering" the same name every poll.
+                                r.last_spoken_text = text_clean
                     else:
                         if not cosmetic:
                             any_dialogue_changed = True
@@ -679,7 +701,32 @@ def main() -> int:
                         print("[skip] no dialogue change")
                 else:
                     speech = build_speech(regions)
-                    if len(speech) >= MIN_TEXT_LEN and speech != state["last_spoken"]:
+                    if len(speech) < MIN_TEXT_LEN:
+                        state["candidate"] = ""
+                    elif speech == state["last_spoken"]:
+                        state["candidate"] = ""
+                        if debug:
+                            print("[skip] speech identical to last spoken")
+                    elif (
+                        state["last_spoken"]
+                        and _similar(speech, state["last_spoken"]) >= 0.92
+                    ):
+                        state["candidate"] = ""
+                        if debug:
+                            print(
+                                f"[skip] speech too similar to last spoken "
+                                f"({_similar(speech, state['last_spoken']):.2f})"
+                            )
+                    elif not state["candidate"] or _similar(speech, state["candidate"]) < 0.92:
+                        # First time seeing this new text — stash as
+                        # candidate, don't speak yet. Need a second
+                        # poll to confirm it's real and not OCR jitter.
+                        state["candidate"] = speech
+                        if debug:
+                            print("[candidate] new text, waiting for confirmation poll")
+                    else:
+                        # Second poll confirmed the candidate — speak it.
+                        state["candidate"] = ""
                         voice = speaker_mgr.voice_for_current()
                         speaker_label = (
                             f" ({speaker_mgr.current_speaker})"
@@ -693,8 +740,6 @@ def main() -> int:
                         for rr in regions:
                             if rr.mode == "dialogue":
                                 rr.last_spoken_text = rr.last_text
-                    elif debug:
-                        print("[skip] speech identical to last spoken")
 
             time.sleep(poll_interval)
     except KeyboardInterrupt:

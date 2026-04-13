@@ -155,7 +155,10 @@ class RegionCapture:
         # makes 12 Hz polling impossible and the stable-hash check can
         # stall for minutes. Screen capture via mss is fine for fullscreen
         # games where Magnifier/zoom aren't a concern.
-        _GRAB_SLOW_MS = 80  # anything above this = too slow for real-time
+        _GRAB_SLOW_MS = 50  # anything above this = too slow for real-time
+        # Normal apps: <10ms. Browsers/games with GPU rendering: 60-200ms+.
+        # 50ms cleanly separates the two — no edge cases where one region
+        # on a window gets game mode and another doesn't.
         self.use_window_mode = False
         self._binarize_hash = False  # set True when falling back from slow window capture
         if hwnd:
@@ -229,12 +232,21 @@ class RegionCapture:
             frame = self._grab_window()
             if frame is not None and frame.size > 0:
                 return frame
-            # PrintWindow blipped this frame — fall through to screen.
+            # PrintWindow blipped — fall through to screen.
 
-        # In screen-capture mode with a known target window, return a
-        # blank frame when the target isn't foreground. This is safer than
-        # caching _last_frame (which can race during alt-tab transitions
-        # and capture the wrong window's content).
+        if self._binarize_hash:
+            # Game mode: prefer PrintWindow (immune to Magnifier), but
+            # if it blips (returns None), fall through to screen capture
+            # instead of returning blank. A brief Magnifier artifact is
+            # better than losing the frame entirely.
+            frame = self._grab_window()
+            if frame is not None and frame.size > 0:
+                return frame
+            # PrintWindow blipped — use screen capture as fallback.
+            return self._grab_screen()
+
+        # Non-game screen capture: blank frame when target isn't
+        # foreground to avoid reading the wrong window.
         if self.hwnd and not _is_target_foreground(self.hwnd):
             return self._blank_frame
 
@@ -251,22 +263,27 @@ class RegionCapture:
     # overlays cause constant hash changes OR the binarized hash is too
     # coarse to detect new text. Instead, we return a frame at ~2 Hz and
     # let the caller's OCR + text-dedup handle change detection.
-    _GAME_POLL_INTERVAL = 6  # return every 6th poll ≈ 2 Hz at 12 Hz
+    _GAME_POLL_INTERVAL = 3  # return every 3rd poll ≈ 4 Hz at 12 Hz
 
     def poll_once(self) -> np.ndarray | None:
         """Single non-blocking poll. Returns a frame iff the region has
         changed AND been stable for `stable_ms` since the change. Otherwise
         returns None. Designed for an outer loop driving multiple regions."""
-        frame = self._grab()
 
         # Game mode: skip pixel hashing, just return frames periodically.
         # The caller's text-based dedup (OCR + _is_cosmetic_change) is far
         # more reliable for animated game UIs.
+        #
+        # We throttle BEFORE grabbing: at ~2 Hz we can afford the slow
+        # PrintWindow path (100ms) which is immune to Magnifier/zoom.
+        # At 12 Hz we couldn't (12 × 100ms > 1 second).
         if self._binarize_hash:
             self._game_poll_count += 1
-            if self._game_poll_count % self._GAME_POLL_INTERVAL == 0:
-                return frame
-            return None
+            if self._game_poll_count % self._GAME_POLL_INTERVAL != 0:
+                return None
+            return self._grab()
+
+        frame = self._grab()
 
         new_hash = _hash_frame(frame)
 

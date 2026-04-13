@@ -38,7 +38,6 @@ DefaultBindings := Map(
     "TogglePause",       "F9",
     "CycleVoice",        "F10",
     "CycleVoicePrev",    "^F10",
-    "SetSpeaker",        "F11",
 )
 DefaultHost        := "127.0.0.1"
 DefaultPort        := "7849"
@@ -72,7 +71,6 @@ SpeedUpKey         := ReadSetting("Hotkeys", "SpeedUp",           DefaultBinding
 PauseKey           := ReadSetting("Hotkeys", "TogglePause",       DefaultBindings["TogglePause"])
 CycleVoiceKey      := ReadSetting("Hotkeys", "CycleVoice",        DefaultBindings["CycleVoice"])
 CycleVoicePrevKey  := ReadSetting("Hotkeys", "CycleVoicePrev",    DefaultBindings["CycleVoicePrev"])
-SetSpeakerKey      := ReadSetting("Hotkeys", "SetSpeaker",        DefaultBindings["SetSpeaker"])
 
 UdpHost     := ReadSetting("Network",  "Host",        DefaultHost)
 UdpPort     := Integer(ReadSetting("Network",  "Port",  DefaultPort))
@@ -117,7 +115,7 @@ LaunchPython() {
     ; safety net for any kill path that bypasses Cleanup (e.g.
     ; MIG_Launcher's ProcessClose).
     ahkPid := DllCall("kernel32\GetCurrentProcessId", "UInt")
-    cmd := PythonExe ' "' MainPy '" --parent-pid ' ahkPid
+    cmd := PythonExe ' "' MainPy '" --debug --parent-pid ' ahkPid
     ; "Hide" hides the py.exe console window. The Python process still
     ; runs normally; print() output just isn't visible. Flip HideConsole
     ; in dialogue_reader.ini to false if you want to see live output.
@@ -182,38 +180,6 @@ TryBind(keyStr, cmdName) {
             . "`n`nEdit dialogue_reader.ini and reload."
     }
 }
-TryBindFn(keyStr, fn, label) {
-    try {
-        Hotkey(keyStr, fn)
-    } catch as e {
-        MsgBox "Couldn't bind hotkey '" keyStr "' for " label ":`n" e.Message
-            . "`n`nEdit dialogue_reader.ini and reload."
-    }
-}
-
-; Pop up an input box so the user can manually type the current speaker
-; name. Used when OCR can't read the in-game name UI (stylized fonts,
-; tilted speech bubbles, etc.). The name is sent verbatim — case and
-; non-ASCII characters are preserved across the UDP hop.
-LastSpeakerName := ""
-PromptSetSpeaker(*) {
-    global LastSpeakerName
-    result := InputBox(
-        "Enter the current speaker name.`n`n"
-        . "Used when OCR can't read the in-game name UI."
-        . "`nThe name is remembered and reused next time it's typed.",
-        "Set Current Speaker",
-        "w320 h150",
-        LastSpeakerName,
-    )
-    if result.Result != "OK"
-        return
-    name := Trim(result.Value)
-    if name = ""
-        return
-    LastSpeakerName := name
-    SendUdp("SET_SPEAKER:" name)
-}
 
 TryBind(PickKey,            "PICK_REGION")
 TryBind(PickSpeakerKey,     "PICK_SPEAKER")
@@ -223,7 +189,6 @@ TryBind(SpeedUpKey,         "SPEED_UP")
 TryBind(PauseKey,           "TOGGLE_PAUSE")
 TryBind(CycleVoiceKey,      "CYCLE_VOICE")
 TryBind(CycleVoicePrevKey,  "CYCLE_VOICE_PREV")
-TryBindFn(SetSpeakerKey, PromptSetSpeaker, "SET_SPEAKER")
 
 ; --- tray menu (labels reflect the actual configured bindings) ---
 A_TrayMenu.Delete()
@@ -236,7 +201,6 @@ A_TrayMenu.Add("Speed Up (" SpeedUpKey ")",                 (*) => SendUdp("SPEE
 A_TrayMenu.Add()
 A_TrayMenu.Add("Cycle Voice forward (" CycleVoiceKey ")",   (*) => SendUdp("CYCLE_VOICE"))
 A_TrayMenu.Add("Cycle Voice back (" CycleVoicePrevKey ")",  (*) => SendUdp("CYCLE_VOICE_PREV"))
-A_TrayMenu.Add("Set Speaker Manually (" SetSpeakerKey ")",  PromptSetSpeaker)
 A_TrayMenu.Add("Toggle Pause (" PauseKey ")",               (*) => SendUdp("TOGGLE_PAUSE"))
 A_TrayMenu.Add()
 A_TrayMenu.Add("Open Config (.ini)",                        (*) => Run(IniFile))
