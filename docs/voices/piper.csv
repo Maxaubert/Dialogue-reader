@@ -1,0 +1,13 @@
+voice,gender,accent,quality,notes
+piper:en_US-amy-medium,F,US,medium,neutral default
+piper:en_US-ryan-high,M,US,high,general-purpose male
+piper:en_US-ljspeech-high,F,US,high,warm narration (LJ Speech dataset)
+piper:en_US-hfc_female-medium,F,US,medium,higher-quality US female
+piper:en_US-hfc_male-medium,M,US,medium,higher-quality US male
+piper:en_US-norman-medium,M,US,medium,LibriVox 15.5h
+piper:en_GB-alan-medium,M,GB,medium,British male
+piper:en_GB-alba-medium,F,GB,medium,Scottish female
+piper:en_GB-cori-high,F,GB,high,British female (only en_GB -high tier)
+piper:en_GB-jenny_dioco-medium,F,GB,medium,British female
+piper:en_GB-northern_english_male-medium,M,GB,medium,Northern English male
+piper:en_GB-semaine-medium,mixed,GB,medium,multi-character SEMAINE dialogue corpus
