@@ -39,6 +39,7 @@ _MODELS = {
         "onnx": "vits-vctk.onnx",
         "lexicon": "lexicon.txt",
         "tokens": "tokens.txt",
+        "num_speakers": 109,
     },
     "melo_en": {
         "url": (
@@ -49,6 +50,7 @@ _MODELS = {
         "onnx": "model.onnx",
         "lexicon": "lexicon.txt",
         "tokens": "tokens.txt",
+        "num_speakers": 1,
     },
     "libritts_r": {
         "url": (
@@ -59,8 +61,16 @@ _MODELS = {
         "onnx": "en_US-libritts_r-medium.onnx",
         "data_dir": "espeak-ng-data",
         "tokens": "tokens.txt",
+        "num_speakers": 904,
     },
 }
+
+
+def get_known_models() -> dict[str, int]:
+    """Return {model_name: num_speakers} for every registered sherpa model.
+    Used by the pool expander so `sherpa:<model>:all` knows how many to
+    emit without downloading the model archive."""
+    return {name: spec["num_speakers"] for name, spec in _MODELS.items()}
 
 # File-size floor to detect partial/corrupt downloads.
 _MIN_ARCHIVE_BYTES = 50_000_000

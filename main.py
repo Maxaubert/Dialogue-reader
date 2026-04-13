@@ -109,6 +109,81 @@ _DEFAULT_VOICE_POOL = [
     "kokoro:bf_lily",       # F  grade D   (British)
 ]
 
+# Curated "all" lists for `<engine>:all` shorthand in the ini Pool.
+# Piper "all" = the voices we've vetted; users wanting others can add by
+# full name. Kokoro "all" = every English grade A→F voice in the pool above.
+_PIPER_ALL = [
+    "piper:en_US-amy-medium",
+    "piper:en_US-ryan-high",
+    "piper:en_US-ljspeech-high",
+    "piper:en_US-hfc_female-medium",
+    "piper:en_US-hfc_male-medium",
+    "piper:en_US-norman-medium",
+    "piper:en_GB-alan-medium",
+    "piper:en_GB-alba-medium",
+    "piper:en_GB-cori-high",
+    "piper:en_GB-jenny_dioco-medium",
+    "piper:en_GB-northern_english_male-medium",
+    "piper:en_GB-semaine-medium",
+]
+_KOKORO_ALL = [v for v in _DEFAULT_VOICE_POOL if v.startswith("kokoro:")]
+
+
+def _expand_voice(voice: str) -> list[str]:
+    """Expand shorthand voice entries into a concrete list.
+
+    Supported forms (in addition to a single bare voice):
+      - `piper:all`                 → every curated Piper voice
+      - `kokoro:all`                → every curated Kokoro voice
+      - `sherpa:<model>:all`        → every speaker id of that sherpa model
+      - `sherpa:<model>:<start>-<end>` → inclusive range of speaker ids
+    """
+    v = voice.strip()
+    if not v:
+        return []
+    # piper:all / kokoro:all
+    if v == "piper:all":
+        return list(_PIPER_ALL)
+    if v == "kokoro:all":
+        return list(_KOKORO_ALL)
+    # sherpa:<model>:all or sherpa:<model>:<start>-<end>
+    if v.startswith("sherpa:"):
+        prefix, _, tail = v.rpartition(":")
+        # Only operate if the tail is `all` or a range — single IDs
+        # pass through unchanged.
+        if tail == "all":
+            # prefix is "sherpa:<model>"
+            _, _, model = prefix.rpartition(":")
+            try:
+                from sherpa_tts import get_known_models
+                n = get_known_models().get(model)
+            except Exception:
+                n = None
+            if n is None:
+                return [v]  # unknown model — let the engine report later
+            return [f"{prefix}:{i}" for i in range(n)]
+        if "-" in tail:
+            try:
+                start_s, end_s = tail.split("-", 1)
+                start, end = int(start_s), int(end_s)
+                if start <= end:
+                    return [f"{prefix}:{i}" for i in range(start, end + 1)]
+            except ValueError:
+                pass
+    return [v]
+
+
+def _expand_pool(pool: list[str]) -> list[str]:
+    """Apply _expand_voice to every entry and de-duplicate while keeping order."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for entry in pool:
+        for expanded in _expand_voice(entry):
+            if expanded not in seen:
+                seen.add(expanded)
+                out.append(expanded)
+    return out
+
 
 def _load_voice_config() -> tuple[list[str], str]:
     """Read [Voices] section from dialogue_reader.ini. Falls back to the
@@ -130,6 +205,7 @@ def _load_voice_config() -> tuple[list[str], str]:
             if raw.strip():
                 pool = [v.strip() for v in raw.split(",") if v.strip()]
             default = cp.get("Voices", "Default", fallback=default).strip() or default
+    pool = _expand_pool(pool)
     if default not in pool:
         pool.insert(0, default)
     return pool, default
