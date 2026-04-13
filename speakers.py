@@ -19,6 +19,11 @@ import threading
 from pathlib import Path
 
 
+# Reserved pseudo-speaker name for the "no speaker detected" state. Treating
+# it as a regular entry lets the user cycle its voice with the usual hotkey.
+DEFAULT_SPEAKER_KEY = "__default__"
+
+
 def _is_one_edit(longer: str, shorter: str) -> bool:
     """True if `shorter` is `longer` with exactly one character removed."""
     if len(longer) != len(shorter) + 1:
@@ -134,14 +139,11 @@ class SpeakerManager:
             return self.assignments[name]
 
     def cycle_current_voice(self, direction: int = 1) -> tuple[str, str] | None:
-        """Cycle the current speaker's voice along the pool.
-        direction = +1 → next voice. direction = -1 → previous voice.
-        Returns (speaker_name, new_voice_name), or None if no current
-        speaker is set."""
+        """Cycle the current speaker's voice along the pool. When no speaker
+        is set, cycles the special 'no-speaker' default voice instead.
+        Returns (display_name, new_voice_name)."""
         with self._lock:
-            name = self.current_speaker
-            if not name:
-                return None
+            name = self.current_speaker or DEFAULT_SPEAKER_KEY
             current_idx = self.cycle_index.get(name, -1)
             # Python's % wraps negatives correctly: (-1) % 10 == 9
             new_idx = (current_idx + direction) % len(self.voice_pool)
@@ -149,10 +151,16 @@ class SpeakerManager:
             self.assignments[name] = new_voice
             self.cycle_index[name] = new_idx
             self._save()
-            return (name, new_voice)
+            # Present the pseudo-speaker as "(no speaker)" for display.
+            display = "(no speaker)" if name == DEFAULT_SPEAKER_KEY else name
+            return (display, new_voice)
 
     def voice_for(self, name: str) -> str | None:
         return self.assignments.get((name or "").strip()) if name else None
 
     def voice_for_current(self) -> str | None:
-        return self.assignments.get(self.current_speaker) if self.current_speaker else None
+        """Return the voice for the current speaker. Falls back to the
+        cycled 'no-speaker' default voice if one has been set."""
+        if self.current_speaker:
+            return self.assignments.get(self.current_speaker)
+        return self.assignments.get(DEFAULT_SPEAKER_KEY)
