@@ -36,7 +36,13 @@ def render(voice: str, out_dir: Path) -> Path:
     from tts import TTS, _parse_voice
 
     engine, _name = _parse_voice(voice)
-    tts = TTS(voice=f"piper:en_US-amy-medium", speed=1.0)
+    # Use the requested voice for init so we don't needlessly preload a
+    # Piper voice when testing Kokoro/Sherpa. If init fails (e.g., voice
+    # isn't in the pool yet), fall back to a known-good default.
+    try:
+        tts = TTS(voice=voice, speed=1.0)
+    except Exception:
+        tts = TTS(voice="piper:en_US-amy-medium", speed=1.0)
 
     # We want the raw audio+rate rather than playback. Call into the engine
     # directly via the same helpers tts.speak() uses, skipping sounddevice.

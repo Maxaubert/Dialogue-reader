@@ -46,7 +46,8 @@ class CommandServer:
         self._thread.start()
 
     def _run(self) -> None:
-        assert self._sock is not None
+        if self._sock is None:
+            raise RuntimeError("CommandServer._run called before start()")
         while not self._stop.is_set():
             try:
                 data, _addr = self._sock.recvfrom(1024)

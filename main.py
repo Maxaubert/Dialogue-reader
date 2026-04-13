@@ -27,7 +27,6 @@ import subprocess
 import sys
 import threading
 import time
-import functools
 import queue
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -46,9 +45,6 @@ from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
 
 
-print = functools.partial(print, flush=True)
-
-
 MIN_TEXT_LEN = 2
 # Per-region OCR dedup: if the new OCR text for a region is this similar to
 # the region's previous OCR text AND the lengths are nearly identical, treat
@@ -65,6 +61,7 @@ STABLE_MS = 350
 TEXT_CONFIRM_POLLS = 3
 TEXT_CONFIRM_INTERVAL = 0.10  # seconds between confirmation polls
 TEXT_CONFIRM_MAX_MULTIPLIER = 4  # max attempts = polls * this
+TEXT_CONFIRM_HARD_CAP = 30  # absolute ceiling regardless of polls setting
 
 _PUNCT_RE = re.compile(r"[^\w\s]")
 
@@ -608,6 +605,15 @@ def handle_command(
             speaker, new_voice = result
             print(f"[dialogue-reader] {speaker} -> {new_voice} (back)")
             tts.speak(f"Voice changed for {speaker}", voice=new_voice)
+    elif cmd.startswith("SET_SPEAKER:"):
+        name = cmd[len("SET_SPEAKER:"):].strip()
+        if name:
+            voice = speaker_mgr.set_current(name)
+            if voice:
+                _safe_print(
+                    "[speakers] current = ",
+                    f"{speaker_mgr.current_speaker!r} voice={voice} (manual SET_SPEAKER)",
+                )
     elif cmd == "PAUSE":
         if not state["paused"]:
             state["paused"] = True
@@ -785,7 +791,10 @@ def main() -> int:
                     if r.mode == "dialogue" and text_confirm_polls > 1:
                         confirmed = new_text.strip()
                         matches = 1
-                        max_attempts = text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER
+                        max_attempts = min(
+                            text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER,
+                            TEXT_CONFIRM_HARD_CAP,
+                        )
                         attempts = 0
                         while matches < text_confirm_polls and attempts < max_attempts:
                             attempts += 1
