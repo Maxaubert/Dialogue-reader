@@ -27,7 +27,6 @@ import subprocess
 import sys
 import threading
 import time
-import functools
 import queue
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -44,9 +43,6 @@ from tts import TTS, DEFAULT_VOICE
 from window_capture import find_window_at, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
-
-
-print = functools.partial(print, flush=True)
 
 
 MIN_TEXT_LEN = 2
