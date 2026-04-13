@@ -1,14 +1,18 @@
 """
-Natural-voice TTS with two local engines: Piper (fast) and Kokoro-82M
-(more natural, ~350ms/sentence on CPU).
+Natural-voice TTS with three local engines: Piper (fast), Kokoro-82M
+(more natural, ~350ms/sentence on CPU), and Sherpa-ONNX (multi-speaker
+VITS models including VCTK, LibriTTS-R, and MeloTTS-en).
 
-Voices are referenced as `engine:name` strings. Bare names (no colon)
+Voices are referenced as `engine:name` strings. Sherpa uses a nested form
+`sherpa:<model>:<speaker_id>` (e.g. `sherpa:vctk:0`). Bare names (no colon)
 default to `piper:` for backward compatibility.
 
 Multi-voice with on-demand caching:
   - Piper: {voice_name -> PiperVoice} dict; each voice ~60-100 MB RAM.
   - Kokoro: single shared model (~310 MB on disk, loaded once into RAM),
     voice selection is a per-synth parameter.
+  - Sherpa: one model per registered name, loaded on demand; each model
+    holds many speakers selected by integer id.
 
 Usage:
     tts = TTS()                                       # piper:en_US-amy-medium
@@ -16,22 +20,13 @@ Usage:
     tts.speak("hello")                                 # use default voice
     tts.speak("hi", voice="piper:en_US-ryan-medium")   # explicit Piper
     tts.speak("hi", voice="kokoro:am_michael")         # explicit Kokoro
+    tts.speak("hi", voice="sherpa:vctk:30")            # explicit Sherpa
     tts.shutdown()
 
 Voice files download once on first use:
-  - Piper voices → voices/<voice>.onnx + .onnx.json
-  - Kokoro model + voices → voices/kokoro/{kokoro-v1.0.onnx, voices-v1.0.bin}
-
-Recommended voices:
-  Piper (fast, ~60 MB each; -high variants ~110 MB):
-    en_US-amy-medium, en_US-ryan-high, en_US-hfc_female-medium,
-    en_US-hfc_male-medium, en_GB-alan-medium, en_GB-alba-medium,
-    en_GB-jenny_dioco-medium, en_GB-northern_english_male-medium
-  Kokoro (natural, share one ~310 MB model):
-    af_heart, af_bella, af_sarah (US female)
-    am_michael, am_adam (US male)
-    bf_emma (British female)
-    bm_george (British male)
+  - Piper voices  → voices/<voice>.onnx + .onnx.json
+  - Kokoro        → voices/kokoro/{kokoro-v1.0.onnx, voices-v1.0.bin}
+  - Sherpa models → voices/sherpa_<model>/<archive contents>
 """
 
 from __future__ import annotations
