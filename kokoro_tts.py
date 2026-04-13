@@ -108,12 +108,17 @@ class KokoroTTS:
             self._kokoro = Kokoro(str(self._model_path), str(self._voices_path))
             print("[kokoro] ready", flush=True)
 
-    def synth(self, text: str, voice: str) -> tuple[np.ndarray, int]:
-        """Synthesize text. Returns (audio float32, sample_rate)."""
+    def synth(
+        self, text: str, voice: str, speed: float = 1.0
+    ) -> tuple[np.ndarray, int]:
+        """Synthesize text. Returns (audio float32, sample_rate).
+
+        `speed` is a proper time-stretch (pitch-preserved): 1.0 = normal,
+        1.5 = 50% faster, 0.8 = 20% slower."""
         self._ensure_loaded()
         assert self._kokoro is not None
         audio, sample_rate = self._kokoro.create(
-            text, voice=voice, speed=1.0, lang="en-us"
+            text, voice=voice, speed=float(speed), lang="en-us"
         )
         audio = np.asarray(audio, dtype=np.float32)
         return audio, int(sample_rate)

@@ -361,16 +361,12 @@ class TTS:
                 k = self._get_kokoro()
                 if k is None:
                     return
-                audio, sample_rate = k.synth(text, name)
+                # Pass speed to Kokoro's own time-stretch (pitch-preserving),
+                # then play at the native sample rate so pitch is unchanged.
+                audio, sample_rate = k.synth(text, name, speed=self._speed)
                 if my_version != self._version:
                     return
-                # Kokoro speed control: scale playback sample_rate by speed.
-                # Kokoro's internal `speed` param exists but we want consistent
-                # behavior with Piper's length_scale, which changes duration.
-                # Playing the same audio at sr*speed is the simplest way to
-                # match "faster = shorter" semantics.
-                effective_sr = int(sample_rate * self._speed)
-                sd.play(audio, samplerate=effective_sr, blocking=False)
+                sd.play(audio, samplerate=sample_rate, blocking=False)
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
 
