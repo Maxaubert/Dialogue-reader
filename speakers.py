@@ -69,9 +69,37 @@ class SpeakerManager:
             data = json.loads(self.save_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             return
-        self.assignments = dict(data.get("assignments", {}))
-        self.cycle_index = {k: int(v) for k, v in data.get("cycle_index", {}).items()}
-        self._next_auto_index = int(data.get("next_auto_index", len(self.assignments)))
+        if not isinstance(data, dict):
+            return
+
+        # Assignments: keep only entries where both key and value are strings.
+        raw_assignments = data.get("assignments", {})
+        if isinstance(raw_assignments, dict):
+            self.assignments = {
+                name: voice
+                for name, voice in raw_assignments.items()
+                if isinstance(name, str) and isinstance(voice, str)
+            }
+
+        # cycle_index: drop entries that can't be coerced to int.
+        raw_cycle = data.get("cycle_index", {})
+        if isinstance(raw_cycle, dict):
+            clean: dict[str, int] = {}
+            for name, idx in raw_cycle.items():
+                if not isinstance(name, str):
+                    continue
+                try:
+                    clean[name] = int(idx)
+                except (TypeError, ValueError):
+                    continue
+            self.cycle_index = clean
+
+        # next_auto_index: fall back to number of assignments on malformed input.
+        raw_next = data.get("next_auto_index")
+        try:
+            self._next_auto_index = int(raw_next) if raw_next is not None else len(self.assignments)
+        except (TypeError, ValueError):
+            self._next_auto_index = len(self.assignments)
 
         # Note: we intentionally do NOT prune assignments whose voice is no
         # longer in the pool. If the user removes a voice from the Pool in
