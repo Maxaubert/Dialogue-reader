@@ -25,10 +25,10 @@ from threading import Lock
 import numpy as np
 
 
-# Model descriptors: name -> {url, archive_subdir, onnx, lexicon, tokens}.
-# archive_subdir is the top-level dir inside the .tar.bz2 that extracts next
-# to the archive (sherpa releases all nest under a subdir named after the
-# model).
+# Model descriptors. Two file-layout flavours:
+#   VCTK/Coqui-style:  model + lexicon + tokens.
+#   Piper-style:       model + data_dir (espeak-ng) + tokens.
+# Mutually exclusive — each spec sets exactly one of `lexicon` or `data_dir`.
 _MODELS = {
     "vctk": {
         "url": (
@@ -38,6 +38,26 @@ _MODELS = {
         "archive_subdir": "vits-vctk",
         "onnx": "vits-vctk.onnx",
         "lexicon": "lexicon.txt",
+        "tokens": "tokens.txt",
+    },
+    "melo_en": {
+        "url": (
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+            "tts-models/vits-melo-tts-en.tar.bz2"
+        ),
+        "archive_subdir": "vits-melo-tts-en",
+        "onnx": "model.onnx",
+        "lexicon": "lexicon.txt",
+        "tokens": "tokens.txt",
+    },
+    "libritts_r": {
+        "url": (
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
+            "tts-models/vits-piper-en_US-libritts_r-medium.tar.bz2"
+        ),
+        "archive_subdir": "vits-piper-en_US-libritts_r-medium",
+        "onnx": "en_US-libritts_r-medium.onnx",
+        "data_dir": "espeak-ng-data",
         "tokens": "tokens.txt",
     },
 }
@@ -126,13 +146,18 @@ class SherpaTTS:
             # Import lazily so the module loads even if sherpa_onnx isn't
             # installed until first use.
             import sherpa_onnx
+            vits_kwargs = {
+                "model": str(model_dir / spec["onnx"]),
+                "tokens": str(model_dir / spec["tokens"]),
+            }
+            # Piper-style models use espeak-ng data_dir; others use a lexicon.
+            if "data_dir" in spec:
+                vits_kwargs["data_dir"] = str(model_dir / spec["data_dir"])
+            if "lexicon" in spec:
+                vits_kwargs["lexicon"] = str(model_dir / spec["lexicon"])
             cfg = sherpa_onnx.OfflineTtsConfig(
                 model=sherpa_onnx.OfflineTtsModelConfig(
-                    vits=sherpa_onnx.OfflineTtsVitsModelConfig(
-                        model=str(model_dir / spec["onnx"]),
-                        lexicon=str(model_dir / spec["lexicon"]),
-                        tokens=str(model_dir / spec["tokens"]),
-                    ),
+                    vits=sherpa_onnx.OfflineTtsVitsModelConfig(**vits_kwargs),
                     num_threads=2,
                 ),
             )
