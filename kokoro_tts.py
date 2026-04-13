@@ -17,10 +17,20 @@ Usage:
 from __future__ import annotations
 
 import urllib.request
+import warnings
 from pathlib import Path
 from threading import Lock
 
 import numpy as np
+
+# Silence the cosmetic RequestsDependencyWarning that the `requests` library
+# emits on import when urllib3/chardet versions don't match its metadata —
+# triggered indirectly when kokoro-onnx pulls in huggingface-hub.
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    module=r"requests(\..*)?",
+)
 
 _MODEL_URL = (
     "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"

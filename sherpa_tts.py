@@ -17,12 +17,38 @@ Usage:
 
 from __future__ import annotations
 
+import os
+import sys
 import tarfile
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 
 import numpy as np
+
+
+@contextmanager
+def _suppress_native_stderr():
+    """Silence stderr written by native (C++) code — sherpa-onnx writes
+    'Unknown token' and 'OOV' warnings directly to fd 2, which Python-level
+    sys.stderr filters can't intercept. We temporarily redirect the OS-level
+    file descriptor to NUL (Windows) / /dev/null (Unix)."""
+    sys.stderr.flush()
+    try:
+        saved_fd = os.dup(2)
+    except OSError:
+        # Some environments (e.g. packaged GUIs) detach fd 2. Bail gracefully.
+        yield
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(devnull)
+        os.close(saved_fd)
 
 
 # Model descriptors. Two file-layout flavours:
@@ -172,7 +198,10 @@ class SherpaTTS:
                 ),
             )
             print(f"[sherpa] loading {model_name}...", flush=True)
-            tts = sherpa_onnx.OfflineTts(cfg)
+            # OfflineTts constructor spams 'Unknown token' to native stderr
+            # while parsing the lexicon. Suppress; those messages are noise.
+            with _suppress_native_stderr():
+                tts = sherpa_onnx.OfflineTts(cfg)
             print(f"[sherpa] {model_name} ready ({tts.num_speakers} speakers)", flush=True)
             self._cache[model_name] = (tts, tts.num_speakers)
             return self._cache[model_name]
@@ -201,6 +230,9 @@ class SherpaTTS:
                 f"sherpa '{model_name}' has {num_speakers} speakers; "
                 f"id {speaker_id} out of range"
             )
-        audio_obj = tts.generate(text, sid=speaker_id, speed=float(speed))
+        # generate() spams 'OOV' for any out-of-vocabulary token (parens,
+        # punctuation, etc.). Suppress; the missing tokens just get skipped.
+        with _suppress_native_stderr():
+            audio_obj = tts.generate(text, sid=speaker_id, speed=float(speed))
         audio = np.asarray(audio_obj.samples, dtype=np.float32)
         return audio, int(audio_obj.sample_rate)
