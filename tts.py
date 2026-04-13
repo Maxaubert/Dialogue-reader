@@ -46,7 +46,7 @@ from piper import PiperVoice
 from piper.config import SynthesisConfig
 
 
-DEFAULT_VOICE = "piper:en_US-amy-medium"
+DEFAULT_VOICE = "kokoro:af_heart"
 _VOICE_REPO_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
 
 

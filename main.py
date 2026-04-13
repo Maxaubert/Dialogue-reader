@@ -75,15 +75,38 @@ _PUNCT_RE = re.compile(r"[^\w\s]")
 # matters: it's used round-robin when assigning voices to new speakers, so
 # alternating M/F/M/F gives a natural spread for the first few characters.
 
+# All 28 Kokoro English voices, ordered F/M alternating by official grade
+# (hexgrad/Kokoro-82M VOICES.md). Females outnumber males 15:13, so the
+# last two entries are female-only (pattern breaks when males run out).
 _DEFAULT_VOICE_POOL = [
-    "kokoro:af_heart",                   # F  US, natural (Kokoro)
-    "piper:en_US-lessac-high",           # F  US, clean diction (high-quality Piper)
-    "kokoro:am_michael",                 # M  US, natural (Kokoro)
-    "piper:en_US-hfc_female-medium",     # F  US, higher-quality Piper
-    "kokoro:bf_emma",                    # F  British (Kokoro)
-    "piper:en_GB-alan-medium",           # M  British
-    "kokoro:am_adam",                    # M  US, deeper (Kokoro)
-    "piper:en_US-ryan-medium",           # M  US, neutral
+    "kokoro:af_heart",      # F  grade A   (US)
+    "kokoro:am_fenrir",     # M  grade C+  (US)
+    "kokoro:af_bella",      # F  grade A-  (US)
+    "kokoro:am_michael",    # M  grade C+  (US)
+    "kokoro:bf_emma",       # F  grade B-  (British)
+    "kokoro:am_puck",       # M  grade C+  (US)
+    "kokoro:af_nicole",     # F  grade B-  (US, ASMR/whisper)
+    "kokoro:bm_fable",      # M  grade C   (British)
+    "kokoro:af_aoede",      # F  grade C+  (US)
+    "kokoro:bm_george",     # M  grade C   (British)
+    "kokoro:af_kore",       # F  grade C+  (US)
+    "kokoro:bm_lewis",      # M  grade D+  (British)
+    "kokoro:af_sarah",      # F  grade C+  (US)
+    "kokoro:am_echo",       # M  grade D   (US)
+    "kokoro:af_alloy",      # F  grade C   (US)
+    "kokoro:am_eric",       # M  grade D   (US)
+    "kokoro:af_nova",       # F  grade C   (US)
+    "kokoro:am_liam",       # M  grade D   (US)
+    "kokoro:bf_isabella",   # F  grade C   (British)
+    "kokoro:am_onyx",       # M  grade D   (US)
+    "kokoro:af_sky",        # F  grade C-  (US)
+    "kokoro:bm_daniel",     # M  grade D   (British)
+    "kokoro:af_jessica",    # F  grade D   (US)
+    "kokoro:am_santa",      # M  grade D-  (US)
+    "kokoro:af_river",      # F  grade D   (US)
+    "kokoro:am_adam",       # M  grade F+  (US)
+    "kokoro:bf_alice",      # F  grade D   (British)
+    "kokoro:bf_lily",       # F  grade D   (British)
 ]
 
 
