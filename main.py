@@ -586,6 +586,11 @@ def handle_command(
         add_region(regions, debug=debug, mode="speaker")
     elif cmd == "CLEAR_REGIONS":
         regions.clear()
+        # Also reset speak-history so freshly-picked regions that happen
+        # to show the same text as the last line we spoke aren't silently
+        # skipped via the "speech identical to last spoken" dedup.
+        state["last_spoken"] = ""
+        state["candidate"] = ""
         print("[dialogue-reader] Cleared all regions.")
     elif cmd == "CYCLE_VOICE":
         result = speaker_mgr.cycle_current_voice(direction=1)
