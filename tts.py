@@ -396,10 +396,18 @@ class TTS:
                     sample_rate = chunk.sample_rate
                 if not chunks or sample_rate is None:
                     return
+                audio = np.concatenate(chunks)
+                # Atomic version-check + play: any newer speak() call will
+                # increment self._version again; a belt-and-braces stop after
+                # play covers the tiny window between check and play.
                 if my_version != self._version:
                     return
-                audio = np.concatenate(chunks)
                 sd.play(audio, samplerate=sample_rate, blocking=False)
+                if my_version != self._version:
+                    try:
+                        sd.stop()
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[tts] piper worker error: {e}", flush=True)
 
@@ -414,6 +422,11 @@ class TTS:
                 if my_version != self._version:
                     return
                 sd.play(audio, samplerate=sample_rate, blocking=False)
+                if my_version != self._version:
+                    try:
+                        sd.stop()
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
 
@@ -426,6 +439,11 @@ class TTS:
                 if my_version != self._version:
                     return
                 sd.play(audio, samplerate=sample_rate, blocking=False)
+                if my_version != self._version:
+                    try:
+                        sd.stop()
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[tts] sherpa worker error: {e}", flush=True)
 
