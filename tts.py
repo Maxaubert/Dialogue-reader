@@ -176,6 +176,10 @@ class TTS:
         self._kokoro = None
         self._kokoro_unavailable = False
 
+        # Lazy Sherpa-ONNX engine — initialized on first sherpa: voice request.
+        self._sherpa = None
+        self._sherpa_unavailable = False
+
         self._speed = max(0.3, min(3.0, float(speed)))
         self._syn_config = SynthesisConfig(
             length_scale=1.0 / self._speed,  # piper: lower = faster
@@ -199,6 +203,33 @@ class TTS:
                 self._get_kokoro()
             except Exception as e:
                 print(f"[tts] Kokoro init failed: {e}", flush=True)
+        elif engine == "sherpa":
+            try:
+                self._get_sherpa()
+            except Exception as e:
+                print(f"[tts] Sherpa init failed: {e}", flush=True)
+
+    def _get_sherpa(self):
+        """Lazily construct SherpaTTS. Returns None and sets
+        _sherpa_unavailable=True if sherpa-onnx isn't installed or fails
+        to load."""
+        if self._sherpa_unavailable:
+            return None
+        if self._sherpa is not None:
+            return self._sherpa
+        try:
+            from sherpa_tts import SherpaTTS
+        except Exception as e:
+            print(f"[tts] sherpa_tts module unavailable: {e}", flush=True)
+            self._sherpa_unavailable = True
+            return None
+        try:
+            self._sherpa = SherpaTTS(self._voices_dir)
+        except Exception as e:
+            print(f"[tts] SherpaTTS init failed: {e}", flush=True)
+            self._sherpa_unavailable = True
+            return None
+        return self._sherpa
 
     def _get_kokoro(self):
         """Lazily construct KokoroTTS. Returns None and sets
@@ -277,6 +308,13 @@ class TTS:
                     self._get_kokoro()
                 except Exception as e:
                     print(f"[tts] Kokoro preload failed: {e}", flush=True)
+            elif engine == "sherpa":
+                # Each sherpa model is loaded on demand inside SherpaTTS.
+                # Touch _get_sherpa once so the instance exists.
+                try:
+                    self._get_sherpa()
+                except Exception as e:
+                    print(f"[tts] Sherpa preload failed: {e}", flush=True)
 
     # ---- speed ----
 
@@ -318,7 +356,7 @@ class TTS:
         engine, name = _parse_voice(voice_name)
 
         # Unknown engine: warn once and fall back to the default voice.
-        if engine not in ("piper", "kokoro"):
+        if engine not in ("piper", "kokoro", "sherpa"):
             print(
                 f"[tts] unknown engine '{engine}' in voice "
                 f"'{voice_name}', falling back to default",
@@ -335,6 +373,15 @@ class TTS:
                 else:
                     # Default is also Kokoro but Kokoro is dead — last-
                     # resort fallback to the hardcoded piper default.
+                    engine, name = "piper", "en_US-amy-medium"
+
+        # Sherpa requested but unavailable: fall back to default Piper.
+        if engine == "sherpa":
+            if self._get_sherpa() is None:
+                fb_engine, fb_name = _parse_voice(self._default_voice)
+                if fb_engine == "piper":
+                    engine, name = fb_engine, fb_name
+                else:
                     engine, name = "piper", "en_US-amy-medium"
 
         def worker_piper():
@@ -370,7 +417,24 @@ class TTS:
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
 
-        worker = worker_kokoro if engine == "kokoro" else worker_piper
+        def worker_sherpa():
+            try:
+                s = self._get_sherpa()
+                if s is None:
+                    return
+                audio, sample_rate = s.synth(text, name, speed=self._speed)
+                if my_version != self._version:
+                    return
+                sd.play(audio, samplerate=sample_rate, blocking=False)
+            except Exception as e:
+                print(f"[tts] sherpa worker error: {e}", flush=True)
+
+        if engine == "kokoro":
+            worker = worker_kokoro
+        elif engine == "sherpa":
+            worker = worker_sherpa
+        else:
+            worker = worker_piper
         threading.Thread(target=worker, daemon=True).start()
 
     def shutdown(self) -> None:
