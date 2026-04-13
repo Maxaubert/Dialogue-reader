@@ -852,6 +852,14 @@ def main() -> int:
                                 # Lock the dedup baseline so we don't keep
                                 # "discovering" the same name every poll.
                                 r.last_spoken_text = text_clean
+                        else:
+                            # Cosmetic read — speaker name matches last-spoken,
+                            # so the speaker hasn't actually changed. Clear
+                            # any stale candidate from earlier transitions
+                            # that never resolved, otherwise dialogue can
+                            # get stuck in [hold] indefinitely.
+                            if speaker_candidate:
+                                speaker_candidate = ""
                     else:
                         if not cosmetic:
                             any_dialogue_changed = True
