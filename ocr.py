@@ -102,10 +102,7 @@ class OCR:
 
         if self.debug:
             for i, lt in enumerate(lines_text):
-                try:
-                    print(f"[ocr] line {i}: {lt!r}", flush=True)
-                except UnicodeEncodeError:
-                    print(f"[ocr] line {i}: {lt.encode('ascii', 'replace').decode()!r}", flush=True)
+                print(f"[ocr] line {i}: {lt!r}", flush=True)
 
         joined = " ".join(lines_text)
         return _WHITESPACE_RE.sub(" ", joined).strip()
