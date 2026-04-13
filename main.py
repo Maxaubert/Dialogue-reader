@@ -68,16 +68,14 @@ _PUNCT_RE = re.compile(r"[^\w\s]")
 # alternating M/F/M/F gives a natural spread for the first few characters.
 
 _DEFAULT_VOICE_POOL = [
-    "en_US-amy-medium",                    # F  US, neutral
-    "en_US-ryan-medium",                   # M  US, neutral
-    "en_US-lessac-medium",                 # F  US, clean diction
-    "en_US-joe-medium",                    # M  US, deeper
-    "en_GB-jenny_dioco-medium",            # F  British
-    "en_GB-alan-medium",                   # M  British
-    "en_US-hfc_female-medium",             # F  US, higher quality
-    "en_US-hfc_male-medium",               # M  US, higher quality
-    "en_GB-alba-medium",                   # F  Scottish
-    "en_GB-northern_english_male-medium",  # M  Northern English
+    "kokoro:af_heart",                   # F  US, natural (Kokoro)
+    "piper:en_US-lessac-high",           # F  US, clean diction (high-quality Piper)
+    "kokoro:am_michael",                 # M  US, natural (Kokoro)
+    "piper:en_US-hfc_female-medium",     # F  US, higher-quality Piper
+    "kokoro:bf_emma",                    # F  British (Kokoro)
+    "piper:en_GB-alan-medium",           # M  British
+    "kokoro:am_adam",                    # M  US, deeper (Kokoro)
+    "piper:en_US-ryan-medium",           # M  US, neutral
 ]
 
 
