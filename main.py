@@ -65,6 +65,7 @@ STABLE_MS = 350
 TEXT_CONFIRM_POLLS = 3
 TEXT_CONFIRM_INTERVAL = 0.10  # seconds between confirmation polls
 TEXT_CONFIRM_MAX_MULTIPLIER = 4  # max attempts = polls * this
+TEXT_CONFIRM_HARD_CAP = 30  # absolute ceiling regardless of polls setting
 
 _PUNCT_RE = re.compile(r"[^\w\s]")
 
@@ -794,7 +795,10 @@ def main() -> int:
                     if r.mode == "dialogue" and text_confirm_polls > 1:
                         confirmed = new_text.strip()
                         matches = 1
-                        max_attempts = text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER
+                        max_attempts = min(
+                            text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER,
+                            TEXT_CONFIRM_HARD_CAP,
+                        )
                         attempts = 0
                         while matches < text_confirm_polls and attempts < max_attempts:
                             attempts += 1
