@@ -125,6 +125,46 @@ class SpeakerManager:
                     return known
         return None
 
+    # Minimum common-prefix length for prefix-extension / prefix-shrink
+    # matches. Prevents short OCR partials like "B" matching "Bob" & "Ben"
+    # by accident.
+    _PREFIX_MIN_LEN = 4
+
+    def _prefix_extension_match(self, name: str) -> str | None:
+        """Find an existing speaker whose name is a proper prefix of `name`
+        (the new reading extends the stored truncated one). E.g. stored
+        'B-King' + new 'B-King Leader'. Returns the stored shorter name,
+        or None if no unique match."""
+        matches = [
+            k for k in self.assignments
+            if len(k) >= self._PREFIX_MIN_LEN
+            and len(k) < len(name)
+            and name.startswith(k)
+        ]
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
+    def _prefix_shrink_match(self, name: str) -> str | None:
+        """Find an existing speaker whose name starts with `name` (the new
+        reading is a truncation of a stored longer one). E.g. stored
+        'B-King Leader' + new 'B-King'. Prefers the current speaker if
+        ambiguous, else returns the unique match or None."""
+        if len(name) < self._PREFIX_MIN_LEN:
+            return None
+        matches = [
+            k for k in self.assignments
+            if len(k) > len(name) and k.startswith(name)
+        ]
+        if not matches:
+            return None
+        if len(matches) == 1:
+            return matches[0]
+        # Ambiguous — prefer current speaker if it's one of the matches.
+        if self.current_speaker in matches:
+            return self.current_speaker
+        return None
+
     def set_current(self, name: str, fuzzy: bool = True) -> str | None:
         """Update the current speaker. Looks up by exact match first, then
         by single-character fuzzy match (if fuzzy=True). If still no match,
@@ -144,6 +184,25 @@ class SpeakerManager:
                 if match:
                     self.current_speaker = match
                     return self.assignments[match]
+                # Prefix extension: OCR previously read a truncated name
+                # (e.g. 'B-King') and now read the full one (e.g. 'B-King
+                # Leader'). Upgrade the stored key to the longer form and
+                # keep the voice assignment.
+                ext = self._prefix_extension_match(name)
+                if ext:
+                    voice = self.assignments.pop(ext)
+                    idx = self.cycle_index.pop(ext, 0)
+                    self.assignments[name] = voice
+                    self.cycle_index[name] = idx
+                    self.current_speaker = name
+                    self._save()
+                    return voice
+                # Prefix shrink: OCR truncated the name mid-dialogue. Reuse
+                # the stored longer name's voice without creating a new entry.
+                shrink = self._prefix_shrink_match(name)
+                if shrink:
+                    self.current_speaker = shrink
+                    return self.assignments[shrink]
             # New speaker — pick a random voice from the pool. Random is
             # preferred over round-robin when the pool is very large and we
             # want variety across runs / sessions. The assignment persists
