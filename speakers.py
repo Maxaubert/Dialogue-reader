@@ -312,9 +312,6 @@ class SpeakerManager:
             display = "(no speaker)" if name == DEFAULT_SPEAKER_KEY else name
             return (display, new_voice)
 
-    def voice_for(self, name: str) -> str | None:
-        return self.assignments.get((name or "").strip()) if name else None
-
     def voice_for_current(self) -> str | None:
         """Return the voice for the current speaker. Falls back to the
         cycled 'no-speaker' default voice if one has been set."""
