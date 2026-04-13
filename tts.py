@@ -1,30 +1,37 @@
 """
-Natural-voice TTS via Piper (local neural model, ONNX runtime).
+Natural-voice TTS with two local engines: Piper (fast) and Kokoro-82M
+(more natural, ~350ms/sentence on CPU).
 
-Multi-voice with on-demand caching: TTS holds a {voice_name -> PiperVoice}
-dict. The first time a voice is used it's loaded from disk (or downloaded
-from HuggingFace if not already cached locally), then it stays in RAM for
-instant switching. Each loaded voice uses ~60-100 MB of memory.
+Voices are referenced as `engine:name` strings. Bare names (no colon)
+default to `piper:` for backward compatibility.
+
+Multi-voice with on-demand caching:
+  - Piper: {voice_name -> PiperVoice} dict; each voice ~60-100 MB RAM.
+  - Kokoro: single shared model (~310 MB on disk, loaded once into RAM),
+    voice selection is a per-synth parameter.
 
 Usage:
-    tts = TTS()                                  # default: en_US-amy-medium
-    tts = TTS(voice="en_US-lessac-medium")       # different default
-    tts.speak("hello")                           # use the default voice
-    tts.speak("hi", voice="en_US-ryan-medium")   # use a specific voice
+    tts = TTS()                                       # piper:en_US-amy-medium
+    tts = TTS(voice="kokoro:af_heart")                 # default Kokoro voice
+    tts.speak("hello")                                 # use default voice
+    tts.speak("hi", voice="piper:en_US-ryan-medium")   # explicit Piper
+    tts.speak("hi", voice="kokoro:am_michael")         # explicit Kokoro
     tts.shutdown()
 
-Voices download once and stay on disk in voices/ — subsequent runs are
-instant. The caller doesn't need to pre-download anything; speak() will
-fetch on first use.
+Voice files download once on first use:
+  - Piper voices → voices/<voice>.onnx + .onnx.json
+  - Kokoro model + voices → voices/kokoro/{kokoro-v1.0.onnx, voices-v1.0.bin}
 
-Recommended voices (all ~60 MB unless noted):
-    en_US-amy-medium         (default; female, US, neutral)
-    en_US-lessac-medium      (female, US, very clean)
-    en_US-ryan-medium        (male, US)
-    en_US-ryan-high          (male, US, ~110 MB)
-    en_US-joe-medium         (male, US, deeper)
-    en_GB-alan-medium        (male, British)
-    en_GB-jenny_dioco-medium (female, British)
+Recommended voices:
+  Piper (fast, ~60 MB each):
+    en_US-amy-medium, en_US-ryan-medium, en_US-lessac-medium,
+    en_US-lessac-high, en_US-hfc_female-medium, en_US-hfc_male-medium,
+    en_GB-alan-medium, en_GB-jenny_dioco-medium
+  Kokoro (natural, share one ~310 MB model):
+    af_heart, af_bella, af_sarah (US female)
+    am_michael, am_adam (US male)
+    bf_emma (British female)
+    bm_george (British male)
 """
 
 from __future__ import annotations
@@ -39,8 +46,19 @@ from piper import PiperVoice
 from piper.config import SynthesisConfig
 
 
-DEFAULT_VOICE = "en_US-amy-medium"
+DEFAULT_VOICE = "piper:en_US-amy-medium"
 _VOICE_REPO_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+
+
+def _parse_voice(voice: str) -> tuple[str, str]:
+    """Split 'engine:name' into (engine_lower, name). Bare names (no colon)
+    default to the 'piper' engine for backward compatibility."""
+    if ":" in voice:
+        engine, _, name = voice.partition(":")
+        engine = engine.strip().lower()
+        name = name.strip()
+        return engine, name
+    return "piper", voice.strip()
 
 
 def _voice_url_base(voice_name: str) -> str:
@@ -154,19 +172,55 @@ class TTS:
         self._voice_cache: dict[str, PiperVoice] = {}
         self._cache_lock = threading.Lock()
 
+        # Lazy Kokoro engine — initialized on first kokoro: voice request.
+        self._kokoro = None
+        self._kokoro_unavailable = False
+
         self._speed = max(0.3, min(3.0, float(speed)))
         self._syn_config = SynthesisConfig(
             length_scale=1.0 / self._speed,  # piper: lower = faster
         )
 
-        # Version counter for cancellation. Each speak() bumps this; in-flight
-        # synth/playback workers compare against the current value and exit
-        # early if a newer call has superseded them.
         self._version = 0
         self._version_lock = threading.Lock()
 
         # Pre-load the default voice so the very first speak() is instant.
-        self._get_voice(self._default_voice)
+        self._ensure_default_loaded()
+
+    def _ensure_default_loaded(self) -> None:
+        engine, name = _parse_voice(self._default_voice)
+        if engine == "piper":
+            try:
+                self._get_voice(name)
+            except Exception as e:
+                print(f"[tts] default voice preload failed: {e}", flush=True)
+        elif engine == "kokoro":
+            try:
+                self._get_kokoro()
+            except Exception as e:
+                print(f"[tts] Kokoro init failed: {e}", flush=True)
+
+    def _get_kokoro(self):
+        """Lazily construct KokoroTTS. Returns None and sets
+        _kokoro_unavailable=True if kokoro-onnx isn't installed or fails
+        to load."""
+        if self._kokoro_unavailable:
+            return None
+        if self._kokoro is not None:
+            return self._kokoro
+        try:
+            from kokoro_tts import KokoroTTS
+        except Exception as e:
+            print(f"[tts] kokoro_tts module unavailable: {e}", flush=True)
+            self._kokoro_unavailable = True
+            return None
+        try:
+            self._kokoro = KokoroTTS(self._voices_dir)
+        except Exception as e:
+            print(f"[tts] KokoroTTS init failed: {e}", flush=True)
+            self._kokoro_unavailable = True
+            return None
+        return self._kokoro
 
     # ---- voice cache ----
 
@@ -205,12 +259,24 @@ class TTS:
 
     def preload(self, voice_names: list[str]) -> None:
         """Make sure each voice in the list is downloaded + loaded into RAM
-        so the first cycle/speak with each one is instant."""
+        so the first cycle/speak with each one is instant. Only preloads
+        Piper voices; Kokoro shares a single model across all voices so
+        preloading individual Kokoro voice names is a no-op."""
+        kokoro_seen = False
         for name in voice_names:
-            try:
-                self._get_voice(name)
-            except Exception as e:
-                print(f"[tts] preload of '{name}' failed: {e}", flush=True)
+            engine, voice = _parse_voice(name)
+            if engine == "piper":
+                try:
+                    self._get_voice(voice)
+                except Exception as e:
+                    print(f"[tts] preload of '{name}' failed: {e}", flush=True)
+            elif engine == "kokoro" and not kokoro_seen:
+                kokoro_seen = True
+                # Trigger one-time Kokoro init so first Kokoro speak() is fast.
+                try:
+                    self._get_kokoro()
+                except Exception as e:
+                    print(f"[tts] Kokoro preload failed: {e}", flush=True)
 
     # ---- speed ----
 
@@ -239,7 +305,6 @@ class TTS:
         if not text:
             return
 
-        # Stop any audio that's currently playing.
         try:
             sd.stop()
         except Exception:
@@ -250,28 +315,66 @@ class TTS:
             my_version = self._version
 
         voice_name = voice or self._default_voice
+        engine, name = _parse_voice(voice_name)
 
-        def worker():
+        # Unknown engine: warn once and fall back to the default voice.
+        if engine not in ("piper", "kokoro"):
+            print(
+                f"[tts] unknown engine '{engine}' in voice "
+                f"'{voice_name}', falling back to default",
+                flush=True,
+            )
+            engine, name = _parse_voice(self._default_voice)
+
+        # Kokoro requested but unavailable: fall back to default Piper.
+        if engine == "kokoro":
+            if self._get_kokoro() is None:
+                fb_engine, fb_name = _parse_voice(self._default_voice)
+                if fb_engine == "piper":
+                    engine, name = fb_engine, fb_name
+                else:
+                    # Default is also Kokoro but Kokoro is dead — last-
+                    # resort fallback to the hardcoded piper default.
+                    engine, name = "piper", "en_US-amy-medium"
+
+        def worker_piper():
             try:
-                piper_voice = self._get_voice(voice_name)
+                piper_voice = self._get_voice(name)
                 chunks: list[np.ndarray] = []
                 sample_rate: int | None = None
                 for chunk in piper_voice.synthesize(text, self._syn_config):
                     if my_version != self._version:
-                        return  # superseded by a newer speak() call
+                        return
                     chunks.append(chunk.audio_float_array)
                     sample_rate = chunk.sample_rate
-
                 if not chunks or sample_rate is None:
                     return
                 if my_version != self._version:
                     return
-
                 audio = np.concatenate(chunks)
                 sd.play(audio, samplerate=sample_rate, blocking=False)
             except Exception as e:
-                print(f"[tts] worker error: {e}", flush=True)
+                print(f"[tts] piper worker error: {e}", flush=True)
 
+        def worker_kokoro():
+            try:
+                k = self._get_kokoro()
+                if k is None:
+                    return
+                audio, sample_rate = k.synth(text, name)
+                if my_version != self._version:
+                    return
+                # Kokoro speed control: scale playback sample_rate by speed.
+                # Kokoro's internal `speed` param exists but we want consistent
+                # behavior with Piper's length_scale, which changes duration.
+                # Playing the same audio at sr*speed is the simplest way to
+                # match "faster = shorter" semantics.
+                effective_sr = int(sample_rate * self._speed)
+                sd.play(audio, samplerate=effective_sr, blocking=False)
+            except Exception as e:
+                print(f"[tts] kokoro worker error: {e}", flush=True)
+
+        worker = worker_kokoro if engine == "kokoro" else worker_piper
         threading.Thread(target=worker, daemon=True).start()
 
     def shutdown(self) -> None:
