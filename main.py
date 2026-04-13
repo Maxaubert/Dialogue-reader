@@ -887,6 +887,16 @@ def main() -> int:
                         state["candidate"] = speech
                         if debug:
                             print("[candidate] new text, waiting for confirmation poll")
+                    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker:
+                        # Dialogue is confirmed but a DIFFERENT speaker is
+                        # still pending confirmation. Holding the line one
+                        # more poll prevents attributing the new dialogue
+                        # to the previous speaker's voice.
+                        if debug:
+                            print(
+                                f"[hold] dialogue ready but waiting for speaker "
+                                f"candidate {speaker_candidate!r} to confirm"
+                            )
                     else:
                         # Second poll confirmed the candidate — speak it.
                         state["candidate"] = ""
