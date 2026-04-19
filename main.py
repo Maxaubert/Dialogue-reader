@@ -208,6 +208,37 @@ def _load_voice_config() -> tuple[list[str], str]:
     return pool, default
 
 
+def _load_ocr_config() -> tuple[str, str]:
+    """Read [OCR] Dialogue / Speaker from dialogue_reader.ini. Valid values
+    are 'winocr' and 'easyocr'. Unknown values fall back to the built-in
+    defaults (winocr for dialogue, easyocr for speaker)."""
+    dialogue_engine = "winocr"
+    speaker_engine = "easyocr"
+    ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not ini_path.exists():
+        return dialogue_engine, speaker_engine
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return dialogue_engine, speaker_engine
+    if not cp.has_section("OCR"):
+        return dialogue_engine, speaker_engine
+    from ocr import VALID_ENGINES
+    d = cp.get("OCR", "Dialogue", fallback="").strip().lower()
+    s = cp.get("OCR", "Speaker", fallback="").strip().lower()
+    if d in VALID_ENGINES:
+        dialogue_engine = d
+    elif d:
+        print(f"[ocr] Invalid [OCR] Dialogue={d!r}, using {dialogue_engine}")
+    if s in VALID_ENGINES:
+        speaker_engine = s
+    elif s:
+        print(f"[ocr] Invalid [OCR] Speaker={s!r}, using {speaker_engine}")
+    return dialogue_engine, speaker_engine
+
+
 def _load_text_confirm_polls() -> int:
     """Read [Polling] TextConfirmPolls from dialogue_reader.ini.
     Returns TEXT_CONFIRM_POLLS if missing, unparseable, or < 1."""
@@ -667,8 +698,16 @@ def main() -> int:
     if debug:
         print(f"[dialogue-reader] TextConfirmPolls = {text_confirm_polls}")
 
-    print("[dialogue-reader] Loading OCR engine...")
-    ocr = OCR(debug=debug)
+    dialogue_engine, speaker_engine = _load_ocr_config()
+    print(
+        f"[dialogue-reader] Loading OCR engines "
+        f"(dialogue={dialogue_engine}, speaker={speaker_engine})..."
+    )
+    ocr = OCR(
+        debug=debug,
+        dialogue_engine=dialogue_engine,
+        speaker_engine=speaker_engine,
+    )
     print("[dialogue-reader] Loading TTS engine...")
     tts = TTS(voice=default_voice, speed=1.1)
 
