@@ -18,7 +18,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import queue
 import re
+import threading
+import time
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -31,6 +36,17 @@ _MIN_OCR_HEIGHT = 200
 _MIN_OCR_WIDTH = 600
 
 VALID_ENGINES = ("winocr", "easyocr")
+
+
+def _hash_frame_fast(arr: np.ndarray) -> str:
+    """Cheap perceptual-ish frame hash (downsample 8x, quantize, md5).
+    Fast enough to run at poll rate on full-screen regions: ~1-2ms on a
+    1248x1422 frame vs. ~800ms for an EasyOCR read of the same frame."""
+    small = arr[::8, ::8]
+    if small.ndim == 3 and small.shape[-1] == 4:
+        small = small[..., :3]
+    quantized = (small >> 3).astype(np.uint8)
+    return hashlib.md5(quantized.tobytes()).hexdigest()
 
 
 def _upscale_for_ocr(frame: np.ndarray) -> np.ndarray:
@@ -166,3 +182,192 @@ class OCR:
 
         joined = " ".join(lines_text)
         return _WHITESPACE_RE.sub(" ", joined).strip()
+
+
+# ---------------------------------------------------------------------------
+# OCR worker thread
+#
+# Problem: OCR on large dialogue regions (especially EasyOCR) takes 500ms-2s.
+# When OCR ran on the main loop, UDP commands (PICK_REGION, CYCLE_VOICE,
+# PAUSE…) sat in the queue for the full OCR duration. Typing a hotkey mid-OCR
+# felt unresponsive.
+#
+# Fix: run OCR + pre-snapshot sleeps + text-confirm loops on a worker thread.
+# The main loop stays tight — it drains commands every ~83ms regardless of
+# OCR state, polls regions for pixel changes, enqueues batch jobs, and
+# applies results non-blockingly when they come back.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class OCRRegionSpec:
+    """One region in an OCR batch job. `capture` is used by the worker to
+    re-snapshot for the pre-OCR settle pause and for text-confirm polls."""
+    name: str
+    mode: str  # "dialogue" or "speaker"
+    capture: object  # RegionCapture — worker calls .snapshot() on it
+
+
+@dataclass
+class OCRBatchJob:
+    generation: int
+    regions: list[OCRRegionSpec]
+    confirm_polls: int
+    debug: bool = False
+    # Tunables — kept in the job so main.py can pass its constants without
+    # the worker having to import them.
+    pre_snapshot_delay: float = 0.15
+    confirm_interval: float = 0.10
+    confirm_max_multiplier: int = 4
+    confirm_hard_cap: int = 30
+
+
+@dataclass
+class OCRBatchResult:
+    generation: int
+    texts: dict[str, str] = field(default_factory=dict)
+    error: str | None = None
+
+
+class OCRWorker:
+    """Single-consumer worker thread that runs OCR batch jobs off the main
+    loop. Thread model:
+
+      - main thread  : submits OCRBatchJob, polls for OCRBatchResult
+                       (non-blocking), handles commands every tick
+      - worker thread: dequeues job, sleeps pre-snapshot delay, takes fresh
+                       snapshots, runs OCR (and text-confirm loop for
+                       dialogue regions), publishes result
+
+    Stale results (generation mismatch) are simply ignored by the caller;
+    the worker doesn't know about pause/clear. Main bumps its generation
+    when state is invalidated.
+    """
+
+    def __init__(self, ocr: OCR) -> None:
+        self._ocr = ocr
+        self._jobs: queue.Queue[OCRBatchJob] = queue.Queue()
+        self._results: queue.Queue[OCRBatchResult] = queue.Queue()
+        # `_busy` is set by submit() and cleared by the worker after a
+        # result has been published. Main checks it to decide whether to
+        # enqueue another batch. We use a plain bool guarded by a lock
+        # instead of Event because we need atomic "set if not already set"
+        # — Event.set() is idempotent but gives no read-modify-write.
+        self._busy = False
+        self._busy_lock = threading.Lock()
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="ocr-worker"
+        )
+        self._thread.start()
+
+    def submit(self, job: OCRBatchJob) -> None:
+        with self._busy_lock:
+            self._busy = True
+        self._jobs.put(job)
+
+    def poll_result(self) -> OCRBatchResult | None:
+        try:
+            return self._results.get_nowait()
+        except queue.Empty:
+            return None
+
+    @property
+    def busy(self) -> bool:
+        with self._busy_lock:
+            return self._busy
+
+    def _run(self) -> None:
+        while True:
+            job = self._jobs.get()
+            try:
+                result = self._process(job)
+            except Exception as e:
+                print(f"[ocr-worker] error: {e}", flush=True)
+                result = OCRBatchResult(generation=job.generation, error=str(e))
+            self._results.put(result)
+            with self._busy_lock:
+                self._busy = False
+
+    def _process(self, job: OCRBatchJob) -> OCRBatchResult:
+        # Pre-snapshot settle: catches typewriter mid-animation and lazy
+        # renders. Matches the pre-existing 150ms delay from main.py.
+        time.sleep(job.pre_snapshot_delay)
+
+        texts: dict[str, str] = {}
+        for r in job.regions:
+            fresh = r.capture.snapshot()
+            new_text = self._ocr.read(fresh, speaker=(r.mode == "speaker"))
+
+            if r.mode == "dialogue" and job.confirm_polls > 1:
+                new_text = self._confirm_dialogue_text(
+                    capture=r.capture,
+                    initial=new_text.strip(),
+                    initial_hash=_hash_frame_fast(fresh),
+                    polls=job.confirm_polls,
+                    interval=job.confirm_interval,
+                    max_multiplier=job.confirm_max_multiplier,
+                    hard_cap=job.confirm_hard_cap,
+                    region_name=r.name,
+                    debug=job.debug,
+                )
+
+            texts[r.name] = new_text
+
+        return OCRBatchResult(generation=job.generation, texts=texts)
+
+    def _confirm_dialogue_text(
+        self,
+        capture: object,
+        initial: str,
+        initial_hash: str,
+        polls: int,
+        interval: float,
+        max_multiplier: int,
+        hard_cap: int,
+        region_name: str,
+        debug: bool,
+    ) -> str:
+        """Re-snapshot + re-OCR until we see `polls` consecutive identical
+        results, or we hit the attempt cap. Prevents reading partial
+        typewriter text.
+
+        Optimization: hash the raw snapshot. If the hash matches the last
+        frame we actually OCR'd, the pixels are identical and the OCR
+        result is guaranteed identical too — skip the expensive OCR call
+        and count it as a match. Turns the stable-text case (the common
+        one) from N * OCR_cost into 1 * OCR_cost + (N-1) * hash_cost.
+        """
+        confirmed = initial
+        matches = 1
+        max_attempts = min(polls * max_multiplier, hard_cap)
+        attempts = 0
+        last_ocr_hash: str | None = initial_hash
+        ocr_calls = 1  # the initial read in _process() counts
+        skipped = 0
+        while matches < polls and attempts < max_attempts:
+            attempts += 1
+            time.sleep(interval)
+            fresh = capture.snapshot()
+            fresh_hash = _hash_frame_fast(fresh)
+            if last_ocr_hash is not None and fresh_hash == last_ocr_hash:
+                # Pixels identical to the frame we last OCR'd — OCR would
+                # return the same text. Count as a match without the call.
+                matches += 1
+                skipped += 1
+                continue
+            fresh_text = self._ocr.read(fresh, speaker=False).strip()
+            ocr_calls += 1
+            last_ocr_hash = fresh_hash
+            if fresh_text == confirmed:
+                matches += 1
+            else:
+                confirmed = fresh_text
+                matches = 1
+        if debug:
+            print(
+                f"[ocr-worker {region_name}] text-confirm: "
+                f"{matches}/{polls} matches in {attempts} attempts "
+                f"(OCR calls: {ocr_calls}, hash-skipped: {skipped})",
+                flush=True,
+            )
+        return confirmed

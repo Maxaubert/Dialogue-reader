@@ -34,11 +34,10 @@ from pathlib import Path
 
 import numpy as np
 import sounddevice as sd
-from PIL import Image
 
 from region_picker import pick_region
 from capture import RegionCapture
-from ocr import OCR
+from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
 from tts import TTS, DEFAULT_VOICE
 from window_capture import find_window_at, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
@@ -619,6 +618,10 @@ def handle_command(
         # skipped via the "speech identical to last spoken" dedup.
         state["last_spoken"] = ""
         state["candidate"] = ""
+        state["speaker_candidate"] = ""
+        # Invalidate any OCR batch still running on the worker — its
+        # results reference captures that no longer belong to any region.
+        state["generation"] += 1
         print("[dialogue-reader] Cleared all regions.")
     elif cmd == "CYCLE_VOICE":
         result = speaker_mgr.cycle_current_voice(direction=1)
@@ -648,6 +651,9 @@ def handle_command(
     elif cmd == "PAUSE":
         if not state["paused"]:
             state["paused"] = True
+            # Drop any OCR batch in flight — speaking its result after the
+            # user pauses would be surprising.
+            state["generation"] += 1
             tts.stop()
             _play_cue(_PAUSE_CUE)
             print("[dialogue-reader] PAUSED (watching + speech stopped)")
@@ -663,6 +669,7 @@ def handle_command(
             print("[dialogue-reader] UNPAUSED")
         else:
             state["paused"] = True
+            state["generation"] += 1
             tts.stop()
             _play_cue(_PAUSE_CUE)
             print("[dialogue-reader] PAUSED")
@@ -676,6 +683,176 @@ def handle_command(
         _restart_last(tts, speaker_mgr, state)
     else:
         print(f"[dialogue-reader] Unknown command: {cmd!r}")
+
+
+def _apply_ocr_result(
+    result: OCRBatchResult,
+    regions: list[WatchedRegion],
+    state: dict,
+    speaker_mgr: SpeakerManager,
+    tts: TTS,
+    debug: bool,
+) -> None:
+    """Consume a completed OCR batch: update per-region state, resolve the
+    speaker-candidate handshake, and (if dialogue changed) run the full
+    speech dedup + candidate machinery that used to live inline in the
+    main loop. Caller is responsible for checking `result.generation`
+    matches `state["generation"]` before calling."""
+    if result.error:
+        if debug:
+            print(f"[ocr] batch failed: {result.error}", flush=True)
+        for r in regions:
+            r.has_pending_frame = False
+            r.pending_frame = None
+        return
+
+    any_dialogue_changed = False
+    speaker_candidate = state["speaker_candidate"]
+
+    for r in regions:
+        if r.name not in result.texts:
+            continue
+        new_text = result.texts[r.name]
+        cosmetic = _is_cosmetic_change(new_text, r.last_spoken_text)
+        if debug:
+            print(
+                f"[ocr {r.name} mode={r.mode}] {new_text!r} "
+                f"(cosmetic vs last-spoken={cosmetic})"
+            )
+
+        if r.mode == "speaker":
+            text_clean = new_text.strip()
+            if not text_clean:
+                # Pixels changed but OCR found no readable name — clear
+                # current speaker so the next dialogue line uses the default
+                # voice rather than inheriting the previous speaker's.
+                if speaker_mgr.current_speaker:
+                    _safe_print(
+                        "[speakers] cleared (was ",
+                        f"{speaker_mgr.current_speaker!r}) — pixels changed but OCR returned nothing",
+                    )
+                    speaker_mgr.current_speaker = ""
+                speaker_candidate = ""
+                r.last_spoken_text = ""
+            elif not cosmetic:
+                if text_clean != speaker_candidate:
+                    speaker_candidate = text_clean
+                    if debug:
+                        _safe_print(
+                            "[speakers] candidate = ",
+                            f"{text_clean!r} (waiting for confirmation)",
+                        )
+                else:
+                    speaker_candidate = ""
+                    voice = speaker_mgr.set_current(text_clean)
+                    if voice:
+                        _safe_print(
+                            "[speakers] current = ",
+                            f"{speaker_mgr.current_speaker!r} voice={voice}",
+                        )
+                    r.last_spoken_text = text_clean
+            else:
+                # Cosmetic (speaker name unchanged) — clear any stale
+                # candidate so dialogue isn't stuck in [hold] forever.
+                if speaker_candidate:
+                    speaker_candidate = ""
+        else:
+            if not cosmetic:
+                any_dialogue_changed = True
+
+        r.last_text = new_text
+        r.has_pending_frame = False
+        r.pending_frame = None
+
+    state["speaker_candidate"] = speaker_candidate
+
+    if not any_dialogue_changed:
+        if debug:
+            print("[skip] no dialogue change")
+        return
+
+    speech = build_speech(regions)
+    if len(speech) < MIN_TEXT_LEN:
+        state["candidate"] = ""
+    elif speech == state["last_spoken"]:
+        state["candidate"] = ""
+        if debug:
+            print("[skip] speech identical to last spoken")
+    elif (
+        state["last_spoken"]
+        and _similar(speech, state["last_spoken"]) >= 0.92
+    ):
+        state["candidate"] = ""
+        if debug:
+            print(
+                f"[skip] speech too similar to last spoken "
+                f"({_similar(speech, state['last_spoken']):.2f})"
+            )
+    elif not state["candidate"] or _similar(speech, state["candidate"]) < 0.92:
+        # First time seeing this text — stash as candidate, don't speak
+        # yet. One more matching poll is needed to confirm it's not jitter.
+        state["candidate"] = speech
+        if debug:
+            print("[candidate] new text, waiting for confirmation poll")
+    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker:
+        # Dialogue confirmed but speaker still pending — hold one more poll
+        # rather than attributing the new line to the previous speaker.
+        if debug:
+            print(
+                f"[hold] dialogue ready but waiting for speaker "
+                f"candidate {speaker_candidate!r} to confirm"
+            )
+    else:
+        state["candidate"] = ""
+        voice = speaker_mgr.voice_for_current()
+        speaker_label = (
+            f" ({speaker_mgr.current_speaker})"
+            if speaker_mgr.current_speaker else ""
+        )
+        print(f"[speak{speaker_label}] {speech}")
+        tts.speak(speech, voice=voice)
+        state["last_spoken"] = speech
+        for rr in regions:
+            if rr.mode == "dialogue":
+                rr.last_spoken_text = rr.last_text
+
+
+def _build_batch_job(
+    regions: list[WatchedRegion],
+    generation: int,
+    confirm_polls: int,
+    debug: bool,
+) -> OCRBatchJob | None:
+    """Build an OCRBatchJob for the worker if any region has a pending
+    change. All speaker regions are always included so a new name bubble
+    that appeared slightly after the dialogue update gets OCR'd before we
+    attribute the line to the previous speaker."""
+    specs: list[OCRRegionSpec] = []
+    dialogue_included = False
+    for r in regions:
+        if r.has_pending_frame or r.mode == "speaker":
+            specs.append(OCRRegionSpec(
+                name=r.name, mode=r.mode, capture=r.capture,
+            ))
+            if r.mode == "dialogue":
+                dialogue_included = True
+    # Require at least one actually-changed region to bother submitting.
+    if not any(r.has_pending_frame for r in regions):
+        return None
+    # Edge case: only speaker regions, none of which changed — skip.
+    # (Can't happen currently since we gate on any_changed above, but the
+    # check is cheap insurance.)
+    del dialogue_included
+    return OCRBatchJob(
+        generation=generation,
+        regions=specs,
+        confirm_polls=confirm_polls,
+        debug=debug,
+        pre_snapshot_delay=0.15,
+        confirm_interval=TEXT_CONFIRM_INTERVAL,
+        confirm_max_multiplier=TEXT_CONFIRM_MAX_MULTIPLIER,
+        confirm_hard_cap=TEXT_CONFIRM_HARD_CAP,
+    )
 
 
 def main() -> int:
@@ -749,10 +926,19 @@ def main() -> int:
             return 1
 
     regions: list[WatchedRegion] = []
-    state = {"paused": False, "last_spoken": "", "candidate": ""}
-    # Speaker two-poll confirmation: must see the same name twice before
-    # accepting it. Prevents OCR jitter from creating phantom speakers.
-    speaker_candidate: str = ""
+    # generation bumps invalidate any OCR batch currently running on the
+    # worker (pause/clear_regions). speaker_candidate lives here so the
+    # result-applier helper can see/update it across ticks.
+    state = {
+        "paused": False,
+        "last_spoken": "",
+        "candidate": "",
+        "generation": 0,
+        "speaker_candidate": "",
+    }
+
+    ocr_worker = OCRWorker(ocr)
+    print("[dialogue-reader] OCR worker thread started.")
 
     print("[dialogue-reader] Ready. Use the AHK script (or send UDP commands) to control.")
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
@@ -765,7 +951,9 @@ def main() -> int:
 
     try:
         while True:
-            # 1. Drain any commands from AHK.
+            # 1. Drain commands. This runs every tick regardless of OCR
+            #    state, so hotkeys (PICK_REGION, CYCLE_VOICE, PAUSE…) are
+            #    handled within one poll_interval of being pressed.
             while not server.queue.empty():
                 try:
                     cmd = server.queue.get_nowait()
@@ -773,207 +961,46 @@ def main() -> int:
                     break
                 handle_command(cmd, regions, tts, speaker_mgr, state, debug=debug)
 
+            # 2. Apply any OCR result the worker just finished. poll_result
+            #    is non-blocking. Stale generations (from pause/clear that
+            #    happened while OCR was in flight) are discarded.
+            result = ocr_worker.poll_result()
+            if result is not None:
+                if result.generation == state["generation"]:
+                    _apply_ocr_result(
+                        result, regions, state, speaker_mgr, tts, debug=debug
+                    )
+                elif debug:
+                    print(
+                        f"[ocr] discarding stale result "
+                        f"(gen {result.generation} != {state['generation']})"
+                    )
+
             if state["paused"] or not regions:
                 time.sleep(poll_interval)
                 continue
 
-            # 2. Poll every region. If any region has new stable content,
-            #    flag it; we'll OCR everything together.
-            any_changed = False
-            for r in regions:
-                frame = r.capture.poll_once()
-                if frame is not None:
-                    r.has_pending_frame = True
-                    r.pending_frame = frame
-                    any_changed = True
-
-            if any_changed:
-                # 3. Confirmation pass: brief sleep, then re-grab the
-                #    changed regions to catch typewriter mid-animation /
-                #    lazy renders. We ALSO force-snapshot every speaker
-                #    region (even ones that didn't yield) so a new
-                #    speaker bubble that appeared slightly after the
-                #    dialogue update gets a chance to be recognised
-                #    BEFORE we attribute the line to the previous speaker.
-                time.sleep(0.15)
+            # 3. Poll regions for pixel changes. Only submit a new batch
+            #    if the worker is idle — no point queueing work that'll
+            #    run against pixels from 2s ago by the time it gets out.
+            if not ocr_worker.busy:
+                any_changed = False
                 for r in regions:
-                    if r.has_pending_frame:
-                        r.pending_frame = r.capture.snapshot()
-                    elif r.mode == "speaker":
-                        r.pending_frame = r.capture.snapshot()
+                    frame = r.capture.poll_once()
+                    if frame is not None:
                         r.has_pending_frame = True
+                        r.pending_frame = frame
+                        any_changed = True
 
-                # 4. OCR each changed region.
-                #
-                # Dialogue-mode regions: per-region dedup compares the new
-                # OCR text against THIS REGION'S last spoken text so OCR
-                # jitter between speaks doesn't drift the baseline.
-                #
-                # Speaker-mode regions: same dedup, BUT if pixels changed
-                # AND OCR returned nothing, we explicitly clear the current
-                # speaker. Without this clear, a new character whose name
-                # UI is unreadable would inherit the previous speaker's
-                # voice — exactly the "Akechi spoke but it played as Ann"
-                # bug. Better to fall back to default voice than misattribute.
-                any_dialogue_changed = False
-                for r in regions:
-                    if not r.has_pending_frame:
-                        continue
-                    new_text = ocr.read(
-                        r.pending_frame, speaker=(r.mode == "speaker")
+                if any_changed:
+                    job = _build_batch_job(
+                        regions,
+                        generation=state["generation"],
+                        confirm_polls=text_confirm_polls,
+                        debug=debug,
                     )
-
-                    # Text-level confirmation for dialogue regions:
-                    # require `text_confirm_polls` consecutive identical
-                    # OCR results (on fresh snapshots) before accepting.
-                    # Prevents reading partial typewriter text.
-                    if r.mode == "dialogue" and text_confirm_polls > 1:
-                        confirmed = new_text.strip()
-                        matches = 1
-                        max_attempts = min(
-                            text_confirm_polls * TEXT_CONFIRM_MAX_MULTIPLIER,
-                            TEXT_CONFIRM_HARD_CAP,
-                        )
-                        attempts = 0
-                        while matches < text_confirm_polls and attempts < max_attempts:
-                            attempts += 1
-                            time.sleep(TEXT_CONFIRM_INTERVAL)
-                            fresh = r.capture.snapshot()
-                            fresh_text = ocr.read(fresh, speaker=False).strip()
-                            if fresh_text == confirmed:
-                                matches += 1
-                            else:
-                                confirmed = fresh_text
-                                matches = 1
-                            r.pending_frame = fresh
-                        new_text = confirmed
-                        if debug:
-                            print(
-                                f"[ocr {r.name}] text-confirm: "
-                                f"{matches}/{text_confirm_polls} matches "
-                                f"in {attempts} attempts"
-                            )
-
-                    cosmetic = _is_cosmetic_change(new_text, r.last_spoken_text)
-                    if debug:
-                        print(
-                            f"[ocr {r.name} mode={r.mode}] {new_text!r} "
-                            f"(cosmetic vs last-spoken={cosmetic})"
-                        )
-                        # Save speaker captures to disk for diagnosis.
-                        if r.mode == "speaker":
-                            suffix = "empty" if not new_text.strip() else "hit"
-                            _debug_path = Path(__file__).parent / f"debug_{r.name}_{suffix}.png"
-                            try:
-                                Image.fromarray(r.pending_frame).save(_debug_path)
-                            except Exception:
-                                pass
-                    if r.mode == "speaker":
-                        text_clean = new_text.strip()
-                        if not text_clean:
-                            # Pixels changed but OCR found no readable name.
-                            # Clear the current speaker so the next dialogue
-                            # uses the default voice instead of the wrong
-                            # previous speaker.
-                            if speaker_mgr.current_speaker:
-                                _safe_print(
-                                    "[speakers] cleared (was ",
-                                    f"{speaker_mgr.current_speaker!r}) — pixels changed but OCR returned nothing",
-                                )
-                                speaker_mgr.current_speaker = ""
-                            speaker_candidate = ""
-                            r.last_spoken_text = ""
-                        elif not cosmetic:
-                            # Two-poll confirmation: require the same name
-                            # on consecutive reads before accepting it.
-                            if text_clean != speaker_candidate:
-                                speaker_candidate = text_clean
-                                if debug:
-                                    _safe_print(
-                                        "[speakers] candidate = ",
-                                        f"{text_clean!r} (waiting for confirmation)",
-                                    )
-                            else:
-                                # Confirmed — look up with fuzzy matching.
-                                speaker_candidate = ""
-                                voice = speaker_mgr.set_current(text_clean)
-                                if voice:
-                                    _safe_print(
-                                        "[speakers] current = ",
-                                        f"{speaker_mgr.current_speaker!r} voice={voice}",
-                                    )
-                                # Lock the dedup baseline so we don't keep
-                                # "discovering" the same name every poll.
-                                r.last_spoken_text = text_clean
-                        else:
-                            # Cosmetic read — speaker name matches last-spoken,
-                            # so the speaker hasn't actually changed. Clear
-                            # any stale candidate from earlier transitions
-                            # that never resolved, otherwise dialogue can
-                            # get stuck in [hold] indefinitely.
-                            if speaker_candidate:
-                                speaker_candidate = ""
-                    else:
-                        if not cosmetic:
-                            any_dialogue_changed = True
-                    r.last_text = new_text
-                    r.has_pending_frame = False
-                    r.pending_frame = None
-
-                if not any_dialogue_changed:
-                    if debug:
-                        print("[skip] no dialogue change")
-                else:
-                    speech = build_speech(regions)
-                    if len(speech) < MIN_TEXT_LEN:
-                        state["candidate"] = ""
-                    elif speech == state["last_spoken"]:
-                        state["candidate"] = ""
-                        if debug:
-                            print("[skip] speech identical to last spoken")
-                    elif (
-                        state["last_spoken"]
-                        and _similar(speech, state["last_spoken"]) >= 0.92
-                    ):
-                        state["candidate"] = ""
-                        if debug:
-                            print(
-                                f"[skip] speech too similar to last spoken "
-                                f"({_similar(speech, state['last_spoken']):.2f})"
-                            )
-                    elif not state["candidate"] or _similar(speech, state["candidate"]) < 0.92:
-                        # First time seeing this new text — stash as
-                        # candidate, don't speak yet. Need a second
-                        # poll to confirm it's real and not OCR jitter.
-                        state["candidate"] = speech
-                        if debug:
-                            print("[candidate] new text, waiting for confirmation poll")
-                    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker:
-                        # Dialogue is confirmed but a DIFFERENT speaker is
-                        # still pending confirmation. Holding the line one
-                        # more poll prevents attributing the new dialogue
-                        # to the previous speaker's voice.
-                        if debug:
-                            print(
-                                f"[hold] dialogue ready but waiting for speaker "
-                                f"candidate {speaker_candidate!r} to confirm"
-                            )
-                    else:
-                        # Second poll confirmed the candidate — speak it.
-                        state["candidate"] = ""
-                        voice = speaker_mgr.voice_for_current()
-                        speaker_label = (
-                            f" ({speaker_mgr.current_speaker})"
-                            if speaker_mgr.current_speaker else ""
-                        )
-                        print(f"[speak{speaker_label}] {speech}")
-                        tts.speak(speech, voice=voice)
-                        state["last_spoken"] = speech
-                        # Snapshot each dialogue region's current OCR as
-                        # the new dedup baseline.
-                        for rr in regions:
-                            if rr.mode == "dialogue":
-                                rr.last_spoken_text = rr.last_text
+                    if job is not None:
+                        ocr_worker.submit(job)
 
             time.sleep(poll_interval)
     except KeyboardInterrupt:
