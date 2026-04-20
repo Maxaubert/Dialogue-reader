@@ -95,6 +95,9 @@ def _deskew_to_target(
     return np.ascontiguousarray(rotated[y_off:y_off + out_h, x_off:x_off + out_w])
 
 
+VALID_CAPTURE_MODES = ("auto", "screen", "window")
+
+
 class RegionCapture:
     def __init__(
         self,
@@ -104,7 +107,14 @@ class RegionCapture:
         stable_ms: int = 350,
         verbose: bool = False,
         rotation: float = 0.0,
+        capture_mode: str = "auto",
     ):
+        if capture_mode not in VALID_CAPTURE_MODES:
+            raise ValueError(
+                f"Unknown capture_mode: {capture_mode!r}. "
+                f"Valid: {VALID_CAPTURE_MODES}"
+            )
+        self.capture_mode = capture_mode
         x, y, w, h = region
         self.rotation = float(rotation)
         # The "target" size — what callers see after we deskew. Same as
@@ -161,7 +171,19 @@ class RegionCapture:
         # on a window gets game mode and another doesn't.
         self.use_window_mode = False
         self._binarize_hash = False  # set True when falling back from slow window capture
-        if hwnd:
+        if capture_mode == "window":
+            # User forced PrintWindow. Skip the speed probe — even if slow
+            # we're committed. Needed when Magnifier-immunity matters more
+            # than blink-free capture.
+            if hwnd:
+                self.use_window_mode = True
+        elif capture_mode == "screen":
+            # User forced mss. No PrintWindow probe at all — important
+            # because the probe itself triggers a game redraw that can
+            # visibly blink. Binarize the hash since game backgrounds
+            # animate behind dialogue.
+            self._binarize_hash = True
+        elif hwnd:  # capture_mode == "auto"
             t0 = time.monotonic()
             test = self._grab_window()
             grab_ms = (time.monotonic() - t0) * 1000
@@ -228,6 +250,13 @@ class RegionCapture:
         return cropped
 
     def _grab(self) -> np.ndarray:
+        # Forced "screen" mode: never touch PrintWindow, even as fallback.
+        # PrintWindow calls cause a game redraw that can visibly flicker
+        # on DirectX titles — the whole point of forcing screen is to
+        # avoid that.
+        if self.capture_mode == "screen":
+            return self._grab_screen()
+
         if self.use_window_mode:
             frame = self._grab_window()
             if frame is not None and frame.size > 0:
@@ -235,14 +264,13 @@ class RegionCapture:
             # PrintWindow blipped — fall through to screen.
 
         if self._binarize_hash:
-            # Game mode: prefer PrintWindow (immune to Magnifier), but
-            # if it blips (returns None), fall through to screen capture
-            # instead of returning blank. A brief Magnifier artifact is
-            # better than losing the frame entirely.
+            # Game mode (auto-detected slow PrintWindow): prefer PrintWindow
+            # because it's immune to Magnifier, but if it blips return a
+            # screen grab instead of nothing. A Magnifier artifact is
+            # better than losing the frame.
             frame = self._grab_window()
             if frame is not None and frame.size > 0:
                 return frame
-            # PrintWindow blipped — use screen capture as fallback.
             return self._grab_screen()
 
         # Non-game screen capture: blank frame when target isn't

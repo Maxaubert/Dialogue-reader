@@ -207,6 +207,47 @@ def _load_voice_config() -> tuple[list[str], str]:
     return pool, default
 
 
+def _load_speaker_assignment_strategy() -> str:
+    """Read [Speakers] AssignmentStrategy from dialogue_reader.ini. Valid
+    values: random, round_robin, inverse_round_robin. Unknown or missing
+    values fall back to 'random' (previous behavior)."""
+    ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not ini_path.exists():
+        return "random"
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return "random"
+    raw = cp.get("Speakers", "AssignmentStrategy", fallback="random").strip().lower()
+    from speakers import VALID_ASSIGNMENT_STRATEGIES
+    if raw in VALID_ASSIGNMENT_STRATEGIES:
+        return raw
+    print(f"[speakers] Invalid [Speakers] AssignmentStrategy={raw!r}, using random")
+    return "random"
+
+
+def _load_capture_mode() -> str:
+    """Read [Capture] Mode from dialogue_reader.ini. Valid values: auto,
+    screen, window. Unknown or missing values fall back to 'auto'."""
+    ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not ini_path.exists():
+        return "auto"
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return "auto"
+    raw = cp.get("Capture", "Mode", fallback="auto").strip().lower()
+    from capture import VALID_CAPTURE_MODES
+    if raw in VALID_CAPTURE_MODES:
+        return raw
+    print(f"[capture] Invalid [Capture] Mode={raw!r}, using auto")
+    return "auto"
+
+
 def _load_ocr_config() -> tuple[str, str]:
     """Read [OCR] Dialogue / Speaker from dialogue_reader.ini. Valid values
     are 'winocr' and 'easyocr'. Unknown values fall back to the built-in
@@ -521,6 +562,7 @@ def add_region(
     regions: list[WatchedRegion],
     debug: bool,
     mode: str = "dialogue",
+    capture_mode: str = "auto",
 ) -> None:
     """Open the region picker and append the result as a new watched region.
 
@@ -561,8 +603,13 @@ def add_region(
         stable_ms=STABLE_MS,
         verbose=False,
         rotation=rotation,
+        capture_mode=capture_mode,
     )
-    if cap.use_window_mode:
+    if cap.capture_mode == "screen":
+        print("[dialogue-reader] Using SCREEN capture mode (forced — PrintWindow disabled).")
+    elif cap.capture_mode == "window":
+        print("[dialogue-reader] Using WINDOW capture mode (forced PrintWindow).")
+    elif cap.use_window_mode:
         print("[dialogue-reader] Using WINDOW capture mode (immune to Magnifier/zoom).")
     else:
         print("[dialogue-reader] Using SCREEN capture mode.")
@@ -608,9 +655,9 @@ def handle_command(
     debug: bool,
 ) -> None:
     if cmd == "PICK_REGION":
-        add_region(regions, debug=debug, mode="dialogue")
+        add_region(regions, debug=debug, mode="dialogue", capture_mode=state["capture_mode"])
     elif cmd == "PICK_SPEAKER":
-        add_region(regions, debug=debug, mode="speaker")
+        add_region(regions, debug=debug, mode="speaker", capture_mode=state["capture_mode"])
     elif cmd == "CLEAR_REGIONS":
         regions.clear()
         # Also reset speak-history so freshly-picked regions that happen
@@ -875,6 +922,9 @@ def main() -> int:
     if debug:
         print(f"[dialogue-reader] TextConfirmPolls = {text_confirm_polls}")
 
+    capture_mode = _load_capture_mode()
+    print(f"[dialogue-reader] Capture mode: {capture_mode}")
+
     dialogue_engine, speaker_engine = _load_ocr_config()
     print(
         f"[dialogue-reader] Loading OCR engines "
@@ -905,8 +955,16 @@ def main() -> int:
             print(f"[tts] could not pre-download '{voice_name}': {e}")
 
     speakers_path = Path(__file__).parent / "speakers.json"
-    speaker_mgr = SpeakerManager(voice_pool=voice_pool, save_path=speakers_path)
-    print(f"[speakers] {len(speaker_mgr.assignments)} speaker(s) loaded from {speakers_path.name}")
+    assignment_strategy = _load_speaker_assignment_strategy()
+    speaker_mgr = SpeakerManager(
+        voice_pool=voice_pool,
+        save_path=speakers_path,
+        assignment_strategy=assignment_strategy,
+    )
+    print(
+        f"[speakers] {len(speaker_mgr.assignments)} speaker(s) loaded from "
+        f"{speakers_path.name} (assignment={assignment_strategy})"
+    )
 
     print(f"[dialogue-reader] Starting UDP command server on 127.0.0.1:{DEFAULT_PORT}")
     server = CommandServer(port=DEFAULT_PORT)
@@ -935,6 +993,7 @@ def main() -> int:
         "candidate": "",
         "generation": 0,
         "speaker_candidate": "",
+        "capture_mode": capture_mode,
     }
 
     ocr_worker = OCRWorker(ocr)
@@ -945,7 +1004,7 @@ def main() -> int:
     print()
 
     if pick_on_start:
-        add_region(regions, debug=debug)
+        add_region(regions, debug=debug, capture_mode=capture_mode)
 
     poll_interval = 1.0 / POLL_HZ
 
