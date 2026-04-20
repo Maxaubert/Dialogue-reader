@@ -147,16 +147,49 @@ class OCR:
                     best_area = area
                     best = text
             return [best] if best else []
-        # Dialogue role: keep every confident line, ordered top-to-bottom.
-        kept: list[tuple[float, str]] = []
+        # Dialogue role: preserve reading order. EasyOCR returns boxes in
+        # a non-deterministic order and a single visual line can be split
+        # across several boxes (e.g. wide word-spacing). Group boxes into
+        # rows by vertical overlap, then sort each row left-to-right.
+        boxes: list[tuple[float, float, float, str]] = []
         for bbox, text, conf in results:
             text = text.strip()
             if not text or conf < 0.3:
                 continue
-            y_top = min(p[1] for p in bbox)
-            kept.append((y_top, text))
-        kept.sort(key=lambda t: t[0])
-        return [t for _, t in kept]
+            ys = [p[1] for p in bbox]
+            xs = [p[0] for p in bbox]
+            boxes.append((min(ys), max(ys), min(xs), text))
+
+        if not boxes:
+            return []
+
+        # Walk boxes in y_top order, placing each into the first existing
+        # row whose vertical span overlaps >50% of the box's own height.
+        # Otherwise start a new row. Handles ragged baselines (italics,
+        # subscripts) and multiple columns of text within one region.
+        boxes.sort(key=lambda b: b[0])
+        rows: list[list[tuple[float, float, float, str]]] = []
+        for box in boxes:
+            y_top, y_bot, _, _ = box
+            height = max(1.0, y_bot - y_top)
+            placed = False
+            for row in rows:
+                row_top = min(b[0] for b in row)
+                row_bot = max(b[1] for b in row)
+                overlap = min(y_bot, row_bot) - max(y_top, row_top)
+                if overlap > height * 0.5:
+                    row.append(box)
+                    placed = True
+                    break
+            if not placed:
+                rows.append([box])
+
+        rows.sort(key=lambda row: min(b[0] for b in row))
+        out: list[str] = []
+        for row in rows:
+            row.sort(key=lambda b: b[2])  # x_left within row
+            out.extend(b[3] for b in row)
+        return out
 
     # ---- dispatch ----
 
