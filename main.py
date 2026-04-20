@@ -38,7 +38,7 @@ import sounddevice as sd
 from region_picker import pick_region
 from capture import RegionCapture
 from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
-from magnifier import is_zoomed as _magnifier_is_zoomed
+from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
 from window_capture import find_window_at, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
@@ -1068,15 +1068,27 @@ def main() -> int:
             #     pick up stray text and dialogue regions misfire. We
             #     still drain commands and apply in-flight OCR results
             #     (done above); only NEW region polling/submission pauses.
-            if skip_when_zoomed and _magnifier_is_zoomed():
-                if not state["zoomed"]:
-                    state["zoomed"] = True
-                    print("[dialogue-reader] Magnifier zoomed — polling paused")
-                time.sleep(poll_interval)
-                continue
-            elif state["zoomed"]:
-                state["zoomed"] = False
-                print("[dialogue-reader] Magnifier back at 100% — polling resumed")
+            #     Debug mode logs the raw level even when detection
+            #     thinks nothing changed — useful for diagnosing setups
+            #     where the Magnification API reports stale values.
+            if skip_when_zoomed:
+                zoomed_now = _magnifier_is_zoomed()
+                if zoomed_now != state["zoomed"]:
+                    level = _magnifier_level()
+                    state["zoomed"] = zoomed_now
+                    if zoomed_now:
+                        print(
+                            f"[dialogue-reader] Magnifier zoomed "
+                            f"(level={level:.2f}) — polling paused"
+                        )
+                    else:
+                        print(
+                            f"[dialogue-reader] Magnifier back at 100% "
+                            f"(level={level:.2f}) — polling resumed"
+                        )
+                if zoomed_now:
+                    time.sleep(poll_interval)
+                    continue
 
             # 3. Poll regions for pixel changes. Only submit a new batch
             #    if the worker is idle — no point queueing work that'll

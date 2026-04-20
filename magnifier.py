@@ -91,38 +91,62 @@ class _MagState:
 _state = _MagState()
 
 
-# Windows class name of the desktop-sized window Magnifier draws into when
-# fullscreen zoom is actively being rendered. The process can be running
-# with a >1.0 transform configured but this window HIDDEN — that's the
-# state after the user closes Magnifier but before the OS clears the
-# saved transform, or when the MIG overlay sets the transform but isn't
-# currently showing a zoom. We need to check both.
-_FULLSCREEN_MAG_CLASS = "Screen Magnifier Fullscreen Window"
+# Magnify.exe is the only process that can drive Windows fullscreen
+# zoom. When it's not running, no amount of stale transform state in the
+# Magnification API matters — the screen can't possibly be zoomed.
+_MAGNIFY_EXE = "Magnify.exe"
 
 _user32: ctypes.WinDLL | None = None
+_kernel32: ctypes.WinDLL | None = None
 if sys.platform == "win32":
     try:
         _user32 = ctypes.WinDLL("user32")
-        _user32.FindWindowW.argtypes = [ctypes.wintypes.LPCWSTR, ctypes.wintypes.LPCWSTR]
-        _user32.FindWindowW.restype = ctypes.wintypes.HWND
-        _user32.IsWindowVisible.argtypes = [ctypes.wintypes.HWND]
-        _user32.IsWindowVisible.restype = ctypes.wintypes.BOOL
     except OSError:
         _user32 = None
+    try:
+        _kernel32 = ctypes.WinDLL("kernel32")
+    except OSError:
+        _kernel32 = None
 
 
-def _fullscreen_magnifier_visible() -> bool:
-    """True iff the Magnifier's fullscreen rendering window is currently
-    visible. Cheap: one FindWindow + IsWindowVisible call."""
-    if _user32 is None:
+def _magnify_process_running() -> bool:
+    """True iff Magnify.exe has at least one live process. Uses the tool-
+    help snapshot API — no external tools, no shelling out to tasklist."""
+    if _kernel32 is None:
+        return False
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_ulong),
+            ("cntUsage", ctypes.c_ulong),
+            ("th32ProcessID", ctypes.c_ulong),
+            ("th32DefaultHeapID", ctypes.c_void_p),
+            ("th32ModuleID", ctypes.c_ulong),
+            ("cntThreads", ctypes.c_ulong),
+            ("th32ParentProcessID", ctypes.c_ulong),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", ctypes.c_ulong),
+            ("szExeFile", ctypes.c_wchar * 260),
+        ]
+
+    snap = _kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if not snap or snap == INVALID_HANDLE_VALUE:
         return False
     try:
-        hwnd = _user32.FindWindowW(_FULLSCREEN_MAG_CLASS, None)
-    except OSError:
-        return False
-    if not hwnd:
-        return False
-    return bool(_user32.IsWindowVisible(hwnd))
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        if not _kernel32.Process32FirstW(snap, ctypes.byref(entry)):
+            return False
+        while True:
+            if entry.szExeFile.lower() == _MAGNIFY_EXE.lower():
+                return True
+            if not _kernel32.Process32NextW(snap, ctypes.byref(entry)):
+                return False
+    finally:
+        _kernel32.CloseHandle(snap)
 
 
 def get_magnification_level() -> float:
@@ -131,18 +155,30 @@ def get_magnification_level() -> float:
 
 
 def is_zoomed() -> bool:
-    """True iff Windows Magnifier is currently zooming the screen.
+    """True iff Windows Magnifier's fullscreen transform is above 1.0.
 
-    Requires BOTH:
-      - transform level > 1.0 (via MagGetFullscreenTransform)
-      - the fullscreen-rendering window exists and is visible
-
-    The second check matters because Magnifier (and third-party tools
-    like the MIG overlay) often keep a saved transform of e.g. 4.0 even
-    when the user isn't actively zoomed — the rendering window is hidden
-    in that state, so the screen looks normal regardless of the saved
-    transform.
+    Previous versions also required a process check or a hidden-window
+    cross-check, but those fail for users whose Magnify.exe runs
+    persistently (e.g. as part of the Magnifier-In-Games overlay) and
+    whose API transform state is managed by that overlay. Level alone is
+    the most reliable signal across those setups. If your Magnifier
+    keeps a non-1.0 transform at rest, set SkipWhenZoomed=false in the
+    INI to disable this check entirely.
     """
-    if get_magnification_level() <= 1.0 + _EPSILON:
-        return False
-    return _fullscreen_magnifier_visible()
+    return get_magnification_level() > 1.0 + _EPSILON
+
+
+if __name__ == "__main__":
+    # Live probe. Run:  py magnifier.py
+    # Then zoom in / out with Win+Plus / Win+Minus and watch the level.
+    import time
+    print("Magnifier live probe. Zoom in/out — Ctrl+C to stop.")
+    last = None
+    while True:
+        level = get_magnification_level()
+        zoomed = is_zoomed()
+        key = (round(level, 2), zoomed)
+        if key != last:
+            print(f"  level={level:.2f}  is_zoomed={zoomed}")
+            last = key
+        time.sleep(0.1)
