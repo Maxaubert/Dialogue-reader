@@ -38,6 +38,7 @@ import sounddevice as sd
 from region_picker import pick_region
 from capture import RegionCapture
 from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
+from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
 from window_capture import find_window_at, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
@@ -277,6 +278,25 @@ def _load_ocr_config() -> tuple[str, str]:
     elif s:
         print(f"[ocr] Invalid [OCR] Speaker={s!r}, using {speaker_engine}")
     return dialogue_engine, speaker_engine
+
+
+def _load_skip_when_zoomed() -> bool:
+    """Read [Magnifier] SkipWhenZoomed from dialogue_reader.ini.
+    Returns True (default) when enabled or the value is missing/invalid
+    — the feature is conservative and opt-out, not opt-in."""
+    ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not ini_path.exists():
+        return True
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return True
+    raw = cp.get("Magnifier", "SkipWhenZoomed", fallback="true").strip().lower()
+    if raw in ("false", "0", "no", "off"):
+        return False
+    return True
 
 
 def _load_text_confirm_polls() -> int:
@@ -925,6 +945,9 @@ def main() -> int:
     capture_mode = _load_capture_mode()
     print(f"[dialogue-reader] Capture mode: {capture_mode}")
 
+    skip_when_zoomed = _load_skip_when_zoomed()
+    print(f"[dialogue-reader] Magnifier SkipWhenZoomed: {skip_when_zoomed}")
+
     dialogue_engine, speaker_engine = _load_ocr_config()
     print(
         f"[dialogue-reader] Loading OCR engines "
@@ -994,6 +1017,7 @@ def main() -> int:
         "generation": 0,
         "speaker_candidate": "",
         "capture_mode": capture_mode,
+        "zoomed": False,
     }
 
     ocr_worker = OCRWorker(ocr)
@@ -1038,6 +1062,33 @@ def main() -> int:
             if state["paused"] or not regions:
                 time.sleep(poll_interval)
                 continue
+
+            # 2b. Skip polling while Windows Magnifier is zoomed in. Pixel
+            #     positions shift when zoomed, so speaker regions tend to
+            #     pick up stray text and dialogue regions misfire. We
+            #     still drain commands and apply in-flight OCR results
+            #     (done above); only NEW region polling/submission pauses.
+            #     Debug mode logs the raw level even when detection
+            #     thinks nothing changed — useful for diagnosing setups
+            #     where the Magnification API reports stale values.
+            if skip_when_zoomed:
+                zoomed_now = _magnifier_is_zoomed()
+                if zoomed_now != state["zoomed"]:
+                    level = _magnifier_level()
+                    state["zoomed"] = zoomed_now
+                    if zoomed_now:
+                        print(
+                            f"[dialogue-reader] Magnifier zoomed "
+                            f"(level={level:.2f}) — polling paused"
+                        )
+                    else:
+                        print(
+                            f"[dialogue-reader] Magnifier back at 100% "
+                            f"(level={level:.2f}) — polling resumed"
+                        )
+                if zoomed_now:
+                    time.sleep(poll_interval)
+                    continue
 
             # 3. Poll regions for pixel changes. Only submit a new batch
             #    if the worker is idle — no point queueing work that'll
