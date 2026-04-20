@@ -1,17 +1,41 @@
 {
   "assignments": {
-    "__default__": "sherpa:vctk:65",
+    "__default__": "kokoro:af_sarah",
     "B-King Leader": "piper:en_US-norman-medium",
     "B-King Thug": "sherpa:libritts_r:879",
     "Yakuza": "sherpa:vctk:30",
-    "Kiryu": "kokoro:am_santa"
+    "Kiryu": "kokoro:am_santa",
+    "Nanako": "kokoro:af_bella",
+    "Rolling student": "kokoro:af_sky",
+    "Dojima": "kokoro:am_michael",
+    "Unfriendly-looking": "kokoro:bm_lewis",
+    "housewife": "kokoro:af_alloy",
+    "Male student": "kokoro:bf_emma",
+    "Female": "kokoro:bf_isabella",
+    "Out-of-towner": "kokoro:am_michael",
+    "NORN": "kokoro:bm_daniel",
+    "I": "kokoro:af_aoede",
+    "Return": "kokoro:am_eric",
+    "222": "kokoro:bf_alice"
   },
   "cycle_index": {
-    "__default__": 94,
+    "__default__": 12,
     "B-King Leader": 5,
     "B-King Thug": 159,
     "Yakuza": 70,
-    "Kiryu": 35
+    "Kiryu": 35,
+    "Nanako": 2,
+    "Rolling student": 20,
+    "Dojima": 3,
+    "Unfriendly-looking": 11,
+    "housewife": 14,
+    "Male student": 4,
+    "Female": 18,
+    "Out-of-towner": 3,
+    "NORN": 21,
+    "I": 8,
+    "Return": 15,
+    "222": 26
   },
-  "next_auto_index": 60
+  "next_auto_index": 72
 }
