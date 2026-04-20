@@ -24,6 +24,8 @@ from pathlib import Path
 # it as a regular entry lets the user cycle its voice with the usual hotkey.
 DEFAULT_SPEAKER_KEY = "__default__"
 
+VALID_ASSIGNMENT_STRATEGIES = ("random", "round_robin", "inverse_round_robin")
+
 
 def _is_one_edit(longer: str, shorter: str) -> bool:
     """True if `shorter` is `longer` with exactly one character removed."""
@@ -45,17 +47,30 @@ def _is_one_edit(longer: str, shorter: str) -> bool:
 
 
 class SpeakerManager:
-    def __init__(self, voice_pool: list[str], save_path: Path):
+    def __init__(
+        self,
+        voice_pool: list[str],
+        save_path: Path,
+        assignment_strategy: str = "random",
+    ):
         if not voice_pool:
             raise ValueError("voice_pool must contain at least one voice")
+        if assignment_strategy not in VALID_ASSIGNMENT_STRATEGIES:
+            raise ValueError(
+                f"Unknown assignment_strategy: {assignment_strategy!r}. "
+                f"Valid: {VALID_ASSIGNMENT_STRATEGIES}"
+            )
         self.voice_pool = list(voice_pool)
         self.save_path = save_path
+        self.assignment_strategy = assignment_strategy
         self.current_speaker: str = ""
         # name -> voice_name
         self.assignments: dict[str, str] = {}
         # name -> index in voice_pool (so cycle picks the *next* voice)
         self.cycle_index: dict[str, int] = {}
-        # Counter used to round-robin auto-assignment of new speakers.
+        # Counter used by round-robin strategies for auto-assigning new
+        # speakers. Random strategy ignores it but still increments it
+        # so switching between strategies mid-session behaves sensibly.
         self._next_auto_index: int = 0
         self._lock = threading.Lock()
         self._load()
@@ -275,17 +290,29 @@ class SpeakerManager:
                 # Don't create an entry for the garbled form.
                 if self._has_garbled_extension(name):
                     return self.assignments.get(self.current_speaker)
-            # New speaker — pick a random voice from the pool. Random is
-            # preferred over round-robin when the pool is very large and we
-            # want variety across runs / sessions. The assignment persists
-            # in speakers.json so the same character keeps their voice.
+            # New speaker — pick a voice from the pool per the configured
+            # strategy. Assignment persists in speakers.json, so the same
+            # character keeps their voice across restarts regardless of
+            # which strategy produced the initial pick.
             self.current_speaker = name
-            idx = random.randrange(len(self.voice_pool))
+            idx = self._pick_new_voice_index()
             self.assignments[name] = self.voice_pool[idx]
             self.cycle_index[name] = idx
             self._next_auto_index += 1
             self._save()
             return self.assignments[name]
+
+    def _pick_new_voice_index(self) -> int:
+        """Return the pool index to use for a brand-new speaker, according
+        to the configured assignment_strategy. Must be called with the
+        lock held."""
+        n = len(self.voice_pool)
+        if self.assignment_strategy == "round_robin":
+            return self._next_auto_index % n
+        if self.assignment_strategy == "inverse_round_robin":
+            return (n - 1 - self._next_auto_index) % n
+        # Default/random: uniform pick across the whole pool.
+        return random.randrange(n)
 
     def cycle_current_voice(self, direction: int = 1) -> tuple[str, str] | None:
         """Reroll the current speaker's voice. With a 1000+ voice pool, linear
