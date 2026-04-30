@@ -315,24 +315,26 @@ class SpeakerManager:
         return random.randrange(n)
 
     def cycle_current_voice(self, direction: int = 1) -> tuple[str, str] | None:
-        """Reroll the current speaker's voice. With a 1000+ voice pool, linear
-        cycling takes forever to sweep, so we pick a random one instead (but
-        still avoid re-picking the exact current voice). `direction` is kept
-        in the signature for compatibility with the CycleVoicePrev hotkey but
-        is ignored — both next and prev simply re-roll."""
+        """Reroll the current speaker's voice, honouring assignment_strategy:
+          - round_robin / inverse_round_robin: linear walk through the pool
+            by `direction` (+1 next, -1 previous).
+          - random: pick a random voice different from the current one.
+        """
         with self._lock:
             name = self.current_speaker or DEFAULT_SPEAKER_KEY
             current_voice = self.assignments.get(name)
-            if len(self.voice_pool) == 1:
-                new_voice = self.voice_pool[0]
+            n = len(self.voice_pool)
+            if n == 1:
                 new_idx = 0
-            else:
-                # Sample until we land on something different from current.
+            elif self.assignment_strategy == "random":
+                new_idx = self.cycle_index.get(name, 0)
                 for _ in range(10):
-                    new_idx = random.randrange(len(self.voice_pool))
+                    new_idx = random.randrange(n)
                     if self.voice_pool[new_idx] != current_voice:
                         break
-                new_voice = self.voice_pool[new_idx]
+            else:
+                new_idx = (self.cycle_index.get(name, 0) + direction) % n
+            new_voice = self.voice_pool[new_idx]
             self.assignments[name] = new_voice
             self.cycle_index[name] = new_idx
             self._save()

@@ -1,6 +1,6 @@
 {
   "assignments": {
-    "__default__": "kokoro:af_sarah",
+    "__default__": "piper:en_US-ryan-high",
     "B-King Leader": "piper:en_US-norman-medium",
     "B-King Thug": "sherpa:libritts_r:879",
     "Yakuza": "sherpa:vctk:30",
@@ -16,10 +16,19 @@
     "NORN": "kokoro:bm_daniel",
     "I": "kokoro:af_aoede",
     "Return": "kokoro:am_eric",
-    "222": "kokoro:bf_alice"
+    "222": "kokoro:bf_alice",
+    "Timmy": "kokoro:am_puck",
+    "Tom": "kokoro:bm_fable",
+    "Nook": "kokoro:bm_lewis",
+    "Antonio": "sherpa:vctk:0",
+    "Faith": "kokoro:af_jessica",
+    "KK:": "sherpa:vctk:37",
+    "off": "sherpa:vctk:38",
+    "Enjoy": "sherpa:vctk:39",
+    "sure": "sherpa:vctk:40"
   },
   "cycle_index": {
-    "__default__": 12,
+    "__default__": 29,
     "B-King Leader": 5,
     "B-King Thug": 159,
     "Yakuza": 70,
@@ -35,7 +44,16 @@
     "NORN": 21,
     "I": 8,
     "Return": 15,
-    "222": 26
+    "222": 26,
+    "Timmy": 5,
+    "Tom": 7,
+    "Nook": 11,
+    "Antonio": 40,
+    "Faith": 22,
+    "KK:": 77,
+    "off": 78,
+    "Enjoy": 79,
+    "sure": 80
   },
-  "next_auto_index": 72
+  "next_auto_index": 81
 }
