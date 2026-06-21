@@ -1,11 +1,10 @@
 """
-Sample-generator test for new voices — writes WAV files to the project root
-so you can play them back and compare. Renders each voice through the full
-TTS dispatch, so this also exercises engine selection & fallback paths.
+Sample-generator for Kokoro voices: renders each voice to a WAV in the
+project root so you can listen and compare.
 
 Run:
-    python test_voices.py            # render all NEW_VOICES
-    python test_voices.py piper:en_US-ryan-high sherpa:vctk:0
+    python test_voices.py                       # render all SAMPLE_VOICES
+    python test_voices.py kokoro:af_heart kokoro:am_michael
 """
 
 from __future__ import annotations
@@ -16,12 +15,11 @@ from pathlib import Path
 
 import numpy as np
 
-# Voices added in the latest round — edit this list as we add more.
-NEW_VOICES = [
-    "sherpa:melo_en:0",
-    "sherpa:libritts_r:0",
-    "sherpa:libritts_r:100",
-    "sherpa:libritts_r:500",
+SAMPLE_VOICES = [
+    "kokoro:af_heart",
+    "kokoro:am_michael",
+    "kokoro:bf_emma",
+    "kokoro:bm_george",
 ]
 
 TEST_TEXT = (
@@ -31,41 +29,13 @@ TEST_TEXT = (
 
 
 def render(voice: str, out_dir: Path) -> Path:
-    # Import inside the function so a missing engine doesn't crash the whole
-    # script — _get_<engine> will just log and fallback to piper.
     from tts import TTS, _parse_voice
 
-    engine, _name = _parse_voice(voice)
-    # Use the requested voice for init so we don't needlessly preload a
-    # Piper voice when testing Kokoro/Sherpa. If init fails (e.g., voice
-    # isn't in the pool yet), fall back to a known-good default.
-    try:
-        tts = TTS(voice=voice, speed=1.0)
-    except Exception:
-        tts = TTS(voice="piper:en_US-amy-medium", speed=1.0)
-
-    # We want the raw audio+rate rather than playback. Call into the engine
-    # directly via the same helpers tts.speak() uses, skipping sounddevice.
-    if engine == "piper":
-        piper_voice = tts._get_voice(_name)
-        chunks: list[np.ndarray] = []
-        sr: int | None = None
-        from piper.config import SynthesisConfig
-        for ch in piper_voice.synthesize(TEST_TEXT, SynthesisConfig(length_scale=1.0)):
-            chunks.append(ch.audio_float_array)
-            sr = ch.sample_rate
-        assert sr is not None and chunks
-        audio = np.concatenate(chunks)
-    elif engine == "kokoro":
-        k = tts._get_kokoro()
-        assert k is not None, "Kokoro engine unavailable"
-        audio, sr = k.synth(TEST_TEXT, _name, speed=1.0)
-    elif engine == "sherpa":
-        s = tts._get_sherpa()
-        assert s is not None, "Sherpa engine unavailable"
-        audio, sr = s.synth(TEST_TEXT, _name, speed=1.0)
-    else:
-        raise ValueError(f"unknown engine '{engine}'")
+    _engine, name = _parse_voice(voice)
+    tts = TTS(voice=voice, speed=1.0)
+    k = tts._get_kokoro()
+    assert k is not None, "Kokoro engine unavailable"
+    audio, sr = k.synth(TEST_TEXT, name, speed=1.0)
 
     safe = voice.replace(":", "_").replace("/", "_")
     out = out_dir / f"sample_{safe}.wav"
@@ -79,7 +49,7 @@ def render(voice: str, out_dir: Path) -> Path:
 
 
 def main() -> int:
-    voices = sys.argv[1:] if len(sys.argv) > 1 else NEW_VOICES
+    voices = sys.argv[1:] if len(sys.argv) > 1 else SAMPLE_VOICES
     out_dir = Path(__file__).parent
     for voice in voices:
         try:
