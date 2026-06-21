@@ -7,3 +7,4 @@ test_*.png
 /voices/
 sample_*.wav
 graphify-out/
+dialogue_reader.lock

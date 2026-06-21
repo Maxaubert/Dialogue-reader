@@ -23,7 +23,6 @@ from __future__ import annotations
 import ctypes
 import os
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -261,59 +260,16 @@ def _load_text_confirm_polls() -> int:
 # ---- singleton enforcement ------------------------------------------------
 #
 # py.exe (the Python launcher) spawns python.exe as a child process. Killing
-# py.exe via AHK's ProcessClose() does NOT cascade to python.exe — it
-# survives as an orphan, holding the UDP port and continuing to OCR/speak.
-# Three orphans = the "reads 3 times" symptom; an orphan owning the port =
-# the "starts paused (but the new instance silently crashed)" symptom.
+# py.exe via AHK's ProcessClose() does NOT cascade to python.exe, so it can
+# survive as an orphan holding the UDP port and continuing to OCR/speak.
 #
-# At startup we enumerate every other python.exe / pythonw.exe / py.exe
-# whose command line references this main.py and TerminateProcess them
-# before binding our own UDP socket.
+# Each instance records its PID in a lock file next to this script. On startup
+# we read that file and, if it names a different live process, terminate it
+# (newest launch wins) before binding our own UDP socket and opening audio.
+# The parent watchdog below is the other safety net: it kills this process
+# when the launching AHK dies.
 
-_NO_WINDOW_FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-
-def _find_orphan_pids() -> list[int]:
-    """Other python interpreter processes whose command line points at this
-    main.py. We deliberately do NOT include py.exe in the search because it
-    is the *launcher* — it's the parent of our own current python.exe, and
-    killing it causes the current process to die or destabilize. The actual
-    interpreter (python.exe / pythonw.exe) is what holds the UDP port and
-    runs the OCR/TTS loop, so that's the only thing worth killing."""
-    my_pid = os.getpid()
-    main_py = str(Path(__file__).resolve()).lower()
-
-    try:
-        result = subprocess.run(
-            [
-                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                "Get-CimInstance Win32_Process -Filter "
-                "\"Name='python.exe' OR Name='pythonw.exe'\" | "
-                "Where-Object { $_.CommandLine -ne $null } | "
-                "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            creationflags=_NO_WINDOW_FLAGS,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    pids: list[int] = []
-    for line in result.stdout.splitlines():
-        if "|" not in line:
-            continue
-        pid_str, _, cmdline = line.partition("|")
-        try:
-            pid = int(pid_str.strip())
-        except ValueError:
-            continue
-        if pid == my_pid:
-            continue
-        if main_py in cmdline.lower():
-            pids.append(pid)
-    return pids
+_LOCK_PATH = Path(__file__).parent / "dialogue_reader.lock"
 
 
 def _terminate_pid(pid: int) -> None:
@@ -327,20 +283,29 @@ def _terminate_pid(pid: int) -> None:
         ctypes.windll.kernel32.CloseHandle(handle)
 
 
-def _kill_orphans() -> None:
-    """Kill any other instance of this script before we try to start ours."""
-    pids = _find_orphan_pids()
-    if not pids:
-        return
-    print(f"[singleton] killing orphan instance(s): {pids}")
-    for pid in pids:
+def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Ensure this is the only running instance. If lock_path records a prior
+    instance's PID that is still alive (and not our own), terminate it, wait
+    briefly for Windows to release its UDP socket and audio streams, then
+    record our own PID. A missing, empty, or unparseable lock file just means
+    'no known prior instance' and we proceed to write ours."""
+    my_pid = os.getpid()
+    try:
+        prior_pid = int(lock_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        prior_pid = None
+    if prior_pid is not None and prior_pid != my_pid and _is_process_alive(prior_pid):
+        print(f"[singleton] killing prior instance pid {prior_pid}")
         try:
-            _terminate_pid(pid)
+            _terminate_pid(prior_pid)
         except Exception as e:
-            print(f"[singleton] failed to kill {pid}: {e}")
-    # Give Windows a moment to release the UDP socket and clean up sounddevice
-    # streams before we try to bind / open audio.
-    time.sleep(0.7)
+            print(f"[singleton] failed to kill {prior_pid}: {e}")
+        # Let Windows release the UDP socket and sounddevice streams.
+        time.sleep(0.7)
+    try:
+        lock_path.write_text(str(my_pid), encoding="utf-8")
+    except OSError as e:
+        print(f"[singleton] could not write lock file: {e}")
 
 
 # ---- parent watchdog ------------------------------------------------------
@@ -853,12 +818,10 @@ def main() -> int:
     debug = "--debug" in sys.argv
     pick_on_start = "--pick-on-start" in sys.argv
 
-    # Kill any orphaned instances of this script BEFORE we touch heavy stuff
-    # like the OCR/TTS models or the UDP socket. Without this, leftover
-    # python.exe processes from previous runs (e.g. ones AHK couldn't
-    # cascade-kill via py.exe) keep watching the screen and speaking, and
-    # the new instance silently crashes when it can't bind UDP.
-    _kill_orphans()
+    # Claim the singleton BEFORE touching heavy stuff (OCR/TTS models, UDP
+    # socket, audio device). This terminates any prior instance recorded in
+    # the lock file so it is not still holding the port or the sound output.
+    _claim_singleton()
     # Watch the parent AHK so we exit if/when it dies, no matter how.
     _start_parent_watchdog()
 
@@ -905,9 +868,9 @@ def main() -> int:
     try:
         server.start()
     except OSError as e:
-        # Port still held — try one more aggressive sweep, then bail.
-        print(f"[singleton] UDP bind failed ({e}); retrying after another orphan sweep")
-        _kill_orphans()
+        # Port still held by a just-terminated prior instance; give Windows a
+        # moment to release it, then retry once before giving up.
+        print(f"[singleton] UDP bind failed ({e}); retrying after a short wait")
         time.sleep(0.5)
         try:
             server = CommandServer(port=DEFAULT_PORT)
