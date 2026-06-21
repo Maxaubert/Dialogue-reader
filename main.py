@@ -888,22 +888,6 @@ def main() -> int:
     print("[dialogue-reader] Loading TTS engine...")
     tts = TTS(voice=default_voice, speed=1.1)
 
-    # Pre-download (NOT pre-load into RAM) every PIPER voice in the pool so
-    # the user doesn't get a download pause mid-game when they cycle to one.
-    # Non-Piper engines (kokoro, sherpa) handle their own model caching
-    # and typically share a single model across many voices.
-    from tts import _ensure_voice, _parse_voice
-    for voice_name in voice_pool:
-        if voice_name == default_voice:
-            continue
-        engine, inner = _parse_voice(voice_name)
-        if engine != "piper":
-            continue
-        try:
-            _ensure_voice(tts._voices_dir, inner)
-        except Exception as e:
-            print(f"[tts] could not pre-download '{voice_name}': {e}")
-
     speakers_path = Path(__file__).parent / "speakers.json"
     assignment_strategy = _load_speaker_assignment_strategy()
     speaker_mgr = SpeakerManager(
