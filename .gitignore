@@ -8,3 +8,4 @@ test_*.png
 sample_*.wav
 graphify-out/
 dialogue_reader.lock
+speakers.json
