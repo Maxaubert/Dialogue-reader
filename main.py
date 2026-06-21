@@ -23,7 +23,6 @@ from __future__ import annotations
 import ctypes
 import os
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -72,9 +71,8 @@ _PUNCT_RE = re.compile(r"[^\w\s]")
 # matters: it's used round-robin when assigning voices to new speakers, so
 # alternating M/F/M/F gives a natural spread for the first few characters.
 
-# All 28 Kokoro English voices, ordered F/M alternating by official grade
-# (hexgrad/Kokoro-82M VOICES.md). Females outnumber males 15:13, so the
-# last two entries are female-only (pattern breaks when males run out).
+# 12 curated Kokoro English voices, ordered F/M alternating by official grade
+# (hexgrad/Kokoro-82M VOICES.md). High-quality voices for round-robin assignment.
 _DEFAULT_VOICE_POOL = [
     "kokoro:af_heart",      # F  grade A   (US)
     "kokoro:am_fenrir",     # M  grade C+  (US)
@@ -87,86 +85,24 @@ _DEFAULT_VOICE_POOL = [
     "kokoro:af_aoede",      # F  grade C+  (US)
     "kokoro:bm_george",     # M  grade C   (British)
     "kokoro:af_kore",       # F  grade C+  (US)
-    "kokoro:bm_lewis",      # M  grade D+  (British)
     "kokoro:af_sarah",      # F  grade C+  (US)
-    "kokoro:am_echo",       # M  grade D   (US)
-    "kokoro:af_alloy",      # F  grade C   (US)
-    "kokoro:am_eric",       # M  grade D   (US)
-    "kokoro:af_nova",       # F  grade C   (US)
-    "kokoro:am_liam",       # M  grade D   (US)
-    "kokoro:bf_isabella",   # F  grade C   (British)
-    "kokoro:am_onyx",       # M  grade D   (US)
-    "kokoro:af_sky",        # F  grade C-  (US)
-    "kokoro:bm_daniel",     # M  grade D   (British)
-    "kokoro:af_jessica",    # F  grade D   (US)
-    "kokoro:am_santa",      # M  grade D-  (US)
-    "kokoro:af_river",      # F  grade D   (US)
-    "kokoro:am_adam",       # M  grade F+  (US)
-    "kokoro:bf_alice",      # F  grade D   (British)
-    "kokoro:bf_lily",       # F  grade D   (British)
 ]
 
-# Curated "all" lists for `<engine>:all` shorthand in the ini Pool.
-# Piper "all" = the voices we've vetted; users wanting others can add by
-# full name. Kokoro "all" = every English grade A→F voice in the pool above.
-_PIPER_ALL = [
-    "piper:en_US-amy-medium",
-    "piper:en_US-ryan-high",
-    "piper:en_US-ljspeech-high",
-    "piper:en_US-hfc_female-medium",
-    "piper:en_US-hfc_male-medium",
-    "piper:en_US-norman-medium",
-    "piper:en_GB-alan-medium",
-    "piper:en_GB-alba-medium",
-    "piper:en_GB-cori-high",
-    "piper:en_GB-jenny_dioco-medium",
-    "piper:en_GB-northern_english_male-medium",
-    "piper:en_GB-semaine-medium",
-]
 _KOKORO_ALL = [v for v in _DEFAULT_VOICE_POOL if v.startswith("kokoro:")]
 
 
 def _expand_voice(voice: str) -> list[str]:
     """Expand shorthand voice entries into a concrete list.
 
-    Supported forms (in addition to a single bare voice):
-      - `piper:all`                 → every curated Piper voice
-      - `kokoro:all`                → every curated Kokoro voice
-      - `sherpa:<model>:all`        → every speaker id of that sherpa model
-      - `sherpa:<model>:<start>-<end>` → inclusive range of speaker ids
+    Supported forms:
+      - `kokoro:all`  -> every curated Kokoro voice
+      - any other single voice passes through unchanged.
     """
     v = voice.strip()
     if not v:
         return []
-    # piper:all / kokoro:all
-    if v == "piper:all":
-        return list(_PIPER_ALL)
     if v == "kokoro:all":
         return list(_KOKORO_ALL)
-    # sherpa:<model>:all or sherpa:<model>:<start>-<end>
-    if v.startswith("sherpa:"):
-        prefix, _, tail = v.rpartition(":")
-        # Only operate if the tail is `all` or a range — single IDs
-        # pass through unchanged.
-        if tail == "all":
-            # prefix is "sherpa:<model>"
-            _, _, model = prefix.rpartition(":")
-            try:
-                from sherpa_tts import get_known_models
-                n = get_known_models().get(model)
-            except Exception:
-                n = None
-            if n is None:
-                return [v]  # unknown model — let the engine report later
-            return [f"{prefix}:{i}" for i in range(n)]
-        if "-" in tail:
-            try:
-                start_s, end_s = tail.split("-", 1)
-                start, end = int(start_s), int(end_s)
-                if start <= end:
-                    return [f"{prefix}:{i}" for i in range(start, end + 1)]
-            except ValueError:
-                pass
     return [v]
 
 
@@ -324,59 +260,16 @@ def _load_text_confirm_polls() -> int:
 # ---- singleton enforcement ------------------------------------------------
 #
 # py.exe (the Python launcher) spawns python.exe as a child process. Killing
-# py.exe via AHK's ProcessClose() does NOT cascade to python.exe — it
-# survives as an orphan, holding the UDP port and continuing to OCR/speak.
-# Three orphans = the "reads 3 times" symptom; an orphan owning the port =
-# the "starts paused (but the new instance silently crashed)" symptom.
+# py.exe via AHK's ProcessClose() does NOT cascade to python.exe, so it can
+# survive as an orphan holding the UDP port and continuing to OCR/speak.
 #
-# At startup we enumerate every other python.exe / pythonw.exe / py.exe
-# whose command line references this main.py and TerminateProcess them
-# before binding our own UDP socket.
+# Each instance records its PID in a lock file next to this script. On startup
+# we read that file and, if it names a different live process, terminate it
+# (newest launch wins) before binding our own UDP socket and opening audio.
+# The parent watchdog below is the other safety net: it kills this process
+# when the launching AHK dies.
 
-_NO_WINDOW_FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-
-def _find_orphan_pids() -> list[int]:
-    """Other python interpreter processes whose command line points at this
-    main.py. We deliberately do NOT include py.exe in the search because it
-    is the *launcher* — it's the parent of our own current python.exe, and
-    killing it causes the current process to die or destabilize. The actual
-    interpreter (python.exe / pythonw.exe) is what holds the UDP port and
-    runs the OCR/TTS loop, so that's the only thing worth killing."""
-    my_pid = os.getpid()
-    main_py = str(Path(__file__).resolve()).lower()
-
-    try:
-        result = subprocess.run(
-            [
-                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                "Get-CimInstance Win32_Process -Filter "
-                "\"Name='python.exe' OR Name='pythonw.exe'\" | "
-                "Where-Object { $_.CommandLine -ne $null } | "
-                "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            creationflags=_NO_WINDOW_FLAGS,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    pids: list[int] = []
-    for line in result.stdout.splitlines():
-        if "|" not in line:
-            continue
-        pid_str, _, cmdline = line.partition("|")
-        try:
-            pid = int(pid_str.strip())
-        except ValueError:
-            continue
-        if pid == my_pid:
-            continue
-        if main_py in cmdline.lower():
-            pids.append(pid)
-    return pids
+_LOCK_PATH = Path(__file__).parent / "dialogue_reader.lock"
 
 
 def _terminate_pid(pid: int) -> None:
@@ -390,20 +283,29 @@ def _terminate_pid(pid: int) -> None:
         ctypes.windll.kernel32.CloseHandle(handle)
 
 
-def _kill_orphans() -> None:
-    """Kill any other instance of this script before we try to start ours."""
-    pids = _find_orphan_pids()
-    if not pids:
-        return
-    print(f"[singleton] killing orphan instance(s): {pids}")
-    for pid in pids:
+def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Ensure this is the only running instance. If lock_path records a prior
+    instance's PID that is still alive (and not our own), terminate it, wait
+    briefly for Windows to release its UDP socket and audio streams, then
+    record our own PID. A missing, empty, or unparseable lock file just means
+    'no known prior instance' and we proceed to write ours."""
+    my_pid = os.getpid()
+    try:
+        prior_pid = int(lock_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        prior_pid = None
+    if prior_pid is not None and prior_pid != my_pid and _is_process_alive(prior_pid):
+        print(f"[singleton] killing prior instance pid {prior_pid}")
         try:
-            _terminate_pid(pid)
+            _terminate_pid(prior_pid)
         except Exception as e:
-            print(f"[singleton] failed to kill {pid}: {e}")
-    # Give Windows a moment to release the UDP socket and clean up sounddevice
-    # streams before we try to bind / open audio.
-    time.sleep(0.7)
+            print(f"[singleton] failed to kill {prior_pid}: {e}")
+        # Let Windows release the UDP socket and sounddevice streams.
+        time.sleep(0.7)
+    try:
+        lock_path.write_text(str(my_pid), encoding="utf-8")
+    except OSError as e:
+        print(f"[singleton] could not write lock file: {e}")
 
 
 # ---- parent watchdog ------------------------------------------------------
@@ -480,9 +382,14 @@ def _make_beep(frequencies: list[float], tone_ms: int = 80) -> np.ndarray:
     return np.concatenate(pieces)
 
 
-# Pause descends (stop) — unpause ascends (go).
+# Pause descends (stop), unpause ascends (go).
 _PAUSE_CUE = _make_beep([700.0, 350.0])
 _UNPAUSE_CUE = _make_beep([350.0, 700.0])
+
+# Distinct rising chime for "app is ready" (C5 -> G5), separate from unpause.
+_READY_CUE = _make_beep([523.0, 784.0])
+_STARTUP_PHRASE = "OCR starting up"
+_READY_PHRASE = "OCR ready"
 
 
 def _play_cue(audio: np.ndarray) -> None:
@@ -512,7 +419,6 @@ class WatchedRegion:
     # baseline.
     last_spoken_text: str = ""
     has_pending_frame: bool = False
-    pending_frame: np.ndarray | None = None
 
 
 def _normalize(s: str) -> str:
@@ -770,7 +676,6 @@ def _apply_ocr_result(
             print(f"[ocr] batch failed: {result.error}", flush=True)
         for r in regions:
             r.has_pending_frame = False
-            r.pending_frame = None
         return
 
     any_dialogue_changed = False
@@ -829,7 +734,6 @@ def _apply_ocr_result(
 
         r.last_text = new_text
         r.has_pending_frame = False
-        r.pending_frame = None
 
     state["speaker_candidate"] = speaker_candidate
 
@@ -895,21 +799,14 @@ def _build_batch_job(
     that appeared slightly after the dialogue update gets OCR'd before we
     attribute the line to the previous speaker."""
     specs: list[OCRRegionSpec] = []
-    dialogue_included = False
     for r in regions:
         if r.has_pending_frame or r.mode == "speaker":
             specs.append(OCRRegionSpec(
                 name=r.name, mode=r.mode, capture=r.capture,
             ))
-            if r.mode == "dialogue":
-                dialogue_included = True
     # Require at least one actually-changed region to bother submitting.
     if not any(r.has_pending_frame for r in regions):
         return None
-    # Edge case: only speaker regions, none of which changed — skip.
-    # (Can't happen currently since we gate on any_changed above, but the
-    # check is cheap insurance.)
-    del dialogue_included
     return OCRBatchJob(
         generation=generation,
         regions=specs,
@@ -926,12 +823,10 @@ def main() -> int:
     debug = "--debug" in sys.argv
     pick_on_start = "--pick-on-start" in sys.argv
 
-    # Kill any orphaned instances of this script BEFORE we touch heavy stuff
-    # like the OCR/TTS models or the UDP socket. Without this, leftover
-    # python.exe processes from previous runs (e.g. ones AHK couldn't
-    # cascade-kill via py.exe) keep watching the screen and speaking, and
-    # the new instance silently crashes when it can't bind UDP.
-    _kill_orphans()
+    # Claim the singleton BEFORE touching heavy stuff (OCR/TTS models, UDP
+    # socket, audio device). This terminates any prior instance recorded in
+    # the lock file so it is not still holding the port or the sound output.
+    _claim_singleton()
     # Watch the parent AHK so we exit if/when it dies, no matter how.
     _start_parent_watchdog()
 
@@ -949,6 +844,14 @@ def main() -> int:
     print(f"[dialogue-reader] Magnifier SkipWhenZoomed: {skip_when_zoomed}")
 
     dialogue_engine, speaker_engine = _load_ocr_config()
+
+    # Load Kokoro FIRST so it can announce startup while the slower OCR
+    # engines (EasyOCR/torch) load. tts.speak() is non-blocking, so the
+    # announcement plays during the OCR load below.
+    print("[dialogue-reader] Loading TTS engine...")
+    tts = TTS(voice=default_voice, speed=1.1)
+    tts.speak(_STARTUP_PHRASE)
+
     print(
         f"[dialogue-reader] Loading OCR engines "
         f"(dialogue={dialogue_engine}, speaker={speaker_engine})..."
@@ -958,24 +861,6 @@ def main() -> int:
         dialogue_engine=dialogue_engine,
         speaker_engine=speaker_engine,
     )
-    print("[dialogue-reader] Loading TTS engine...")
-    tts = TTS(voice=default_voice, speed=1.1)
-
-    # Pre-download (NOT pre-load into RAM) every PIPER voice in the pool so
-    # the user doesn't get a download pause mid-game when they cycle to one.
-    # Non-Piper engines (kokoro, sherpa) handle their own model caching
-    # and typically share a single model across many voices.
-    from tts import _ensure_voice, _parse_voice
-    for voice_name in voice_pool:
-        if voice_name == default_voice:
-            continue
-        engine, inner = _parse_voice(voice_name)
-        if engine != "piper":
-            continue
-        try:
-            _ensure_voice(tts._voices_dir, inner)
-        except Exception as e:
-            print(f"[tts] could not pre-download '{voice_name}': {e}")
 
     speakers_path = Path(__file__).parent / "speakers.json"
     assignment_strategy = _load_speaker_assignment_strategy()
@@ -994,9 +879,9 @@ def main() -> int:
     try:
         server.start()
     except OSError as e:
-        # Port still held — try one more aggressive sweep, then bail.
-        print(f"[singleton] UDP bind failed ({e}); retrying after another orphan sweep")
-        _kill_orphans()
+        # Port still held by a just-terminated prior instance; give Windows a
+        # moment to release it, then retry once before giving up.
+        print(f"[singleton] UDP bind failed ({e}); retrying after a short wait")
         time.sleep(0.5)
         try:
             server = CommandServer(port=DEFAULT_PORT)
@@ -1022,6 +907,12 @@ def main() -> int:
 
     ocr_worker = OCRWorker(ocr)
     print("[dialogue-reader] OCR worker thread started.")
+
+    # Everything is loaded and the command server is bound, so hotkeys are
+    # now live. Signal it: rising chime (plays even if Kokoro is down) then a
+    # spoken confirmation.
+    _play_cue(_READY_CUE)
+    tts.speak(_READY_PHRASE)
 
     print("[dialogue-reader] Ready. Use the AHK script (or send UDP commands) to control.")
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
@@ -1099,7 +990,6 @@ def main() -> int:
                     frame = r.capture.poll_once()
                     if frame is not None:
                         r.has_pending_frame = True
-                        r.pending_frame = frame
                         any_changed = True
 
                 if any_changed:

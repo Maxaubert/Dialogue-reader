@@ -8,9 +8,6 @@ Two backends:
   crops to the region. Immune to Magnifier/zoom and follows the window
   if the user moves it. Falls back to screen mode if PrintWindow returns
   blank/None (e.g., GPU-rendered DirectX games).
-
-`stable_frames()` blocks until pixels in the region change AND stay still
-for `stable_ms`. That's how we avoid OCR'ing partially-revealed text.
 """
 
 from __future__ import annotations
@@ -18,8 +15,6 @@ from __future__ import annotations
 import math
 import time
 import hashlib
-from collections.abc import Iterator
-
 import cv2
 import mss
 import numpy as np
@@ -211,7 +206,7 @@ class RegionCapture:
         )
 
         # Polling state for poll_once() — used when one outer loop drives
-        # multiple regions. stable_frames() ignores these.
+        # multiple regions.
         self._current_hash: str = ""
         self._last_yielded_hash: str = ""
         self._stable_since: float = 0.0
@@ -334,42 +329,3 @@ class RegionCapture:
             return frame
 
         return None
-
-    def stable_frames(self) -> Iterator[np.ndarray]:
-        """Yield a frame every time the region changes and then stabilizes."""
-        last_yielded_hash = None
-        current_hash = _hash_frame(self._grab())
-        stable_since = time.monotonic()
-        last_heartbeat = time.monotonic()
-        poll_count = 0
-
-        while True:
-            time.sleep(self.poll_interval)
-            frame = self._grab()
-            new_hash = _hash_frame(frame)
-            poll_count += 1
-
-            if self.verbose and time.monotonic() - last_heartbeat > 3.0:
-                print(
-                    f"[capture] {poll_count} polls, "
-                    f"hash={current_hash[:8]} "
-                    f"stable_for={time.monotonic() - stable_since:.1f}s",
-                    flush=True,
-                )
-                last_heartbeat = time.monotonic()
-
-            if new_hash != current_hash:
-                if self.verbose:
-                    print(f"[capture] change detected ({new_hash[:8]})", flush=True)
-                current_hash = new_hash
-                stable_since = time.monotonic()
-                continue
-
-            if (
-                time.monotonic() - stable_since >= self.stable_seconds
-                and current_hash != last_yielded_hash
-            ):
-                last_yielded_hash = current_hash
-                if self.verbose:
-                    print("[capture] stable -> yielding frame", flush=True)
-                yield frame

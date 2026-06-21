@@ -1,7 +1,10 @@
 mss>=10.0
 Pillow>=10.0
 numpy>=1.24
+sounddevice>=0.4
 PySide6>=6.6
-rapidocr-onnxruntime>=1.2
 kokoro-onnx>=0.3.0
-sherpa-onnx>=1.10
+winocr
+easyocr>=1.7
+opencv-python>=4.8
+pywin32>=306
