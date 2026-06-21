@@ -87,23 +87,7 @@ _DEFAULT_VOICE_POOL = [
     "kokoro:af_aoede",      # F  grade C+  (US)
     "kokoro:bm_george",     # M  grade C   (British)
     "kokoro:af_kore",       # F  grade C+  (US)
-    "kokoro:bm_lewis",      # M  grade D+  (British)
     "kokoro:af_sarah",      # F  grade C+  (US)
-    "kokoro:am_echo",       # M  grade D   (US)
-    "kokoro:af_alloy",      # F  grade C   (US)
-    "kokoro:am_eric",       # M  grade D   (US)
-    "kokoro:af_nova",       # F  grade C   (US)
-    "kokoro:am_liam",       # M  grade D   (US)
-    "kokoro:bf_isabella",   # F  grade C   (British)
-    "kokoro:am_onyx",       # M  grade D   (US)
-    "kokoro:af_sky",        # F  grade C-  (US)
-    "kokoro:bm_daniel",     # M  grade D   (British)
-    "kokoro:af_jessica",    # F  grade D   (US)
-    "kokoro:am_santa",      # M  grade D-  (US)
-    "kokoro:af_river",      # F  grade D   (US)
-    "kokoro:am_adam",       # M  grade F+  (US)
-    "kokoro:bf_alice",      # F  grade D   (British)
-    "kokoro:bf_lily",       # F  grade D   (British)
 ]
 
 _KOKORO_ALL = [v for v in _DEFAULT_VOICE_POOL if v.startswith("kokoro:")]
