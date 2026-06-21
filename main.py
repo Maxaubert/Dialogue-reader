@@ -512,7 +512,6 @@ class WatchedRegion:
     # baseline.
     last_spoken_text: str = ""
     has_pending_frame: bool = False
-    pending_frame: np.ndarray | None = None
 
 
 def _normalize(s: str) -> str:
@@ -770,7 +769,6 @@ def _apply_ocr_result(
             print(f"[ocr] batch failed: {result.error}", flush=True)
         for r in regions:
             r.has_pending_frame = False
-            r.pending_frame = None
         return
 
     any_dialogue_changed = False
@@ -829,7 +827,6 @@ def _apply_ocr_result(
 
         r.last_text = new_text
         r.has_pending_frame = False
-        r.pending_frame = None
 
     state["speaker_candidate"] = speaker_candidate
 
@@ -895,21 +892,14 @@ def _build_batch_job(
     that appeared slightly after the dialogue update gets OCR'd before we
     attribute the line to the previous speaker."""
     specs: list[OCRRegionSpec] = []
-    dialogue_included = False
     for r in regions:
         if r.has_pending_frame or r.mode == "speaker":
             specs.append(OCRRegionSpec(
                 name=r.name, mode=r.mode, capture=r.capture,
             ))
-            if r.mode == "dialogue":
-                dialogue_included = True
     # Require at least one actually-changed region to bother submitting.
     if not any(r.has_pending_frame for r in regions):
         return None
-    # Edge case: only speaker regions, none of which changed — skip.
-    # (Can't happen currently since we gate on any_changed above, but the
-    # check is cheap insurance.)
-    del dialogue_included
     return OCRBatchJob(
         generation=generation,
         regions=specs,
@@ -1099,7 +1089,6 @@ def main() -> int:
                     frame = r.capture.poll_once()
                     if frame is not None:
                         r.has_pending_frame = True
-                        r.pending_frame = frame
                         any_changed = True
 
                 if any_changed:
