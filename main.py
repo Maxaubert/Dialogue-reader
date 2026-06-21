@@ -382,9 +382,14 @@ def _make_beep(frequencies: list[float], tone_ms: int = 80) -> np.ndarray:
     return np.concatenate(pieces)
 
 
-# Pause descends (stop) — unpause ascends (go).
+# Pause descends (stop), unpause ascends (go).
 _PAUSE_CUE = _make_beep([700.0, 350.0])
 _UNPAUSE_CUE = _make_beep([350.0, 700.0])
+
+# Distinct rising chime for "app is ready" (C5 -> G5), separate from unpause.
+_READY_CUE = _make_beep([523.0, 784.0])
+_STARTUP_PHRASE = "OCR starting up"
+_READY_PHRASE = "OCR ready"
 
 
 def _play_cue(audio: np.ndarray) -> None:
@@ -839,6 +844,14 @@ def main() -> int:
     print(f"[dialogue-reader] Magnifier SkipWhenZoomed: {skip_when_zoomed}")
 
     dialogue_engine, speaker_engine = _load_ocr_config()
+
+    # Load Kokoro FIRST so it can announce startup while the slower OCR
+    # engines (EasyOCR/torch) load. tts.speak() is non-blocking, so the
+    # announcement plays during the OCR load below.
+    print("[dialogue-reader] Loading TTS engine...")
+    tts = TTS(voice=default_voice, speed=1.1)
+    tts.speak(_STARTUP_PHRASE)
+
     print(
         f"[dialogue-reader] Loading OCR engines "
         f"(dialogue={dialogue_engine}, speaker={speaker_engine})..."
@@ -848,8 +861,6 @@ def main() -> int:
         dialogue_engine=dialogue_engine,
         speaker_engine=speaker_engine,
     )
-    print("[dialogue-reader] Loading TTS engine...")
-    tts = TTS(voice=default_voice, speed=1.1)
 
     speakers_path = Path(__file__).parent / "speakers.json"
     assignment_strategy = _load_speaker_assignment_strategy()
@@ -896,6 +907,12 @@ def main() -> int:
 
     ocr_worker = OCRWorker(ocr)
     print("[dialogue-reader] OCR worker thread started.")
+
+    # Everything is loaded and the command server is bound, so hotkeys are
+    # now live. Signal it: rising chime (plays even if Kokoro is down) then a
+    # spoken confirmation.
+    _play_cue(_READY_CUE)
+    tts.speak(_READY_PHRASE)
 
     print("[dialogue-reader] Ready. Use the AHK script (or send UDP commands) to control.")
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
