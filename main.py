@@ -72,9 +72,8 @@ _PUNCT_RE = re.compile(r"[^\w\s]")
 # matters: it's used round-robin when assigning voices to new speakers, so
 # alternating M/F/M/F gives a natural spread for the first few characters.
 
-# All 28 Kokoro English voices, ordered F/M alternating by official grade
-# (hexgrad/Kokoro-82M VOICES.md). Females outnumber males 15:13, so the
-# last two entries are female-only (pattern breaks when males run out).
+# 12 curated Kokoro English voices, ordered F/M alternating by official grade
+# (hexgrad/Kokoro-82M VOICES.md). High-quality voices for round-robin assignment.
 _DEFAULT_VOICE_POOL = [
     "kokoro:af_heart",      # F  grade A   (US)
     "kokoro:am_fenrir",     # M  grade C+  (US)
