@@ -1,12 +1,27 @@
 <div align="center">
 
-# Dialogue Reader
+  <img src="assets/logo.png" alt="Dialogue Reader" width="120">
+
+  # Dialogue Reader
+
+  **Reads on-screen game dialogue aloud, with a different voice per speaker.**
+
+  ![Windows](https://img.shields.io/badge/Windows_10_%7C_11-0078D6?logo=windows&logoColor=white)
+  ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+  ![AutoHotkey](https://img.shields.io/badge/AutoHotkey_v2-334A5E?logo=autohotkey&logoColor=white)
+  ![Voices](https://img.shields.io/badge/1000%2B_voices-EE8C2B)
+  [![Last commit](https://img.shields.io/github/last-commit/Maxaubert/Dialogue-reader?color=EE8C2B)](https://github.com/Maxaubert/Dialogue-reader/commits)
+
+  <br>
+
+  <!-- tech-stack row (skill-icons): Python, PySide6 (Qt), Windows -->
+  <img src="https://skillicons.dev/icons?i=py,qt,windows" alt="Python, PySide6 (Qt), Windows">
 
 </div>
 
-<p align="center"><b>Reads on-screen game dialogue out loud, with a different voice per speaker.</b></p>
-
-<p align="center"><i>Watches selected screen regions, OCRs new text the moment it appears, and pipes it through a TTS engine. Built for games but works on any app with on-screen text.</i></p>
+<!-- DEMO GIF slot: record a short loop of Dialogue Reader speaking game dialogue, save it as
+     assets/demo.gif, and uncomment the line below: -->
+<!-- <p align="center"><img src="assets/demo.gif" alt="Dialogue Reader in action" width="760"></p> -->
 
 ---
 
