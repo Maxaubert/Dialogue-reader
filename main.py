@@ -34,12 +34,12 @@ from pathlib import Path
 import numpy as np
 import sounddevice as sd
 
-from region_picker import pick_region
+from region_picker import manage_regions
 from capture import RegionCapture
 from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
 from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
-from window_capture import find_window_at, get_window_title
+from window_capture import find_window_at, get_window_rect, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
 
@@ -484,66 +484,166 @@ def _safe_print(prefix: str, value: str) -> None:
         print(f"{prefix}{value.encode('ascii', 'replace').decode()}")
 
 
-def add_region(
+def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
+    """Describe each watched region's current on-screen rectangle so the
+    picker overlay can outline it. Regions bound to a window follow the
+    window's current position (matching capture behavior); forced-screen
+    regions are absolute. Rotated regions report the user's original rect
+    (centered in the padded capture bbox) plus the rotation."""
+    outlines: list[dict] = []
+    for r in regions:
+        cap = r.capture
+        bx, by = cap.bbox["left"], cap.bbox["top"]
+        if cap.hwnd and cap.capture_mode != "screen":
+            try:
+                wx, wy, _, _ = get_window_rect(cap.hwnd)
+                bx, by = wx + cap.rel_x, wy + cap.rel_y
+            except Exception:
+                pass  # window gone — show the pick-time position
+        cx = bx + cap.bbox["width"] / 2.0
+        cy = by + cap.bbox["height"] / 2.0
+        outlines.append({
+            "x": int(cx - cap.target_w / 2.0),
+            "y": int(cy - cap.target_h / 2.0),
+            "w": cap.target_w,
+            "h": cap.target_h,
+            "rotation": cap.rotation,
+            "label": r.name,
+            "mode": r.mode,
+        })
+    return outlines
+
+
+def _apply_region_edits(
+    regions: list[WatchedRegion],
+    outlines: list[dict] | None,
+    state: dict,
+) -> None:
+    """Push outline edits made inside the picker (moved/resized regions)
+    back into the running captures. Each edited region gets a fresh
+    RegionCapture at its new rect (re-detecting the window underneath) and
+    reset text state; any in-flight OCR batch is invalidated."""
+    by_label = {o.get("label"): o for o in (outlines or [])}
+    changed = False
+    for r in regions:
+        o = by_label.get(r.name)
+        if not o or not o.get("edited"):
+            continue
+        rect = (o["x"], o["y"], o["w"], o["h"])
+        hwnd = find_window_at(o["x"] + o["w"] // 2, o["y"] + o["h"] // 2)
+        r.capture = RegionCapture(
+            rect,
+            hwnd=hwnd,
+            poll_hz=POLL_HZ,
+            stable_ms=STABLE_MS,
+            verbose=False,
+            rotation=float(o.get("rotation", 0.0)),
+            capture_mode=state["capture_mode"],
+        )
+        r.last_text = ""
+        r.last_spoken_text = ""
+        r.has_pending_frame = False
+        changed = True
+        print(
+            f"[dialogue-reader] {r.name} adjusted -> "
+            f"x={o['x']} y={o['y']} w={o['w']} h={o['h']}"
+        )
+    if changed:
+        # Results from OCR batches referencing the old captures no longer
+        # apply to what these regions now show.
+        state["generation"] += 1
+
+
+def _capture_mode_label(cap) -> str:
+    if cap.capture_mode == "screen":
+        return "SCREEN (forced)"
+    if cap.capture_mode == "window":
+        return "WINDOW (forced)"
+    if cap.use_window_mode:
+        return "WINDOW"
+    return "SCREEN"
+
+
+def open_region_manager(
     regions: list[WatchedRegion],
     debug: bool,
-    mode: str = "dialogue",
-    capture_mode: str = "auto",
-) -> None:
-    """Open the region picker and append the result as a new watched region.
+    mode: str,
+    state: dict,
+    poll_commands=None,
+) -> list[str]:
+    """Run a region-manager session and apply its outcome to `regions`.
 
-    mode="dialogue" → text gets read aloud (the normal case).
-    mode="speaker"  → text becomes the current speaker name; not spoken,
-                      used to look up which voice to use for dialogue.
+    The manager stays open until the user presses F1 again or Esc. Inside
+    it they can draw any number of new regions (added with `mode` —
+    "dialogue" is spoken, "speaker" feeds the voice lookup), move/resize
+    existing ones, and right-click-delete them. Returns UDP commands that
+    arrived mid-session for the caller to process afterwards.
     """
     label = "speaker name" if mode == "speaker" else "dialogue"
-    print(f"[dialogue-reader] Pick the {label} region to watch...")
-    region, hwnd, rotation = pick_region()
-    if not region:
-        print("[dialogue-reader] Region pick cancelled.")
-        return
-
-    x, y, w, h = region
-    rot_label = f"  rotation={rotation:+.0f}\u00B0" if abs(rotation) > 0.001 else ""
-    print(f"[dialogue-reader] Region picked: x={x} y={y} w={w} h={h}{rot_label}")
-
-    # The picker now captures the underlying HWND at release time, while it
-    # still knows exactly where the user clicked AND has hidden the overlay.
-    # If for some reason that failed (returned 0), fall back to a fresh
-    # WindowFromPoint call here.
-    if not hwnd:
-        hwnd = find_window_at(x + w // 2, y + h // 2)
-
-    if hwnd:
-        _safe_print(
-            "[dialogue-reader] Window under region: ",
-            f"{get_window_title(hwnd)} (hwnd={hwnd})",
-        )
-    else:
-        print("[dialogue-reader] No window detected — falling back to screen capture.")
-
-    cap = RegionCapture(
-        region,
-        hwnd=hwnd,
-        poll_hz=POLL_HZ,
-        stable_ms=STABLE_MS,
-        verbose=False,
-        rotation=rotation,
-        capture_mode=capture_mode,
+    print(
+        f"[dialogue-reader] Region manager open ({label} mode). "
+        f"Drag to add, right-click to delete, F1/Esc to close."
     )
-    if cap.capture_mode == "screen":
-        print("[dialogue-reader] Using SCREEN capture mode (forced — PrintWindow disabled).")
-    elif cap.capture_mode == "window":
-        print("[dialogue-reader] Using WINDOW capture mode (forced PrintWindow).")
-    elif cap.use_window_mode:
-        print("[dialogue-reader] Using WINDOW capture mode (immune to Magnifier/zoom).")
-    else:
-        print("[dialogue-reader] Using SCREEN capture mode.")
+    result = manage_regions(
+        _existing_outlines(regions),
+        mode=mode,
+        poll_commands=poll_commands,
+    )
 
-    n_existing = len([r for r in regions if r.mode == mode])
-    name = f"{mode}{n_existing + 1}"
-    regions.append(WatchedRegion(name=name, capture=cap, mode=mode))
-    print(f"[dialogue-reader] Added {name} (mode={mode}). Total regions: {len(regions)}")
+    # 1. Deletions.
+    deleted = {d for d in result.deleted if d}
+    if deleted:
+        removed = [r for r in regions if r.name in deleted]
+        regions[:] = [r for r in regions if r.name not in deleted]
+        for r in removed:
+            print(f"[dialogue-reader] Removed {r.name}")
+        # In-flight OCR may reference the removed captures.
+        state["generation"] += 1
+        if not regions:
+            # Same reset CLEAR_REGIONS does: nothing watched anymore.
+            state["last_spoken"] = ""
+            state["candidate"] = ""
+            state["speaker_candidate"] = ""
+
+    # 2. Moves/resizes of surviving pre-existing regions.
+    _apply_region_edits(
+        regions,
+        [o for o in result.outlines if not o.get("created")],
+        state,
+    )
+
+    # 3. Newly drawn regions.
+    for o in result.outlines:
+        if not o.get("created"):
+            continue
+        region = (o["x"], o["y"], o["w"], o["h"])
+        hwnd = o.get("hwnd", 0)
+        if not hwnd:
+            hwnd = find_window_at(o["x"] + o["w"] // 2, o["y"] + o["h"] // 2)
+        if hwnd:
+            _safe_print(
+                "[dialogue-reader] Window under region: ",
+                f"{get_window_title(hwnd)} (hwnd={hwnd})",
+            )
+        cap = RegionCapture(
+            region,
+            hwnd=hwnd,
+            poll_hz=POLL_HZ,
+            stable_ms=STABLE_MS,
+            verbose=False,
+            rotation=float(o.get("rotation", 0.0)),
+            capture_mode=state["capture_mode"],
+        )
+        regions.append(
+            WatchedRegion(name=o["label"], capture=cap, mode=o["mode"])
+        )
+        print(
+            f"[dialogue-reader] Added {o['label']} (mode={o['mode']}, "
+            f"capture={_capture_mode_label(cap)})."
+        )
+
+    print(f"[dialogue-reader] Manager closed. Total regions: {len(regions)}")
+    return result.unhandled
 
 
 def build_speech(regions: list[WatchedRegion]) -> str:
@@ -579,11 +679,22 @@ def handle_command(
     speaker_mgr: SpeakerManager,
     state: dict,
     debug: bool,
+    poll_commands=None,
 ) -> None:
-    if cmd == "PICK_REGION":
-        add_region(regions, debug=debug, mode="dialogue", capture_mode=state["capture_mode"])
-    elif cmd == "PICK_SPEAKER":
-        add_region(regions, debug=debug, mode="speaker", capture_mode=state["capture_mode"])
+    if cmd in ("PICK_REGION", "PICK_SPEAKER"):
+        mode = "speaker" if cmd == "PICK_SPEAKER" else "dialogue"
+        unhandled = open_region_manager(
+            regions, debug=debug, mode=mode, state=state,
+            poll_commands=poll_commands,
+        )
+        # Commands that arrived while the manager was open. They can never
+        # contain PICK_* (the manager consumes those as its close toggle),
+        # so this recursion is at most one level deep.
+        for extra in unhandled:
+            handle_command(
+                extra, regions, tts, speaker_mgr, state, debug=debug,
+                poll_commands=poll_commands,
+            )
     elif cmd == "CLEAR_REGIONS":
         regions.clear()
         # Also reset speak-history so freshly-picked regions that happen
@@ -918,8 +1029,27 @@ def main() -> int:
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
     print()
 
+    def _drain_commands() -> list[str]:
+        """Pull every pending UDP command off the server queue. Used by
+        the region manager to notice F1-again (toggle close) while the
+        main loop is blocked inside the manager session."""
+        cmds: list[str] = []
+        while True:
+            try:
+                cmds.append(server.queue.get_nowait())
+            except queue.Empty:
+                break
+        return cmds
+
     if pick_on_start:
-        add_region(regions, debug=debug, capture_mode=capture_mode)
+        for extra in open_region_manager(
+            regions, debug=debug, mode="dialogue", state=state,
+            poll_commands=_drain_commands,
+        ):
+            handle_command(
+                extra, regions, tts, speaker_mgr, state, debug=debug,
+                poll_commands=_drain_commands,
+            )
 
     poll_interval = 1.0 / POLL_HZ
 
@@ -933,7 +1063,10 @@ def main() -> int:
                     cmd = server.queue.get_nowait()
                 except queue.Empty:
                     break
-                handle_command(cmd, regions, tts, speaker_mgr, state, debug=debug)
+                handle_command(
+                    cmd, regions, tts, speaker_mgr, state, debug=debug,
+                    poll_commands=_drain_commands,
+                )
 
             # 2. Apply any OCR result the worker just finished. poll_result
             #    is non-blocking. Stale generations (from pause/clear that
