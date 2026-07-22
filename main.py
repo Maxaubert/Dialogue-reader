@@ -484,6 +484,22 @@ def _safe_print(prefix: str, value: str) -> None:
         print(f"{prefix}{value.encode('ascii', 'replace').decode()}")
 
 
+def _describe_capture_mode(cap) -> str:
+    """One-line summary of which capture pipeline a new region landed in."""
+    if cap.capture_mode == "screen":
+        return "Using SCREEN capture mode (forced — PrintWindow disabled)."
+    if cap.capture_mode == "window":
+        return "Using WINDOW capture mode (forced PrintWindow)."
+    if cap.use_window_mode:
+        return "Using WINDOW capture mode (immune to Magnifier/zoom)."
+    if cap.game_mode:
+        return (
+            "Using GAME capture mode (animated content — "
+            "OCR-based change detection)."
+        )
+    return "Using SCREEN capture mode."
+
+
 def add_region(
     regions: list[WatchedRegion],
     debug: bool,
@@ -531,14 +547,7 @@ def add_region(
         rotation=rotation,
         capture_mode=capture_mode,
     )
-    if cap.capture_mode == "screen":
-        print("[dialogue-reader] Using SCREEN capture mode (forced — PrintWindow disabled).")
-    elif cap.capture_mode == "window":
-        print("[dialogue-reader] Using WINDOW capture mode (forced PrintWindow).")
-    elif cap.use_window_mode:
-        print("[dialogue-reader] Using WINDOW capture mode (immune to Magnifier/zoom).")
-    else:
-        print("[dialogue-reader] Using SCREEN capture mode.")
+    print(f"[dialogue-reader] {_describe_capture_mode(cap)}")
 
     n_existing = len([r for r in regions if r.mode == mode])
     name = f"{mode}{n_existing + 1}"

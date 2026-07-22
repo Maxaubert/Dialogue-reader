@@ -92,6 +92,58 @@ def _deskew_to_target(
 
 VALID_CAPTURE_MODES = ("auto", "screen", "window")
 
+# Pick-time stability probe (auto mode). We sample the region at the same
+# cadence the runtime poll loop uses and ask: would the pixel-hash gate ever
+# open here? If the longest run of identical hashes is shorter than the
+# stable_ms requirement, the content is animated and only game mode (OCR-based
+# change detection) can work. The probe runs ONCE, at pick time — content is
+# expected to churn later (e.g. after an in-game letter closes), so the
+# decision is never revisited.
+_PROBE_SAMPLES = 10
+_PROBE_INTERVAL = 1.0 / 12.0
+
+
+def _longest_stable_run_ms(hashes: list[str], interval_ms: float) -> float:
+    """Duration of the longest run of consecutive identical hashes, where a
+    run of k identical samples spans (k-1) * interval_ms."""
+    if not hashes:
+        return 0.0
+    best = cur = 1
+    for a, b in zip(hashes, hashes[1:]):
+        cur = cur + 1 if a == b else 1
+        best = max(best, cur)
+    return (best - 1) * interval_ms
+
+
+def _decide_auto_mode(pw_ok: bool, pw_slow: bool, screen_stable: bool) -> str:
+    """Classify a region at pick time.
+
+    Returns "game" (periodic OCR + text dedup), "window" (PrintWindow +
+    pixel-hash gate), or "screen" (screen grab + pixel-hash gate).
+    Animated pixels always win: the pixel-hash gate can never open on them,
+    no matter how the frames are sourced.
+    """
+    if not screen_stable:
+        return "game"
+    if pw_ok and pw_slow:
+        return "game"
+    if pw_ok:
+        return "window"
+    return "screen"
+
+
+def _frames_roughly_match(
+    a: np.ndarray | None, b: np.ndarray | None, max_mean_diff: float = 20.0
+) -> bool:
+    """True if two frames show approximately the same content. Used to catch
+    PrintWindow serving a stale/frozen surface: it answers fast with valid
+    pixels that no longer match what's actually on screen."""
+    if a is None or b is None or a.shape != b.shape:
+        return False
+    da = a[::8, ::8].astype(np.int16)
+    db = b[::8, ::8].astype(np.int16)
+    return float(np.abs(da - db).mean()) <= max_mean_diff
+
 
 class RegionCapture:
     def __init__(
@@ -152,22 +204,10 @@ class RegionCapture:
             self.rel_x = self.rel_y = self.rel_w = self.rel_h = 0
             self.window_title = ""
 
-        # Decide capture mode at startup. We try window capture once and
-        # see if it returns non-blank pixels AND is fast enough. DirectX/
-        # OpenGL games often return valid pixels via PrintWindow but at
-        # catastrophic latency (100-500ms+) because PW_RENDERFULLCONTENT
-        # forces a GPU→system-memory readback of the entire window. That
-        # makes 12 Hz polling impossible and the stable-hash check can
-        # stall for minutes. Screen capture via mss is fine for fullscreen
-        # games where Magnifier/zoom aren't a concern.
-        _GRAB_SLOW_MS = 50  # anything above this = too slow for real-time
-        # Normal apps: <10ms. Browsers/games with GPU rendering: 60-200ms+.
-        # 50ms cleanly separates the two — no edge cases where one region
-        # on a window gets game mode and another doesn't.
         self.use_window_mode = False
-        self._binarize_hash = False  # set True when falling back from slow window capture
+        self._binarize_hash = False  # True = game mode (OCR-based change detection)
         if capture_mode == "window":
-            # User forced PrintWindow. Skip the speed probe — even if slow
+            # User forced PrintWindow. Skip the probe — even if slow
             # we're committed. Needed when Magnifier-immunity matters more
             # than blink-free capture.
             if hwnd:
@@ -175,29 +215,11 @@ class RegionCapture:
         elif capture_mode == "screen":
             # User forced mss. No PrintWindow probe at all — important
             # because the probe itself triggers a game redraw that can
-            # visibly blink. Binarize the hash since game backgrounds
+            # visibly blink. Game-mode polling since game backgrounds
             # animate behind dialogue.
             self._binarize_hash = True
-        elif hwnd:  # capture_mode == "auto"
-            t0 = time.monotonic()
-            test = self._grab_window()
-            grab_ms = (time.monotonic() - t0) * 1000
-            if test is not None and test.size > 0:
-                non_black_ratio = (test.sum(axis=-1) > 30).mean()
-                if non_black_ratio > 0.05:
-                    if grab_ms > _GRAB_SLOW_MS:
-                        print(
-                            f"[capture] PrintWindow returned pixels but took "
-                            f"{grab_ms:.0f}ms (>{_GRAB_SLOW_MS}ms) — falling "
-                            f"back to fast screen capture."
-                        )
-                        # Screen capture of a game will have animated
-                        # backgrounds behind dialogue. Binarize the hash
-                        # so only text changes trigger, not flickering
-                        # lighting/particles.
-                        self._binarize_hash = True
-                    else:
-                        self.use_window_mode = True
+        else:  # capture_mode == "auto"
+            self._probe_auto_mode()
 
         # A black frame returned when the target window is not foreground,
         # so we never accidentally OCR a random overlapping window.
@@ -212,6 +234,91 @@ class RegionCapture:
         self._stable_since: float = 0.0
         self._initialized = False
         self._game_poll_count: int = 0
+
+    # ---- pick-time probe ----
+
+    # PrintWindow latency threshold. Normal apps: <10ms. Browsers/games with
+    # GPU rendering: 60-200ms+ because PW_RENDERFULLCONTENT forces a
+    # GPU→system-memory readback of the entire window. That makes 12 Hz
+    # polling impossible, so slow PrintWindow also means game mode.
+    _GRAB_SLOW_MS = 50
+
+    def _probe_auto_mode(self) -> None:
+        """Classify this region once, at pick time (auto mode only).
+
+        Two measurements feed _decide_auto_mode:
+        - One PrintWindow grab: does window capture work here, and how fast?
+        - ~1s of screen samples at the runtime poll cadence: do the pixels
+          hold still long enough for the pixel-hash gate to ever open?
+
+        Sets use_window_mode / _binarize_hash accordingly. The decision is
+        final — game content is expected to animate later even when the
+        picked area (a letter, a menu) is static right now, so re-probing
+        after pick time would misclassify.
+        """
+        pw_ok = False
+        pw_slow = False
+        pw_frame = None
+        if self.hwnd:
+            t0 = time.monotonic()
+            pw_frame = self._grab_window()
+            grab_ms = (time.monotonic() - t0) * 1000
+            if grab_ms > self._GRAB_SLOW_MS:
+                # A single slow sample can be transient system contention,
+                # not intrinsic PrintWindow cost. Retry and take the min —
+                # the fastest observed grab is the honest estimate.
+                for _ in range(2):
+                    t0 = time.monotonic()
+                    retry = self._grab_window()
+                    grab_ms = min(grab_ms, (time.monotonic() - t0) * 1000)
+                    if retry is not None:
+                        pw_frame = retry
+            if pw_frame is not None and pw_frame.size > 0:
+                non_black_ratio = (pw_frame.sum(axis=-1) > 30).mean()
+                if non_black_ratio > 0.05:
+                    pw_ok = True
+                    pw_slow = grab_ms > self._GRAB_SLOW_MS
+
+        hashes: list[str] = []
+        last_screen: np.ndarray | None = None
+        for i in range(_PROBE_SAMPLES):
+            if i:
+                time.sleep(_PROBE_INTERVAL)
+            last_screen = self._grab_screen()
+            hashes.append(_hash_frame(last_screen))
+        screen_stable = (
+            _longest_stable_run_ms(hashes, _PROBE_INTERVAL * 1000)
+            >= self.stable_seconds * 1000
+        )
+
+        mode = _decide_auto_mode(pw_ok, pw_slow, screen_stable)
+        if mode == "window" and not _frames_roughly_match(pw_frame, last_screen):
+            print(
+                "[capture] PrintWindow frame doesn't match the screen "
+                "(stale/frozen surface) — using screen capture instead."
+            )
+            mode = "screen"
+
+        if mode == "game":
+            self._binarize_hash = True
+            if not screen_stable:
+                print(
+                    "[capture] Animated content detected at pick time — "
+                    "using game mode (OCR-based change detection)."
+                )
+            else:
+                print(
+                    f"[capture] PrintWindow works but is too slow "
+                    f"(>{self._GRAB_SLOW_MS}ms) — using game mode."
+                )
+        elif mode == "window":
+            self.use_window_mode = True
+
+    @property
+    def game_mode(self) -> bool:
+        """True when this region uses game-mode polling (periodic frames +
+        OCR-text change detection) instead of the pixel-hash gate."""
+        return self._binarize_hash
 
     # ---- backends ----
 
@@ -248,8 +355,11 @@ class RegionCapture:
         # Forced "screen" mode: never touch PrintWindow, even as fallback.
         # PrintWindow calls cause a game redraw that can visibly flicker
         # on DirectX titles — the whole point of forcing screen is to
-        # avoid that.
+        # avoid that. Still blank when the target isn't foreground so an
+        # overlapping window is never OCR'd.
         if self.capture_mode == "screen":
+            if self.hwnd and not _is_target_foreground(self.hwnd):
+                return self._blank_frame
             return self._grab_screen()
 
         if self.use_window_mode:
@@ -259,13 +369,16 @@ class RegionCapture:
             # PrintWindow blipped — fall through to screen.
 
         if self._binarize_hash:
-            # Game mode (auto-detected slow PrintWindow): prefer PrintWindow
-            # because it's immune to Magnifier, but if it blips return a
-            # screen grab instead of nothing. A Magnifier artifact is
-            # better than losing the frame.
+            # Game mode: prefer PrintWindow because it's immune to
+            # Magnifier, but if it blips return a screen grab instead of
+            # nothing. A Magnifier artifact is better than losing the
+            # frame — unless the target isn't even foreground, in which
+            # case a screen grab would capture whatever window is on top.
             frame = self._grab_window()
             if frame is not None and frame.size > 0:
                 return frame
+            if self.hwnd and not _is_target_foreground(self.hwnd):
+                return self._blank_frame
             return self._grab_screen()
 
         # Non-game screen capture: blank frame when target isn't
