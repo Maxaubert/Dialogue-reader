@@ -132,6 +132,16 @@ def _decide_auto_mode(pw_ok: bool, pw_slow: bool, screen_stable: bool) -> str:
     return "screen"
 
 
+def _frame_usable(frame: np.ndarray | None) -> bool:
+    """True if a captured frame contains actual content. PrintWindow on
+    some GPU-rendered games (e.g. UE5/DX12) returns a full-size all-BLACK
+    bitmap — non-None and non-empty, but OCRing it reads nothing forever.
+    Those frames must never be preferred over a screen grab."""
+    if frame is None or frame.size == 0:
+        return False
+    return (frame.sum(axis=-1) > 30).mean() > 0.02
+
+
 def _frames_roughly_match(
     a: np.ndarray | None, b: np.ndarray | None, max_mean_diff: float = 20.0
 ) -> bool:
@@ -206,6 +216,11 @@ class RegionCapture:
 
         self.use_window_mode = False
         self._binarize_hash = False  # True = game mode (OCR-based change detection)
+        # Whether PrintWindow is worth calling at runtime. Forced window
+        # mode always tries; auto mode learns from the probe (a game whose
+        # PrintWindow came back black shouldn't pay a per-frame GPU
+        # readback that can also flicker the game).
+        self._pw_usable = capture_mode != "screen"
         if capture_mode == "window":
             # User forced PrintWindow. Skip the probe — even if slow
             # we're committed. Needed when Magnifier-immunity matters more
@@ -278,6 +293,7 @@ class RegionCapture:
                 if non_black_ratio > 0.05:
                     pw_ok = True
                     pw_slow = grab_ms > self._GRAB_SLOW_MS
+        self._pw_usable = pw_ok
 
         hashes: list[str] = []
         last_screen: np.ndarray | None = None
@@ -364,19 +380,23 @@ class RegionCapture:
 
         if self.use_window_mode:
             frame = self._grab_window()
-            if frame is not None and frame.size > 0:
+            if _frame_usable(frame):
                 return frame
-            # PrintWindow blipped — fall through to screen.
+            # PrintWindow blipped or went black — fall through to screen.
 
         if self._binarize_hash:
             # Game mode: prefer PrintWindow because it's immune to
-            # Magnifier, but if it blips return a screen grab instead of
-            # nothing. A Magnifier artifact is better than losing the
-            # frame — unless the target isn't even foreground, in which
-            # case a screen grab would capture whatever window is on top.
-            frame = self._grab_window()
-            if frame is not None and frame.size > 0:
-                return frame
+            # Magnifier — but only when the probe found it usable, and
+            # never trust an all-black frame (UE5/DX12 readbacks can turn
+            # black at runtime; OCRing them is silent failure). If it
+            # blips, return a screen grab instead of nothing. A Magnifier
+            # artifact is better than losing the frame — unless the target
+            # isn't even foreground, in which case a screen grab would
+            # capture whatever window is on top.
+            if self._pw_usable:
+                frame = self._grab_window()
+                if _frame_usable(frame):
+                    return frame
             if self.hwnd and not _is_target_foreground(self.hwnd):
                 return self._blank_frame
             return self._grab_screen()
