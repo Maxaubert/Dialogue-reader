@@ -276,3 +276,64 @@ def test_consistently_slow_printwindow_picks_game_mode(
     )
     assert cap.game_mode
     assert not cap.use_window_mode
+
+
+# ---- black PrintWindow frames at runtime (the VEIN silence bug) ----------
+
+def test_game_mode_ignores_black_window_frames(monkeypatch, patched_window):
+    # Probe: PrintWindow valid, screen churns -> game mode. At runtime the
+    # game's PrintWindow starts returning all-BLACK frames (DX12 readback
+    # failure). They are non-None and non-empty, but OCRing them reads
+    # nothing forever — the grab must fall through to screen capture.
+    cap = _make_auto(
+        monkeypatch,
+        screen_frames=lambda i: _static_frame((i * 16) % 256),
+        window_frame=_full_window_frame(),
+    )
+    assert cap.game_mode
+    monkeypatch.setattr(capture, "capture_window", lambda h: _full_window_frame(0))
+    monkeypatch.setattr(capture, "_is_target_foreground", lambda h: True)
+    frame = cap._grab()
+    assert frame.any()          # the screen frame, not the black crop
+
+
+def test_game_mode_skips_printwindow_when_probe_found_it_black(
+    monkeypatch, patched_window
+):
+    # Probe already saw a black PrintWindow -> don't call it per-frame at
+    # runtime (each call costs a GPU readback and can flicker the game).
+    calls = {"n": 0}
+
+    def counting_black(h):
+        calls["n"] += 1
+        return _full_window_frame(0)
+
+    monkeypatch.setattr(capture, "capture_window", counting_black)
+    caps_calls_during_probe = None
+    cap = _make_auto(
+        monkeypatch,
+        screen_frames=lambda i: _static_frame((i * 16) % 256),
+        window_frame=None,  # ignored; counting_black overrides below
+    )
+    # _make_auto re-patches capture_window; restore the counter for runtime.
+    monkeypatch.setattr(capture, "capture_window", counting_black)
+    monkeypatch.setattr(capture, "_is_target_foreground", lambda h: True)
+    assert cap.game_mode
+    calls["n"] = 0
+    frame = cap._grab()
+    assert frame.any()
+    assert calls["n"] == 0      # PrintWindow not even attempted
+
+
+def test_window_mode_black_blip_falls_through_to_screen(
+    monkeypatch, patched_window
+):
+    cap = _make_auto(
+        monkeypatch,
+        screen_frames=lambda i: _static_frame(),
+        window_frame=_full_window_frame(),
+    )
+    assert cap.use_window_mode
+    monkeypatch.setattr(capture, "capture_window", lambda h: _full_window_frame(0))
+    monkeypatch.setattr(capture, "_is_target_foreground", lambda h: True)
+    assert cap._grab().any()
