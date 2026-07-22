@@ -39,7 +39,7 @@ from capture import RegionCapture
 from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
 from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
-from window_capture import find_window_at, get_window_title
+from window_capture import find_window_at, get_window_rect, get_window_title
 from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
 
@@ -484,6 +484,36 @@ def _safe_print(prefix: str, value: str) -> None:
         print(f"{prefix}{value.encode('ascii', 'replace').decode()}")
 
 
+def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
+    """Describe each watched region's current on-screen rectangle so the
+    picker overlay can outline it. Regions bound to a window follow the
+    window's current position (matching capture behavior); forced-screen
+    regions are absolute. Rotated regions report the user's original rect
+    (centered in the padded capture bbox) plus the rotation."""
+    outlines: list[dict] = []
+    for r in regions:
+        cap = r.capture
+        bx, by = cap.bbox["left"], cap.bbox["top"]
+        if cap.hwnd and cap.capture_mode != "screen":
+            try:
+                wx, wy, _, _ = get_window_rect(cap.hwnd)
+                bx, by = wx + cap.rel_x, wy + cap.rel_y
+            except Exception:
+                pass  # window gone — show the pick-time position
+        cx = bx + cap.bbox["width"] / 2.0
+        cy = by + cap.bbox["height"] / 2.0
+        outlines.append({
+            "x": int(cx - cap.target_w / 2.0),
+            "y": int(cy - cap.target_h / 2.0),
+            "w": cap.target_w,
+            "h": cap.target_h,
+            "rotation": cap.rotation,
+            "label": r.name,
+            "mode": r.mode,
+        })
+    return outlines
+
+
 def add_region(
     regions: list[WatchedRegion],
     debug: bool,
@@ -498,7 +528,7 @@ def add_region(
     """
     label = "speaker name" if mode == "speaker" else "dialogue"
     print(f"[dialogue-reader] Pick the {label} region to watch...")
-    region, hwnd, rotation = pick_region()
+    region, hwnd, rotation = pick_region(existing=_existing_outlines(regions))
     if not region:
         print("[dialogue-reader] Region pick cancelled.")
         return

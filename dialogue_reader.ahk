@@ -31,8 +31,8 @@ PythonExe := "py.exe"
 ; --- defaults (used when ini is missing or a key is absent) ---
 DefaultBindings := Map(
     "PickRegion",        "F6",
-    "PickSpeakerRegion", "^F6",
-    "ClearRegions",      "+F6",
+    "PickSpeakerRegion", "+F6",
+    "ClearRegions",      "^F6",
     "SpeedDown",         "F7",
     "SpeedUp",           "F8",
     "TogglePause",       "F9",

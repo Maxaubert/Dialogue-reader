@@ -52,9 +52,18 @@ def _force_hide(hwnd: int) -> None:
         pass
 
 
+# Outline colors for already-watched regions shown during a pick.
+_DIALOGUE_OUTLINE = QColor(120, 220, 140)
+_SPEAKER_OUTLINE = QColor(255, 170, 60)
+
+
 class _Overlay(QWidget):
-    def __init__(self):
+    def __init__(self, existing: list[dict] | None = None):
         super().__init__()
+        # Already-watched regions, drawn as labeled outlines so the user
+        # can see what's being watched while picking a new region. Each is
+        # {x, y, w, h, rotation, label, mode} in physical screen pixels.
+        self._existing = existing or []
         # No Qt.Tool flag — Tool windows do not trigger lastWindowClosed,
         # which causes app.exec() to hang forever after the user makes a pick.
         self.setWindowFlags(
@@ -189,11 +198,58 @@ class _Overlay(QWidget):
             self.update()
 
     # ---- paint ----
+    def _draw_existing(self, p: QPainter) -> None:
+        """Outline every already-watched region (dashed, labeled)."""
+        if not self._existing:
+            return
+        dpr = self.screen().devicePixelRatio()
+        p.setFont(QFont("Segoe UI", 9))
+        for reg in self._existing:
+            # Physical screen pixels -> logical global -> widget-local.
+            top_left = self.mapFromGlobal(
+                QPoint(round(reg["x"] / dpr), round(reg["y"] / dpr))
+            )
+            w = round(reg["w"] / dpr)
+            h = round(reg["h"] / dpr)
+            rect = QRect(top_left, QPoint(top_left.x() + w, top_left.y() + h))
+            color = (
+                _SPEAKER_OUTLINE if reg.get("mode") == "speaker"
+                else _DIALOGUE_OUTLINE
+            )
+            rotation = float(reg.get("rotation", 0.0))
+
+            if abs(rotation) > 0.001:
+                p.save()
+                cx, cy = rect.center().x(), rect.center().y()
+                p.translate(cx, cy)
+                p.rotate(rotation)
+                p.translate(-cx, -cy)
+
+            pen = QPen(color, 2, Qt.DashLine)
+            p.setPen(pen)
+            p.drawRect(rect)
+
+            if abs(rotation) > 0.001:
+                p.restore()
+
+            label = reg.get("label", "")
+            if label:
+                p.fillRect(
+                    rect.x(), max(0, rect.y() - 20), 8 + 7 * len(label), 18,
+                    QColor(0, 0, 0, 180),
+                )
+                p.setPen(color)
+                p.drawText(rect.x() + 4, max(13, rect.y() - 6), label)
+
     def paintEvent(self, ev):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         # Dim the whole screen.
         p.fillRect(self.rect(), QColor(0, 0, 0, 110))
+
+        # Show what's already being watched (under the selection drawing so
+        # the in-progress pick always reads on top).
+        self._draw_existing(p)
 
         # Punch a hole for the current selection (rotated if applicable).
         if self._origin and self._current:
@@ -239,16 +295,20 @@ class _Overlay(QWidget):
         )
 
 
-def pick_region() -> tuple[tuple[int, int, int, int] | None, int, float]:
+def pick_region(
+    existing: list[dict] | None = None,
+) -> tuple[tuple[int, int, int, int] | None, int, float]:
     """Open the picker and return (region_tuple, hwnd, rotation_degrees).
 
     region_tuple is (x, y, w, h) in physical pixels, or None if cancelled.
     hwnd is the underlying top-level window HWND at release, or 0.
     rotation_degrees is CW rotation applied via mouse wheel during the
     drag, or 0.0 if the user didn't scroll.
+    existing is an optional list of already-watched regions to outline on
+    the overlay: {x, y, w, h, rotation, label, mode} in physical pixels.
     """
     app = QApplication.instance() or QApplication(sys.argv)
-    overlay = _Overlay()
+    overlay = _Overlay(existing=existing)
     # Use show() instead of showFullScreen() so our virtual-desktop geometry
     # (which can span multiple monitors) is honored.
     overlay.show()

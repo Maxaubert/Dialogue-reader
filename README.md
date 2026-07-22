@@ -85,8 +85,8 @@ In game, use:
 | Hotkey | What it does |
 |---|---|
 | `F1` | Pick a dialogue region |
-| `Ctrl+F1` | Pick a speaker-name region |
-| `Shift+F1` | Clear all regions |
+| `Shift+F1` | Pick a speaker-name region |
+| `Ctrl+F1` | Clear all regions |
 | `End` | Pause or unpause |
 | `PgUp` / `PgDn` | TTS speed up / down |
 | `F2` / `Ctrl+F2` | Cycle the current speaker's voice forward / back |
