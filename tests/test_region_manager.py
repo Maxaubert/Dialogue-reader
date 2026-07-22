@@ -167,6 +167,7 @@ class _FakeCapture:
         self.target_h = region[3]
         self.rel_x = self.rel_y = 0
         self.use_window_mode = False
+        self.game_mode = False
 
 
 def _watched(name="dialogue1", mode="dialogue"):

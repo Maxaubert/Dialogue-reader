@@ -561,6 +561,8 @@ def _capture_mode_label(cap) -> str:
         return "WINDOW (forced)"
     if cap.use_window_mode:
         return "WINDOW"
+    if cap.game_mode:
+        return "GAME (animated content, OCR-based change detection)"
     return "SCREEN"
 
 
