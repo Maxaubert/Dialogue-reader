@@ -1,30 +1,42 @@
 """
-Fullscreen transparent overlay for picking a screen region.
+Fullscreen region MANAGER overlay.
 
 Usage:
-    from region_picker import pick_region
-    region, hwnd, rotation = pick_region()
-    # region   == (x, y, w, h) in physical screen pixels, or None if cancelled.
-    # hwnd     == the underlying top-level window's HWND at the time of
-    #             release, or 0 if no window was detected. Captured INSIDE
-    #             the picker after the overlay is hidden so WindowFromPoint
-    #             sees the real window underneath, not the overlay itself.
-    # rotation == clockwise rotation in degrees applied during the drag
-    #             via the mouse wheel. 0 if the user didn't scroll.
+    from region_picker import manage_regions
+    result = manage_regions(existing_outlines, mode="dialogue",
+                            poll_commands=drain_udp_queue)
+    # result.outlines  == the outline dicts after the session: surviving
+    #                     pre-existing entries (possibly with "edited": True
+    #                     and new geometry) plus entries the user drew this
+    #                     session ("created": True, with "hwnd"/"label").
+    # result.deleted   == labels of pre-existing regions the user
+    #                     right-click-deleted.
+    # result.unhandled == UDP commands that arrived during the session and
+    #                     aren't the manager's to handle (the caller should
+    #                     process them after applying the session result).
 
-While the user is dragging:
-    Mouse wheel       rotate ±2° per notch
-    Shift + wheel     rotate ±10° per notch
-    0 (zero key)      reset rotation to 0
-    Esc               cancel the pick entirely
+The manager stays open across any number of drags — each completed drag
+becomes a new region outline immediately. It closes on Esc or when another
+PICK_REGION / PICK_SPEAKER command arrives via poll_commands (i.e. the
+user pressed F1 again: F1 toggles the manager).
+
+Inside the manager:
+    Left-drag empty space    draw a new region
+    Drag an outline's edge   move that region
+    Drag an outline's dots   resize it (corners = both axes, sides = one)
+    Right-click an outline   delete that region
+    Mouse wheel              rotate the in-progress drag (Shift = 10°)
+    0 (zero key)             reset rotation of the in-progress drag
+    Esc                      cancel the drag/edit in progress, else close
 """
 
 import ctypes
 import math
 import sys
 import time
+from dataclasses import dataclass, field
 
-from PySide6.QtCore import Qt, QRect, QPoint
+from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QGuiApplication, QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -83,6 +95,25 @@ _HANDLE_HIT_R = 8.0   # px: click-radius of a handle dot
 _HANDLE_DRAW_R = 4    # px: drawn dot radius
 _EDGE_HIT_R = 6.0     # px: half-thickness of the draggable edge band
 _MIN_EDIT_SIZE = 20.0  # px: smallest w/h a resize can reach
+
+
+def _next_label(labels, mode: str) -> str:
+    """Smallest free '<mode><n>' name. Reuses gaps left by deletions so a
+    new region never collides with a survivor's label."""
+    taken = set(labels)
+    i = 1
+    while f"{mode}{i}" in taken:
+        i += 1
+    return f"{mode}{i}"
+
+
+def _point_in_outline(rect, rotation_deg, pos, pad=_EDGE_HIT_R) -> bool:
+    """True if `pos` lies inside the (rotated) outline rect, edges included
+    with a small grab margin. Used for right-click delete."""
+    lx, ly = _to_local(rect, rotation_deg, pos)
+    return (
+        abs(lx) <= rect[2] / 2.0 + pad and abs(ly) <= rect[3] / 2.0 + pad
+    )
 
 
 def _to_local(rect, rotation_deg, pos):
@@ -146,12 +177,32 @@ def _apply_edit(rect, rotation_deg, kind, dx, dy):
 
 
 class _Overlay(QWidget):
-    def __init__(self, existing: list[dict] | None = None):
+    def __init__(
+        self,
+        existing: list[dict] | None = None,
+        mode: str = "dialogue",
+        poll_commands=None,
+    ):
         super().__init__()
-        # Already-watched regions, drawn as labeled outlines so the user
-        # can see what's being watched while picking a new region. Each is
-        # {x, y, w, h, rotation, label, mode} in physical screen pixels.
-        self._existing = existing or []
+        # Watched regions, drawn as labeled editable outlines. Regions the
+        # user draws during this session are appended here with
+        # "created": True. Each is {x, y, w, h, rotation, label, mode} in
+        # physical screen pixels.
+        self._existing = existing if existing is not None else []
+        self._mode = mode          # mode assigned to newly drawn regions
+        self._poll_commands = poll_commands
+        # Session outcome, read by manage_regions() after the event loop.
+        self.done = False
+        self.deleted: list[str] = []    # labels of pre-existing regions removed
+        self.unhandled: list[str] = []  # UDP commands for the caller
+
+        # F1 is swallowed by the AHK layer and arrives as a queued UDP
+        # command — poll for it so F1 toggles the manager closed.
+        if poll_commands is not None:
+            self._cmd_timer = QTimer(self)
+            self._cmd_timer.setInterval(100)
+            self._cmd_timer.timeout.connect(self._process_commands)
+            self._cmd_timer.start()
         # No Qt.Tool flag — Tool windows do not trigger lastWindowClosed,
         # which causes app.exec() to hang forever after the user makes a pick.
         self.setWindowFlags(
@@ -180,16 +231,28 @@ class _Overlay(QWidget):
         self._current: QPoint | None = None
         self._rotation: float = 0.0  # CW degrees, applied during drag
 
-        self.result: tuple[int, int, int, int] | None = None
-        self.result_hwnd: int = 0
-        self.result_rotation: float = 0.0
-
     def _finish(self):
-        """Close window and exit the QApplication event loop."""
+        """End the session: close the window, exit the event loop."""
+        self.done = True
         self.close()
         app = QApplication.instance()
         if app is not None:
             app.quit()
+
+    def _process_commands(self):
+        """Drain UDP commands that arrived mid-session. Another pick
+        command means 'F1 pressed again' — close the manager. Everything
+        else is kept for the caller to handle after the session."""
+        if self._poll_commands is None:
+            return
+        toggle = False
+        for cmd in self._poll_commands():
+            if cmd in ("PICK_REGION", "PICK_SPEAKER"):
+                toggle = True
+            else:
+                self.unhandled.append(cmd)
+        if toggle:
+            self._finish()
 
     # ---- outline editing helpers ----
     def _logical_rect(self, reg: dict) -> tuple[float, float, float, float]:
@@ -227,6 +290,26 @@ class _Overlay(QWidget):
 
     # ---- input ----
     def mousePressEvent(self, ev):
+        if ev.button() == Qt.RightButton:
+            # Right-click deletes the outline under the cursor.
+            if self._origin is not None or self._edit_kind is not None:
+                return
+            pos = ev.position().toPoint()
+            for i in range(len(self._existing) - 1, -1, -1):
+                reg = self._existing[i]
+                if _point_in_outline(
+                    self._logical_rect(reg),
+                    float(reg.get("rotation", 0.0)),
+                    (pos.x(), pos.y()),
+                ):
+                    removed = self._existing.pop(i)
+                    if not removed.get("created"):
+                        # Pre-existing region: the caller must drop it.
+                        # Created-this-session ones just vanish.
+                        self.deleted.append(removed.get("label", ""))
+                    self.update()
+                    break
+            return
         if ev.button() == Qt.LeftButton:
             pos = ev.position().toPoint()
             hit = self._hit_existing(pos)
@@ -312,7 +395,6 @@ class _Overlay(QWidget):
                 y = int(top_left.y() * dpr)
                 w = int(rect.width() * dpr)
                 h = int(rect.height() * dpr)
-                self.result = (x, y, w, h)
 
                 # CRITICAL: hide ourselves before WindowFromPoint, otherwise
                 # it returns OUR HWND (the overlay) and the resulting
@@ -350,9 +432,26 @@ class _Overlay(QWidget):
                 if detected == my_hwnd:
                     detected = 0  # give up; force screen-mode fallback
 
-                self.result_hwnd = detected
-                self.result_rotation = self._rotation
-                self._finish()
+                # Commit the new region as an outline and keep the manager
+                # open for the next drag/edit/delete.
+                self._existing.append({
+                    "x": x, "y": y, "w": w, "h": h,
+                    "rotation": self._rotation,
+                    "label": _next_label(
+                        [o.get("label", "") for o in self._existing],
+                        self._mode,
+                    ),
+                    "mode": self._mode,
+                    "created": True,
+                    "hwnd": detected,
+                })
+                self._origin = None
+                self._current = None
+                self._rotation = 0.0
+                self.show()
+                self.raise_()
+                self.activateWindow()
+                self.update()
             else:
                 # Too small — treat as a misclick, reset.
                 self._origin = None
@@ -361,10 +460,25 @@ class _Overlay(QWidget):
 
     def keyPressEvent(self, ev):
         if ev.key() == Qt.Key_Escape:
-            self.result = None
-            self.result_hwnd = 0
-            self.result_rotation = 0.0
-            self._finish()
+            if self._origin is not None:
+                # Cancel the drag in progress; the manager stays open.
+                self._origin = None
+                self._current = None
+                self._rotation = 0.0
+                self.update()
+            elif self._edit_kind is not None:
+                # Cancel the outline edit in progress: restore geometry.
+                self._sync_outline(
+                    self._existing[self._edit_index], self._edit_orig
+                )
+                self._edit_index = -1
+                self._edit_kind = None
+                self._edit_orig = None
+                self._edit_press = None
+                self.setCursor(Qt.CrossCursor)
+                self.update()
+            else:
+                self._finish()
         elif ev.key() == Qt.Key_0 and self._origin is not None:
             # Snap rotation back to 0 mid-drag
             self._rotation = 0.0
@@ -470,14 +584,11 @@ class _Overlay(QWidget):
         p.setPen(QColor(255, 255, 255))
         p.setFont(QFont("Segoe UI", 12))
         help_text = (
-            "Drag to select.   Scroll to rotate (Shift = 10\u00B0).   "
-            "0 to reset rotation.   Esc to cancel."
+            "Drag to add a region.   Right-click a region to delete it.   "
+            "Scroll to rotate a drag (Shift = 10\u00B0).\n"
+            "Drag a region's edge to move it, its dots to resize it.   "
+            "F1 or Esc to close."
         )
-        if self._existing:
-            help_text += (
-                "\nDrag an outline's edge to move a watched region, "
-                "its dots to resize it."
-            )
         p.drawText(
             self.rect().adjusted(0, 30, 0, 0),
             Qt.AlignHCenter | Qt.AlignTop,
@@ -485,40 +596,50 @@ class _Overlay(QWidget):
         )
 
 
-def pick_region(
-    existing: list[dict] | None = None,
-) -> tuple[tuple[int, int, int, int] | None, int, float, list[dict]]:
-    """Open the picker and return (region_tuple, hwnd, rotation, existing).
+@dataclass
+class ManagerResult:
+    """Outcome of a manager session. See the module docstring."""
+    outlines: list[dict] = field(default_factory=list)
+    deleted: list[str] = field(default_factory=list)
+    unhandled: list[str] = field(default_factory=list)
 
-    region_tuple is (x, y, w, h) in physical pixels, or None if cancelled.
-    hwnd is the underlying top-level window HWND at release, or 0.
-    rotation is CW degrees applied via mouse wheel during the drag, or 0.0.
-    existing is an optional list of already-watched regions to outline on
-    the overlay: {x, y, w, h, rotation, label, mode} in physical pixels.
-    They are editable — the user can drag an outline's dashed line to move
-    it or its handle dots to resize it. Edited entries come back with
-    updated geometry and "edited": True (also when the pick itself was
-    cancelled with Esc, so a session can be adjust-only).
+
+def manage_regions(
+    existing: list[dict] | None = None,
+    mode: str = "dialogue",
+    poll_commands=None,
+) -> ManagerResult:
+    """Open the region manager overlay; block until the user closes it.
+
+    existing: outlines of currently watched regions ({x, y, w, h, rotation,
+    label, mode} in physical pixels). The user can move/resize them (they
+    come back with "edited": True), right-click-delete them (their labels
+    land in result.deleted), and draw any number of new regions (appended
+    to result.outlines with "created": True, "hwnd", and a collision-free
+    "label"). New regions get `mode`.
+
+    poll_commands: optional zero-arg callable returning pending UDP command
+    strings. PICK_REGION / PICK_SPEAKER close the session (F1 toggles the
+    manager); everything else is returned in result.unhandled.
     """
     app = QApplication.instance() or QApplication(sys.argv)
-    overlay = _Overlay(existing=existing)
+    overlay = _Overlay(existing=existing, mode=mode, poll_commands=poll_commands)
     # Use show() instead of showFullScreen() so our virtual-desktop geometry
     # (which can span multiple monitors) is honored.
     overlay.show()
     overlay.raise_()
     overlay.activateWindow()
     app.exec()
-    # Drain any pending delete events so the next pick_region call starts
-    # with a clean slate.
+    # Drain any pending delete events so the next session starts clean.
     QApplication.processEvents()
-    return (
-        overlay.result,
-        overlay.result_hwnd,
-        overlay.result_rotation,
-        overlay._existing,
+    return ManagerResult(
+        outlines=overlay._existing,
+        deleted=overlay.deleted,
+        unhandled=overlay.unhandled,
     )
 
 
 if __name__ == "__main__":
-    r, h, rot, ex = pick_region()
-    print("region:", r, "hwnd:", h, "rotation:", rot, "edited:", ex)
+    res = manage_regions([])
+    print("outlines:", res.outlines)
+    print("deleted:", res.deleted)

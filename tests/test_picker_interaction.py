@@ -42,8 +42,9 @@ def test_drag_edge_moves_outline(app):
     assert (reg["x"], reg["y"]) == (130, 260)
     assert (reg["w"], reg["h"]) == (400, 150)
     assert reg["edited"] is True
-    # Editing must not have started a new-region pick.
-    assert ov.result is None
+    # Editing must not have started a new-region drag or ended the session.
+    assert not [o for o in ov._existing if o.get("created")]
+    assert ov.done is False
     ov.close()
 
 

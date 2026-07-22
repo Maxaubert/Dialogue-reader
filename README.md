@@ -84,8 +84,8 @@ In game, use:
 
 | Hotkey | What it does |
 |---|---|
-| `F1` | Pick a dialogue region |
-| `Shift+F1` | Pick a speaker-name region |
+| `F1` | Open/close the region manager: drag to add dialogue regions, drag an outline's edge to move it, its dots to resize, right-click to delete |
+| `Shift+F1` | Same manager, adding speaker-name regions |
 | `Ctrl+F1` | Clear all regions |
 | `End` | Pause or unpause |
 | `PgUp` / `PgDn` | TTS speed up / down |
