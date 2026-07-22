@@ -514,21 +514,70 @@ def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
     return outlines
 
 
+def _apply_region_edits(
+    regions: list[WatchedRegion],
+    outlines: list[dict] | None,
+    state: dict,
+) -> None:
+    """Push outline edits made inside the picker (moved/resized regions)
+    back into the running captures. Each edited region gets a fresh
+    RegionCapture at its new rect (re-detecting the window underneath) and
+    reset text state; any in-flight OCR batch is invalidated."""
+    by_label = {o.get("label"): o for o in (outlines or [])}
+    changed = False
+    for r in regions:
+        o = by_label.get(r.name)
+        if not o or not o.get("edited"):
+            continue
+        rect = (o["x"], o["y"], o["w"], o["h"])
+        hwnd = find_window_at(o["x"] + o["w"] // 2, o["y"] + o["h"] // 2)
+        r.capture = RegionCapture(
+            rect,
+            hwnd=hwnd,
+            poll_hz=POLL_HZ,
+            stable_ms=STABLE_MS,
+            verbose=False,
+            rotation=float(o.get("rotation", 0.0)),
+            capture_mode=state["capture_mode"],
+        )
+        r.last_text = ""
+        r.last_spoken_text = ""
+        r.has_pending_frame = False
+        changed = True
+        print(
+            f"[dialogue-reader] {r.name} adjusted -> "
+            f"x={o['x']} y={o['y']} w={o['w']} h={o['h']}"
+        )
+    if changed:
+        # Results from OCR batches referencing the old captures no longer
+        # apply to what these regions now show.
+        state["generation"] += 1
+
+
 def add_region(
     regions: list[WatchedRegion],
     debug: bool,
     mode: str = "dialogue",
     capture_mode: str = "auto",
+    state: dict | None = None,
 ) -> None:
     """Open the region picker and append the result as a new watched region.
 
     mode="dialogue" → text gets read aloud (the normal case).
     mode="speaker"  → text becomes the current speaker name; not spoken,
                       used to look up which voice to use for dialogue.
+
+    Existing regions are shown as editable outlines in the picker; any
+    move/resize the user made is applied even when the new pick itself is
+    cancelled with Esc (an adjust-only session).
     """
     label = "speaker name" if mode == "speaker" else "dialogue"
     print(f"[dialogue-reader] Pick the {label} region to watch...")
-    region, hwnd, rotation = pick_region(existing=_existing_outlines(regions))
+    region, hwnd, rotation, edited = pick_region(
+        existing=_existing_outlines(regions)
+    )
+    if state is not None:
+        _apply_region_edits(regions, edited, state)
     if not region:
         print("[dialogue-reader] Region pick cancelled.")
         return
@@ -611,9 +660,9 @@ def handle_command(
     debug: bool,
 ) -> None:
     if cmd == "PICK_REGION":
-        add_region(regions, debug=debug, mode="dialogue", capture_mode=state["capture_mode"])
+        add_region(regions, debug=debug, mode="dialogue", capture_mode=state["capture_mode"], state=state)
     elif cmd == "PICK_SPEAKER":
-        add_region(regions, debug=debug, mode="speaker", capture_mode=state["capture_mode"])
+        add_region(regions, debug=debug, mode="speaker", capture_mode=state["capture_mode"], state=state)
     elif cmd == "CLEAR_REGIONS":
         regions.clear()
         # Also reset speak-history so freshly-picked regions that happen
@@ -949,7 +998,7 @@ def main() -> int:
     print()
 
     if pick_on_start:
-        add_region(regions, debug=debug, capture_mode=capture_mode)
+        add_region(regions, debug=debug, capture_mode=capture_mode, state=state)
 
     poll_interval = 1.0 / POLL_HZ
 
