@@ -40,6 +40,7 @@ from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
 from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
 from window_capture import (
+    find_process_window,
     find_window_at,
     get_foreground_window,
     get_window_process,
@@ -47,6 +48,7 @@ from window_capture import (
     get_window_title,
     is_window,
 )
+from profiles import ProfileStore, scale_regions
 from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
 
@@ -789,6 +791,108 @@ def _reload_config(tts, speaker_mgr, state, ocr=None, debug=False) -> None:
     print("[dialogue-reader] Config reloaded.")
 
 
+def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
+    """PROFILE_SAVE / PROFILE_APPLY / PROFILE_UNAPPLY / PROFILE_DELETE /
+    PROFILE_AUTO. The reader owns profiles.json; the settings UI drives
+    these over UDP."""
+
+    def _reset_speech_state():
+        state["generation"] += 1
+        state["last_spoken"] = ""
+        state["candidate"] = ""
+        state["speaker_candidate"] = ""
+
+    if cmd.startswith("PROFILE_SAVE:"):
+        name = cmd[len("PROFILE_SAVE:"):].strip()
+        if not name:
+            return
+        candidates = sorted({r.process for r in regions if r.process})
+        fg = _foreground_exe()
+        process = fg if fg in candidates else (
+            candidates[0] if len(candidates) == 1 else "")
+        if not process:
+            print(
+                f"[profiles] Cannot save '{name}': no process-bound regions"
+                + (f" (candidates: {candidates})" if candidates else "")
+            )
+            return
+        scoped = [r for r in regions if r.process == process]
+        hwnd = next(
+            (r.capture.hwnd for r in scoped
+             if r.capture.hwnd and is_window(r.capture.hwnd)), 0)
+        if not hwnd:
+            print(f"[profiles] Cannot save '{name}': {process} window not found")
+            return
+        profiles.snapshot(name, process, get_window_rect(hwnd),
+                          _existing_outlines(scoped))
+        profiles.set_applied(name, True)   # what's on screen IS this profile
+        print(f"[profiles] Saved '{name}': {len(scoped)} region(s) for {process}")
+
+    elif cmd.startswith("PROFILE_APPLY:"):
+        name = cmd[len("PROFILE_APPLY:"):].strip()
+        p = profiles.get(name)
+        if p is None:
+            print(f"[profiles] Unknown profile: {name!r}")
+            return
+        hwnd = find_process_window(p["process"])
+        if not hwnd:
+            print(f"[profiles] '{name}': {p['process']} is not running")
+            return
+        rect = get_window_rect(hwnd)
+        regions[:] = [r for r in regions if r.process != p["process"]]
+        for o in scale_regions(p, rect):
+            cap = RegionCapture(
+                (o["x"], o["y"], o["w"], o["h"]),
+                hwnd=hwnd,
+                poll_hz=POLL_HZ,
+                stable_ms=STABLE_MS,
+                verbose=False,
+                rotation=o["rotation"],
+                capture_mode=state["capture_mode"],
+            )
+            regions.append(WatchedRegion(
+                name=o["label"], capture=cap, mode=o["mode"],
+                process=p["process"],
+            ))
+        _reset_speech_state()
+        profiles.set_applied(name, True)
+        print(
+            f"[profiles] Applied '{name}': {len(p['regions'])} region(s) "
+            f"for {p['process']}"
+        )
+        tts.speak(f"Profile {name} applied", pause_media=False)
+
+    elif cmd.startswith("PROFILE_UNAPPLY:"):
+        name = cmd[len("PROFILE_UNAPPLY:"):].strip()
+        p = profiles.get(name)
+        if p is None:
+            return
+        before = len(regions)
+        regions[:] = [r for r in regions if r.process != p["process"]]
+        if len(regions) != before:
+            _reset_speech_state()
+        profiles.set_applied(name, False)
+        print(f"[profiles] Unapplied '{name}' ({before - len(regions)} region(s) removed)")
+
+    elif cmd.startswith("PROFILE_DELETE:"):
+        name = cmd[len("PROFILE_DELETE:"):].strip()
+        p = profiles.get(name)
+        if p is not None and p.get("applied"):
+            regions[:] = [r for r in regions if r.process != p["process"]]
+            _reset_speech_state()
+        profiles.delete(name)
+        print(f"[profiles] Deleted '{name}'")
+
+    elif cmd.startswith("PROFILE_AUTO:"):
+        rest = cmd[len("PROFILE_AUTO:"):]
+        name, _, flag = rest.rpartition(":")
+        name = name.strip()
+        if name:
+            on = flag.strip() == "1"
+            profiles.set_auto(name, on)
+            print(f"[profiles] '{name}' apply-on-launch: {'on' if on else 'off'}")
+
+
 def handle_command(
     cmd: str,
     regions: list[WatchedRegion],
@@ -798,6 +902,7 @@ def handle_command(
     debug: bool,
     poll_commands=None,
     ocr=None,
+    profiles=None,
 ) -> None:
     if cmd in ("PICK_REGION", "PICK_SPEAKER"):
         mode = "speaker" if cmd == "PICK_SPEAKER" else "dialogue"
@@ -814,7 +919,7 @@ def handle_command(
         for extra in unhandled:
             handle_command(
                 extra, regions, tts, speaker_mgr, state, debug=debug,
-                poll_commands=poll_commands, ocr=ocr,
+                poll_commands=poll_commands, ocr=ocr, profiles=profiles,
             )
     elif cmd == "CLEAR_REGIONS":
         # Scoped like F1: clears only the foreground process's regions
@@ -893,6 +998,8 @@ def handle_command(
             speaker_mgr.set_no_speaker_voice(voice)
             print(f"[dialogue-reader] No-speaker voice -> {voice}")
             tts.speak("Default voice changed", voice=voice, pause_media=False)
+    elif cmd.startswith("PROFILE_") and profiles is not None:
+        _handle_profile_command(cmd, regions, tts, state, profiles)
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):
@@ -1123,6 +1230,11 @@ def main() -> int:
         speaker_engine=speaker_engine,
     )
 
+    profiles_store = ProfileStore(Path(__file__).parent / "profiles.json")
+    profiles_store.reset_applied()   # fresh start: nothing applied yet
+    if profiles_store.names():
+        print(f"[profiles] {len(profiles_store.names())} profile(s) loaded")
+
     speakers_path = Path(__file__).parent / "speakers.json"
     assignment_strategy = _load_speaker_assignment_strategy()
     speaker_mgr = SpeakerManager(
@@ -1200,8 +1312,38 @@ def main() -> int:
         ):
             handle_command(
                 extra, regions, tts, speaker_mgr, state, debug=debug,
-                poll_commands=_drain_commands, ocr=ocr,
+                poll_commands=_drain_commands, ocr=ocr, profiles=profiles_store,
             )
+
+    def _profile_watcher() -> None:
+        """Every ~3s: re-arm profiles whose game exited, and enqueue an
+        apply for auto profiles whose game just appeared (with a window).
+        Applying happens on the main thread via the command queue."""
+        import psutil
+        while True:
+            time.sleep(3.0)
+            try:
+                running = {
+                    p.info["name"].lower()
+                    for p in psutil.process_iter(["name"])
+                    if p.info["name"]
+                }
+            except Exception:
+                continue
+            for name in profiles_store.names():
+                p = profiles_store.get(name)
+                if p and p.get("applied") and p.get("process") not in running:
+                    profiles_store.mark_unapplied_for_process(p["process"])
+            for name in profiles_store.auto_pending(running):
+                p = profiles_store.get(name)
+                if p and find_process_window(p["process"]):
+                    print(
+                        f"[profiles] {p['process']} detected — "
+                        f"auto-applying '{name}'"
+                    )
+                    server.queue.put(f"PROFILE_APPLY:{name}")
+
+    threading.Thread(target=_profile_watcher, daemon=True).start()
 
     poll_interval = 1.0 / POLL_HZ
     prune_every = max(1, int(POLL_HZ * 2))   # dead-window check ~every 2s
@@ -1219,7 +1361,7 @@ def main() -> int:
                     break
                 handle_command(
                     cmd, regions, tts, speaker_mgr, state, debug=debug,
-                    poll_commands=_drain_commands, ocr=ocr,
+                    poll_commands=_drain_commands, ocr=ocr, profiles=profiles_store,
                 )
 
             # 2. Apply any OCR result the worker just finished. poll_result

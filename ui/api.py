@@ -14,6 +14,7 @@ from pathlib import Path
 _REPO = Path(__file__).parent.parent
 _DEFAULT_INI = _REPO / "dialogue_reader.ini"
 _DEFAULT_SPEAKERS = _REPO / "speakers.json"
+_DEFAULT_PROFILES = _REPO / "profiles.json"
 _DEFAULT_PORT = 7849
 
 # (type, default[, choices]) per section/key. Drives typed reads and the
@@ -242,6 +243,17 @@ def no_speaker_voice(speakers_path: Path | str = _DEFAULT_SPEAKERS,
     return read_settings(ini_path)["Voices"]["Default"]
 
 
+def read_profiles(profiles_path: Path | str = _DEFAULT_PROFILES) -> dict:
+    """Profiles as written by the reader (the single writer). Read-only."""
+    import json
+    try:
+        data = json.loads(Path(profiles_path).read_text(encoding="utf-8"))
+        profiles = data.get("profiles", {})
+        return profiles if isinstance(profiles, dict) else {}
+    except Exception:
+        return {}
+
+
 # ---- pywebview bridge -------------------------------------------------------
 
 _LIVE_COMMANDS = {
@@ -254,9 +266,11 @@ class Api:
     """Methods here are callable from JS as window.pywebview.api.<name>()."""
 
     def __init__(self, ini_path: Path | str | None = None,
-                 speakers_path: Path | str | None = None):
+                 speakers_path: Path | str | None = None,
+                 profiles_path: Path | str | None = None):
         self._ini = Path(ini_path) if ini_path else _DEFAULT_INI
         self._speakers = Path(speakers_path) if speakers_path else _DEFAULT_SPEAKERS
+        self._profiles = Path(profiles_path) if profiles_path else _DEFAULT_PROFILES
 
     def get_state(self) -> dict:
         return {
@@ -265,6 +279,7 @@ class Api:
             "voices": english_voices(),
             "running": reader_running(),
             "no_speaker_voice": no_speaker_voice(self._speakers, self._ini),
+            "profiles": read_profiles(self._profiles),
         }
 
     def save_settings(self, values: dict) -> bool:
@@ -293,6 +308,26 @@ class Api:
     def live_command(self, cmd: str) -> None:
         if cmd in _LIVE_COMMANDS:
             send_command(cmd)
+
+    # ---- profiles (mutations go through the reader over UDP) ----
+
+    def profile_save(self, name: str) -> None:
+        send_command(f"PROFILE_SAVE:{name.strip()}")
+
+    def profile_apply(self, name: str) -> None:
+        send_command(f"PROFILE_APPLY:{name.strip()}")
+
+    def profile_unapply(self, name: str) -> None:
+        send_command(f"PROFILE_UNAPPLY:{name.strip()}")
+
+    def profile_delete(self, name: str) -> None:
+        send_command(f"PROFILE_DELETE:{name.strip()}")
+
+    def profile_auto(self, name: str, on: bool) -> None:
+        send_command(f"PROFILE_AUTO:{name.strip()}:{1 if on else 0}")
+
+    def get_profiles(self) -> dict:
+        return read_profiles(self._profiles)
 
     def reader_status(self) -> bool:
         return reader_running()

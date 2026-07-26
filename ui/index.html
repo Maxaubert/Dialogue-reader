@@ -80,6 +80,18 @@
   </section>
 
   <section class="card">
+    <h2>Game profiles</h2>
+    <div class="row">
+      <input type="text" id="profile-name" placeholder="Profile name (e.g. vein)">
+      <button id="btn-profile-save">Save current regions</button>
+    </div>
+    <p class="hint">Snapshots the focused game's boxes. <b>Applied</b> loads them now;
+      <b>Auto</b> applies them whenever the game launches. Boxes scale if the
+      window size changed.</p>
+    <div id="profile-list"></div>
+  </section>
+
+  <section class="card">
     <h2>Hotkeys <span class="tag">restart needed</span></h2>
     <p class="hint">AHK syntax: <code>^</code>=Ctrl <code>+</code>=Shift <code>!</code>=Alt <code>#</code>=Win</p>
     <div class="hotkeys" id="hotkeys"></div>

@@ -34,6 +34,20 @@ def page(ui_server):
         # Deliberately different from the ini default (af_heart): the UI must
         # show the live no-speaker voice, not the ini value.
         "no_speaker_voice": "kokoro:am_michael",
+        "profiles": {
+            "vein": {
+                "process": "vein-win64-test.exe",
+                "window": {"w": 2000, "h": 1000},
+                "regions": [
+                    {"rel_x": 50, "rel_y": 140, "w": 400, "h": 150,
+                     "rotation": 0.0, "label": "dialogue1", "mode": "dialogue"},
+                    {"rel_x": 60, "rel_y": 40, "w": 200, "h": 60,
+                     "rotation": 0.0, "label": "speaker1", "mode": "speaker"},
+                ],
+                "apply_on_launch": False,
+                "applied": True,
+            },
+        },
     }
     stub = """
     window.__calls = [];
@@ -45,8 +59,14 @@ def page(ui_server):
       reader_status: () => Promise.resolve(true),
       restart_reader: () => { window.__calls.push(["restart_reader"]); return Promise.resolve(true); },
       set_no_speaker_voice: (v) => { window.__calls.push(["set_no_speaker_voice", v]); return Promise.resolve(null); },
+      get_profiles: () => Promise.resolve(%s),
+      profile_save: (n) => { window.__calls.push(["profile_save", n]); return Promise.resolve(null); },
+      profile_apply: (n) => { window.__calls.push(["profile_apply", n]); return Promise.resolve(null); },
+      profile_unapply: (n) => { window.__calls.push(["profile_unapply", n]); return Promise.resolve(null); },
+      profile_delete: (n) => { window.__calls.push(["profile_delete", n]); return Promise.resolve(null); },
+      profile_auto: (n, on) => { window.__calls.push(["profile_auto", n, on]); return Promise.resolve(null); },
     }};
-    """ % json.dumps(state)
+    """ % (json.dumps(state), json.dumps(state["profiles"]))
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context()
@@ -110,6 +130,30 @@ def test_hotkey_edit_shows_restart_hint(page):
     box.fill("F9")
     assert page.is_visible("#restart-hint")
     assert page.is_visible("#savebar")
+
+
+def test_profile_card_renders_preview(page):
+    row = page.locator("#profile-list .profile")
+    assert row.count() == 1
+    assert "vein-win64-test.exe" in row.text_content()
+    assert page.locator("#profile-list svg rect").count() == 2   # two boxes
+    assert page.is_checked("#profile-list .p-applied")           # applied=True
+
+
+def test_profile_auto_toggle_sends_command(page):
+    page.check("#profile-list .p-auto")
+    page.wait_for_function(
+        'window.__calls.some(c => c[0] === "profile_auto")')
+    assert ["profile_auto", "vein", True] in _calls(page)
+
+
+def test_profile_save_button(page):
+    page.fill("#profile-name", "persona5")
+    page.click("#btn-profile-save")
+    page.wait_for_function(
+        'window.__calls.some(c => c[0] === "profile_save")')
+    assert ["profile_save", "persona5"] in _calls(page)
+    assert page.input_value("#profile-name") == ""
 
 
 def test_pool_checkboxes_enable_when_use_all_off(page):

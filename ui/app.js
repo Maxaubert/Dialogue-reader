@@ -112,6 +112,116 @@ function collect() {
   return out;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+const MODE_FILL = { dialogue: "rgba(120,220,140,0.35)", speaker: "rgba(255,170,60,0.4)" };
+const MODE_STROKE = { dialogue: "#78dc8c", speaker: "#ffaa3c" };
+
+function profilePreview(p) {
+  // Miniature of the game window with the profile's boxes, to scale.
+  const w = p.window?.w || 1920, h = p.window?.h || 1080;
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("width", "150");
+  svg.setAttribute("height", Math.max(40, Math.round((150 * h) / w)));
+  for (const r of p.regions || []) {
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", r.rel_x);
+    rect.setAttribute("y", r.rel_y);
+    rect.setAttribute("width", r.w);
+    rect.setAttribute("height", r.h);
+    rect.setAttribute("fill", MODE_FILL[r.mode] || MODE_FILL.dialogue);
+    rect.setAttribute("stroke", MODE_STROKE[r.mode] || MODE_STROKE.dialogue);
+    rect.setAttribute("stroke-width", Math.max(2, Math.round(w / 300)));
+    if (r.rotation) {
+      rect.setAttribute("transform",
+        `rotate(${r.rotation} ${r.rel_x + r.w / 2} ${r.rel_y + r.h / 2})`);
+    }
+    svg.append(rect);
+  }
+  return svg;
+}
+
+function buildProfiles(profiles) {
+  const list = $("#profile-list");
+  list.replaceChildren();
+  const names = Object.keys(profiles || {});
+  if (!names.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No profiles yet. Set up boxes in a game (F1), then save them here.";
+    list.append(empty);
+    return;
+  }
+  for (const name of names) {
+    const p = profiles[name];
+    const row = document.createElement("div");
+    row.className = "profile";
+    row.append(profilePreview(p));
+
+    const info = document.createElement("div");
+    info.className = "p-info";
+    const title = document.createElement("div");
+    title.className = "p-name";
+    title.textContent = name;
+    const meta = document.createElement("div");
+    meta.className = "p-meta";
+    meta.textContent =
+      `${p.process} · ${(p.regions || []).length} box(es) · ${p.window?.w}×${p.window?.h}`;
+    info.append(title, meta);
+    row.append(info);
+
+    const controls = document.createElement("div");
+    controls.className = "p-controls";
+
+    const applied = document.createElement("label");
+    const appliedCb = document.createElement("input");
+    appliedCb.type = "checkbox";
+    appliedCb.className = "p-applied";
+    appliedCb.checked = !!p.applied;
+    appliedCb.addEventListener("change", async () => {
+      if (appliedCb.checked) await API.profile_apply(name);
+      else await API.profile_unapply(name);
+      scheduleProfileRefresh();
+    });
+    applied.append(appliedCb, document.createTextNode("Applied"));
+
+    const auto = document.createElement("label");
+    const autoCb = document.createElement("input");
+    autoCb.type = "checkbox";
+    autoCb.className = "p-auto";
+    autoCb.checked = !!p.apply_on_launch;
+    autoCb.addEventListener("change", async () => {
+      await API.profile_auto(name, autoCb.checked);
+      scheduleProfileRefresh();
+    });
+    auto.append(autoCb, document.createTextNode("Auto"));
+
+    const del = document.createElement("button");
+    del.textContent = "🗑";
+    del.className = "mini";
+    del.title = "Delete profile";
+    del.addEventListener("click", async () => {
+      await API.profile_delete(name);
+      scheduleProfileRefresh();
+    });
+
+    controls.append(applied, auto, del);
+    row.append(controls);
+    list.append(row);
+  }
+}
+
+let profileRefreshTimer = null;
+function scheduleProfileRefresh() {
+  // The reader needs a beat to process the command and rewrite profiles.json.
+  clearTimeout(profileRefreshTimer);
+  profileRefreshTimer = setTimeout(refreshProfiles, 1200);
+}
+
+async function refreshProfiles() {
+  buildProfiles(await API.get_profiles());
+}
+
 async function refreshStatus() {
   const running = await API.reader_status();
   const pill = $("#status");
@@ -126,6 +236,15 @@ async function init() {
   const state = await API.get_state();
 
   fillFields(state.settings);
+  buildProfiles(state.profiles);
+  setInterval(refreshProfiles, 5000);   // auto-apply changes state in the bg
+  $("#btn-profile-save").addEventListener("click", async () => {
+    const name = $("#profile-name").value.trim();
+    if (!name) return;
+    await API.profile_save(name);
+    $("#profile-name").value = "";
+    scheduleProfileRefresh();
+  });
   // The select shows the LIVE no-speaker voice (speakers.json __default__),
   // which wins over the ini Voices.Default once F2 has ever been pressed.
   initialNoSpeakerVoice = state.no_speaker_voice;
