@@ -37,9 +37,12 @@ def _parse_voice(voice: str) -> tuple[str, str]:
 
 
 class TTS:
-    def __init__(self, voice: str = DEFAULT_VOICE, speed: float = 1.0):
+    def __init__(self, voice: str = DEFAULT_VOICE, speed: float = 1.0,
+                 media_gate=None):
         self._voices_dir = Path(__file__).parent / "voices"
         self._default_voice = voice
+        # Optional media_gate.MediaGate: pauses other media while we speak.
+        self._media_gate = media_gate
 
         # Lazy Kokoro engine, initialized on first use.
         self._kokoro = None
@@ -99,6 +102,22 @@ class TTS:
     def get_speed(self) -> float:
         return self._speed
 
+    # ---- media gate ----
+
+    def _gate_started(self) -> None:
+        if self._media_gate is not None:
+            try:
+                self._media_gate.speech_started()
+            except Exception:
+                pass
+
+    def _gate_ended(self) -> None:
+        if self._media_gate is not None:
+            try:
+                self._media_gate.speech_ended()
+            except Exception:
+                pass
+
     # ---- control ----
 
     def stop(self) -> None:
@@ -109,12 +128,15 @@ class TTS:
             sd.stop()
         except Exception:
             pass
+        self._gate_ended()
 
     def speak(self, text: str, voice: str | None = None) -> None:
         """Speak `text`. If `voice` is None, uses the default voice. Any
         previously-playing speech is interrupted."""
         if not text:
             return
+
+        self._gate_started()
 
         try:
             sd.stop()
@@ -132,6 +154,9 @@ class TTS:
             try:
                 k = self._get_kokoro()
                 if k is None:
+                    # No synthesis happened; media must not stay paused.
+                    if my_version == self._version:
+                        self._gate_ended()
                     return
                 # speed is a pitch-preserving time-stretch handled by Kokoro,
                 # then played at the native sample rate so pitch is unchanged.
@@ -144,8 +169,17 @@ class TTS:
                         sd.stop()
                     except Exception:
                         pass
+                    return
+                try:
+                    sd.wait()
+                except Exception:
+                    pass
+                if my_version == self._version:
+                    self._gate_ended()
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
+                if my_version == self._version:
+                    self._gate_ended()
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -156,3 +190,8 @@ class TTS:
             sd.stop()
         except Exception:
             pass
+        if self._media_gate is not None:
+            try:
+                self._media_gate.shutdown()
+            except Exception:
+                pass

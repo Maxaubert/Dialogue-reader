@@ -257,6 +257,33 @@ def _load_text_confirm_polls() -> int:
     return max(1, n)
 
 
+def _load_media_config(ini_path=None) -> tuple[bool, int]:
+    """Read [Media] PauseDuringSpeech / ResumeDelayMs from dialogue_reader.ini.
+    Returns (enabled, resume_delay_ms); defaults (True, 1000) for anything
+    missing or unparseable."""
+    enabled, delay_ms = True, 1000
+    if ini_path is None:
+        ini_path = Path(__file__).parent / "dialogue_reader.ini"
+    if not Path(ini_path).exists():
+        return enabled, delay_ms
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        cp.read(ini_path, encoding="utf-8")
+    except Exception:
+        return enabled, delay_ms
+    raw = cp.get("Media", "PauseDuringSpeech", fallback="true").strip().lower()
+    if raw in ("false", "0", "no", "off"):
+        enabled = False
+    raw = cp.get("Media", "ResumeDelayMs", fallback="").strip()
+    if raw:
+        try:
+            delay_ms = max(0, int(raw))
+        except ValueError:
+            pass
+    return enabled, delay_ms
+
+
 # ---- singleton enforcement ------------------------------------------------
 #
 # py.exe (the Python launcher) spawns python.exe as a child process. Killing
@@ -962,7 +989,13 @@ def main() -> int:
     # engines (EasyOCR/torch) load. tts.speak() is non-blocking, so the
     # announcement plays during the OCR load below.
     print("[dialogue-reader] Loading TTS engine...")
-    tts = TTS(voice=default_voice, speed=1.1)
+    media_pause, resume_delay_ms = _load_media_config()
+    media_gate = None
+    if media_pause:
+        from media_gate import MediaGate
+        media_gate = MediaGate(resume_delay_ms=resume_delay_ms, verbose=debug)
+        print(f"[dialogue-reader] Media pause on (resume after {resume_delay_ms}ms quiet)")
+    tts = TTS(voice=default_voice, speed=1.1, media_gate=media_gate)
     tts.speak(_STARTUP_PHRASE)
 
     print(
