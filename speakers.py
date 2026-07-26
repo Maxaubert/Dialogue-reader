@@ -347,3 +347,18 @@ class SpeakerManager:
         if self.current_speaker:
             return self.assignments.get(self.current_speaker)
         return self.assignments.get(DEFAULT_SPEAKER_KEY)
+
+    @property
+    def no_speaker_voice(self) -> str | None:
+        """The voice pinned for the no-speaker state, if any."""
+        return self.assignments.get(DEFAULT_SPEAKER_KEY)
+
+    def set_no_speaker_voice(self, voice: str) -> str:
+        """Pin the voice used when no speaker is detected. Aligns the cycle
+        index so F2 continues from the pinned voice rather than jumping."""
+        with self._lock:
+            self.assignments[DEFAULT_SPEAKER_KEY] = voice
+            if voice in self.voice_pool:
+                self.cycle_index[DEFAULT_SPEAKER_KEY] = self.voice_pool.index(voice)
+            self._save()
+            return voice

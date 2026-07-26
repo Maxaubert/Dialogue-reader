@@ -817,6 +817,12 @@ def handle_command(
             tts.stop()
             _play_cue(_PAUSE_CUE)
             print("[dialogue-reader] PAUSED")
+    elif cmd.startswith("SET_NO_SPEAKER_VOICE:"):
+        voice = cmd[len("SET_NO_SPEAKER_VOICE:"):].strip()
+        if voice:
+            speaker_mgr.set_no_speaker_voice(voice)
+            print(f"[dialogue-reader] No-speaker voice -> {voice}")
+            tts.speak("Default voice changed", voice=voice)
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):

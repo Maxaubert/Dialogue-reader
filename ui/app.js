@@ -2,6 +2,7 @@
 
 let API = null;
 let initialHotkeys = {};
+let initialNoSpeakerVoice = null;
 
 function apiReady() {
   return new Promise((resolve) => {
@@ -125,7 +126,10 @@ async function init() {
   const state = await API.get_state();
 
   fillFields(state.settings);
-  buildDefaultVoice(state.voices, state.settings.Voices.Default);
+  // The select shows the LIVE no-speaker voice (speakers.json __default__),
+  // which wins over the ini Voices.Default once F2 has ever been pressed.
+  initialNoSpeakerVoice = state.no_speaker_voice;
+  buildDefaultVoice(state.voices, state.no_speaker_voice);
   buildVoiceGrid(state.voices, state.settings.Voices.Pool);
   buildHotkeys(state.settings.Hotkeys);
 
@@ -144,6 +148,11 @@ async function init() {
 
   $("#btn-save").addEventListener("click", async () => {
     await API.save_settings(collect());
+    const nsv = $("#default-voice").value;
+    if (nsv !== initialNoSpeakerVoice) {
+      await API.set_no_speaker_voice(nsv);
+      initialNoSpeakerVoice = nsv;
+    }
     $("#savebar").classList.add("hidden");
     const hk = collect().Hotkeys || {};
     const changed = Object.keys(hk).some((k) => hk[k] !== initialHotkeys[k]);

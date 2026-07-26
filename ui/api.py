@@ -13,6 +13,7 @@ from pathlib import Path
 
 _REPO = Path(__file__).parent.parent
 _DEFAULT_INI = _REPO / "dialogue_reader.ini"
+_DEFAULT_SPEAKERS = _REPO / "speakers.json"
 _DEFAULT_PORT = 7849
 
 # (type, default[, choices]) per section/key. Drives typed reads and the
@@ -225,6 +226,22 @@ def english_voices(voices_bin: Path | str | None = None) -> list[str]:
     return [f"kokoro:{n}" for n in (english or _ENGLISH_FALLBACK)]
 
 
+def no_speaker_voice(speakers_path: Path | str = _DEFAULT_SPEAKERS,
+                     ini_path: Path | str = _DEFAULT_INI) -> str:
+    """The voice actually used when no speaker is detected: the persisted
+    __default__ assignment in speakers.json (written by F2 cycling and
+    SET_NO_SPEAKER_VOICE), falling back to the ini Voices.Default."""
+    import json
+    try:
+        data = json.loads(Path(speakers_path).read_text(encoding="utf-8"))
+        v = data.get("assignments", {}).get("__default__")
+        if isinstance(v, str) and v:
+            return v
+    except Exception:
+        pass
+    return read_settings(ini_path)["Voices"]["Default"]
+
+
 # ---- pywebview bridge -------------------------------------------------------
 
 _LIVE_COMMANDS = {
@@ -236,8 +253,10 @@ _LIVE_COMMANDS = {
 class Api:
     """Methods here are callable from JS as window.pywebview.api.<name>()."""
 
-    def __init__(self, ini_path: Path | str | None = None):
+    def __init__(self, ini_path: Path | str | None = None,
+                 speakers_path: Path | str | None = None):
         self._ini = Path(ini_path) if ini_path else _DEFAULT_INI
+        self._speakers = Path(speakers_path) if speakers_path else _DEFAULT_SPEAKERS
 
     def get_state(self) -> dict:
         return {
@@ -245,6 +264,7 @@ class Api:
             "schema": SCHEMA,
             "voices": english_voices(),
             "running": reader_running(),
+            "no_speaker_voice": no_speaker_voice(self._speakers, self._ini),
         }
 
     def save_settings(self, values: dict) -> bool:
@@ -264,6 +284,11 @@ class Api:
 
     def preview_voice(self, voice: str) -> None:
         send_command(f"PREVIEW_VOICE:{voice}")
+
+    def set_no_speaker_voice(self, voice: str) -> None:
+        """Pin the reader's live no-speaker voice (persisted by the reader
+        into speakers.json, avoiding file races with its own saves)."""
+        send_command(f"SET_NO_SPEAKER_VOICE:{voice}")
 
     def live_command(self, cmd: str) -> None:
         if cmd in _LIVE_COMMANDS:

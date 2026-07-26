@@ -120,6 +120,26 @@ def test_english_voices_fallback_is_nonempty(tmp_path):
     assert "kokoro:af_heart" in voices
 
 
+# ---- no-speaker voice ------------------------------------------------------
+
+def test_no_speaker_voice_reads_speakers_json(tmp_path):
+    from ui.api import no_speaker_voice
+    sp = tmp_path / "speakers.json"
+    sp.write_text('{"assignments": {"__default__": "kokoro:am_michael"}}',
+                  encoding="utf-8")
+    ini = tmp_path / "d.ini"
+    ini.write_text(INI, encoding="utf-8")
+    assert no_speaker_voice(speakers_path=sp, ini_path=ini) == "kokoro:am_michael"
+
+
+def test_no_speaker_voice_falls_back_to_ini_default(tmp_path):
+    from ui.api import no_speaker_voice
+    ini = tmp_path / "d.ini"
+    ini.write_text(INI, encoding="utf-8")
+    assert no_speaker_voice(speakers_path=tmp_path / "nope.json",
+                            ini_path=ini) == "kokoro:af_heart"
+
+
 # ---- Api bridge ------------------------------------------------------------
 
 def test_api_save_writes_ini_and_reloads(tmp_path, monkeypatch):
@@ -142,6 +162,14 @@ def test_api_preview_and_live(monkeypatch, tmp_path):
     assert sent == ["PREVIEW_VOICE:kokoro:bf_emma", "TOGGLE_PAUSE"]
 
 
+def test_api_set_no_speaker_voice_sends_command(monkeypatch, tmp_path):
+    sent = []
+    monkeypatch.setattr("ui.api.send_command", lambda cmd, **kw: sent.append(cmd))
+    api = Api(ini_path=tmp_path / "d.ini")
+    api.set_no_speaker_voice("kokoro:bf_emma")
+    assert sent == ["SET_NO_SPEAKER_VOICE:kokoro:bf_emma"]
+
+
 def test_api_get_state_shape(tmp_path, monkeypatch):
     p = tmp_path / "d.ini"
     p.write_text(INI, encoding="utf-8")
@@ -151,3 +179,4 @@ def test_api_get_state_shape(tmp_path, monkeypatch):
     assert state["running"] is True
     assert state["settings"]["Media"]["ResumeDelayMs"] == 1000
     assert state["voices"]
+    assert "no_speaker_voice" in state
