@@ -43,6 +43,8 @@ class TTS:
         self._default_voice = voice
         # Optional media_gate.MediaGate: pauses other media while we speak.
         self._media_gate = media_gate
+        # True while a gated (pause_media=True) utterance is in flight.
+        self._gate_active = False
 
         # Lazy Kokoro engine, initialized on first use.
         self._kokoro = None
@@ -146,15 +148,26 @@ class TTS:
             sd.stop()
         except Exception:
             pass
+        self._gate_active = False
         self._gate_ended()
 
-    def speak(self, text: str, voice: str | None = None) -> None:
+    def speak(self, text: str, voice: str | None = None,
+              pause_media: bool = True) -> None:
         """Speak `text`. If `voice` is None, uses the default voice. Any
-        previously-playing speech is interrupted."""
+        previously-playing speech is interrupted. `pause_media=False` marks
+        an announcement (startup cues, "voice changed", previews): it skips
+        the media gate so the user's music/video keeps playing."""
         if not text:
             return
 
-        self._gate_started()
+        if pause_media:
+            self._gate_active = True
+            self._gate_started()
+        elif self._gate_active:
+            # This announcement is about to cut off gated dialogue speech;
+            # close out the gate so media is not left stuck paused.
+            self._gate_active = False
+            self._gate_ended()
 
         try:
             sd.stop()
@@ -168,13 +181,18 @@ class TTS:
         voice_name = voice or self._default_voice
         _engine, name = _parse_voice(voice_name)
 
+        def _finish():
+            """Close out the gate for this utterance, if it owned it."""
+            if pause_media and my_version == self._version:
+                self._gate_active = False
+                self._gate_ended()
+
         def worker():
             try:
                 k = self._get_kokoro()
                 if k is None:
                     # No synthesis happened; media must not stay paused.
-                    if my_version == self._version:
-                        self._gate_ended()
+                    _finish()
                     return
                 # speed is a pitch-preserving time-stretch handled by Kokoro,
                 # then played at the native sample rate so pitch is unchanged.
@@ -192,12 +210,10 @@ class TTS:
                     sd.wait()
                 except Exception:
                     pass
-                if my_version == self._version:
-                    self._gate_ended()
+                _finish()
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
-                if my_version == self._version:
-                    self._gate_ended()
+                _finish()
 
         threading.Thread(target=worker, daemon=True).start()
 

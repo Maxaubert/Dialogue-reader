@@ -112,6 +112,30 @@ def test_no_gate_is_fine(monkeypatch):
     t.shutdown()
 
 
+# ---- announcements (pause_media=False) -------------------------------------
+
+def test_announcement_does_not_touch_gate(monkeypatch):
+    gate = FakeGate()
+    t = _make_tts(monkeypatch, gate, FakeKokoro())
+    t.speak("OCR ready", pause_media=False)
+    time.sleep(0.2)
+    assert gate.events == []
+
+
+def test_announcement_cutting_gated_speech_closes_gate(monkeypatch):
+    # Dialogue is speaking (media paused); an announcement interrupts it.
+    # The gate must be closed out so media is not left stuck paused.
+    release = threading.Event()
+    gate = FakeGate()
+    t = _make_tts(monkeypatch, gate, FakeKokoro(block_event=release))
+    t.speak("dialogue line")                        # gated, blocks in synth
+    t.speak("Voice changed", pause_media=False)     # cuts it off
+    release.set()
+    assert _wait_for(lambda: "end" in gate.events)
+    time.sleep(0.15)
+    assert gate.events == ["start", "end"]          # nothing from announcement
+
+
 # ---- hot-apply setters -----------------------------------------------------
 
 def test_set_media_gate_swaps_and_shuts_down_old(monkeypatch):
