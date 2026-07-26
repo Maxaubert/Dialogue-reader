@@ -182,8 +182,12 @@ class _Overlay(QWidget):
         existing: list[dict] | None = None,
         mode: str = "dialogue",
         poll_commands=None,
+        reserved_labels=None,
     ):
         super().__init__()
+        # Labels in use by regions NOT shown in this session (other
+        # processes' regions). New labels must not collide with them.
+        self._reserved_labels = set(reserved_labels or [])
         # Watched regions, drawn as labeled editable outlines. Regions the
         # user draws during this session are appended here with
         # "created": True. Each is {x, y, w, h, rotation, label, mode} in
@@ -438,7 +442,8 @@ class _Overlay(QWidget):
                     "x": x, "y": y, "w": w, "h": h,
                     "rotation": self._rotation,
                     "label": _next_label(
-                        [o.get("label", "") for o in self._existing],
+                        [o.get("label", "") for o in self._existing]
+                        + list(self._reserved_labels),
                         self._mode,
                     ),
                     "mode": self._mode,
@@ -608,6 +613,7 @@ def manage_regions(
     existing: list[dict] | None = None,
     mode: str = "dialogue",
     poll_commands=None,
+    reserved_labels=None,
 ) -> ManagerResult:
     """Open the region manager overlay; block until the user closes it.
 
@@ -623,7 +629,8 @@ def manage_regions(
     manager); everything else is returned in result.unhandled.
     """
     app = QApplication.instance() or QApplication(sys.argv)
-    overlay = _Overlay(existing=existing, mode=mode, poll_commands=poll_commands)
+    overlay = _Overlay(existing=existing, mode=mode, poll_commands=poll_commands,
+                       reserved_labels=reserved_labels)
     # Use show() instead of showFullScreen() so our virtual-desktop geometry
     # (which can span multiple monitors) is honored.
     overlay.show()

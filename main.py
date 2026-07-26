@@ -39,7 +39,14 @@ from capture import RegionCapture
 from ocr import OCR, OCRWorker, OCRBatchJob, OCRBatchResult, OCRRegionSpec
 from magnifier import is_zoomed as _magnifier_is_zoomed, get_magnification_level as _magnifier_level
 from tts import TTS, DEFAULT_VOICE
-from window_capture import find_window_at, get_window_rect, get_window_title
+from window_capture import (
+    find_window_at,
+    get_foreground_window,
+    get_window_process,
+    get_window_rect,
+    get_window_title,
+    is_window,
+)
 from command_server import CommandServer, DEFAULT_PORT
 from speakers import SpeakerManager
 
@@ -446,6 +453,9 @@ class WatchedRegion:
     # baseline.
     last_spoken_text: str = ""
     has_pending_frame: bool = False
+    # Executable name (lowercase) of the process this region belongs to.
+    # "" = global region (drawn over the desktop): always active.
+    process: str = ""
 
 
 def _normalize(s: str) -> str:
@@ -509,6 +519,40 @@ def _safe_print(prefix: str, value: str) -> None:
         print(f"{prefix}{value}")
     except UnicodeEncodeError:
         print(f"{prefix}{value.encode('ascii', 'replace').decode()}")
+
+
+# hwnd -> exe cache so the 12 Hz loop doesn't hit psutil every tick.
+_EXE_CACHE: dict[int, str] = {}
+
+
+def _foreground_exe() -> str:
+    """Exe name of the process owning the current foreground window."""
+    hwnd = get_foreground_window()
+    if not hwnd:
+        return ""
+    if hwnd not in _EXE_CACHE:
+        if len(_EXE_CACHE) > 256:
+            _EXE_CACHE.clear()
+        _EXE_CACHE[hwnd] = get_window_process(hwnd)
+    return _EXE_CACHE[hwnd]
+
+
+def _active_regions(regions: list[WatchedRegion], fg_exe: str) -> list[WatchedRegion]:
+    """Regions eligible for polling right now: the foreground process's
+    own regions plus globals (process == '')."""
+    return [r for r in regions if not r.process or r.process == fg_exe]
+
+
+def _prune_dead_regions(regions: list[WatchedRegion], state: dict) -> None:
+    """Drop regions whose window no longer exists (game closed). Globals
+    (hwnd 0) are kept. Bumps the OCR generation when anything is removed."""
+    dead = [r for r in regions if r.capture.hwnd and not is_window(r.capture.hwnd)]
+    if not dead:
+        return
+    regions[:] = [r for r in regions if r not in dead]
+    for r in dead:
+        print(f"[dialogue-reader] Removed {r.name} ({r.process or 'unknown'} closed)")
+    state["generation"] += 1
 
 
 def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
@@ -599,8 +643,14 @@ def open_region_manager(
     mode: str,
     state: dict,
     poll_commands=None,
+    target_process: str = "",
 ) -> list[str]:
     """Run a region-manager session and apply its outcome to `regions`.
+
+    The manager is scoped to `target_process` (the exe that owned the
+    foreground window when F1 was pressed): only its regions are shown and
+    editable, and new regions bind to it. Other processes' regions are
+    untouched, their labels merely reserved against collisions.
 
     The manager stays open until the user presses F1 again or Esc. Inside
     it they can draw any number of new regions (added with `mode` —
@@ -609,14 +659,18 @@ def open_region_manager(
     arrived mid-session for the caller to process afterwards.
     """
     label = "speaker name" if mode == "speaker" else "dialogue"
+    scoped = [r for r in regions if (r.process or "") == target_process]
+    hidden_labels = [r.name for r in regions if r not in scoped]
     print(
-        f"[dialogue-reader] Region manager open ({label} mode). "
+        f"[dialogue-reader] Region manager open ({label} mode, "
+        f"process={target_process or 'desktop'}). "
         f"Drag to add, right-click to delete, F1/Esc to close."
     )
     result = manage_regions(
-        _existing_outlines(regions),
+        _existing_outlines(scoped),
         mode=mode,
         poll_commands=poll_commands,
+        reserved_labels=hidden_labels,
     )
 
     # 1. Deletions.
@@ -663,11 +717,15 @@ def open_region_manager(
             rotation=float(o.get("rotation", 0.0)),
             capture_mode=state["capture_mode"],
         )
+        process = get_window_process(hwnd) or target_process
         regions.append(
-            WatchedRegion(name=o["label"], capture=cap, mode=o["mode"])
+            WatchedRegion(
+                name=o["label"], capture=cap, mode=o["mode"], process=process,
+            )
         )
         print(
             f"[dialogue-reader] Added {o['label']} (mode={o['mode']}, "
+            f"process={process or 'global'}, "
             f"capture={_capture_mode_label(cap)})."
         )
 
@@ -743,9 +801,12 @@ def handle_command(
 ) -> None:
     if cmd in ("PICK_REGION", "PICK_SPEAKER"):
         mode = "speaker" if cmd == "PICK_SPEAKER" else "dialogue"
+        # Resolve the focused process BEFORE the overlay steals focus: the
+        # manager session is scoped to whatever app the user was in.
+        target_process = _foreground_exe()
         unhandled = open_region_manager(
             regions, debug=debug, mode=mode, state=state,
-            poll_commands=poll_commands,
+            poll_commands=poll_commands, target_process=target_process,
         )
         # Commands that arrived while the manager was open. They can never
         # contain PICK_* (the manager consumes those as its close toggle),
@@ -756,7 +817,11 @@ def handle_command(
                 poll_commands=poll_commands, ocr=ocr,
             )
     elif cmd == "CLEAR_REGIONS":
-        regions.clear()
+        # Scoped like F1: clears only the foreground process's regions
+        # (globals when focused on the desktop).
+        fg = _foreground_exe()
+        cleared = [r for r in regions if (r.process or "") == fg]
+        regions[:] = [r for r in regions if r not in cleared]
         # Also reset speak-history so freshly-picked regions that happen
         # to show the same text as the last line we spoke aren't silently
         # skipped via the "speech identical to last spoken" dedup.
@@ -766,7 +831,10 @@ def handle_command(
         # Invalidate any OCR batch still running on the worker — its
         # results reference captures that no longer belong to any region.
         state["generation"] += 1
-        print("[dialogue-reader] Cleared all regions.")
+        print(
+            f"[dialogue-reader] Cleared {len(cleared)} region(s) for "
+            f"{fg or 'desktop'}."
+        )
     elif cmd == "CYCLE_VOICE":
         result = speaker_mgr.cycle_current_voice(direction=1)
         if result is None:
@@ -1136,6 +1204,8 @@ def main() -> int:
             )
 
     poll_interval = 1.0 / POLL_HZ
+    prune_every = max(1, int(POLL_HZ * 2))   # dead-window check ~every 2s
+    prune_countdown = prune_every
 
     try:
         while True:
@@ -1198,12 +1268,23 @@ def main() -> int:
                     time.sleep(poll_interval)
                     continue
 
-            # 3. Poll regions for pixel changes. Only submit a new batch
-            #    if the worker is idle — no point queueing work that'll
-            #    run against pixels from 2s ago by the time it gets out.
+            # 2c. Drop regions whose window died (game closed). Checked at
+            #     ~2s cadence, not every tick.
+            prune_countdown -= 1
+            if prune_countdown <= 0:
+                prune_countdown = prune_every
+                _prune_dead_regions(regions, state)
+
+            # 3. Poll regions for pixel changes. Only the foreground
+            #    process's regions (plus globals) are polled — a tabbed-out
+            #    game goes quiet instead of OCR-ing whatever covers it now.
+            #    Only submit a new batch if the worker is idle — no point
+            #    queueing work that'll run against pixels from 2s ago by
+            #    the time it gets out.
             if not ocr_worker.busy:
+                active = _active_regions(regions, _foreground_exe())
                 any_changed = False
-                for r in regions:
+                for r in active:
                     frame = r.capture.poll_once()
                     if frame is not None:
                         r.has_pending_frame = True
@@ -1211,7 +1292,7 @@ def main() -> int:
 
                 if any_changed:
                     job = _build_batch_job(
-                        regions,
+                        active,
                         generation=state["generation"],
                         confirm_polls=state["text_confirm_polls"],
                         debug=debug,

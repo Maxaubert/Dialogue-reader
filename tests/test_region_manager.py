@@ -182,7 +182,8 @@ def test_manager_result_applied(monkeypatch):
     r2 = _watched("dialogue2")
     regions = [r1, r2]
 
-    def fake_manage(outlines, mode="dialogue", poll_commands=None):
+    def fake_manage(outlines, mode="dialogue", poll_commands=None,
+                    reserved_labels=None):
         # dialogue1 deleted; dialogue2 moved; one new region created.
         survivors = [o for o in outlines if o["label"] == "dialogue2"]
         survivors[0]["x"] = 111
