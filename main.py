@@ -701,6 +701,36 @@ def _restart_last(tts: TTS, speaker_mgr: SpeakerManager, state: dict) -> None:
     tts.speak(last, voice=voice)
 
 
+def _reload_config(tts, speaker_mgr, state, ocr=None, debug=False) -> None:
+    """Re-read dialogue_reader.ini and hot-apply everything that does not
+    need a restart. Hotkeys, [Launcher] and [Network] are AHK-side and
+    excluded; changing those requires restarting the reader."""
+    voice_pool, default_voice = _load_voice_config()
+    speaker_mgr.voice_pool = list(voice_pool)
+    speaker_mgr.assignment_strategy = _load_speaker_assignment_strategy()
+    tts.set_default_voice(default_voice)
+    state["capture_mode"] = _load_capture_mode()
+    state["text_confirm_polls"] = _load_text_confirm_polls()
+    state["skip_when_zoomed"] = _load_skip_when_zoomed()
+    if ocr is not None:
+        d_eng, s_eng = _load_ocr_config()
+        try:
+            ocr.set_engines(d_eng, s_eng)
+        except Exception as e:
+            print(f"[dialogue-reader] OCR engine swap failed: {e}")
+    enabled, delay_ms = _load_media_config()
+    gate = tts.media_gate
+    if enabled and gate is not None:
+        gate.set_resume_delay_ms(delay_ms)
+    elif enabled:
+        import media_gate
+        tts.set_media_gate(
+            media_gate.MediaGate(resume_delay_ms=delay_ms, verbose=debug))
+    elif gate is not None:
+        tts.set_media_gate(None)
+    print("[dialogue-reader] Config reloaded.")
+
+
 def handle_command(
     cmd: str,
     regions: list[WatchedRegion],
@@ -709,6 +739,7 @@ def handle_command(
     state: dict,
     debug: bool,
     poll_commands=None,
+    ocr=None,
 ) -> None:
     if cmd in ("PICK_REGION", "PICK_SPEAKER"):
         mode = "speaker" if cmd == "PICK_SPEAKER" else "dialogue"
@@ -722,7 +753,7 @@ def handle_command(
         for extra in unhandled:
             handle_command(
                 extra, regions, tts, speaker_mgr, state, debug=debug,
-                poll_commands=poll_commands,
+                poll_commands=poll_commands, ocr=ocr,
             )
     elif cmd == "CLEAR_REGIONS":
         regions.clear()
@@ -786,6 +817,13 @@ def handle_command(
             tts.stop()
             _play_cue(_PAUSE_CUE)
             print("[dialogue-reader] PAUSED")
+    elif cmd == "RELOAD_CONFIG":
+        _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
+    elif cmd.startswith("PREVIEW_VOICE:"):
+        voice = cmd[len("PREVIEW_VOICE:"):].strip()
+        if voice:
+            print(f"[dialogue-reader] Voice preview: {voice}")
+            tts.speak("Hello! This is how I sound.", voice=voice)
     elif cmd == "SPEED_UP":
         tts.set_speed(round(tts.get_speed() + 0.1, 2))
         print(f"[dialogue-reader] TTS speed -> {tts.get_speed():.2f}x")
@@ -1049,6 +1087,8 @@ def main() -> int:
         "speaker_candidate": "",
         "capture_mode": capture_mode,
         "zoomed": False,
+        "text_confirm_polls": text_confirm_polls,
+        "skip_when_zoomed": skip_when_zoomed,
     }
 
     ocr_worker = OCRWorker(ocr)
@@ -1083,7 +1123,7 @@ def main() -> int:
         ):
             handle_command(
                 extra, regions, tts, speaker_mgr, state, debug=debug,
-                poll_commands=_drain_commands,
+                poll_commands=_drain_commands, ocr=ocr,
             )
 
     poll_interval = 1.0 / POLL_HZ
@@ -1100,7 +1140,7 @@ def main() -> int:
                     break
                 handle_command(
                     cmd, regions, tts, speaker_mgr, state, debug=debug,
-                    poll_commands=_drain_commands,
+                    poll_commands=_drain_commands, ocr=ocr,
                 )
 
             # 2. Apply any OCR result the worker just finished. poll_result
@@ -1130,7 +1170,7 @@ def main() -> int:
             #     Debug mode logs the raw level even when detection
             #     thinks nothing changed — useful for diagnosing setups
             #     where the Magnification API reports stale values.
-            if skip_when_zoomed:
+            if state["skip_when_zoomed"]:
                 zoomed_now = _magnifier_is_zoomed()
                 if zoomed_now != state["zoomed"]:
                     level = _magnifier_level()
@@ -1164,7 +1204,7 @@ def main() -> int:
                     job = _build_batch_job(
                         regions,
                         generation=state["generation"],
-                        confirm_polls=text_confirm_polls,
+                        confirm_polls=state["text_confirm_polls"],
                         debug=debug,
                     )
                     if job is not None:

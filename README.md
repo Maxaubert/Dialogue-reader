@@ -93,6 +93,10 @@ In game, use:
 
 Bindings live in `dialogue_reader.ini`. Right-click the tray icon and pick "Reload Script" to apply changes.
 
+### Settings app
+
+Double-click `dialogue_reader_ui.pyw` for a settings window: live controls (pause, speed, voice cycling), media pause, capture/OCR modes, the voice pool with per-voice previews, and hotkey editing. Changes hot-apply to the running reader (`RELOAD_CONFIG` over UDP); only hotkey changes need the restart button. Closing the window keeps it in the tray.
+
 ---
 
 ## Configuration
@@ -121,6 +125,8 @@ region_picker.py    Click-and-drag region selector (PySide6 overlay)
 ocr.py              WinOCR and EasyOCR wrappers + worker thread
 tts.py              TTS dispatcher (piper / kokoro / sherpa)
 media_gate.py       Pauses other media (GSMTC) while speaking, resumes after
+ui/                 Settings app: pywebview window (api.py backend, index.html)
+dialogue_reader_ui.pyw  Settings app launcher (close-to-tray, single instance)
 kokoro_tts.py       Kokoro-ONNX backend
 sherpa_tts.py       Sherpa-ONNX backend (VCTK, LibriTTS-R, MeloTTS)
 speakers.py         Speaker to voice mapping with persistence

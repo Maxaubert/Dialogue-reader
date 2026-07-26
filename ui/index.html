@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DialogReader Settings</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>DialogReader</h1>
+  <span id="status" class="pill">checking…</span>
+  <div class="live">
+    <button id="btn-pause" title="Pause / resume the reader">⏯ Pause</button>
+    <button id="btn-slower" title="Slow down speech">− Speed</button>
+    <button id="btn-faster" title="Speed up speech">+ Speed</button>
+    <button id="btn-cycle" title="Next voice for current speaker">↻ Voice</button>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Media pause</h2>
+    <label class="row">
+      <input type="checkbox" data-s="Media" data-k="PauseDuringSpeech">
+      Pause other media (YouTube, Spotify…) while the reader speaks
+    </label>
+    <label class="row">
+      Resume after quiet period
+      <input type="number" min="0" step="100" data-s="Media" data-k="ResumeDelayMs" class="num"> ms
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Capture &amp; OCR</h2>
+    <label class="row">Capture mode
+      <select data-s="Capture" data-k="Mode">
+        <option value="auto">auto (probe at pick time)</option>
+        <option value="screen">screen (force mss)</option>
+        <option value="window">window (force PrintWindow)</option>
+      </select>
+    </label>
+    <label class="row">Dialogue OCR
+      <select data-s="OCR" data-k="Dialogue">
+        <option value="winocr">winocr (fast, clean text)</option>
+        <option value="easyocr">easyocr (stylized fonts)</option>
+      </select>
+    </label>
+    <label class="row">Speaker OCR
+      <select data-s="OCR" data-k="Speaker">
+        <option value="winocr">winocr (fast, clean text)</option>
+        <option value="easyocr">easyocr (stylized fonts)</option>
+      </select>
+    </label>
+    <label class="row">Confirm polls before speaking
+      <input type="number" min="1" max="10" data-s="Polling" data-k="TextConfirmPolls" class="num">
+    </label>
+    <label class="row">
+      <input type="checkbox" data-s="Magnifier" data-k="SkipWhenZoomed">
+      Pause watching while Windows Magnifier is zoomed
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Voices</h2>
+    <label class="row">Default voice
+      <select id="default-voice" data-s="Voices" data-k="Default"></select>
+      <button id="preview-default" class="mini" title="Preview">▶</button>
+    </label>
+    <label class="row">Assignment strategy
+      <select data-s="Speakers" data-k="AssignmentStrategy">
+        <option value="random">random</option>
+        <option value="round_robin">round robin</option>
+        <option value="inverse_round_robin">inverse round robin</option>
+      </select>
+    </label>
+    <label class="row">
+      <input type="checkbox" id="use-all-voices"> Use every English voice in the cycle pool
+    </label>
+    <div id="voice-grid" class="grid"></div>
+  </section>
+
+  <section class="card">
+    <h2>Hotkeys <span class="tag">restart needed</span></h2>
+    <p class="hint">AHK syntax: <code>^</code>=Ctrl <code>+</code>=Shift <code>!</code>=Alt <code>#</code>=Win</p>
+    <div class="hotkeys" id="hotkeys"></div>
+    <button id="btn-restart" class="warn">Restart reader</button>
+    <span id="restart-hint" class="hint hidden">Hotkey changes apply after a restart.</span>
+  </section>
+</main>
+
+<footer id="savebar" class="hidden">
+  <span>Unsaved changes</span>
+  <button id="btn-save">Save &amp; apply</button>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

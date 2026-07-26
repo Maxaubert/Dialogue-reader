@@ -8,3 +8,6 @@ winocr
 easyocr>=1.7
 opencv-python>=4.8
 pywin32>=306
+pywebview>=5.0
+pystray>=0.19
+psutil>=5.9
