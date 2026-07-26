@@ -31,6 +31,9 @@ def page(ui_server):
         "settings": read_settings(Path("does-not-exist.ini")),  # pure defaults
         "voices": english_voices(),
         "running": True,
+        # Deliberately different from the ini default (af_heart): the UI must
+        # show the live no-speaker voice, not the ini value.
+        "no_speaker_voice": "kokoro:am_michael",
     }
     stub = """
     window.__calls = [];
@@ -41,6 +44,7 @@ def page(ui_server):
       live_command: (c) => { window.__calls.push(["live_command", c]); return Promise.resolve(null); },
       reader_status: () => Promise.resolve(true),
       restart_reader: () => { window.__calls.push(["restart_reader"]); return Promise.resolve(true); },
+      set_no_speaker_voice: (v) => { window.__calls.push(["set_no_speaker_voice", v]); return Promise.resolve(null); },
     }};
     """ % json.dumps(state)
     with sync_playwright() as p:
@@ -89,6 +93,16 @@ def test_preview_default_voice(page):
     calls = _calls(page)
     assert calls[-1][0] == "preview_voice"
     assert calls[-1][1].startswith("kokoro:")
+
+
+def test_no_speaker_voice_shows_live_value_and_saves(page):
+    # Shows the live voice from speakers.json, not the ini default
+    assert page.input_value("#default-voice") == "kokoro:am_michael"
+    page.select_option("#default-voice", "kokoro:bf_emma")
+    page.click("#btn-save")
+    page.wait_for_function(
+        'window.__calls.some(c => c[0] === "set_no_speaker_voice")')
+    assert ["set_no_speaker_voice", "kokoro:bf_emma"] in _calls(page)
 
 
 def test_hotkey_edit_shows_restart_hint(page):
