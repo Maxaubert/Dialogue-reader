@@ -23,8 +23,8 @@ class FakeTTS:
     def set_default_voice(self, voice):
         self.default_voice = voice
 
-    def speak(self, text, voice=None):
-        self.spoken.append((text, voice))
+    def speak(self, text, voice=None, pause_media=True):
+        self.spoken.append((text, voice, pause_media))
 
 
 class FakeGate:
@@ -131,6 +131,7 @@ def test_handle_command_preview_voice():
                    _state(), debug=False)
     assert len(tts.spoken) == 1
     assert tts.spoken[0][1] == "kokoro:bf_emma"
+    assert tts.spoken[0][2] is False        # previews never pause media
 
 
 def test_handle_command_preview_voice_empty_is_ignored():

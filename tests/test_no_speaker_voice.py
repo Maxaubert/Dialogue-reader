@@ -51,8 +51,8 @@ class _FakeTTS:
     def __init__(self):
         self.spoken = []
 
-    def speak(self, text, voice=None):
-        self.spoken.append((text, voice))
+    def speak(self, text, voice=None, pause_media=True):
+        self.spoken.append((text, voice, pause_media))
 
 
 def test_handle_command_set_no_speaker_voice(tmp_path):
@@ -62,6 +62,7 @@ def test_handle_command_set_no_speaker_voice(tmp_path):
                    {}, debug=False)
     assert m.no_speaker_voice == "kokoro:bf_emma"
     assert tts.spoken and tts.spoken[0][1] == "kokoro:bf_emma"
+    assert tts.spoken[0][2] is False        # confirmations never pause media
 
 
 def test_handle_command_set_no_speaker_voice_empty_ignored(tmp_path):

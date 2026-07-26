@@ -774,7 +774,8 @@ def handle_command(
         else:
             speaker, new_voice = result
             print(f"[dialogue-reader] {speaker} -> {new_voice}")
-            tts.speak(f"Voice changed for {speaker}", voice=new_voice)
+            tts.speak(f"Voice changed for {speaker}", voice=new_voice,
+                      pause_media=False)
     elif cmd == "CYCLE_VOICE_PREV":
         result = speaker_mgr.cycle_current_voice(direction=-1)
         if result is None:
@@ -782,7 +783,8 @@ def handle_command(
         else:
             speaker, new_voice = result
             print(f"[dialogue-reader] {speaker} -> {new_voice} (back)")
-            tts.speak(f"Voice changed for {speaker}", voice=new_voice)
+            tts.speak(f"Voice changed for {speaker}", voice=new_voice,
+                      pause_media=False)
     elif cmd.startswith("SET_SPEAKER:"):
         name = cmd[len("SET_SPEAKER:"):].strip()
         if name:
@@ -822,14 +824,15 @@ def handle_command(
         if voice:
             speaker_mgr.set_no_speaker_voice(voice)
             print(f"[dialogue-reader] No-speaker voice -> {voice}")
-            tts.speak("Default voice changed", voice=voice)
+            tts.speak("Default voice changed", voice=voice, pause_media=False)
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):
         voice = cmd[len("PREVIEW_VOICE:"):].strip()
         if voice:
             print(f"[dialogue-reader] Voice preview: {voice}")
-            tts.speak("Hello! This is how I sound.", voice=voice)
+            tts.speak("Hello! This is how I sound.", voice=voice,
+                      pause_media=False)
     elif cmd == "SPEED_UP":
         tts.set_speed(round(tts.get_speed() + 0.1, 2))
         print(f"[dialogue-reader] TTS speed -> {tts.get_speed():.2f}x")
@@ -1040,7 +1043,7 @@ def main() -> int:
         media_gate = MediaGate(resume_delay_ms=resume_delay_ms, verbose=debug)
         print(f"[dialogue-reader] Media pause on (resume after {resume_delay_ms}ms quiet)")
     tts = TTS(voice=default_voice, speed=1.1, media_gate=media_gate)
-    tts.speak(_STARTUP_PHRASE)
+    tts.speak(_STARTUP_PHRASE, pause_media=False)
 
     print(
         f"[dialogue-reader] Loading OCR engines "
@@ -1104,7 +1107,7 @@ def main() -> int:
     # now live. Signal it: rising chime (plays even if Kokoro is down) then a
     # spoken confirmation.
     _play_cue(_READY_CUE)
-    tts.speak(_READY_PHRASE)
+    tts.speak(_READY_PHRASE, pause_media=False)
 
     print("[dialogue-reader] Ready. Use the AHK script (or send UDP commands) to control.")
     print("[dialogue-reader] PICK_REGION to add a region. Ctrl+C to quit.")
