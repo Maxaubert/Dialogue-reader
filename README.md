@@ -106,6 +106,7 @@ Bindings live in `dialogue_reader.ini`. Right-click the tray icon and pick "Relo
 | `[Capture]` | Capture mode (`auto`, `screen`, `window`) |
 | `[Speakers]` | Voice-assignment strategy (`random`, `round_robin`, `inverse_round_robin`) |
 | `[Magnifier]` | `SkipWhenZoomed`: pause polling while zoomed |
+| `[Media]` | `PauseDuringSpeech`: pause YouTube/Spotify etc. while the reader speaks; `ResumeDelayMs`: quiet period before resuming (default 1000) |
 | `[Voices]` | Default voice and the pool. Supports `<engine>:all` and `sherpa:<model>:<a>-<b>` ranges |
 | `[Polling]` | `TextConfirmPolls`: how many identical OCR polls before speaking |
 
@@ -119,6 +120,7 @@ capture.py          Region capture (mss / PrintWindow window-mode)
 region_picker.py    Click-and-drag region selector (PySide6 overlay)
 ocr.py              WinOCR and EasyOCR wrappers + worker thread
 tts.py              TTS dispatcher (piper / kokoro / sherpa)
+media_gate.py       Pauses other media (GSMTC) while speaking, resumes after
 kokoro_tts.py       Kokoro-ONNX backend
 sherpa_tts.py       Sherpa-ONNX backend (VCTK, LibriTTS-R, MeloTTS)
 speakers.py         Speaker to voice mapping with persistence
