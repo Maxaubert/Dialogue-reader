@@ -104,6 +104,24 @@ class TTS:
 
     # ---- media gate ----
 
+    @property
+    def media_gate(self):
+        return self._media_gate
+
+    def set_media_gate(self, gate) -> None:
+        """Swap the media gate at runtime (RELOAD_CONFIG). The old gate is
+        shut down so any media it paused resumes immediately."""
+        old, self._media_gate = self._media_gate, gate
+        if old is not None:
+            try:
+                old.shutdown()
+            except Exception:
+                pass
+
+    def set_default_voice(self, voice: str) -> None:
+        """Change the voice used when speak() gets no explicit voice."""
+        self._default_voice = voice
+
     def _gate_started(self) -> None:
         if self._media_gate is not None:
             try:

@@ -87,11 +87,33 @@ class OCR:
             self._init_winocr()
         if "easyocr" in engines_needed:
             self._init_easyocr()
+        self._engines_loaded = set(engines_needed)
 
         print(
             f"[ocr] ready — dialogue={dialogue_engine} speaker={speaker_engine}",
             flush=True,
         )
+
+    def set_engines(self, dialogue_engine: str, speaker_engine: str) -> None:
+        """Hot-swap the per-role engine choice (RELOAD_CONFIG). Lazily
+        initializes an engine that was not loaded at startup; raises
+        ValueError on unknown names without touching current roles."""
+        dialogue_engine = dialogue_engine.strip().lower()
+        speaker_engine = speaker_engine.strip().lower()
+        for role, eng in (("dialogue", dialogue_engine), ("speaker", speaker_engine)):
+            if eng not in VALID_ENGINES:
+                raise ValueError(
+                    f"Unknown OCR engine for {role}: {eng!r}. "
+                    f"Valid: {VALID_ENGINES}"
+                )
+        for eng in {dialogue_engine, speaker_engine} - self._engines_loaded:
+            if eng == "winocr":
+                self._init_winocr()
+            elif eng == "easyocr":
+                self._init_easyocr()
+            self._engines_loaded.add(eng)
+        self._dialogue_engine = dialogue_engine
+        self._speaker_engine = speaker_engine
 
     # ---- engine init (only called if needed) ----
 

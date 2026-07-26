@@ -135,6 +135,18 @@ def test_resume_memory_clears_after_firing():
     assert s.play_calls == 1
 
 
+# ---- hot-apply -------------------------------------------------------------
+
+def test_set_resume_delay_ms():
+    s = FakeSession("spotify")
+    gate = _gate([s], delay_ms=10_000)
+    gate.set_resume_delay_ms(30)
+    gate.speech_started()
+    assert _wait_for(lambda: s.is_paused)
+    gate.speech_ended()
+    assert _wait_for(lambda: s.play_calls == 1)   # new short delay in effect
+
+
 # ---- shutdown --------------------------------------------------------------
 
 def test_shutdown_resumes_immediately():

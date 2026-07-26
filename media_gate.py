@@ -30,6 +30,11 @@ class MediaGate:
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
 
+    def set_resume_delay_ms(self, resume_delay_ms: int) -> None:
+        """Hot-apply a new quiet-period length (RELOAD_CONFIG). Takes effect
+        on the next speech_ended()."""
+        self._resume_delay = max(0, int(resume_delay_ms)) / 1000.0
+
     # ---- lifecycle ----
 
     def speech_started(self) -> None:

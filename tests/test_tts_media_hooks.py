@@ -110,3 +110,28 @@ def test_no_gate_is_fine(monkeypatch):
     t.speak("hello")   # must not raise
     t.stop()
     t.shutdown()
+
+
+# ---- hot-apply setters -----------------------------------------------------
+
+def test_set_media_gate_swaps_and_shuts_down_old(monkeypatch):
+    old, new = FakeGate(), FakeGate()
+    t = _make_tts(monkeypatch, old, FakeKokoro())
+    t.set_media_gate(new)
+    assert t.media_gate is new
+    assert "shutdown" in old.events        # old gate releases held media
+
+
+def test_set_media_gate_none_disables(monkeypatch):
+    old = FakeGate()
+    t = _make_tts(monkeypatch, old, FakeKokoro())
+    t.set_media_gate(None)
+    assert t.media_gate is None
+    assert "shutdown" in old.events
+    t.speak("hello")                       # must not raise without a gate
+
+
+def test_set_default_voice(monkeypatch):
+    t = _make_tts(monkeypatch, None, FakeKokoro())
+    t.set_default_voice("kokoro:bf_emma")
+    assert t._default_voice == "kokoro:bf_emma"
