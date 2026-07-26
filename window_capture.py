@@ -54,6 +54,35 @@ def get_window_title(hwnd: int) -> str:
         return "<unknown>"
 
 
+def get_foreground_window() -> int:
+    """HWND of the current foreground window's top-level ancestor, or 0."""
+    hwnd = _user32.GetForegroundWindow()
+    if not hwnd:
+        return 0
+    return _user32.GetAncestor(hwnd, _GA_ROOT) or hwnd
+
+
+def get_window_process(hwnd: int) -> str:
+    """Executable name (lowercase, e.g. 'vein-win64-test.exe') of the
+    process owning `hwnd`, or '' if it can't be resolved."""
+    if not hwnd:
+        return ""
+    try:
+        import psutil
+        import win32process
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        if not pid:
+            return ""
+        return psutil.Process(pid).name().lower()
+    except Exception:
+        return ""
+
+
+def is_window(hwnd: int) -> bool:
+    """True if `hwnd` still refers to an existing window."""
+    return bool(hwnd) and bool(_user32.IsWindow(hwnd))
+
+
 def capture_window(hwnd: int) -> np.ndarray | None:
     """Capture the window's contents as a (H, W, 3) RGB uint8 array.
     Returns None if the capture fails (window closed, minimized, GPU app)."""
