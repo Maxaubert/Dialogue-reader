@@ -1,0 +1,123 @@
+/* Simple, dark, calm. A dedicated design pass comes later. */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+  background: #16181d;
+  color: #d8dbe2;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #1d2026;
+  border-bottom: 1px solid #2a2e36;
+  position: sticky;
+  top: 0;
+}
+h1 { font-size: 17px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 10px; color: #fff; }
+.pill {
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  background: #3a3f49;
+}
+.pill.on  { background: #1d4a2c; color: #8fe6a7; }
+.pill.off { background: #4a1d1d; color: #e68f8f; }
+.live { margin-left: auto; display: flex; gap: 6px; }
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 20px 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card {
+  background: #1d2026;
+  border: 1px solid #2a2e36;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.row select, .row input[type="number"] { margin-left: auto; }
+
+button {
+  background: #2c313a;
+  color: #d8dbe2;
+  border: 1px solid #3a3f49;
+  border-radius: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #3a4150; }
+button.mini { padding: 2px 8px; margin-left: 6px; }
+button.warn { border-color: #7a4a1d; }
+select, input[type="number"], input[type="text"] {
+  background: #14161a;
+  color: #d8dbe2;
+  border: 1px solid #3a3f49;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.num { width: 90px; }
+input[type="checkbox"] { accent-color: #4f8cff; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+.grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  white-space: nowrap;
+}
+.grid .mini { margin-left: auto; }
+
+.hotkeys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  margin-bottom: 10px;
+}
+.hotkeys label { display: flex; align-items: center; gap: 8px; }
+.hotkeys input { margin-left: auto; width: 90px; }
+.tag {
+  font-size: 11px;
+  color: #e6bd8f;
+  border: 1px solid #7a4a1d;
+  border-radius: 99px;
+  padding: 1px 8px;
+  vertical-align: 2px;
+}
+.hint { color: #8a8f9a; font-size: 12px; }
+code { background: #14161a; padding: 1px 5px; border-radius: 4px; }
+
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px;
+  background: #1d2026;
+  border-top: 1px solid #2a2e36;
+}
+#btn-save { background: #2456b3; border-color: #2f6ad1; color: #fff; }
+#btn-save:hover { background: #2f6ad1; }
+.hidden { display: none !important; }
