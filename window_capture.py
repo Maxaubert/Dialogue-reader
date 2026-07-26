@@ -83,6 +83,33 @@ def is_window(hwnd: int) -> bool:
     return bool(hwnd) and bool(_user32.IsWindow(hwnd))
 
 
+def find_process_window(exe: str) -> int:
+    """Largest visible, titled top-level window owned by `exe` (lowercase
+    executable name), or 0. Used to (re)locate a game's window when applying
+    a profile."""
+    if not exe:
+        return 0
+    best = [0, 0]  # hwnd, area
+
+    def cb(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        if not win32gui.GetWindowText(hwnd):
+            return
+        if get_window_process(hwnd) != exe:
+            return
+        left, top, right, bot = win32gui.GetWindowRect(hwnd)
+        area = max(0, right - left) * max(0, bot - top)
+        if area > best[1]:
+            best[0], best[1] = hwnd, area
+
+    try:
+        win32gui.EnumWindows(cb, None)
+    except Exception:
+        pass
+    return best[0]
+
+
 def capture_window(hwnd: int) -> np.ndarray | None:
     """Capture the window's contents as a (H, W, 3) RGB uint8 array.
     Returns None if the capture fails (window closed, minimized, GPU app)."""

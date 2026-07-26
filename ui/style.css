@@ -105,6 +105,27 @@ input[type="checkbox"] { accent-color: #4f8cff; }
 .hint { color: #8a8f9a; font-size: 12px; }
 code { background: #14161a; padding: 1px 5px; border-radius: 4px; }
 
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid #2a2e36;
+}
+.profile svg {
+  flex: 0 0 auto;
+  border: 1px solid #3a3f49;
+  border-radius: 4px;
+  background: #101216;
+}
+.profile .p-info { flex: 1; min-width: 0; }
+.profile .p-name { font-weight: 600; color: #fff; }
+.profile .p-meta { font-size: 12px; color: #8a8f9a; word-break: break-all; }
+.profile .p-controls { display: flex; align-items: center; gap: 10px; }
+.profile .p-controls label { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+#profile-name { flex: 1; }
+.empty { color: #8a8f9a; font-size: 13px; padding: 8px 0; }
+
 footer {
   position: fixed;
   bottom: 0;

@@ -140,6 +140,68 @@ def test_no_speaker_voice_falls_back_to_ini_default(tmp_path):
                             ini_path=ini) == "kokoro:af_heart"
 
 
+# ---- profiles --------------------------------------------------------------
+
+_PROFILES_JSON = """{
+  "profiles": {
+    "vein": {
+      "process": "vein-win64-test.exe",
+      "window": {"w": 2000, "h": 1000},
+      "regions": [
+        {"rel_x": 50, "rel_y": 140, "w": 400, "h": 150,
+         "rotation": 0.0, "label": "dialogue1", "mode": "dialogue"}
+      ],
+      "apply_on_launch": true,
+      "applied": false
+    }
+  }
+}"""
+
+
+def test_read_profiles(tmp_path):
+    from ui.api import read_profiles
+    p = tmp_path / "profiles.json"
+    p.write_text(_PROFILES_JSON, encoding="utf-8")
+    profiles = read_profiles(p)
+    assert profiles["vein"]["process"] == "vein-win64-test.exe"
+    assert profiles["vein"]["apply_on_launch"] is True
+
+
+def test_read_profiles_missing_file(tmp_path):
+    from ui.api import read_profiles
+    assert read_profiles(tmp_path / "nope.json") == {}
+
+
+def test_api_profile_commands(monkeypatch, tmp_path):
+    sent = []
+    monkeypatch.setattr("ui.api.send_command", lambda cmd, **kw: sent.append(cmd))
+    api = Api(ini_path=tmp_path / "d.ini")
+    api.profile_save("vein")
+    api.profile_apply("vein")
+    api.profile_unapply("vein")
+    api.profile_auto("vein", True)
+    api.profile_auto("vein", False)
+    api.profile_delete("vein")
+    assert sent == [
+        "PROFILE_SAVE:vein",
+        "PROFILE_APPLY:vein",
+        "PROFILE_UNAPPLY:vein",
+        "PROFILE_AUTO:vein:1",
+        "PROFILE_AUTO:vein:0",
+        "PROFILE_DELETE:vein",
+    ]
+
+
+def test_api_get_state_includes_profiles(tmp_path, monkeypatch):
+    ini = tmp_path / "d.ini"
+    ini.write_text(INI, encoding="utf-8")
+    pj = tmp_path / "profiles.json"
+    pj.write_text(_PROFILES_JSON, encoding="utf-8")
+    monkeypatch.setattr("ui.api.reader_running", lambda **kw: True)
+    api = Api(ini_path=ini, profiles_path=pj)
+    assert "vein" in api.get_state()["profiles"]
+
+
 # ---- Api bridge ------------------------------------------------------------
 
 def test_api_save_writes_ini_and_reloads(tmp_path, monkeypatch):
