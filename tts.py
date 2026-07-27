@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 import sounddevice as sd
@@ -206,10 +207,15 @@ class TTS:
                     except Exception:
                         pass
                     return
-                try:
-                    sd.wait()
-                except Exception:
-                    pass
+                # Time the playback out instead of sd.wait(): the global
+                # stream's wait() is not safe against a concurrent stop()/
+                # play() from another thread (native crash, issue #20).
+                duration = len(audio) / float(sample_rate) if sample_rate else 0.0
+                deadline = time.monotonic() + duration + 0.2
+                while time.monotonic() < deadline:
+                    if my_version != self._version:
+                        return
+                    time.sleep(0.05)
                 _finish()
             except Exception as e:
                 print(f"[tts] kokoro worker error: {e}", flush=True)
