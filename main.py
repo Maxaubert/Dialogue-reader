@@ -1181,8 +1181,31 @@ def _build_batch_job(
     )
 
 
+# Keep the crash-log handle alive for the process lifetime: faulthandler
+# writes to the raw fd on a native fault (access violation, segfault) and
+# dumps every thread's Python stack — the only forensics we get, since the
+# console is hidden and native crashes never reach sys.excepthook.
+_crash_log_file = None
+
+
+def _enable_crash_log() -> None:
+    global _crash_log_file
+    try:
+        import faulthandler
+        _crash_log_file = open(
+            Path(__file__).parent / "crash.log", "a", encoding="utf-8")
+        _crash_log_file.write(
+            f"\n==== session start {time.strftime('%Y-%m-%d %H:%M:%S')} "
+            f"(pid {os.getpid()}) ====\n")
+        _crash_log_file.flush()
+        faulthandler.enable(file=_crash_log_file)
+    except Exception:
+        pass
+
+
 def main() -> int:
     debug = "--debug" in sys.argv
+    _enable_crash_log()
     pick_on_start = "--pick-on-start" in sys.argv
 
     # Claim the singleton BEFORE touching heavy stuff (OCR/TTS models, UDP

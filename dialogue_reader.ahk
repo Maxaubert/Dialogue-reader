@@ -130,6 +130,25 @@ LaunchPython() {
 }
 LaunchPython()
 
+; --- child supervision: relaunch python if it dies (crash resilience) ---
+;
+; py.exe exits when its python.exe child dies (crash or otherwise), so
+; ProcessExist(PyPid) going false means the reader is gone. Relaunch it,
+; rate-limited so a python that crashes instantly at startup does not
+; spin-loop (model load alone takes ~30s, so 30s between attempts).
+LastRelaunch := 0
+CheckChild() {
+    global PyPid, LastRelaunch
+    if (PyPid && ProcessExist(PyPid))
+        return
+    if (A_TickCount - LastRelaunch < 30000)
+        return
+    LastRelaunch := A_TickCount
+    TrayTip("Dialogue Reader", "Reader process died — relaunching...", 1)
+    LaunchPython()
+}
+SetTimer(CheckChild, 5000)
+
 ; --- shutdown handling: kill the python process tree when this script exits ---
 ;
 ; Three-step cleanup, because killing Python from AHK is harder than it

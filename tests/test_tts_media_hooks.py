@@ -112,6 +112,25 @@ def test_no_gate_is_fine(monkeypatch):
     t.shutdown()
 
 
+# ---- audio-thread safety ---------------------------------------------------
+
+def test_worker_never_calls_sd_wait(monkeypatch):
+    # sounddevice's global-stream wait() is not safe against a concurrent
+    # stop()/play() from another thread (native crash, issue #20). The
+    # worker must time playback out instead of blocking in wait().
+    waits = []
+    monkeypatch.setattr(tts_mod, "sd", SimpleNamespace(
+        play=lambda *a, **k: None, stop=lambda: None,
+        wait=lambda: waits.append(1)))
+    monkeypatch.setattr(TTS, "_ensure_default_loaded", lambda self: None)
+    gate = FakeGate()
+    t = TTS(media_gate=gate)
+    monkeypatch.setattr(t, "_get_kokoro", lambda: FakeKokoro())
+    t.speak("hello")
+    assert _wait_for(lambda: gate.events == ["start", "end"])
+    assert waits == []
+
+
 # ---- announcements (pause_media=False) -------------------------------------
 
 def test_announcement_does_not_touch_gate(monkeypatch):
