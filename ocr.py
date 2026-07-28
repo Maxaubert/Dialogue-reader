@@ -367,8 +367,7 @@ class OCRWorker:
             new_text = self._ocr.read(fresh, speaker=(r.mode == "speaker"))
 
             if r.mode == "dialogue" and job.confirm_polls > 1:
-                confirmed.add(r.name)
-                new_text = self._confirm_dialogue_text(
+                new_text, held = self._confirm_dialogue_text(
                     capture=r.capture,
                     initial=new_text.strip(),
                     initial_hash=_hash_frame_fast(fresh),
@@ -379,6 +378,11 @@ class OCRWorker:
                     region_name=r.name,
                     debug=job.debug,
                 )
+                # ONLY when the text actually held still. Reporting every
+                # attempt as confirmed disabled the caller's jitter guard and
+                # spoke mid-typewriter text (issue #25).
+                if held:
+                    confirmed.add(r.name)
 
             texts[r.name] = new_text
 
@@ -396,10 +400,14 @@ class OCRWorker:
         hard_cap: int,
         region_name: str,
         debug: bool,
-    ) -> str:
+    ) -> tuple[str, bool]:
         """Re-snapshot + re-OCR until we see `polls` consecutive identical
         results, or we hit the attempt cap. Prevents reading partial
         typewriter text.
+
+        Returns (text, held) where `held` is True only when the text reached
+        `polls` consecutive identical reads. Giving up returns the last read
+        with held=False so the caller can still apply its own jitter guard.
 
         Optimization: hash the raw snapshot. If the hash matches the last
         frame we actually OCR'd, the pixels are identical and the OCR
@@ -440,4 +448,4 @@ class OCRWorker:
                 f"(OCR calls: {ocr_calls}, hash-skipped: {skipped})",
                 flush=True,
             )
-        return confirmed
+        return confirmed, matches >= polls

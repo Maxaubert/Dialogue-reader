@@ -28,4 +28,20 @@ def block_commands_to_the_live_reader(monkeypatch):
             f"Patch ui.api.send_command in this test."
         )
 
+    def no_processes(attrs=None):
+        # restart_reader() swallows exceptions, so guarding send_command
+        # alone still let it walk the process list and KILL the running
+        # supervisor. Block the kill and relaunch paths too (issue #25).
+        raise AssertionError(
+            "test called restart_reader() (or process_iter) without patching "
+            "it; that would kill the live reader. Patch ui.api.psutil."
+        )
+
+    def no_launch(path):
+        raise AssertionError(
+            f"test tried to launch {path!r}. Patch ui.api.os.startfile."
+        )
+
     monkeypatch.setattr(ui_api, "send_command", guarded)
+    monkeypatch.setattr(ui_api.psutil, "process_iter", no_processes)
+    monkeypatch.setattr(ui_api.os, "startfile", no_launch)

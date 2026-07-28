@@ -238,6 +238,20 @@ class ProfileStore:
                     self._claimed.discard(name)
                 self._save()
 
+    def note_process_gone(self, process: str) -> None:
+        """The game is no longer running: re-arm its profiles.
+
+        Separate from mark_unapplied_for_process because that one only had
+        an effect on profiles still flagged `applied` -- so a profile the
+        user had explicitly unapplied stayed suppressed forever and never
+        auto-applied again until the reader restarted (issue #25)."""
+        with self._lock:
+            for name, p in self._profiles.items():
+                if p.get("process") != process:
+                    continue
+                self._claimed.discard(name)
+                self._suppressed.discard(name)
+
     def release_claim(self, name: str) -> None:
         """Let the watcher consider `name` again (the apply finished, failed,
         or its game vanished)."""

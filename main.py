@@ -879,6 +879,33 @@ def _reload_config(tts, speaker_mgr, state, ocr=None, debug=False) -> None:
     print("[dialogue-reader] Config reloaded.")
 
 
+def _profile_watch_tick(profiles, running: set[str], enqueue) -> None:
+    """One pass of the apply-on-launch watcher.
+
+    Extracted from the thread so it can be tested: a silently dead watcher
+    just means auto-apply stops working, which is invisible until you notice
+    your boxes never came back (issue #25)."""
+    for name in profiles.names():
+        p = profiles.get(name)
+        if p and p.get("process") not in running:
+            # Unconditional: gating this on `applied` left a profile the
+            # user had unapplied suppressed forever, so it never
+            # auto-applied again for the rest of the session (issue #25).
+            profiles.note_process_gone(p["process"])
+            if p.get("applied"):
+                profiles.mark_unapplied_for_process(p["process"])
+    # claim_auto hands each profile out ONCE: the main thread can be blocked
+    # in the region manager for a minute, and an unclaimed check queued the
+    # same apply every 3s (issue #23).
+    for name in profiles.claim_auto(running):
+        p = profiles.get(name)
+        if p and find_process_window(p["process"]):
+            print(f"[profiles] {p['process']} detected — auto-applying '{name}'")
+            enqueue(f"PROFILE_APPLY:{name}")
+        else:
+            profiles.release_claim(name)        # window not up yet
+
+
 def _next_free_label(taken, mode: str) -> str:
     """Smallest free '<mode><n>' not in `taken`. Mirrors the picker's naming
     so profile-applied and hand-drawn regions share one namespace."""
@@ -1241,6 +1268,14 @@ def _apply_ocr_result(
     # text (#22); re-querying the foreground HERE instead dropped the line
     # whenever focus moved during OCR, so the batch carries its own (#23).
     speech = build_speech(_active_regions(regions, getattr(result, "fg_exe", "")))
+    # True only when EVERY dialogue region that changed in this batch was
+    # re-verified by the worker. Testing the set's truthiness let one
+    # region's confirmation disarm the guard for the others (issue #25).
+    confirmed_names = getattr(result, "confirmed", None) or set()
+    changed_dialogue = [r.name for r in regions
+                        if r.mode == "dialogue" and r.name in result.texts]
+    worker_confirmed = bool(changed_dialogue) and all(
+        n in confirmed_names for n in changed_dialogue)
     if len(speech) < MIN_TEXT_LEN:
         state["candidate"] = ""
     elif speech == state["last_spoken"]:
@@ -1258,39 +1293,63 @@ def _apply_ocr_result(
                 f"({_similar(speech, state['last_spoken']):.2f})"
             )
     elif ((not state["candidate"] or _similar(speech, state["candidate"]) < 0.92)
-            and not getattr(result, "confirmed", None)):
+            and not worker_confirmed):
         # First time seeing this text — stash as candidate, don't speak
         # yet. One more matching poll is needed to confirm it's not jitter.
         #
-        # Skipped when the WORKER already confirmed the text (it re-snapshots
-        # and re-OCRs until it holds). Pixel-hash-gated regions yield exactly
-        # one frame per stable image, so a second batch never arrives for a
-        # dialogue box that appears and stays put — the line was stashed here
-        # and never spoken (issue #24).
+        # Skipped when the WORKER confirmed this batch's dialogue regions (it
+        # re-snapshots and re-OCRs until the text holds). Pixel-hash-gated
+        # regions yield exactly one frame per stable image, so a second batch
+        # never arrives for a dialogue box that appears and stays put — the
+        # line was stashed here and never spoken (issue #24).
         state["candidate"] = speech
         if debug:
             print("[candidate] new text, waiting for confirmation poll")
-    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker:
+    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker \
+            and worker_confirmed:
+        # The name came from this same worker-confirmed batch and no further
+        # frame is coming for a hash-gated region, so waiting would drop the
+        # line entirely. Accept the name now and speak (issue #25).
+        voice = speaker_mgr.set_current(speaker_candidate)
+        if voice:
+            _safe_print("[speakers] current = ",
+                        f"{speaker_mgr.current_speaker!r} voice={voice} "
+                        f"(accepted from a confirmed batch)")
+        state["speaker_candidate"] = ""
+        _speak_now(speech, regions, state, speaker_mgr, tts)
+    elif (speaker_candidate and speaker_candidate != speaker_mgr.current_speaker
+            and not worker_confirmed):
         # Dialogue confirmed but speaker still pending — hold one more poll
         # rather than attributing the new line to the previous speaker.
+        #
+        # Only when another poll can actually come. For a worker-confirmed
+        # batch the speaker name was read from the SAME batch and no further
+        # frame is coming, so holding dropped the first line after every
+        # speaker change (issue #25); accept the name instead.
         if debug:
             print(
                 f"[hold] dialogue ready but waiting for speaker "
                 f"candidate {speaker_candidate!r} to confirm"
             )
     else:
-        state["candidate"] = ""
-        voice = speaker_mgr.voice_for_current()
-        speaker_label = (
-            f" ({speaker_mgr.current_speaker})"
-            if speaker_mgr.current_speaker else ""
-        )
-        print(f"[speak{speaker_label}] {speech}")
-        tts.speak(speech, voice=voice)
-        state["last_spoken"] = speech
-        for rr in regions:
-            if rr.mode == "dialogue":
-                rr.last_spoken_text = rr.last_text
+        _speak_now(speech, regions, state, speaker_mgr, tts)
+
+
+def _speak_now(speech, regions, state, speaker_mgr, tts) -> None:
+    """Speak `speech` in the current speaker's voice and re-baseline the
+    dialogue regions that contributed to it."""
+    state["candidate"] = ""
+    voice = speaker_mgr.voice_for_current()
+    speaker_label = (
+        f" ({speaker_mgr.current_speaker})"
+        if speaker_mgr.current_speaker else ""
+    )
+    print(f"[speak{speaker_label}] {speech}")
+    tts.speak(speech, voice=voice)
+    state["last_spoken"] = speech
+    for rr in regions:
+        if rr.mode == "dialogue":
+            rr.last_spoken_text = rr.last_text
 
 
 def _poll_regions(regions: list[WatchedRegion], debug: bool) -> bool:
@@ -1508,7 +1567,6 @@ def main() -> int:
         """Every ~3s: re-arm profiles whose game exited, and enqueue an
         apply for auto profiles whose game just appeared (with a window).
         Applying happens on the main thread via the command queue."""
-        import psutil
         while True:
             time.sleep(3.0)
             try:
@@ -1519,23 +1577,12 @@ def main() -> int:
                 }
             except Exception:
                 continue
-            for name in profiles_store.names():
-                p = profiles_store.get(name)
-                if p and p.get("applied") and p.get("process") not in running:
-                    profiles_store.mark_unapplied_for_process(p["process"])
-            # claim_auto hands each profile out ONCE: the main thread can be
-            # blocked in the region manager for a minute, and an unclaimed
-            # check queued the same apply every 3s (issue #23).
-            for name in profiles_store.claim_auto(running):
-                p = profiles_store.get(name)
-                if p and find_process_window(p["process"]):
-                    print(
-                        f"[profiles] {p['process']} detected — "
-                        f"auto-applying '{name}'"
-                    )
-                    server.queue.put(f"PROFILE_APPLY:{name}")
-                else:
-                    profiles_store.release_claim(name)   # window not up yet
+            try:
+                _profile_watch_tick(profiles_store, running, server.queue.put)
+            except Exception as e:
+                # A dead watcher silently disables apply-on-launch for the
+                # rest of the session, so one bad tick must not kill it.
+                print(f"[profiles] watcher tick failed: {e}")
 
     threading.Thread(target=_profile_watcher, daemon=True).start()
 
