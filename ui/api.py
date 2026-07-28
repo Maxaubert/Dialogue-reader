@@ -7,9 +7,12 @@ pywebview frontend as the `Api` bridge class.
 
 from __future__ import annotations
 
+import os
 import re
 import socket
 from pathlib import Path
+
+import psutil
 
 _REPO = Path(__file__).parent.parent
 _DEFAULT_INI = _REPO / "dialogue_reader.ini"
@@ -74,7 +77,12 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
     lines keep their exact whitespace/separator style; comments and unrelated
     lines are untouched. Missing keys are appended to their section, missing
     sections appended at the end."""
-    pending = dict(values)
+    # Ini keys and sections are case-insensitive to both configparser and
+    # AHK's IniRead, so matching them case-sensitively appended a SECOND
+    # differently-cased entry -- a duplicate option that makes the whole file
+    # unreadable and silently reverts every setting (issue #22). Keys are
+    # normalized for lookup; the file's own spelling is preserved on rewrite.
+    pending = {(s.lower(), k.lower()): (k, v) for (s, k), v in values.items()}
     result: list[str] = []
     current: str | None = None
 
@@ -83,15 +91,17 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
         section's trailing blank lines after the inserted keys."""
         if section is None:
             return
-        adds = [(k, v) for (s, k), v in list(pending.items()) if s == section]
+        sl = section.lower()
+        adds = [(key, orig, v) for (s, key), (orig, v) in list(pending.items())
+                if s == sl]
         if not adds:
             return
         tail: list[str] = []
         while result and result[-1].strip() == "":
             tail.insert(0, result.pop())
-        for k, v in adds:
-            result.append(f"{k}={v}")
-            del pending[(section, k)]
+        for key, orig, v in adds:
+            result.append(f"{orig}={v}")
+            del pending[(sl, key)]
         result.extend(tail)
 
     for line in text.splitlines():
@@ -103,19 +113,21 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
             continue
         m = _KV_RE.match(line)
         if m and current is not None:
-            key = m.group(2).strip()
-            if (current, key) in pending:
+            key = m.group(2).strip().lower()
+            if (current.lower(), key) in pending:
+                _orig, val = pending.pop((current.lower(), key))
                 result.append(
-                    f"{m.group(1)}{m.group(2)}{m.group(3)}"
-                    f"{pending.pop((current, key))}"
+                    f"{m.group(1)}{m.group(2)}{m.group(3)}{val}"
                 )
                 continue
         result.append(line)
     flush(current)
 
     sections: dict[str, list[tuple[str, str]]] = {}
-    for (s, k), v in pending.items():
-        sections.setdefault(s, []).append((k, v))
+    for (_s, _k), (orig, v) in pending.items():
+        # Use the caller's spelling for a section we are creating fresh.
+        disp = next(s for (s, k) in values if k == orig)
+        sections.setdefault(disp, []).append((orig, v))
     for s, kvs in sections.items():
         if result and result[-1].strip() != "":
             result.append("")
@@ -194,15 +206,36 @@ def reader_running(port: int = _DEFAULT_PORT) -> bool:
         s.close()
 
 
+def _is_reader_process(info: dict) -> bool:
+    """True only for OUR supervisor or reader child.
+
+    Matching a substring of the joined command line killed innocent
+    bystanders: an editor with dialogue_reader.ahk open, a shell whose
+    command line merely mentioned the path, or a second checkout of the repo
+    (issue #22). Require both a plausible image name and an argument that
+    resolves to exactly one of our two entry points."""
+    name = (info.get("name") or "").lower()
+    if name not in ("autohotkey.exe", "autohotkey64.exe", "autohotkey32.exe",
+                    "autohotkeyu64.exe", "autohotkeyux.exe",
+                    "py.exe", "python.exe", "pythonw.exe"):
+        return False
+    targets = {str((_REPO / n).resolve()).lower()
+               for n in ("dialogue_reader.ahk", "main.py")}
+    for arg in info.get("cmdline") or []:
+        try:
+            if str(Path(arg).resolve()).lower() in targets:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
 def restart_reader() -> bool:
     """Kill the AHK supervisor and its Python child, then relaunch the AHK
     script. Needed only for [Hotkeys]/[Launcher] changes."""
-    import os
-    import psutil
-    for p in psutil.process_iter(["cmdline"]):
+    for p in psutil.process_iter(["name", "cmdline"]):
         try:
-            cl = " ".join(p.info["cmdline"] or [])
-            if "dialogue_reader.ahk" in cl or "Dialogue-reader\\main.py" in cl:
+            if _is_reader_process(p.info):
                 p.kill()
         except Exception:
             pass

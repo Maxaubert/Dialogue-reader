@@ -29,6 +29,16 @@ class MediaGate:
         self._paused_ids: set[str] = set()
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
+        # Serializes pause against resume. Without it a slow pause worker and
+        # the resume timer interleaved: the resume enumerated first, found
+        # nothing owed, and the pause landed after it -- media stayed paused
+        # forever (issue #22).
+        self._work_lock = threading.RLock()
+        # Bumped by every speech_started(). _resume_paused captures it and
+        # re-checks before issuing any play(), because Timer.cancel() is a
+        # no-op once the callback has already begun running.
+        self._epoch = 0
+        self._pause_thread: threading.Thread | None = None
 
     def set_resume_delay_ms(self, resume_delay_ms: int) -> None:
         """Hot-apply a new quiet-period length (RELOAD_CONFIG). Takes effect
@@ -41,21 +51,41 @@ class MediaGate:
         """Cancel any pending resume, then pause playing sessions. The pause
         itself runs on a worker thread so speak() never blocks on winrt."""
         self._cancel_timer()
-        threading.Thread(target=self._pause_all, daemon=True).start()
+        with self._lock:
+            self._epoch += 1
+            epoch = self._epoch
+        t = threading.Thread(target=self._pause_all, args=(epoch,), daemon=True)
+        with self._lock:
+            self._pause_thread = t
+        t.start()
 
     def speech_ended(self) -> None:
         """Start (or restart) the quiet-period timer that resumes media."""
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()
-            self._timer = threading.Timer(self._resume_delay, self._resume_paused)
+            epoch = self._epoch
+            self._timer = threading.Timer(
+                self._resume_delay, self._resume_paused, kwargs={"epoch": epoch})
             self._timer.daemon = True
             self._timer.start()
 
     def shutdown(self) -> None:
-        """Resume immediately; quitting must never leave media stuck paused."""
+        """Resume immediately; quitting must never leave media stuck paused.
+        Waits briefly for an in-flight pause so we never exit having just
+        paused something with nothing left to un-pause it."""
         self._cancel_timer()
-        self._resume_paused()
+        with self._lock:
+            t = self._pause_thread
+        if t is not None and t.is_alive():
+            t.join(timeout=4.0)
+        self._resume_paused(epoch=None)     # epoch=None: resume unconditionally
+        close = getattr(self._session_source, "close", None)
+        if close is not None:
+            try:
+                close()      # stop the winrt loop thread we own
+            except Exception as e:
+                self._log(f"session source close failed: {e}")
 
     # ---- internals ----
 
@@ -65,32 +95,60 @@ class MediaGate:
                 self._timer.cancel()
                 self._timer = None
 
-    def _pause_all(self) -> None:
-        for s in self._sessions():
-            try:
-                if s.is_playing and s.can_pause:
-                    s.pause()
-                    with self._lock:
-                        self._paused_ids.add(s.app_id)
-                    self._log(f"paused {s.app_id}")
-            except Exception as e:
-                self._log(f"pause failed for {s.app_id}: {e}")
+    def _pause_all(self, epoch: int) -> None:
+        with self._work_lock:          # never interleave with a resume
+            for s in self._sessions():
+                try:
+                    if s.is_playing and s.can_pause:
+                        s.pause()
+                        with self._lock:
+                            self._paused_ids.add(s.app_id)
+                        self._log(f"paused {s.app_id}")
+                except Exception as e:
+                    self._log(f"pause failed for {s.app_id}: {e}")
 
-    def _resume_paused(self) -> None:
+    def _resume_paused(self, epoch: int | None = None) -> None:
+        """Un-pause what we paused. `epoch` is the speech generation this
+        resume was armed for; if newer speech has started since, abandon it
+        (Timer.cancel() cannot stop a callback that already began running).
+        epoch=None forces the resume, used by shutdown()."""
+        with self._work_lock:          # waits out an in-flight pause
+            with self._lock:
+                self._timer = None
+                if epoch is not None and epoch != self._epoch:
+                    self._log("resume abandoned: speech resumed")
+                    return
+                ids, self._paused_ids = self._paused_ids, set()
+            if not ids:
+                return
+            sessions = self._sessions()      # can block on winrt for seconds
+            if self._stale(epoch):
+                # Speech restarted while we were enumerating. Hand the ids
+                # back so the next quiet period still un-pauses them.
+                with self._lock:
+                    self._paused_ids |= ids
+                self._log("resume abandoned: speech resumed")
+                return
+            for s in sessions:
+                if self._stale(epoch):
+                    with self._lock:
+                        self._paused_ids |= ids
+                    return
+                try:
+                    # Only resume what we paused AND what is still paused, so
+                    # a user's manual play/pause in between is never fought.
+                    if s.app_id in ids and s.is_paused and s.can_play:
+                        s.play()
+                        self._log(f"resumed {s.app_id}")
+                except Exception as e:
+                    self._log(f"resume failed for {s.app_id}: {e}")
+
+    def _stale(self, epoch: int | None) -> bool:
+        """True when newer speech has started since this resume was armed."""
+        if epoch is None:
+            return False
         with self._lock:
-            self._timer = None
-            ids, self._paused_ids = self._paused_ids, set()
-        if not ids:
-            return
-        for s in self._sessions():
-            try:
-                # Only resume what we paused AND what is still paused, so a
-                # user's manual play/pause in between is never fought.
-                if s.app_id in ids and s.is_paused and s.can_play:
-                    s.play()
-                    self._log(f"resumed {s.app_id}")
-            except Exception as e:
-                self._log(f"resume failed for {s.app_id}: {e}")
+            return epoch != self._epoch
 
     def _sessions(self) -> list:
         try:
@@ -147,8 +205,25 @@ class _GsmtcSource:
 
     def __init__(self):
         self._loop = asyncio.new_event_loop()
-        threading.Thread(target=self._loop.run_forever, daemon=True).start()
+        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        self._thread.start()
         self._manager = None
+
+    def close(self) -> None:
+        """Stop the loop and join its thread. Without this, every RELOAD_CONFIG
+        that rebuilt the gate left another live asyncio loop thread behind
+        (issue #22)."""
+        if self._loop.is_closed():
+            return
+        try:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        except RuntimeError:
+            return
+        self._thread.join(timeout=2.0)
+        try:
+            self._loop.close()
+        except RuntimeError:
+            pass
 
     def _run(self, coro, timeout: float = 3.0):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)

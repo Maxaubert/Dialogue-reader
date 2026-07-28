@@ -21,6 +21,7 @@ Inside the running process:
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import re
 import sys
@@ -32,7 +33,9 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 import numpy as np
-import sounddevice as sd
+import psutil
+
+import audio
 
 from region_picker import manage_regions
 from capture import RegionCapture
@@ -319,29 +322,86 @@ def _terminate_pid(pid: int) -> None:
         ctypes.windll.kernel32.CloseHandle(handle)
 
 
-def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
-    """Ensure this is the only running instance. If lock_path records a prior
-    instance's PID that is still alive (and not our own), terminate it, wait
-    briefly for Windows to release its UDP socket and audio streams, then
-    record our own PID. A missing, empty, or unparseable lock file just means
-    'no known prior instance' and we proceed to write ours."""
-    my_pid = os.getpid()
+def _self_identity() -> dict:
+    """PID plus the two fields that make it verifiable later. Windows recycles
+    PIDs, so a bare number is not identity (issue #22)."""
+    rec = {"pid": os.getpid(), "name": "", "create_time": 0.0}
     try:
-        prior_pid = int(lock_path.read_text(encoding="utf-8").strip())
+        p = psutil.Process(rec["pid"])
+        rec["name"] = p.name()
+        rec["create_time"] = p.create_time()
+    except Exception:
+        pass
+    return rec
+
+
+def _read_lock(lock_path: Path) -> dict | None:
+    """Parse the lock file. Returns None for missing/garbage AND for legacy
+    bare-PID files: without identity fields we cannot prove ownership, and
+    killing on an unverified PID is exactly the bug."""
+    try:
+        rec = json.loads(lock_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        prior_pid = None
-    if prior_pid is not None and prior_pid != my_pid and _is_process_alive(prior_pid):
-        print(f"[singleton] killing prior instance pid {prior_pid}")
-        try:
-            _terminate_pid(prior_pid)
-        except Exception as e:
-            print(f"[singleton] failed to kill {prior_pid}: {e}")
-        # Let Windows release the UDP socket and sounddevice streams.
-        time.sleep(0.7)
+        return None
+    if not isinstance(rec, dict):
+        return None
     try:
-        lock_path.write_text(str(my_pid), encoding="utf-8")
+        rec["pid"] = int(rec["pid"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not rec.get("name") or not rec.get("create_time"):
+        return None
+    return rec
+
+
+def _is_our_prior_instance(rec: dict) -> bool:
+    """True only if the live process with that PID is the very process the
+    lock recorded: same image name AND same start time."""
+    try:
+        p = psutil.Process(rec["pid"])
+        return (p.name() == rec["name"]
+                and abs(p.create_time() - float(rec["create_time"])) < 1.0)
+    except Exception:
+        return False
+
+
+def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Ensure this is the only running instance. A prior instance is killed
+    only when the lock file proves the live PID is that same process (image
+    name + creation time). Anything unverifiable - missing, garbage, legacy
+    bare-PID, recycled PID - is left strictly alone; the worst case is two
+    readers competing for the UDP port, which is loud and recoverable, while
+    killing a stranger's process is neither."""
+    my_pid = os.getpid()
+    rec = _read_lock(lock_path)
+    if rec is not None and rec["pid"] != my_pid:
+        if _is_our_prior_instance(rec):
+            print(f"[singleton] killing prior instance pid {rec['pid']}")
+            try:
+                _terminate_pid(rec["pid"])
+            except Exception as e:
+                print(f"[singleton] failed to kill {rec['pid']}: {e}")
+            # Let Windows release the UDP socket and audio streams.
+            time.sleep(0.7)
+        elif _is_process_alive(rec["pid"]):
+            print(f"[singleton] stale lock: pid {rec['pid']} is not our reader, "
+                  f"leaving it alone")
+    try:
+        lock_path.write_text(json.dumps(_self_identity()), encoding="utf-8")
     except OSError as e:
         print(f"[singleton] could not write lock file: {e}")
+
+
+def _release_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Delete the lock on clean exit, but only if it is still ours: a newer
+    instance may have already claimed it (newest launch wins)."""
+    rec = _read_lock(lock_path)
+    if rec is not None and rec["pid"] != os.getpid():
+        return
+    try:
+        lock_path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 # ---- parent watchdog ------------------------------------------------------
@@ -428,14 +488,12 @@ _STARTUP_PHRASE = "OCR starting up"
 _READY_PHRASE = "OCR ready"
 
 
-def _play_cue(audio: np.ndarray) -> None:
-    """Play a short audio cue, blocking until done. Safe alongside TTS:
-    sd.play() preempts any current playback, and the cue is brief enough
-    that holding the main loop for it is fine."""
-    try:
-        sd.play(audio, samplerate=_BEEP_RATE, blocking=True)
-    except Exception:
-        pass
+def _play_cue(samples: np.ndarray) -> None:
+    """Play a short audio cue, blocking until done. Goes through audio.py so
+    it is serialized against the TTS worker threads: sounddevice's global
+    stream is closed unguarded, and a cue racing a worker's play/stop closed
+    the same PaStream twice -> native crash (issue #22)."""
+    audio.play(samples, _BEEP_RATE, blocking=True)
 
 
 @dataclass
@@ -528,15 +586,27 @@ _EXE_CACHE: dict[int, str] = {}
 
 
 def _foreground_exe() -> str:
-    """Exe name of the process owning the current foreground window."""
+    """Exe name of the process owning the current foreground window.
+
+    Cached, because this runs at 12 Hz. Two rules keep the cache honest
+    (issue #22): a failed lookup is never cached (a transient miss would
+    otherwise deactivate the game's regions for good), and an entry is
+    dropped once its window is gone (Windows recycles HWNDs, so a stale
+    entry would attribute a new window to the old process)."""
     hwnd = get_foreground_window()
     if not hwnd:
         return ""
-    if hwnd not in _EXE_CACHE:
+    cached = _EXE_CACHE.get(hwnd)
+    if cached is not None:
+        if is_window(hwnd):
+            return cached
+        del _EXE_CACHE[hwnd]
+    exe = get_window_process(hwnd)
+    if exe:
         if len(_EXE_CACHE) > 256:
             _EXE_CACHE.clear()
-        _EXE_CACHE[hwnd] = get_window_process(hwnd)
-    return _EXE_CACHE[hwnd]
+        _EXE_CACHE[hwnd] = exe
+    return exe
 
 
 def _active_regions(regions: list[WatchedRegion], fg_exe: str) -> list[WatchedRegion]:
@@ -791,6 +861,15 @@ def _reload_config(tts, speaker_mgr, state, ocr=None, debug=False) -> None:
     print("[dialogue-reader] Config reloaded.")
 
 
+def _next_free_label(taken, mode: str) -> str:
+    """Smallest free '<mode><n>' not in `taken`. Mirrors the picker's naming
+    so profile-applied and hand-drawn regions share one namespace."""
+    i = 1
+    while f"{mode}{i}" in taken:
+        i += 1
+    return f"{mode}{i}"
+
+
 def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
     """PROFILE_SAVE / PROFILE_APPLY / PROFILE_UNAPPLY / PROFILE_DELETE /
     PROFILE_AUTO. The reader owns profiles.json; the settings UI drives
@@ -825,7 +904,8 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
             return
         profiles.snapshot(name, process, get_window_rect(hwnd),
                           _existing_outlines(scoped))
-        profiles.set_applied(name, True)   # what's on screen IS this profile
+        # What's on screen IS this profile now, and only this one.
+        profiles.set_applied_exclusive(name, process)
         print(f"[profiles] Saved '{name}': {len(scoped)} region(s) for {process}")
 
     elif cmd.startswith("PROFILE_APPLY:"):
@@ -850,12 +930,21 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
                 rotation=o["rotation"],
                 capture_mode=state["capture_mode"],
             )
+            # Labels are only unique within the profile that saved them. Two
+            # games both holding a "dialogue1" would make edits and deletes
+            # (which match by label) hit the wrong region, so rename on
+            # collision with whatever is already live (issue #22).
+            label = o["label"]
+            taken = {r.name for r in regions}
+            if label in taken:
+                label = _next_free_label(taken, o["mode"])
+                print(f"[profiles] '{o['label']}' taken, using '{label}'")
             regions.append(WatchedRegion(
-                name=o["label"], capture=cap, mode=o["mode"],
+                name=label, capture=cap, mode=o["mode"],
                 process=p["process"],
             ))
         _reset_speech_state()
-        profiles.set_applied(name, True)
+        profiles.set_applied_exclusive(name, p["process"])
         print(
             f"[profiles] Applied '{name}': {len(p['regions'])} region(s) "
             f"for {p['process']}"
@@ -999,7 +1088,14 @@ def handle_command(
             print(f"[dialogue-reader] No-speaker voice -> {voice}")
             tts.speak("Default voice changed", voice=voice, pause_media=False)
     elif cmd.startswith("PROFILE_") and profiles is not None:
-        _handle_profile_command(cmd, regions, tts, state, profiles)
+        # Contained: these paths touch Win32 window handles and user-editable
+        # JSON, both of which can fail at any moment (the game's window dies
+        # between the watcher seeing it and this running). An escape here
+        # would unwind the poll loop and kill the reader (issue #22).
+        try:
+            _handle_profile_command(cmd, regions, tts, state, profiles)
+        except Exception as e:
+            print(f"[profiles] {cmd} failed: {e}")
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):
@@ -1104,7 +1200,10 @@ def _apply_ocr_result(
             print("[skip] no dialogue change")
         return
 
-    speech = build_speech(regions)
+    # Compose from the SAME subset that is being polled. Using every region
+    # glued a backgrounded game's stale line onto the foreground app's text,
+    # silently defeating per-process scoping (issue #22).
+    speech = build_speech(_active_regions(regions, _foreground_exe()))
     if len(speech) < MIN_TEXT_LEN:
         state["candidate"] = ""
     elif speech == state["last_spoken"]:
@@ -1382,10 +1481,18 @@ def main() -> int:
                     cmd = server.queue.get_nowait()
                 except queue.Empty:
                     break
-                handle_command(
-                    cmd, regions, tts, speaker_mgr, state, debug=debug,
-                    poll_commands=_drain_commands, ocr=ocr, profiles=profiles_store,
-                )
+                try:
+                    handle_command(
+                        cmd, regions, tts, speaker_mgr, state, debug=debug,
+                        poll_commands=_drain_commands, ocr=ocr,
+                        profiles=profiles_store,
+                    )
+                except Exception as e:
+                    # One malformed or unlucky command must never unwind the
+                    # poll loop and take the whole reader down (issue #22).
+                    import traceback
+                    print(f"[dialogue-reader] command {cmd!r} failed: {e}")
+                    traceback.print_exc()
 
             # 2. Apply any OCR result the worker just finished. poll_result
             #    is non-blocking. Stale generations (from pause/clear that
@@ -1474,6 +1581,7 @@ def main() -> int:
         except Exception:
             pass
         server.stop()
+        _release_singleton()
     return 0
 
 

@@ -124,8 +124,14 @@ class SpeakerManager:
         # them off an out-of-pool voice.
 
     def _save(self) -> None:
+        """Atomic: temp file + os.replace. The reader is routinely force-killed
+        (AHK taskkill, supervisor restart), and a kill mid-write left a torn
+        file that _load silently reset to empty, losing every voice
+        assignment (issue #22)."""
+        import os
+        tmp = self.save_path.with_suffix(".tmp")
         try:
-            self.save_path.write_text(
+            tmp.write_text(
                 json.dumps(
                     {
                         "assignments": self.assignments,
@@ -137,8 +143,12 @@ class SpeakerManager:
                 ),
                 encoding="utf-8",
             )
+            os.replace(tmp, self.save_path)
         except OSError:
-            pass
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     # ---- speaker tracking ----
 

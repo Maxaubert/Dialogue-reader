@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import tts as tts_mod
+import audio as audio_mod
 from tts import TTS
 
 
@@ -36,7 +36,7 @@ class FakeKokoro:
 
 
 def _make_tts(monkeypatch, gate, kokoro=None):
-    monkeypatch.setattr(tts_mod, "sd", SimpleNamespace(
+    monkeypatch.setattr(audio_mod, "sd", SimpleNamespace(
         play=lambda *a, **k: None, stop=lambda: None, wait=lambda: None))
     monkeypatch.setattr(TTS, "_ensure_default_loaded", lambda self: None)
     t = TTS(media_gate=gate)
@@ -119,7 +119,7 @@ def test_worker_never_calls_sd_wait(monkeypatch):
     # stop()/play() from another thread (native crash, issue #20). The
     # worker must time playback out instead of blocking in wait().
     waits = []
-    monkeypatch.setattr(tts_mod, "sd", SimpleNamespace(
+    monkeypatch.setattr(audio_mod, "sd", SimpleNamespace(
         play=lambda *a, **k: None, stop=lambda: None,
         wait=lambda: waits.append(1)))
     monkeypatch.setattr(TTS, "_ensure_default_loaded", lambda self: None)

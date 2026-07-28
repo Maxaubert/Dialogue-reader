@@ -12,6 +12,7 @@ the file for display and mutates through UDP commands (PROFILE_SAVE, ...).
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -51,27 +52,74 @@ class ProfileStore:
 
     # ---- persistence ----
 
+    @staticmethod
+    def _valid(p) -> bool:
+        """A profile we can actually apply. A malformed entry (hand-edited, or
+        written by another version) used to raise KeyError deep inside
+        scale_regions and take the whole reader down, and with apply-on-launch
+        set that became a relaunch loop (issue #22)."""
+        if not isinstance(p, dict) or not p.get("process"):
+            return False
+        if not isinstance(p.get("regions"), list):
+            return False
+        for r in p["regions"]:
+            if not isinstance(r, dict):
+                return False
+            if not all(k in r for k in ("rel_x", "rel_y", "w", "h", "label")):
+                return False
+        return True
+
     def _load(self) -> None:
         try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            profiles = data.get("profiles", {})
-            if isinstance(profiles, dict):
-                self._profiles = {
-                    name: p for name, p in profiles.items()
-                    if isinstance(name, str) and isinstance(p, dict)
-                }
-        except Exception:
-            self._profiles = {}
+            raw = self.path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            # A torn write (the process is routinely force-killed) must not
+            # silently become an empty store that we then overwrite: keep the
+            # evidence aside so the data is recoverable.
+            self._quarantine(raw)
+            return
+        profiles = data.get("profiles", {}) if isinstance(data, dict) else {}
+        if not isinstance(profiles, dict):
+            return
+        for name, p in profiles.items():
+            if not isinstance(name, str):
+                continue
+            if self._valid(p):
+                self._profiles[name] = p
+            else:
+                print(f"[profiles] dropping malformed profile {name!r}",
+                      flush=True)
+
+    def _quarantine(self, raw: str) -> None:
+        bad = self.path.with_suffix(".corrupt")
+        try:
+            bad.write_text(raw, encoding="utf-8")
+            print(f"[profiles] {self.path.name} is corrupt; saved a copy as "
+                  f"{bad.name} and starting empty", flush=True)
+        except OSError:
+            pass
 
     def _save(self) -> None:
+        """Atomic: write a sibling temp file then os.replace it over the
+        target. A kill mid-write previously left a truncated file that the
+        next start silently reset to empty, losing every profile."""
+        tmp = self.path.with_suffix(".tmp")
         try:
-            self.path.write_text(
+            tmp.write_text(
                 json.dumps({"profiles": self._profiles}, indent=2,
                            ensure_ascii=False),
                 encoding="utf-8",
             )
+            os.replace(tmp, self.path)
         except OSError:
-            pass
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     # ---- reads ----
 
@@ -141,6 +189,19 @@ class ProfileStore:
             if name in self._profiles:
                 self._profiles[name]["applied"] = bool(on)
                 self._save()
+
+    def set_applied_exclusive(self, name: str, process: str) -> None:
+        """Mark `name` applied and clear every other profile for the same
+        process. Only one layout can be on screen per game, and two profiles
+        both flagged applied made a later delete rip out the live regions of
+        whichever one was actually showing (issue #22)."""
+        with self._lock:
+            for other, p in self._profiles.items():
+                if other != name and p.get("process") == process:
+                    p["applied"] = False
+            if name in self._profiles:
+                self._profiles[name]["applied"] = True
+            self._save()
 
     def mark_unapplied_for_process(self, process: str) -> None:
         """Game exited: its profiles become re-applicable on next launch."""
