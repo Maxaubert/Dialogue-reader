@@ -1257,9 +1257,16 @@ def _apply_ocr_result(
                 f"[skip] speech too similar to last spoken "
                 f"({_similar(speech, state['last_spoken']):.2f})"
             )
-    elif not state["candidate"] or _similar(speech, state["candidate"]) < 0.92:
+    elif ((not state["candidate"] or _similar(speech, state["candidate"]) < 0.92)
+            and not getattr(result, "confirmed", None)):
         # First time seeing this text — stash as candidate, don't speak
         # yet. One more matching poll is needed to confirm it's not jitter.
+        #
+        # Skipped when the WORKER already confirmed the text (it re-snapshots
+        # and re-OCRs until it holds). Pixel-hash-gated regions yield exactly
+        # one frame per stable image, so a second batch never arrives for a
+        # dialogue box that appears and stays put — the line was stashed here
+        # and never spoken (issue #24).
         state["candidate"] = speech
         if debug:
             print("[candidate] new text, waiting for confirmation poll")

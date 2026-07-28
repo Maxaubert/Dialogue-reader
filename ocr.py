@@ -288,6 +288,11 @@ class OCRBatchResult:
     texts: dict[str, str] = field(default_factory=dict)
     error: str | None = None
     fg_exe: str = ""      # echoed from the job (see OCRBatchJob.fg_exe)
+    # Dialogue regions whose text the worker re-snapshotted and saw hold
+    # steady. The caller treats that as the jitter confirmation instead of
+    # waiting for a whole second batch that a static region never produces
+    # (issue #24).
+    confirmed: set = field(default_factory=set)
 
 
 class OCRWorker:
@@ -356,11 +361,13 @@ class OCRWorker:
         time.sleep(job.pre_snapshot_delay)
 
         texts: dict[str, str] = {}
+        confirmed: set = set()
         for r in job.regions:
             fresh = r.capture.snapshot()
             new_text = self._ocr.read(fresh, speaker=(r.mode == "speaker"))
 
             if r.mode == "dialogue" and job.confirm_polls > 1:
+                confirmed.add(r.name)
                 new_text = self._confirm_dialogue_text(
                     capture=r.capture,
                     initial=new_text.strip(),
@@ -376,7 +383,7 @@ class OCRWorker:
             texts[r.name] = new_text
 
         return OCRBatchResult(generation=job.generation, texts=texts,
-                              fg_exe=job.fg_exe)
+                              fg_exe=job.fg_exe, confirmed=confirmed)
 
     def _confirm_dialogue_text(
         self,
