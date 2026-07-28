@@ -73,6 +73,28 @@ _ENGLISH_FALLBACK = [
 _KV_RE = re.compile(r"^(\s*)([^=;#\[\s][^=]*?)(\s*=\s*)(.*)$")
 
 
+def _drop_duplicate_options(text: str) -> str:
+    """Return `text` with every repeated key in a section removed, keeping the
+    FIRST occurrence (configparser's own precedence when it does not raise)."""
+    out: list[str] = []
+    section: str | None = None
+    seen: set[tuple[str, str]] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1].lower()
+            out.append(line)
+            continue
+        m = _KV_RE.match(line)
+        if m and section is not None:
+            slot = (section, m.group(2).strip().lower())
+            if slot in seen:
+                continue
+            seen.add(slot)
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
 def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
     """Return `text` with each (section, key) set to its new value. Existing
     lines keep their exact whitespace/separator style; comments and unrelated
@@ -180,12 +202,19 @@ def read_settings(ini_path: Path | str = _DEFAULT_INI) -> dict:
     try:
         cp.read(ini_path, encoding="utf-8")
     except configparser.DuplicateOptionError as e:
-        # Everything after the duplicate is lost, so the page would show
-        # defaults for half the file with no explanation. Say so; saving
-        # once from the UI heals the file (update_ini_text drops the dupe).
+        # configparser aborts AT the duplicate, so every later section is
+        # missing and would read back as SCHEMA defaults -- which the next
+        # save would then write over the user's real settings. Heal a copy
+        # in memory and re-parse so the values are still correct (#24).
         print(f"[settings] {Path(ini_path).name} has a duplicate key "
-              f"({e.option!r} in [{e.section}]); settings after it fall back "
-              f"to defaults until you save from this page.")
+              f"({e.option!r} in [{e.section}]); using the first value. "
+              f"Saving from this page removes the duplicate.")
+        try:
+            text = Path(ini_path).read_text(encoding="utf-8")
+            cp = configparser.ConfigParser()
+            cp.read_string(_drop_duplicate_options(text))
+        except Exception as e2:
+            print(f"[settings] could not recover {Path(ini_path).name}: {e2}")
     except Exception as e:
         print(f"[settings] could not read {Path(ini_path).name}: {e}")
     out: dict = {}
@@ -243,7 +272,13 @@ def _is_reader_process(info: dict) -> bool:
                for n in ("dialogue_reader.ahk", "main.py")}
     for arg in info.get("cmdline") or []:
         try:
-            if str(Path(arg).resolve()).lower() in targets:
+            p = Path(arg)
+            # Only ABSOLUTE arguments count. A bare "main.py" would otherwise
+            # resolve against OUR cwd -- which is this repo -- and match an
+            # unrelated `python main.py` in someone else's project (#24).
+            if not p.is_absolute():
+                continue
+            if str(p.resolve()).lower() in targets:
                 return True
         except (OSError, ValueError):
             continue
@@ -258,7 +293,11 @@ def restart_reader() -> bool:
     # forever (issue #23). The kills below are the backstop.
     try:
         send_command("QUIT")
-        time.sleep(0.4)
+        # Wait for it to actually exit (it resumes paused media first)
+        # rather than guessing a duration; the kills below are the backstop.
+        deadline = time.monotonic() + 2.5
+        while time.monotonic() < deadline and reader_running():
+            time.sleep(0.05)
     except Exception:
         pass
     for p in psutil.process_iter(["name", "cmdline"]):

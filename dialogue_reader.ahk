@@ -173,8 +173,17 @@ Cleanup(*) {
     ; own shutdown, so anything it paused (YouTube, Spotify) stayed paused
     ; forever after a tray Exit. QUIT makes it resume media and release its
     ; lock file; the kills below still run for a reader that ignores it.
+    ; Poll for the reader to actually go away rather than guessing a number:
+    ; its own shutdown has to resume paused media first, and a fixed sleep
+    ; that is too short kills it mid-resume (issue #24).
     try SendUdp("QUIT")
-    Sleep 400
+    if PyPid {
+        deadline := A_TickCount + 2500
+        while (ProcessExist(PyPid) && A_TickCount < deadline)
+            Sleep 50
+    } else {
+        Sleep 400
+    }
     if PyPid {
         try RunWait("taskkill.exe /F /T /PID " PyPid, , "Hide")
     }

@@ -196,6 +196,13 @@ class _FakeProc:
 
 
 def _restart_with(monkeypatch, procs):
+    # restart_reader() sends a real QUIT before killing; unpatched, that
+    # reached the developer's live reader on 127.0.0.1:7849 (issue #24).
+    monkeypatch.setattr(ui_api, "send_command", lambda cmd, **kw: None)
+    monkeypatch.setattr(ui_api.time, "sleep", lambda s: None)
+    # Never let a test's runtime depend on whether the developer's reader
+    # happens to be running (the QUIT wait polls this).
+    monkeypatch.setattr(ui_api, "reader_running", lambda **kw: False)
     monkeypatch.setattr(ui_api.psutil, "process_iter", lambda attrs=None: list(procs))
     monkeypatch.setattr(ui_api.os, "startfile", lambda p: None)
     ui_api.restart_reader()

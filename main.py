@@ -627,6 +627,24 @@ def _prune_dead_regions(regions: list[WatchedRegion], state: dict) -> None:
     state["generation"] += 1
 
 
+def _follows_window(cap) -> bool:
+    """True when this capture actually reads window-relative pixels.
+
+    Being bound to an hwnd is not enough: a game-mode region whose
+    PrintWindow came back black falls through to screen grabs at FIXED
+    screen coordinates, so drawing its outline relative to the window put
+    the box where the capture wasn't as soon as the window moved (#24)."""
+    if not getattr(cap, "hwnd", 0) or cap.capture_mode == "screen":
+        return False
+    if getattr(cap, "use_window_mode", False):
+        return True
+    if getattr(cap, "game_mode", False):
+        # Game mode prefers PrintWindow but falls back to screen grabs when
+        # the probe found it unusable (all-black frames).
+        return bool(getattr(cap, "_pw_usable", True))
+    return False
+
+
 def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
     """Describe each watched region's current on-screen rectangle so the
     picker overlay can outline it. Regions bound to a window follow the
@@ -637,7 +655,7 @@ def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
     for r in regions:
         cap = r.capture
         bx, by = cap.bbox["left"], cap.bbox["top"]
-        if cap.hwnd and cap.capture_mode != "screen":
+        if _follows_window(cap):
             try:
                 wx, wy, _, _ = get_window_rect(cap.hwnd)
                 bx, by = wx + cap.rel_x, wy + cap.rel_y

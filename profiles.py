@@ -51,6 +51,10 @@ class ProfileStore:
         # Auto-applies handed to the command queue but not yet consumed.
         # In-memory only: a restart re-evaluates from scratch.
         self._claimed: set[str] = set()
+        # Profiles the user explicitly unapplied. The watcher must not undo
+        # that decision while the game is still running (issue #24); it
+        # clears when the game exits or the user applies again.
+        self._suppressed: set[str] = set()
         self._load()
 
     # ---- persistence ----
@@ -65,10 +69,22 @@ class ProfileStore:
             return False
         if not isinstance(p.get("regions"), list):
             return False
+        win = p.get("window")
+        if win is not None:
+            if not isinstance(win, dict):
+                return False
+            for k in ("w", "h"):
+                v = win.get(k)
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0:
+                    return False
         for r in p["regions"]:
             if not isinstance(r, dict):
                 return False
             if not all(k in r for k in ("rel_x", "rel_y", "w", "h", "label")):
+                return False
+            rot = r.get("rotation")
+            if rot is not None and (isinstance(rot, bool)
+                                    or not isinstance(rot, (int, float))):
                 return False
             # Coordinates must be NUMBERS, not merely present: a hand-edited
             # "120" sails through scale_regions' arithmetic and blows up
@@ -153,6 +169,7 @@ class ProfileStore:
                 and not p.get("applied")
                 and p.get("process") in running_exes
                 and name not in self._claimed
+                and name not in self._suppressed
             ]
 
     def claim_auto(self, running_exes: set[str]) -> list[str]:
@@ -214,6 +231,11 @@ class ProfileStore:
         with self._lock:
             if name in self._profiles:
                 self._profiles[name]["applied"] = bool(on)
+                if not on:
+                    # An explicit unapply is a user decision; keep the
+                    # watcher from re-applying it under them (issue #24).
+                    self._suppressed.add(name)
+                    self._claimed.discard(name)
                 self._save()
 
     def release_claim(self, name: str) -> None:
@@ -234,6 +256,7 @@ class ProfileStore:
             if name in self._profiles:
                 self._profiles[name]["applied"] = True
             self._claimed.discard(name)      # the queued apply is consumed
+            self._suppressed.discard(name)   # applying again clears an unapply
             self._save()
 
     def mark_unapplied_for_process(self, process: str) -> None:
@@ -243,7 +266,8 @@ class ProfileStore:
             for name, p in self._profiles.items():
                 if p.get("process") != process:
                     continue
-                self._claimed.discard(name)   # re-armable on next launch
+                self._claimed.discard(name)     # re-armable on next launch
+                self._suppressed.discard(name)  # a relaunch is a fresh start
                 if p.get("applied"):
                     p["applied"] = False
                     changed = True

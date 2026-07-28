@@ -248,6 +248,7 @@ def test_restart_reader_asks_before_killing(monkeypatch):
     monkeypatch.setattr(ui_api.psutil, "process_iter", lambda attrs=None: [])
     monkeypatch.setattr(ui_api.os, "startfile", lambda p: None)
     monkeypatch.setattr(ui_api.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ui_api, "reader_running", lambda **kw: False)
     ui_api.restart_reader()
     assert "QUIT" in sent
 

@@ -78,7 +78,10 @@ class MediaGate:
         with self._lock:
             t = self._pause_thread
         if t is not None and t.is_alive():
-            t.join(timeout=4.0)
+            # Short: the AHK supervisor gives us a fixed grace period before
+            # taskkill, so a long join would just get us killed mid-wait and
+            # leave the media paused anyway (issue #24).
+            t.join(timeout=0.6)
         self._resume_paused(epoch=None)     # epoch=None: resume unconditionally
         close = getattr(self._session_source, "close", None)
         if close is not None:
