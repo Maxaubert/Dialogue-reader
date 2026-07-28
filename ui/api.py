@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import socket
+import time
 from pathlib import Path
 
 import psutil
@@ -104,6 +105,7 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
             del pending[(sl, key)]
         result.extend(tail)
 
+    written: set[tuple[str, str]] = set()   # (section, key) already emitted
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -114,12 +116,23 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
         m = _KV_RE.match(line)
         if m and current is not None:
             key = m.group(2).strip().lower()
-            if (current.lower(), key) in pending:
-                _orig, val = pending.pop((current.lower(), key))
+            slot = (current.lower(), key)
+            if slot in pending:
+                _orig, val = pending.pop(slot)
                 result.append(
                     f"{m.group(1)}{m.group(2)}{m.group(3)}{val}"
                 )
+                written.add(slot)
                 continue
+            if slot in written:
+                # A pre-existing duplicate of a key we already wrote. Dropping
+                # it HEALS the file: configparser raises DuplicateOptionError
+                # on the second copy and every later section is then lost,
+                # silently reverting settings to defaults (issue #23).
+                print(f"[settings] removing duplicate {m.group(2).strip()!r} "
+                      f"in [{current}]")
+                continue
+            written.add(slot)
         result.append(line)
     flush(current)
 
@@ -166,8 +179,15 @@ def read_settings(ini_path: Path | str = _DEFAULT_INI) -> dict:
     cp = configparser.ConfigParser()
     try:
         cp.read(ini_path, encoding="utf-8")
-    except Exception:
-        pass
+    except configparser.DuplicateOptionError as e:
+        # Everything after the duplicate is lost, so the page would show
+        # defaults for half the file with no explanation. Say so; saving
+        # once from the UI heals the file (update_ini_text drops the dupe).
+        print(f"[settings] {Path(ini_path).name} has a duplicate key "
+              f"({e.option!r} in [{e.section}]); settings after it fall back "
+              f"to defaults until you save from this page.")
+    except Exception as e:
+        print(f"[settings] could not read {Path(ini_path).name}: {e}")
     out: dict = {}
     for section, keys in SCHEMA.items():
         out[section] = {}
@@ -233,6 +253,14 @@ def _is_reader_process(info: dict) -> bool:
 def restart_reader() -> bool:
     """Kill the AHK supervisor and its Python child, then relaunch the AHK
     script. Needed only for [Hotkeys]/[Launcher] changes."""
+    # Ask the reader to stop first: killing the supervisor bypasses its own
+    # cleanup, and a hard kill leaves any media the gate paused paused
+    # forever (issue #23). The kills below are the backstop.
+    try:
+        send_command("QUIT")
+        time.sleep(0.4)
+    except Exception:
+        pass
     for p in psutil.process_iter(["name", "cmdline"]):
         try:
             if _is_reader_process(p.info):

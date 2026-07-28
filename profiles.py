@@ -48,6 +48,9 @@ class ProfileStore:
         self.path = Path(path)
         self._lock = threading.Lock()
         self._profiles: dict[str, dict] = {}
+        # Auto-applies handed to the command queue but not yet consumed.
+        # In-memory only: a restart re-evaluates from scratch.
+        self._claimed: set[str] = set()
         self._load()
 
     # ---- persistence ----
@@ -66,6 +69,14 @@ class ProfileStore:
             if not isinstance(r, dict):
                 return False
             if not all(k in r for k in ("rel_x", "rel_y", "w", "h", "label")):
+                return False
+            # Coordinates must be NUMBERS, not merely present: a hand-edited
+            # "120" sails through scale_regions' arithmetic and blows up
+            # halfway through building the replacement regions (issue #23).
+            for k in ("rel_x", "rel_y", "w", "h"):
+                if isinstance(r[k], bool) or not isinstance(r[k], (int, float)):
+                    return False
+            if not isinstance(r["label"], str) or not r["label"]:
                 return False
         return True
 
@@ -141,7 +152,22 @@ class ProfileStore:
                 if p.get("apply_on_launch")
                 and not p.get("applied")
                 and p.get("process") in running_exes
+                and name not in self._claimed
             ]
+
+    def claim_auto(self, running_exes: set[str]) -> list[str]:
+        """auto_pending(), but each name is handed out ONCE.
+
+        The watcher runs every 3s while the main thread may be blocked for a
+        minute inside the region manager, so an unclaimed check queued the
+        same apply twenty times; the backlog then replayed, each copy wiping
+        the regions the user had just drawn (issue #23). The claim is
+        released when the apply completes (set_applied_exclusive) or when the
+        game exits (mark_unapplied_for_process)."""
+        names = self.auto_pending(running_exes)
+        with self._lock:
+            self._claimed.update(names)
+        return names
 
     # ---- mutations (reader main loop / watcher only) ----
 
@@ -190,6 +216,12 @@ class ProfileStore:
                 self._profiles[name]["applied"] = bool(on)
                 self._save()
 
+    def release_claim(self, name: str) -> None:
+        """Let the watcher consider `name` again (the apply finished, failed,
+        or its game vanished)."""
+        with self._lock:
+            self._claimed.discard(name)
+
     def set_applied_exclusive(self, name: str, process: str) -> None:
         """Mark `name` applied and clear every other profile for the same
         process. Only one layout can be on screen per game, and two profiles
@@ -201,14 +233,18 @@ class ProfileStore:
                     p["applied"] = False
             if name in self._profiles:
                 self._profiles[name]["applied"] = True
+            self._claimed.discard(name)      # the queued apply is consumed
             self._save()
 
     def mark_unapplied_for_process(self, process: str) -> None:
         """Game exited: its profiles become re-applicable on next launch."""
         with self._lock:
             changed = False
-            for p in self._profiles.values():
-                if p.get("process") == process and p.get("applied"):
+            for name, p in self._profiles.items():
+                if p.get("process") != process:
+                    continue
+                self._claimed.discard(name)   # re-armable on next launch
+                if p.get("applied"):
                     p["applied"] = False
                     changed = True
             if changed:

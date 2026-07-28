@@ -169,6 +169,12 @@ SetTimer(CheckChild, 5000)
 OnExit(Cleanup)
 Cleanup(*) {
     global PyPid, sock, MainPy
+    ; Ask first, kill second. taskkill gives the reader no chance to run its
+    ; own shutdown, so anything it paused (YouTube, Spotify) stayed paused
+    ; forever after a tray Exit. QUIT makes it resume media and release its
+    ; lock file; the kills below still run for a reader that ignores it.
+    try SendUdp("QUIT")
+    Sleep 400
     if PyPid {
         try RunWait("taskkill.exe /F /T /PID " PyPid, , "Hide")
     }

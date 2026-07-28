@@ -917,9 +917,16 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
         hwnd = find_process_window(p["process"])
         if not hwnd:
             print(f"[profiles] '{name}': {p['process']} is not running")
+            profiles.release_claim(name)
             return
         rect = get_window_rect(hwnd)
-        regions[:] = [r for r in regions if r.process != p["process"]]
+        # Build the whole replacement set FIRST and only swap it in once every
+        # capture exists. Destroying the live regions up front meant a failure
+        # part-way through (bad coords, window dying, capture probe error)
+        # left the game with no regions at all -- and with apply-on-launch the
+        # watcher retried the destruction every 3s (issue #23).
+        survivors = [r for r in regions if r.process != p["process"]]
+        built: list[WatchedRegion] = []
         for o in scale_regions(p, rect):
             cap = RegionCapture(
                 (o["x"], o["y"], o["w"], o["h"]),
@@ -935,14 +942,15 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
             # (which match by label) hit the wrong region, so rename on
             # collision with whatever is already live (issue #22).
             label = o["label"]
-            taken = {r.name for r in regions}
+            taken = {r.name for r in survivors} | {r.name for r in built}
             if label in taken:
                 label = _next_free_label(taken, o["mode"])
                 print(f"[profiles] '{o['label']}' taken, using '{label}'")
-            regions.append(WatchedRegion(
+            built.append(WatchedRegion(
                 name=label, capture=cap, mode=o["mode"],
                 process=p["process"],
             ))
+        regions[:] = survivors + built
         _reset_speech_state()
         profiles.set_applied_exclusive(name, p["process"])
         print(
@@ -1096,6 +1104,16 @@ def handle_command(
             _handle_profile_command(cmd, regions, tts, state, profiles)
         except Exception as e:
             print(f"[profiles] {cmd} failed: {e}")
+            if cmd.startswith("PROFILE_APPLY:"):
+                # Don't strand the claim: a transient failure should be
+                # retryable on the watcher's next tick.
+                profiles.release_claim(cmd[len("PROFILE_APPLY:"):].strip())
+    elif cmd == "QUIT":
+        # Graceful stop (sent by the AHK supervisor before it taskkills us).
+        # Raising unwinds the poll loop into its finally, which resumes any
+        # media the gate paused and releases the singleton lock (issue #23).
+        print("[dialogue-reader] QUIT received, shutting down.")
+        raise KeyboardInterrupt
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):
@@ -1200,10 +1218,11 @@ def _apply_ocr_result(
             print("[skip] no dialogue change")
         return
 
-    # Compose from the SAME subset that is being polled. Using every region
-    # glued a backgrounded game's stale line onto the foreground app's text,
-    # silently defeating per-process scoping (issue #22).
-    speech = build_speech(_active_regions(regions, _foreground_exe()))
+    # Compose from the SAME subset the batch was built from. Using every
+    # region glued a backgrounded game's stale line onto the foreground app's
+    # text (#22); re-querying the foreground HERE instead dropped the line
+    # whenever focus moved during OCR, so the batch carries its own (#23).
+    speech = build_speech(_active_regions(regions, getattr(result, "fg_exe", "")))
     if len(speech) < MIN_TEXT_LEN:
         state["candidate"] = ""
     elif speech == state["last_spoken"]:
@@ -1249,11 +1268,33 @@ def _apply_ocr_result(
                 rr.last_spoken_text = rr.last_text
 
 
+def _poll_regions(regions: list[WatchedRegion], debug: bool) -> bool:
+    """Grab a frame from each region; True if any changed.
+
+    A capture failure is contained PER REGION: mss and PrintWindow both raise
+    on transient Windows conditions (display-config change, session lock, GPU
+    driver reset, the window dying mid-grab), and one such exception used to
+    unwind the whole poll loop and kill the reader (issue #23)."""
+    any_changed = False
+    for r in regions:
+        try:
+            frame = r.capture.poll_once()
+        except Exception as e:
+            if debug:
+                print(f"[capture] {r.name} poll failed: {e}", flush=True)
+            continue
+        if frame is not None:
+            r.has_pending_frame = True
+            any_changed = True
+    return any_changed
+
+
 def _build_batch_job(
     regions: list[WatchedRegion],
     generation: int,
     confirm_polls: int,
     debug: bool,
+    fg_exe: str = "",
 ) -> OCRBatchJob | None:
     """Build an OCRBatchJob for the worker if any region has a pending
     change. All speaker regions are always included so a new name bubble
@@ -1272,6 +1313,7 @@ def _build_batch_job(
         generation=generation,
         regions=specs,
         confirm_polls=confirm_polls,
+        fg_exe=fg_exe,
         debug=debug,
         pre_snapshot_delay=0.15,
         confirm_interval=TEXT_CONFIRM_INTERVAL,
@@ -1456,7 +1498,10 @@ def main() -> int:
                 p = profiles_store.get(name)
                 if p and p.get("applied") and p.get("process") not in running:
                     profiles_store.mark_unapplied_for_process(p["process"])
-            for name in profiles_store.auto_pending(running):
+            # claim_auto hands each profile out ONCE: the main thread can be
+            # blocked in the region manager for a minute, and an unclaimed
+            # check queued the same apply every 3s (issue #23).
+            for name in profiles_store.claim_auto(running):
                 p = profiles_store.get(name)
                 if p and find_process_window(p["process"]):
                     print(
@@ -1464,6 +1509,8 @@ def main() -> int:
                         f"auto-applying '{name}'"
                     )
                     server.queue.put(f"PROFILE_APPLY:{name}")
+                else:
+                    profiles_store.release_claim(name)   # window not up yet
 
     threading.Thread(target=_profile_watcher, daemon=True).start()
 
@@ -1500,9 +1547,16 @@ def main() -> int:
             result = ocr_worker.poll_result()
             if result is not None:
                 if result.generation == state["generation"]:
-                    _apply_ocr_result(
-                        result, regions, state, speaker_mgr, tts, debug=debug
-                    )
+                    try:
+                        _apply_ocr_result(
+                            result, regions, state, speaker_mgr, tts, debug=debug
+                        )
+                    except Exception as e:
+                        # Contained for the same reason as command dispatch:
+                        # nothing here is worth killing the reader over.
+                        import traceback
+                        print(f"[dialogue-reader] applying OCR result failed: {e}")
+                        traceback.print_exc()
                 elif debug:
                     print(
                         f"[ocr] discarding stale result "
@@ -1554,20 +1608,15 @@ def main() -> int:
             #    queueing work that'll run against pixels from 2s ago by
             #    the time it gets out.
             if not ocr_worker.busy:
-                active = _active_regions(regions, _foreground_exe())
-                any_changed = False
-                for r in active:
-                    frame = r.capture.poll_once()
-                    if frame is not None:
-                        r.has_pending_frame = True
-                        any_changed = True
-
-                if any_changed:
+                fg_exe = _foreground_exe()
+                active = _active_regions(regions, fg_exe)
+                if _poll_regions(active, debug=debug):
                     job = _build_batch_job(
                         active,
                         generation=state["generation"],
                         confirm_polls=state["text_confirm_polls"],
                         debug=debug,
+                        fg_exe=fg_exe,
                     )
                     if job is not None:
                         ocr_worker.submit(job)

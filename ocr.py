@@ -269,6 +269,11 @@ class OCRBatchJob:
     regions: list[OCRRegionSpec]
     confirm_polls: int
     debug: bool = False
+    # Foreground executable at SUBMIT time. Carried through to the result so
+    # the caller scopes the spoken utterance to the same set of regions the
+    # batch was built from; re-querying the foreground when the result lands
+    # dropped lines whenever focus moved during OCR (issue #23).
+    fg_exe: str = ""
     # Tunables — kept in the job so main.py can pass its constants without
     # the worker having to import them.
     pre_snapshot_delay: float = 0.15
@@ -282,6 +287,7 @@ class OCRBatchResult:
     generation: int
     texts: dict[str, str] = field(default_factory=dict)
     error: str | None = None
+    fg_exe: str = ""      # echoed from the job (see OCRBatchJob.fg_exe)
 
 
 class OCRWorker:
@@ -338,7 +344,8 @@ class OCRWorker:
                 result = self._process(job)
             except Exception as e:
                 print(f"[ocr-worker] error: {e}", flush=True)
-                result = OCRBatchResult(generation=job.generation, error=str(e))
+                result = OCRBatchResult(generation=job.generation, error=str(e),
+                                        fg_exe=job.fg_exe)
             self._results.put(result)
             with self._busy_lock:
                 self._busy = False
@@ -368,7 +375,8 @@ class OCRWorker:
 
             texts[r.name] = new_text
 
-        return OCRBatchResult(generation=job.generation, texts=texts)
+        return OCRBatchResult(generation=job.generation, texts=texts,
+                              fg_exe=job.fg_exe)
 
     def _confirm_dialogue_text(
         self,
