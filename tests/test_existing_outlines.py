@@ -15,6 +15,9 @@ def _region(
     rotation=0.0,
     target=None,
     rel=(0, 0),
+    use_window_mode=True,
+    game_mode=False,
+    pw_usable=True,
 ):
     x, y, w, h = bbox
     tw, th = target if target else (w, h)
@@ -27,6 +30,11 @@ def _region(
         target_h=th,
         rel_x=rel[0],
         rel_y=rel[1],
+        # Which backend actually reads the pixels decides whether the outline
+        # follows the window; being bound to an hwnd is not enough (#24).
+        use_window_mode=use_window_mode,
+        game_mode=game_mode,
+        _pw_usable=pw_usable,
     )
     return SimpleNamespace(name=name, mode=mode, capture=cap)
 
@@ -89,3 +97,22 @@ def test_speaker_region_keeps_mode():
     out = _existing_outlines([_region(name="speaker1", mode="speaker")])
     assert out[0]["mode"] == "speaker"
     assert out[0]["label"] == "speaker1"
+
+
+def test_game_mode_region_with_black_printwindow_does_not_follow(monkeypatch):
+    # Game mode falls back to SCREEN grabs when the pick-time probe found
+    # PrintWindow unusable, so those pixels come from fixed screen
+    # coordinates and the outline must stay put (#24).
+    monkeypatch.setattr(main, "get_window_rect", lambda h: (50, 80, 800, 600))
+    r = _region(hwnd=7, rel=(100, 200), use_window_mode=False,
+                game_mode=True, pw_usable=False)
+    out = _existing_outlines([r])
+    assert (out[0]["x"], out[0]["y"]) == (100, 200)
+
+
+def test_game_mode_region_with_working_printwindow_follows(monkeypatch):
+    monkeypatch.setattr(main, "get_window_rect", lambda h: (50, 80, 800, 600))
+    r = _region(hwnd=7, rel=(100, 200), use_window_mode=False,
+                game_mode=True, pw_usable=True)
+    out = _existing_outlines([r])
+    assert (out[0]["x"], out[0]["y"]) == (150, 280)

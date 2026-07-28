@@ -22,7 +22,7 @@ import threading
 import time
 from pathlib import Path
 
-import sounddevice as sd
+import audio
 
 
 DEFAULT_VOICE = "kokoro:af_heart"
@@ -145,10 +145,7 @@ class TTS:
         """Cancel any in-progress speech immediately."""
         with self._version_lock:
             self._version += 1
-        try:
-            sd.stop()
-        except Exception:
-            pass
+        audio.stop()
         self._gate_active = False
         self._gate_ended()
 
@@ -170,10 +167,7 @@ class TTS:
             self._gate_active = False
             self._gate_ended()
 
-        try:
-            sd.stop()
-        except Exception:
-            pass
+        audio.stop()
 
         with self._version_lock:
             self._version += 1
@@ -197,20 +191,18 @@ class TTS:
                     return
                 # speed is a pitch-preserving time-stretch handled by Kokoro,
                 # then played at the native sample rate so pitch is unchanged.
-                audio, sample_rate = k.synth(text, name, speed=self._speed)
+                samples, sample_rate = k.synth(text, name, speed=self._speed)
                 if my_version != self._version:
                     return
-                sd.play(audio, samplerate=sample_rate, blocking=False)
+                audio.play(samples, sample_rate)
                 if my_version != self._version:
-                    try:
-                        sd.stop()
-                    except Exception:
-                        pass
+                    audio.stop()
                     return
                 # Time the playback out instead of sd.wait(): the global
                 # stream's wait() is not safe against a concurrent stop()/
-                # play() from another thread (native crash, issue #20).
-                duration = len(audio) / float(sample_rate) if sample_rate else 0.0
+                # play() from another thread (native crash, issue #20). The
+                # sleep stays OUTSIDE audio's lock so stop() can interrupt.
+                duration = len(samples) / float(sample_rate) if sample_rate else 0.0
                 deadline = time.monotonic() + duration + 0.2
                 while time.monotonic() < deadline:
                     if my_version != self._version:
@@ -226,10 +218,7 @@ class TTS:
     def shutdown(self) -> None:
         with self._version_lock:
             self._version += 1
-        try:
-            sd.stop()
-        except Exception:
-            pass
+        audio.stop()
         if self._media_gate is not None:
             try:
                 self._media_gate.shutdown()

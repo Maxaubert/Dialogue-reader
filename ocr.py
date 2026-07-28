@@ -269,6 +269,11 @@ class OCRBatchJob:
     regions: list[OCRRegionSpec]
     confirm_polls: int
     debug: bool = False
+    # Foreground executable at SUBMIT time. Carried through to the result so
+    # the caller scopes the spoken utterance to the same set of regions the
+    # batch was built from; re-querying the foreground when the result lands
+    # dropped lines whenever focus moved during OCR (issue #23).
+    fg_exe: str = ""
     # Tunables — kept in the job so main.py can pass its constants without
     # the worker having to import them.
     pre_snapshot_delay: float = 0.15
@@ -282,6 +287,12 @@ class OCRBatchResult:
     generation: int
     texts: dict[str, str] = field(default_factory=dict)
     error: str | None = None
+    fg_exe: str = ""      # echoed from the job (see OCRBatchJob.fg_exe)
+    # Dialogue regions whose text the worker re-snapshotted and saw hold
+    # steady. The caller treats that as the jitter confirmation instead of
+    # waiting for a whole second batch that a static region never produces
+    # (issue #24).
+    confirmed: set = field(default_factory=set)
 
 
 class OCRWorker:
@@ -338,7 +349,8 @@ class OCRWorker:
                 result = self._process(job)
             except Exception as e:
                 print(f"[ocr-worker] error: {e}", flush=True)
-                result = OCRBatchResult(generation=job.generation, error=str(e))
+                result = OCRBatchResult(generation=job.generation, error=str(e),
+                                        fg_exe=job.fg_exe)
             self._results.put(result)
             with self._busy_lock:
                 self._busy = False
@@ -349,12 +361,19 @@ class OCRWorker:
         time.sleep(job.pre_snapshot_delay)
 
         texts: dict[str, str] = {}
+        confirmed: set = set()
         for r in job.regions:
             fresh = r.capture.snapshot()
             new_text = self._ocr.read(fresh, speaker=(r.mode == "speaker"))
 
-            if r.mode == "dialogue" and job.confirm_polls > 1:
-                new_text = self._confirm_dialogue_text(
+            if r.mode == "dialogue" and job.confirm_polls <= 1:
+                # Confirmation is switched off, so there is no second look to
+                # wait for: this text is as settled as it will ever be.
+                # Reporting nothing here left hash-gated regions (which yield
+                # one frame per stable image) permanently silent (issue #26).
+                confirmed.add(r.name)
+            elif r.mode == "dialogue":
+                new_text, held = self._confirm_dialogue_text(
                     capture=r.capture,
                     initial=new_text.strip(),
                     initial_hash=_hash_frame_fast(fresh),
@@ -365,10 +384,16 @@ class OCRWorker:
                     region_name=r.name,
                     debug=job.debug,
                 )
+                # ONLY when the text actually held still. Reporting every
+                # attempt as confirmed disabled the caller's jitter guard and
+                # spoke mid-typewriter text (issue #25).
+                if held:
+                    confirmed.add(r.name)
 
             texts[r.name] = new_text
 
-        return OCRBatchResult(generation=job.generation, texts=texts)
+        return OCRBatchResult(generation=job.generation, texts=texts,
+                              fg_exe=job.fg_exe, confirmed=confirmed)
 
     def _confirm_dialogue_text(
         self,
@@ -381,10 +406,14 @@ class OCRWorker:
         hard_cap: int,
         region_name: str,
         debug: bool,
-    ) -> str:
+    ) -> tuple[str, bool]:
         """Re-snapshot + re-OCR until we see `polls` consecutive identical
         results, or we hit the attempt cap. Prevents reading partial
         typewriter text.
+
+        Returns (text, held) where `held` is True only when the text reached
+        `polls` consecutive identical reads. Giving up returns the last read
+        with held=False so the caller can still apply its own jitter guard.
 
         Optimization: hash the raw snapshot. If the hash matches the last
         frame we actually OCR'd, the pixels are identical and the OCR
@@ -425,4 +454,4 @@ class OCRWorker:
                 f"(OCR calls: {ocr_calls}, hash-skipped: {skipped})",
                 flush=True,
             )
-        return confirmed
+        return confirmed, matches >= polls

@@ -21,6 +21,7 @@ Inside the running process:
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import re
 import sys
@@ -32,7 +33,9 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 import numpy as np
-import sounddevice as sd
+import psutil
+
+import audio
 
 from region_picker import manage_regions
 from capture import RegionCapture
@@ -319,29 +322,86 @@ def _terminate_pid(pid: int) -> None:
         ctypes.windll.kernel32.CloseHandle(handle)
 
 
-def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
-    """Ensure this is the only running instance. If lock_path records a prior
-    instance's PID that is still alive (and not our own), terminate it, wait
-    briefly for Windows to release its UDP socket and audio streams, then
-    record our own PID. A missing, empty, or unparseable lock file just means
-    'no known prior instance' and we proceed to write ours."""
-    my_pid = os.getpid()
+def _self_identity() -> dict:
+    """PID plus the two fields that make it verifiable later. Windows recycles
+    PIDs, so a bare number is not identity (issue #22)."""
+    rec = {"pid": os.getpid(), "name": "", "create_time": 0.0}
     try:
-        prior_pid = int(lock_path.read_text(encoding="utf-8").strip())
+        p = psutil.Process(rec["pid"])
+        rec["name"] = p.name()
+        rec["create_time"] = p.create_time()
+    except Exception:
+        pass
+    return rec
+
+
+def _read_lock(lock_path: Path) -> dict | None:
+    """Parse the lock file. Returns None for missing/garbage AND for legacy
+    bare-PID files: without identity fields we cannot prove ownership, and
+    killing on an unverified PID is exactly the bug."""
+    try:
+        rec = json.loads(lock_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        prior_pid = None
-    if prior_pid is not None and prior_pid != my_pid and _is_process_alive(prior_pid):
-        print(f"[singleton] killing prior instance pid {prior_pid}")
-        try:
-            _terminate_pid(prior_pid)
-        except Exception as e:
-            print(f"[singleton] failed to kill {prior_pid}: {e}")
-        # Let Windows release the UDP socket and sounddevice streams.
-        time.sleep(0.7)
+        return None
+    if not isinstance(rec, dict):
+        return None
     try:
-        lock_path.write_text(str(my_pid), encoding="utf-8")
+        rec["pid"] = int(rec["pid"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not rec.get("name") or not rec.get("create_time"):
+        return None
+    return rec
+
+
+def _is_our_prior_instance(rec: dict) -> bool:
+    """True only if the live process with that PID is the very process the
+    lock recorded: same image name AND same start time."""
+    try:
+        p = psutil.Process(rec["pid"])
+        return (p.name() == rec["name"]
+                and abs(p.create_time() - float(rec["create_time"])) < 1.0)
+    except Exception:
+        return False
+
+
+def _claim_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Ensure this is the only running instance. A prior instance is killed
+    only when the lock file proves the live PID is that same process (image
+    name + creation time). Anything unverifiable - missing, garbage, legacy
+    bare-PID, recycled PID - is left strictly alone; the worst case is two
+    readers competing for the UDP port, which is loud and recoverable, while
+    killing a stranger's process is neither."""
+    my_pid = os.getpid()
+    rec = _read_lock(lock_path)
+    if rec is not None and rec["pid"] != my_pid:
+        if _is_our_prior_instance(rec):
+            print(f"[singleton] killing prior instance pid {rec['pid']}")
+            try:
+                _terminate_pid(rec["pid"])
+            except Exception as e:
+                print(f"[singleton] failed to kill {rec['pid']}: {e}")
+            # Let Windows release the UDP socket and audio streams.
+            time.sleep(0.7)
+        elif _is_process_alive(rec["pid"]):
+            print(f"[singleton] stale lock: pid {rec['pid']} is not our reader, "
+                  f"leaving it alone")
+    try:
+        lock_path.write_text(json.dumps(_self_identity()), encoding="utf-8")
     except OSError as e:
         print(f"[singleton] could not write lock file: {e}")
+
+
+def _release_singleton(lock_path: Path = _LOCK_PATH) -> None:
+    """Delete the lock on clean exit, but only if it is still ours: a newer
+    instance may have already claimed it (newest launch wins)."""
+    rec = _read_lock(lock_path)
+    if rec is not None and rec["pid"] != os.getpid():
+        return
+    try:
+        lock_path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 # ---- parent watchdog ------------------------------------------------------
@@ -428,14 +488,12 @@ _STARTUP_PHRASE = "OCR starting up"
 _READY_PHRASE = "OCR ready"
 
 
-def _play_cue(audio: np.ndarray) -> None:
-    """Play a short audio cue, blocking until done. Safe alongside TTS:
-    sd.play() preempts any current playback, and the cue is brief enough
-    that holding the main loop for it is fine."""
-    try:
-        sd.play(audio, samplerate=_BEEP_RATE, blocking=True)
-    except Exception:
-        pass
+def _play_cue(samples: np.ndarray) -> None:
+    """Play a short audio cue, blocking until done. Goes through audio.py so
+    it is serialized against the TTS worker threads: sounddevice's global
+    stream is closed unguarded, and a cue racing a worker's play/stop closed
+    the same PaStream twice -> native crash (issue #22)."""
+    audio.play(samples, _BEEP_RATE, blocking=True)
 
 
 @dataclass
@@ -528,15 +586,27 @@ _EXE_CACHE: dict[int, str] = {}
 
 
 def _foreground_exe() -> str:
-    """Exe name of the process owning the current foreground window."""
+    """Exe name of the process owning the current foreground window.
+
+    Cached, because this runs at 12 Hz. Two rules keep the cache honest
+    (issue #22): a failed lookup is never cached (a transient miss would
+    otherwise deactivate the game's regions for good), and an entry is
+    dropped once its window is gone (Windows recycles HWNDs, so a stale
+    entry would attribute a new window to the old process)."""
     hwnd = get_foreground_window()
     if not hwnd:
         return ""
-    if hwnd not in _EXE_CACHE:
+    cached = _EXE_CACHE.get(hwnd)
+    if cached is not None:
+        if is_window(hwnd):
+            return cached
+        del _EXE_CACHE[hwnd]
+    exe = get_window_process(hwnd)
+    if exe:
         if len(_EXE_CACHE) > 256:
             _EXE_CACHE.clear()
-        _EXE_CACHE[hwnd] = get_window_process(hwnd)
-    return _EXE_CACHE[hwnd]
+        _EXE_CACHE[hwnd] = exe
+    return exe
 
 
 def _active_regions(regions: list[WatchedRegion], fg_exe: str) -> list[WatchedRegion]:
@@ -557,6 +627,24 @@ def _prune_dead_regions(regions: list[WatchedRegion], state: dict) -> None:
     state["generation"] += 1
 
 
+def _follows_window(cap) -> bool:
+    """True when this capture actually reads window-relative pixels.
+
+    Being bound to an hwnd is not enough: a game-mode region whose
+    PrintWindow came back black falls through to screen grabs at FIXED
+    screen coordinates, so drawing its outline relative to the window put
+    the box where the capture wasn't as soon as the window moved (#24)."""
+    if not getattr(cap, "hwnd", 0) or cap.capture_mode == "screen":
+        return False
+    if getattr(cap, "use_window_mode", False):
+        return True
+    if getattr(cap, "game_mode", False):
+        # Game mode prefers PrintWindow but falls back to screen grabs when
+        # the probe found it unusable (all-black frames).
+        return bool(getattr(cap, "_pw_usable", True))
+    return False
+
+
 def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
     """Describe each watched region's current on-screen rectangle so the
     picker overlay can outline it. Regions bound to a window follow the
@@ -567,7 +655,7 @@ def _existing_outlines(regions: list[WatchedRegion]) -> list[dict]:
     for r in regions:
         cap = r.capture
         bx, by = cap.bbox["left"], cap.bbox["top"]
-        if cap.hwnd and cap.capture_mode != "screen":
+        if _follows_window(cap):
             try:
                 wx, wy, _, _ = get_window_rect(cap.hwnd)
                 bx, by = wx + cap.rel_x, wy + cap.rel_y
@@ -791,6 +879,42 @@ def _reload_config(tts, speaker_mgr, state, ocr=None, debug=False) -> None:
     print("[dialogue-reader] Config reloaded.")
 
 
+def _profile_watch_tick(profiles, running: set[str], enqueue) -> None:
+    """One pass of the apply-on-launch watcher.
+
+    Extracted from the thread so it can be tested: a silently dead watcher
+    just means auto-apply stops working, which is invisible until you notice
+    your boxes never came back (issue #25)."""
+    for name in profiles.names():
+        p = profiles.get(name)
+        if p and p.get("process") not in running:
+            # Unconditional: gating this on `applied` left a profile the
+            # user had unapplied suppressed forever, so it never
+            # auto-applied again for the rest of the session (issue #25).
+            profiles.note_process_gone(p["process"])
+            if p.get("applied"):
+                profiles.mark_unapplied_for_process(p["process"])
+    # claim_auto hands each profile out ONCE: the main thread can be blocked
+    # in the region manager for a minute, and an unclaimed check queued the
+    # same apply every 3s (issue #23).
+    for name in profiles.claim_auto(running):
+        p = profiles.get(name)
+        if p and find_process_window(p["process"]):
+            print(f"[profiles] {p['process']} detected — auto-applying '{name}'")
+            enqueue(f"PROFILE_APPLY:{name}")
+        else:
+            profiles.release_claim(name)        # window not up yet
+
+
+def _next_free_label(taken, mode: str) -> str:
+    """Smallest free '<mode><n>' not in `taken`. Mirrors the picker's naming
+    so profile-applied and hand-drawn regions share one namespace."""
+    i = 1
+    while f"{mode}{i}" in taken:
+        i += 1
+    return f"{mode}{i}"
+
+
 def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
     """PROFILE_SAVE / PROFILE_APPLY / PROFILE_UNAPPLY / PROFILE_DELETE /
     PROFILE_AUTO. The reader owns profiles.json; the settings UI drives
@@ -825,7 +949,8 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
             return
         profiles.snapshot(name, process, get_window_rect(hwnd),
                           _existing_outlines(scoped))
-        profiles.set_applied(name, True)   # what's on screen IS this profile
+        # What's on screen IS this profile now, and only this one.
+        profiles.set_applied_exclusive(name, process)
         print(f"[profiles] Saved '{name}': {len(scoped)} region(s) for {process}")
 
     elif cmd.startswith("PROFILE_APPLY:"):
@@ -837,9 +962,16 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
         hwnd = find_process_window(p["process"])
         if not hwnd:
             print(f"[profiles] '{name}': {p['process']} is not running")
+            profiles.release_claim(name)
             return
         rect = get_window_rect(hwnd)
-        regions[:] = [r for r in regions if r.process != p["process"]]
+        # Build the whole replacement set FIRST and only swap it in once every
+        # capture exists. Destroying the live regions up front meant a failure
+        # part-way through (bad coords, window dying, capture probe error)
+        # left the game with no regions at all -- and with apply-on-launch the
+        # watcher retried the destruction every 3s (issue #23).
+        survivors = [r for r in regions if r.process != p["process"]]
+        built: list[WatchedRegion] = []
         for o in scale_regions(p, rect):
             cap = RegionCapture(
                 (o["x"], o["y"], o["w"], o["h"]),
@@ -850,12 +982,22 @@ def _handle_profile_command(cmd, regions, tts, state, profiles) -> None:
                 rotation=o["rotation"],
                 capture_mode=state["capture_mode"],
             )
-            regions.append(WatchedRegion(
-                name=o["label"], capture=cap, mode=o["mode"],
+            # Labels are only unique within the profile that saved them. Two
+            # games both holding a "dialogue1" would make edits and deletes
+            # (which match by label) hit the wrong region, so rename on
+            # collision with whatever is already live (issue #22).
+            label = o["label"]
+            taken = {r.name for r in survivors} | {r.name for r in built}
+            if label in taken:
+                label = _next_free_label(taken, o["mode"])
+                print(f"[profiles] '{o['label']}' taken, using '{label}'")
+            built.append(WatchedRegion(
+                name=label, capture=cap, mode=o["mode"],
                 process=p["process"],
             ))
+        regions[:] = survivors + built
         _reset_speech_state()
-        profiles.set_applied(name, True)
+        profiles.set_applied_exclusive(name, p["process"])
         print(
             f"[profiles] Applied '{name}': {len(p['regions'])} region(s) "
             f"for {p['process']}"
@@ -999,7 +1141,24 @@ def handle_command(
             print(f"[dialogue-reader] No-speaker voice -> {voice}")
             tts.speak("Default voice changed", voice=voice, pause_media=False)
     elif cmd.startswith("PROFILE_") and profiles is not None:
-        _handle_profile_command(cmd, regions, tts, state, profiles)
+        # Contained: these paths touch Win32 window handles and user-editable
+        # JSON, both of which can fail at any moment (the game's window dies
+        # between the watcher seeing it and this running). An escape here
+        # would unwind the poll loop and kill the reader (issue #22).
+        try:
+            _handle_profile_command(cmd, regions, tts, state, profiles)
+        except Exception as e:
+            print(f"[profiles] {cmd} failed: {e}")
+            if cmd.startswith("PROFILE_APPLY:"):
+                # Don't strand the claim: a transient failure should be
+                # retryable on the watcher's next tick.
+                profiles.release_claim(cmd[len("PROFILE_APPLY:"):].strip())
+    elif cmd == "QUIT":
+        # Graceful stop (sent by the AHK supervisor before it taskkills us).
+        # Raising unwinds the poll loop into its finally, which resumes any
+        # media the gate paused and releases the singleton lock (issue #23).
+        print("[dialogue-reader] QUIT received, shutting down.")
+        raise KeyboardInterrupt
     elif cmd == "RELOAD_CONFIG":
         _reload_config(tts, speaker_mgr, state, ocr=ocr, debug=debug)
     elif cmd.startswith("PREVIEW_VOICE:"):
@@ -1104,7 +1263,19 @@ def _apply_ocr_result(
             print("[skip] no dialogue change")
         return
 
-    speech = build_speech(regions)
+    # Compose from the SAME subset the batch was built from. Using every
+    # region glued a backgrounded game's stale line onto the foreground app's
+    # text (#22); re-querying the foreground HERE instead dropped the line
+    # whenever focus moved during OCR, so the batch carries its own (#23).
+    speech = build_speech(_active_regions(regions, getattr(result, "fg_exe", "")))
+    # True only when EVERY dialogue region that changed in this batch was
+    # re-verified by the worker. Testing the set's truthiness let one
+    # region's confirmation disarm the guard for the others (issue #25).
+    confirmed_names = getattr(result, "confirmed", None) or set()
+    changed_dialogue = [r.name for r in regions
+                        if r.mode == "dialogue" and r.name in result.texts]
+    worker_confirmed = bool(changed_dialogue) and all(
+        n in confirmed_names for n in changed_dialogue)
     if len(speech) < MIN_TEXT_LEN:
         state["candidate"] = ""
     elif speech == state["last_spoken"]:
@@ -1121,33 +1292,85 @@ def _apply_ocr_result(
                 f"[skip] speech too similar to last spoken "
                 f"({_similar(speech, state['last_spoken']):.2f})"
             )
-    elif not state["candidate"] or _similar(speech, state["candidate"]) < 0.92:
+    elif ((not state["candidate"] or _similar(speech, state["candidate"]) < 0.92)
+            and not worker_confirmed):
         # First time seeing this text — stash as candidate, don't speak
         # yet. One more matching poll is needed to confirm it's not jitter.
+        #
+        # Skipped when the WORKER confirmed this batch's dialogue regions (it
+        # re-snapshots and re-OCRs until the text holds). Pixel-hash-gated
+        # regions yield exactly one frame per stable image, so a second batch
+        # never arrives for a dialogue box that appears and stays put — the
+        # line was stashed here and never spoken (issue #24).
         state["candidate"] = speech
         if debug:
             print("[candidate] new text, waiting for confirmation poll")
-    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker:
+    elif speaker_candidate and speaker_candidate != speaker_mgr.current_speaker \
+            and worker_confirmed:
+        # The name came from this same worker-confirmed batch and no further
+        # frame is coming for a hash-gated region, so waiting would drop the
+        # line entirely. Accept the name now and speak (issue #25).
+        voice = speaker_mgr.set_current(speaker_candidate)
+        if voice:
+            _safe_print("[speakers] current = ",
+                        f"{speaker_mgr.current_speaker!r} voice={voice} "
+                        f"(accepted from a confirmed batch)")
+        state["speaker_candidate"] = ""
+        _speak_now(speech, regions, state, speaker_mgr, tts)
+    elif (speaker_candidate and speaker_candidate != speaker_mgr.current_speaker
+            and not worker_confirmed):
         # Dialogue confirmed but speaker still pending — hold one more poll
         # rather than attributing the new line to the previous speaker.
+        #
+        # Only when another poll can actually come. For a worker-confirmed
+        # batch the speaker name was read from the SAME batch and no further
+        # frame is coming, so holding dropped the first line after every
+        # speaker change (issue #25); accept the name instead.
         if debug:
             print(
                 f"[hold] dialogue ready but waiting for speaker "
                 f"candidate {speaker_candidate!r} to confirm"
             )
     else:
-        state["candidate"] = ""
-        voice = speaker_mgr.voice_for_current()
-        speaker_label = (
-            f" ({speaker_mgr.current_speaker})"
-            if speaker_mgr.current_speaker else ""
-        )
-        print(f"[speak{speaker_label}] {speech}")
-        tts.speak(speech, voice=voice)
-        state["last_spoken"] = speech
-        for rr in regions:
-            if rr.mode == "dialogue":
-                rr.last_spoken_text = rr.last_text
+        _speak_now(speech, regions, state, speaker_mgr, tts)
+
+
+def _speak_now(speech, regions, state, speaker_mgr, tts) -> None:
+    """Speak `speech` in the current speaker's voice and re-baseline the
+    dialogue regions that contributed to it."""
+    state["candidate"] = ""
+    voice = speaker_mgr.voice_for_current()
+    speaker_label = (
+        f" ({speaker_mgr.current_speaker})"
+        if speaker_mgr.current_speaker else ""
+    )
+    print(f"[speak{speaker_label}] {speech}")
+    tts.speak(speech, voice=voice)
+    state["last_spoken"] = speech
+    for rr in regions:
+        if rr.mode == "dialogue":
+            rr.last_spoken_text = rr.last_text
+
+
+def _poll_regions(regions: list[WatchedRegion], debug: bool) -> bool:
+    """Grab a frame from each region; True if any changed.
+
+    A capture failure is contained PER REGION: mss and PrintWindow both raise
+    on transient Windows conditions (display-config change, session lock, GPU
+    driver reset, the window dying mid-grab), and one such exception used to
+    unwind the whole poll loop and kill the reader (issue #23)."""
+    any_changed = False
+    for r in regions:
+        try:
+            frame = r.capture.poll_once()
+        except Exception as e:
+            if debug:
+                print(f"[capture] {r.name} poll failed: {e}", flush=True)
+            continue
+        if frame is not None:
+            r.has_pending_frame = True
+            any_changed = True
+    return any_changed
 
 
 def _build_batch_job(
@@ -1155,6 +1378,7 @@ def _build_batch_job(
     generation: int,
     confirm_polls: int,
     debug: bool,
+    fg_exe: str = "",
 ) -> OCRBatchJob | None:
     """Build an OCRBatchJob for the worker if any region has a pending
     change. All speaker regions are always included so a new name bubble
@@ -1173,6 +1397,7 @@ def _build_batch_job(
         generation=generation,
         regions=specs,
         confirm_polls=confirm_polls,
+        fg_exe=fg_exe,
         debug=debug,
         pre_snapshot_delay=0.15,
         confirm_interval=TEXT_CONFIRM_INTERVAL,
@@ -1342,7 +1567,6 @@ def main() -> int:
         """Every ~3s: re-arm profiles whose game exited, and enqueue an
         apply for auto profiles whose game just appeared (with a window).
         Applying happens on the main thread via the command queue."""
-        import psutil
         while True:
             time.sleep(3.0)
             try:
@@ -1353,18 +1577,12 @@ def main() -> int:
                 }
             except Exception:
                 continue
-            for name in profiles_store.names():
-                p = profiles_store.get(name)
-                if p and p.get("applied") and p.get("process") not in running:
-                    profiles_store.mark_unapplied_for_process(p["process"])
-            for name in profiles_store.auto_pending(running):
-                p = profiles_store.get(name)
-                if p and find_process_window(p["process"]):
-                    print(
-                        f"[profiles] {p['process']} detected — "
-                        f"auto-applying '{name}'"
-                    )
-                    server.queue.put(f"PROFILE_APPLY:{name}")
+            try:
+                _profile_watch_tick(profiles_store, running, server.queue.put)
+            except Exception as e:
+                # A dead watcher silently disables apply-on-launch for the
+                # rest of the session, so one bad tick must not kill it.
+                print(f"[profiles] watcher tick failed: {e}")
 
     threading.Thread(target=_profile_watcher, daemon=True).start()
 
@@ -1382,10 +1600,18 @@ def main() -> int:
                     cmd = server.queue.get_nowait()
                 except queue.Empty:
                     break
-                handle_command(
-                    cmd, regions, tts, speaker_mgr, state, debug=debug,
-                    poll_commands=_drain_commands, ocr=ocr, profiles=profiles_store,
-                )
+                try:
+                    handle_command(
+                        cmd, regions, tts, speaker_mgr, state, debug=debug,
+                        poll_commands=_drain_commands, ocr=ocr,
+                        profiles=profiles_store,
+                    )
+                except Exception as e:
+                    # One malformed or unlucky command must never unwind the
+                    # poll loop and take the whole reader down (issue #22).
+                    import traceback
+                    print(f"[dialogue-reader] command {cmd!r} failed: {e}")
+                    traceback.print_exc()
 
             # 2. Apply any OCR result the worker just finished. poll_result
             #    is non-blocking. Stale generations (from pause/clear that
@@ -1393,9 +1619,16 @@ def main() -> int:
             result = ocr_worker.poll_result()
             if result is not None:
                 if result.generation == state["generation"]:
-                    _apply_ocr_result(
-                        result, regions, state, speaker_mgr, tts, debug=debug
-                    )
+                    try:
+                        _apply_ocr_result(
+                            result, regions, state, speaker_mgr, tts, debug=debug
+                        )
+                    except Exception as e:
+                        # Contained for the same reason as command dispatch:
+                        # nothing here is worth killing the reader over.
+                        import traceback
+                        print(f"[dialogue-reader] applying OCR result failed: {e}")
+                        traceback.print_exc()
                 elif debug:
                     print(
                         f"[ocr] discarding stale result "
@@ -1447,20 +1680,15 @@ def main() -> int:
             #    queueing work that'll run against pixels from 2s ago by
             #    the time it gets out.
             if not ocr_worker.busy:
-                active = _active_regions(regions, _foreground_exe())
-                any_changed = False
-                for r in active:
-                    frame = r.capture.poll_once()
-                    if frame is not None:
-                        r.has_pending_frame = True
-                        any_changed = True
-
-                if any_changed:
+                fg_exe = _foreground_exe()
+                active = _active_regions(regions, fg_exe)
+                if _poll_regions(active, debug=debug):
                     job = _build_batch_job(
                         active,
                         generation=state["generation"],
                         confirm_polls=state["text_confirm_polls"],
                         debug=debug,
+                        fg_exe=fg_exe,
                     )
                     if job is not None:
                         ocr_worker.submit(job)
@@ -1474,6 +1702,7 @@ def main() -> int:
         except Exception:
             pass
         server.stop()
+        _release_singleton()
     return 0
 
 

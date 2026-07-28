@@ -7,9 +7,13 @@ pywebview frontend as the `Api` bridge class.
 
 from __future__ import annotations
 
+import os
 import re
 import socket
+import time
 from pathlib import Path
+
+import psutil
 
 _REPO = Path(__file__).parent.parent
 _DEFAULT_INI = _REPO / "dialogue_reader.ini"
@@ -69,12 +73,39 @@ _ENGLISH_FALLBACK = [
 _KV_RE = re.compile(r"^(\s*)([^=;#\[\s][^=]*?)(\s*=\s*)(.*)$")
 
 
+def _drop_duplicate_options(text: str) -> str:
+    """Return `text` with every repeated key in a section removed, keeping the
+    FIRST occurrence (configparser's own precedence when it does not raise)."""
+    out: list[str] = []
+    section: str | None = None
+    seen: set[tuple[str, str]] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1].lower()
+            out.append(line)
+            continue
+        m = _KV_RE.match(line)
+        if m and section is not None:
+            slot = (section, m.group(2).strip().lower())
+            if slot in seen:
+                continue
+            seen.add(slot)
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
 def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
     """Return `text` with each (section, key) set to its new value. Existing
     lines keep their exact whitespace/separator style; comments and unrelated
     lines are untouched. Missing keys are appended to their section, missing
     sections appended at the end."""
-    pending = dict(values)
+    # Ini keys and sections are case-insensitive to both configparser and
+    # AHK's IniRead, so matching them case-sensitively appended a SECOND
+    # differently-cased entry -- a duplicate option that makes the whole file
+    # unreadable and silently reverts every setting (issue #22). Keys are
+    # normalized for lookup; the file's own spelling is preserved on rewrite.
+    pending = {(s.lower(), k.lower()): (k, v) for (s, k), v in values.items()}
     result: list[str] = []
     current: str | None = None
 
@@ -83,17 +114,20 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
         section's trailing blank lines after the inserted keys."""
         if section is None:
             return
-        adds = [(k, v) for (s, k), v in list(pending.items()) if s == section]
+        sl = section.lower()
+        adds = [(key, orig, v) for (s, key), (orig, v) in list(pending.items())
+                if s == sl]
         if not adds:
             return
         tail: list[str] = []
         while result and result[-1].strip() == "":
             tail.insert(0, result.pop())
-        for k, v in adds:
-            result.append(f"{k}={v}")
-            del pending[(section, k)]
+        for key, orig, v in adds:
+            result.append(f"{orig}={v}")
+            del pending[(sl, key)]
         result.extend(tail)
 
+    written: set[tuple[str, str]] = set()   # (section, key) already emitted
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -103,19 +137,32 @@ def update_ini_text(text: str, values: dict[tuple[str, str], str]) -> str:
             continue
         m = _KV_RE.match(line)
         if m and current is not None:
-            key = m.group(2).strip()
-            if (current, key) in pending:
+            key = m.group(2).strip().lower()
+            slot = (current.lower(), key)
+            if slot in pending:
+                _orig, val = pending.pop(slot)
                 result.append(
-                    f"{m.group(1)}{m.group(2)}{m.group(3)}"
-                    f"{pending.pop((current, key))}"
+                    f"{m.group(1)}{m.group(2)}{m.group(3)}{val}"
                 )
+                written.add(slot)
                 continue
+            if slot in written:
+                # A pre-existing duplicate of a key we already wrote. Dropping
+                # it HEALS the file: configparser raises DuplicateOptionError
+                # on the second copy and every later section is then lost,
+                # silently reverting settings to defaults (issue #23).
+                print(f"[settings] removing duplicate {m.group(2).strip()!r} "
+                      f"in [{current}]")
+                continue
+            written.add(slot)
         result.append(line)
     flush(current)
 
     sections: dict[str, list[tuple[str, str]]] = {}
-    for (s, k), v in pending.items():
-        sections.setdefault(s, []).append((k, v))
+    for (_s, _k), (orig, v) in pending.items():
+        # Use the caller's spelling for a section we are creating fresh.
+        disp = next(s for (s, k) in values if k == orig)
+        sections.setdefault(disp, []).append((orig, v))
     for s, kvs in sections.items():
         if result and result[-1].strip() != "":
             result.append("")
@@ -154,8 +201,22 @@ def read_settings(ini_path: Path | str = _DEFAULT_INI) -> dict:
     cp = configparser.ConfigParser()
     try:
         cp.read(ini_path, encoding="utf-8")
-    except Exception:
-        pass
+    except configparser.DuplicateOptionError as e:
+        # configparser aborts AT the duplicate, so every later section is
+        # missing and would read back as SCHEMA defaults -- which the next
+        # save would then write over the user's real settings. Heal a copy
+        # in memory and re-parse so the values are still correct (#24).
+        print(f"[settings] {Path(ini_path).name} has a duplicate key "
+              f"({e.option!r} in [{e.section}]); using the first value. "
+              f"Saving from this page removes the duplicate.")
+        try:
+            text = Path(ini_path).read_text(encoding="utf-8")
+            cp = configparser.ConfigParser()
+            cp.read_string(_drop_duplicate_options(text))
+        except Exception as e2:
+            print(f"[settings] could not recover {Path(ini_path).name}: {e2}")
+    except Exception as e:
+        print(f"[settings] could not read {Path(ini_path).name}: {e}")
     out: dict = {}
     for section, keys in SCHEMA.items():
         out[section] = {}
@@ -194,15 +255,54 @@ def reader_running(port: int = _DEFAULT_PORT) -> bool:
         s.close()
 
 
+def _is_reader_process(info: dict) -> bool:
+    """True only for OUR supervisor or reader child.
+
+    Matching a substring of the joined command line killed innocent
+    bystanders: an editor with dialogue_reader.ahk open, a shell whose
+    command line merely mentioned the path, or a second checkout of the repo
+    (issue #22). Require both a plausible image name and an argument that
+    resolves to exactly one of our two entry points."""
+    name = (info.get("name") or "").lower()
+    if name not in ("autohotkey.exe", "autohotkey64.exe", "autohotkey32.exe",
+                    "autohotkeyu64.exe", "autohotkeyux.exe",
+                    "py.exe", "python.exe", "pythonw.exe"):
+        return False
+    targets = {str((_REPO / n).resolve()).lower()
+               for n in ("dialogue_reader.ahk", "main.py")}
+    for arg in info.get("cmdline") or []:
+        try:
+            p = Path(arg)
+            # Only ABSOLUTE arguments count. A bare "main.py" would otherwise
+            # resolve against OUR cwd -- which is this repo -- and match an
+            # unrelated `python main.py` in someone else's project (#24).
+            if not p.is_absolute():
+                continue
+            if str(p.resolve()).lower() in targets:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
 def restart_reader() -> bool:
     """Kill the AHK supervisor and its Python child, then relaunch the AHK
     script. Needed only for [Hotkeys]/[Launcher] changes."""
-    import os
-    import psutil
-    for p in psutil.process_iter(["cmdline"]):
+    # Ask the reader to stop first: killing the supervisor bypasses its own
+    # cleanup, and a hard kill leaves any media the gate paused paused
+    # forever (issue #23). The kills below are the backstop.
+    try:
+        send_command("QUIT")
+        # Wait for it to actually exit (it resumes paused media first)
+        # rather than guessing a duration; the kills below are the backstop.
+        deadline = time.monotonic() + 2.5
+        while time.monotonic() < deadline and reader_running():
+            time.sleep(0.05)
+    except Exception:
+        pass
+    for p in psutil.process_iter(["name", "cmdline"]):
         try:
-            cl = " ".join(p.info["cmdline"] or [])
-            if "dialogue_reader.ahk" in cl or "Dialogue-reader\\main.py" in cl:
+            if _is_reader_process(p.info):
                 p.kill()
         except Exception:
             pass
