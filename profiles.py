@@ -267,6 +267,11 @@ class ProfileStore:
             for other, p in self._profiles.items():
                 if other != name and p.get("process") == process:
                     p["applied"] = False
+                    # Suppress it too, or the watcher reads the cleared flag
+                    # as "needs applying" and two auto profiles for the same
+                    # game rebuild each other's regions forever (issue #26).
+                    self._suppressed.add(other)
+                    self._claimed.discard(other)
             if name in self._profiles:
                 self._profiles[name]["applied"] = True
             self._claimed.discard(name)      # the queued apply is consumed

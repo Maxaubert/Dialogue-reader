@@ -105,7 +105,7 @@ def test_worker_reports_confirmation(monkeypatch):
     assert "dialogue1" in res.confirmed
 
 
-def test_worker_reports_nothing_when_confirmation_is_off():
+def test_confirmation_off_reports_every_dialogue_region_confirmed():
     from ocr import OCRBatchJob, OCRRegionSpec, OCRWorker
 
     class FakeOCR:
@@ -124,4 +124,7 @@ def test_worker_reports_nothing_when_confirmation_is_off():
                                capture=FakeCapture())],
         confirm_polls=1, debug=False, pre_snapshot_delay=0.0,
     )
-    assert worker._process(job).confirmed == set()
+    # With confirmation switched off there is no second look to wait for, so
+    # the text counts as settled. Reporting an empty set here left hash-gated
+    # regions permanently silent at TextConfirmPolls=1 (issue #26).
+    assert worker._process(job).confirmed == {"dialogue1"}

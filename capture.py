@@ -75,7 +75,11 @@ def _deskew_to_target(
     if bh == 0 or bw == 0:
         return bbox_img
     center = (bw / 2.0, bh / 2.0)
-    M = cv2.getRotationMatrix2D(center, -rotation_deg, 1.0)
+    # OpenCV's positive angle is COUNTER-clockwise, and `rotation_deg` is the
+    # user's clockwise tilt, so undoing it needs +rotation_deg. Passing the
+    # negative rotated the same way again and handed OCR text at double the
+    # tilt (issue #26).
+    M = cv2.getRotationMatrix2D(center, rotation_deg, 1.0)
     rotated = cv2.warpAffine(
         bbox_img, M, (bw, bh),
         flags=cv2.INTER_CUBIC,

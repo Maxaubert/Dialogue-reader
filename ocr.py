@@ -366,7 +366,13 @@ class OCRWorker:
             fresh = r.capture.snapshot()
             new_text = self._ocr.read(fresh, speaker=(r.mode == "speaker"))
 
-            if r.mode == "dialogue" and job.confirm_polls > 1:
+            if r.mode == "dialogue" and job.confirm_polls <= 1:
+                # Confirmation is switched off, so there is no second look to
+                # wait for: this text is as settled as it will ever be.
+                # Reporting nothing here left hash-gated regions (which yield
+                # one frame per stable image) permanently silent (issue #26).
+                confirmed.add(r.name)
+            elif r.mode == "dialogue":
                 new_text, held = self._confirm_dialogue_text(
                     capture=r.capture,
                     initial=new_text.strip(),

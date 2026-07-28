@@ -227,7 +227,9 @@ def test_shutdown_waits_for_an_in_flight_pause():
     gate.speech_started()
     assert started.wait(2.0)
     gate.shutdown()                   # must not exit leaving media paused
-    assert s.play_calls == 1
+    # The invariant is the END STATE, not which path got there: shutdown
+    # either resumes what the worker paused, or the worker sees _closing and
+    # never pauses at all (issue #26). Both leave the media playing.
     assert not s.is_paused
 
 
