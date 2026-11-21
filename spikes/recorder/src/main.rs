@@ -75,11 +75,12 @@ struct Args {
     /// Seconds to switch to the game when neither --process nor --title is given
     #[arg(long, default_value_t = 5)]
     countdown: u32,
-    /// Key that marks a pop-up: scrolllock, pause, insert, home, f8..f12
-    #[arg(long, default_value = "scrolllock")]
+    /// Key that marks a pop-up: pipe (the | key left of 1 on Nordic keyboards), scrolllock, pause,
+    /// insert, home, f8..f12, mouse4, mouse5, or a virtual-key code like 0xDC
+    #[arg(long, default_value = "pipe")]
     mark_key: String,
-    /// Key that stops recording
-    #[arg(long, default_value = "pause")]
+    /// Key that stops recording (same names as --mark-key)
+    #[arg(long, default_value = "f10")]
     stop_key: String,
     /// Stop by itself after this many seconds (0 = no limit)
     #[arg(long, default_value_t = 0)]
@@ -105,6 +106,9 @@ fn now_ticks() -> i64 {
 
 fn vk(name: &str) -> Result<i32> {
     Ok(match name.to_ascii_lowercase().as_str() {
+        "pipe" | "|" | "section" | "oem5" => 0xDC,
+        "mouse4" => 0x05,
+        "mouse5" => 0x06,
         "scrolllock" => 0x91,
         "pause" => 0x13,
         "insert" => 0x2D,
@@ -114,7 +118,10 @@ fn vk(name: &str) -> Result<i32> {
         "f10" => 0x79,
         "f11" => 0x7A,
         "f12" => 0x7B,
-        other => bail!("unknown key '{other}'"),
+        other => match other.strip_prefix("0x").map(|h| i32::from_str_radix(h, 16)) {
+            Some(Ok(code)) if (1..=0xFE).contains(&code) => code,
+            _ => bail!("unknown key '{other}'"),
+        },
     })
 }
 

@@ -21,12 +21,13 @@ cargo build --release
    ```
    Switch to the game within 5 s. Or pick the window directly: `--process RDR2.exe`
    (`--list` shows the names).
-3. Play. Each time a pop-up or new dialogue line appears, press **Scroll Lock**.
+3. Play. Each time a pop-up or new dialogue line appears, press the **|** key (left of 1 on a Nordic keyboard).
    The tool saves lossless PNGs from 8 s before to 3 s after the press.
-4. Press **Pause** to stop (or Ctrl+C in the console). Closing the console window also saves
+4. Press **F10** to stop (or Ctrl+C in the console). Closing the console window also saves
    everything; the mark frames then stay as `.qoi` until you run `recorder --convert "<session folder>"`.
 
-Keys can be changed with `--mark-key` and `--stop-key` (scrolllock, pause, insert, home, f8 to f12).
+Keys can be changed with `--mark-key` and `--stop-key`: pipe, scrolllock, pause, insert, home, f8 to f12,
+mouse4, mouse5 (side buttons), or any virtual-key code such as `0xDC`.
 If the game runs as admin, the keys may not reach the recorder. Then run the recorder as admin too.
 
 ## Output
