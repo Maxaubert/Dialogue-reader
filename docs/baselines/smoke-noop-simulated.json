@@ -1,0 +1,556 @@
+{
+  "suite": "smoke",
+  "seed": 1,
+  "truth_fingerprint": "0099daf8c452e4f8",
+  "reader": "noop",
+  "reader_options": {},
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 8,
+    "items_should_read": 29,
+    "items_read": 0,
+    "recall": 0.0,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 1,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "1-2s",
+        "total": 5,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "2-4s",
+        "total": 19,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": ">4s",
+        "total": 4,
+        "read": 0,
+        "recall": 0.0
+      }
+    ],
+    "mean_cer": 0.0,
+    "exact_match_rate": 0.0,
+    "prompts_total": 5,
+    "prompts_read": 0,
+    "prompt_recall": 0.0,
+    "events_total": 0,
+    "duplicates": 0,
+    "noise_reads": 0,
+    "background_reads": 0,
+    "hallucinations": 0,
+    "latency_p50_ms": 0.0,
+    "latency_p95_ms": 0.0,
+    "cpu_ms_p50": 0.0,
+    "cpu_ms_p95": 0.00019999999999999998,
+    "frames_total": 2903,
+    "frames_processed": 2903
+  },
+  "scenarios": [
+    {
+      "id": "smoke-000",
+      "genres": [
+        "rpg_dialogue"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 394,
+        "frames_processed": 394
+      },
+      "missed": [
+        "spk001 (3324 ms readable): Juno",
+        "dlg002 (3324 ms readable): Our scouts spotted smoke near the southern farms.",
+        "spk003 (2526 ms readable): Elder Wynn",
+        "dlg004 (2526 ms readable): Take this lantern. You will need it where you are going.",
+        "spk005 (4635 ms readable): Juno",
+        "dlg006 (4635 ms readable): Keep your voice down. The guards change shifts at midnight."
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-001",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.0003,
+        "frames_total": 308,
+        "frames_processed": 308
+      },
+      "missed": [
+        "toast001 (3220 ms readable): + 9 Mana Crystal",
+        "toast002 (1967 ms readable): + 4 Glass Vial",
+        "toast003 (1869 ms readable): + 3 Rope",
+        "toast004 (2631 ms readable): + 8 Glass Vial",
+        "toast005 (2461 ms readable): + 8 Wolf Pelt",
+        "toast006 (1077 ms readable): + 20 Wolf Pelt"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-002",
+      "genres": [
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 380,
+        "frames_processed": 380
+      },
+      "missed": [
+        "sub001 (3388 ms readable): Hold the line!",
+        "sub002 (3403 ms readable): I have seen that symbol before, in my grandmother's book.",
+        "sub003 (3429 ms readable): That sword belonged to my father. Treat it well."
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-003",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 374,
+        "frames_processed": 374
+      },
+      "missed": [
+        "obj001 (4432 ms readable): Main Quest: Reach the north tower",
+        "obj002 (1408 ms readable): Quest: Return to camp before nightfall"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-004",
+      "genres": [
+        "tooltip"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 387,
+        "frames_processed": 387
+      },
+      "missed": [
+        "tip001 (2232 ms readable): Field Kit Quest item Restores 40 health Stackable",
+        "tip002 (3000 ms readable): Spell Tome Two-handed Restores 40 health Stackable",
+        "tip003 (3408 ms readable): Spell Tome Stackable"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-005",
+      "genres": [
+        "prompt_flicker",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 5,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.0003,
+        "frames_total": 339,
+        "frames_processed": 339
+      },
+      "missed": [
+        "sub001 (1978 ms readable): The old road is safer, but it takes twice as long.",
+        "sub002 (2781 ms readable): The prophecy speaks of a traveller with no past.",
+        "sub003 (4779 ms readable): The bridge to the north is out. We need another way across.",
+        "sub004 (335 ms readable): Keep your voice down. The guards change shifts at midnight."
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-006",
+      "genres": [
+        "damage_numbers",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 323,
+        "frames_processed": 323
+      },
+      "missed": [
+        "sub001 (2112 ms readable): GARRICK: Three of my men are still trapped inside the fort.",
+        "sub002 (2935 ms readable): JUNO: My brother never came back from the eastern ridge.",
+        "sub003 (3655 ms readable): JUNO: Go to the lighthouse and light the signal fire."
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-007",
+      "genres": [
+        "menu_overlay",
+        "objective_update"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.00009999999999999999,
+        "frames_total": 398,
+        "frames_processed": 398
+      },
+      "missed": [
+        "obj001 (3403 ms readable): Escort the caravan",
+        "obj002 (3303 ms readable): New Objective: Craft a better weapon"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    }
+  ]
+}

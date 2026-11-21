@@ -1,0 +1,55 @@
+[package]
+name = "arena"
+version = "0.1.0"
+edition = "2024"
+description = "Test arena: plays fake game scenes with a known answer key to a reader and scores it"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "arena"
+path = "src/main.rs"
+
+[features]
+# PP-OCR engine for ocr-bench via ONNX Runtime (src/ocr/ppocr.rs).
+ppocr = ["dep:ort"]
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.9", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.154"
+ab_glyph = "0.2.32"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
+
+# ---- deps added by the live-mode agent (src/live.rs) ----
+
+# ---- deps added by the winocr / ocr-bench agent (src/ocr.rs, src/readers/winocr.rs) ----
+# PP-OCR engine: optional, behind the `ppocr` feature (downloads ONNX Runtime at build time).
+ort = { version = "=2.0.0-rc.15", optional = true, default-features = false, features = ["std", "download-binaries", "tls-native", "copy-dylibs", "api-31"] }
+
+# ---- deps added by the real-world import agent (src/realworld.rs) ----
+
+# Shared Windows bindings for live mode, the winocr reader and ocr-bench.
+# Add a missing feature to this list rather than a second `windows` line.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Performance",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_Threading",
+    "Win32_System_WinRT",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-capture = "2.0.1"
