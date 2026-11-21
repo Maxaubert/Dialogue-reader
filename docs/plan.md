@@ -15,3 +15,6 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
    where do they land. Tool: `spikes/recorder`.
 3. Rust runtime: ort + DirectML + Kokoro time-to-first-audio.
 4. UI shell: overlay over borderless games, hotkeys vs elevated games.
+
+## Results
+- Spike 2, Satisfactory: [spike2-satisfactory.md](spike2-satisfactory.md)
