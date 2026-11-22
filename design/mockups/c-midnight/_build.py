@@ -294,7 +294,7 @@ css03 = """
 """
 kinds = [("dialogue", "Spoken lines"), ("speaker", "Who is talking"), ("pickups", "Item pop-ups"), ("prompts", "Button hints"), ("ignore", "Never read")]
 klist = "".join(f'<div class="krow"><span class="kicon">{ic("k-" + k)}</span><span style="font-weight:500;width:72px">{KIND[k]}</span><span class="muted">{d}</span></div>' for k, d in kinds)
-html = head("Draw zones", css03) + obbar(2) + f'''<main class="page">
+html = head("Draw zones", css03) + obbar(2) + f'''<main class="page kgrey">
 <div class="ob">{obhead("Mark where text shows up", "Drag on the screenshot to draw a zone, then pick what kind of text it holds.")}</div>
 <div class="work">
 {zonetools(draw=True)}
@@ -395,7 +395,7 @@ css06 = """
 .sum .set-row{min-height:48px}
 .sum .k{width:120px;color:var(--text-2)}
 """
-html = head("Mode", css06) + obbar(5) + f'''<main class="page"><div class="ob">
+html = head("Mode", css06) + obbar(5) + f'''<main class="page kgrey"><div class="ob">
 {obhead("How should it read?", "You can switch any time from the main window.")}
 <div class="ob-body opts">
 <div class="card opt sel"><div class="row"><span class="icb">{ic("zap")}</span><span class="spacer radio on"></span></div><h3>Automatic</h3><p>Reads new text the moment it appears in a zone.</p><p class="muted">Good for story games and long talks.</p></div>
@@ -524,7 +524,7 @@ css11 = """
 .sec{padding:var(--s-4) var(--s-5);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:var(--s-3)}
 .found{padding:var(--s-3);border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line)}
 """
-html = head("Zones", css11) + nav("Zones") + f'''<main class="page"><div class="ed">
+html = head("Zones", css11) + nav("Zones") + f'''<main class="page kgrey"><div class="ed">
 <section class="canvas">
 <div class="tb ztools">{zonetools(draw=False)[len('<div class="ztools">'):-len('</div>')]}</div>
 <div class="cv">{stage(style="width:1016px", sel="Subtitles", off=("prompts",))}</div>

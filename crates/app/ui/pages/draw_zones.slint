@@ -70,6 +70,7 @@ export component DrawZonesPage inherits Rectangle {
             Stage {
                 width: 872px;
                 zones: root.zones;
+                grey-kinds: true;
                 selected: root.selected;
                 behind: Palette.bg;
                 zone-clicked(i) => {

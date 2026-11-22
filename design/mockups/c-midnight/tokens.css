@@ -308,3 +308,11 @@ h3 { font-size: var(--fs-3); font-weight: 500; line-height: 1.3; }
 .zrow .zic { display: inline-flex; width: 16px; height: 16px; color: var(--text-2); flex: none; }
 .zrow .zic svg { width: 16px; height: 16px; }
 .zrow.on .zic { color: var(--text); }
+
+/* 2026-11-22 (Max): zone kinds are grey on 03, 11 and 06 (pages marked .kgrey). Zone boxes, their tags,
+   the Kind picker dots and the summary dots use grey. The grey kind line icons are the only kind cue.
+   The selected zone uses the accent for selection only. */
+.kgrey .zone { --zc: var(--text-2); --zf: rgba(162, 171, 188, 0.14); }
+.kgrey .zone.sel { border-color: var(--accent); }
+.kgrey .zone.sel .handle { border-color: var(--accent); }
+.kgrey .dot[class*=" k-"] { background: var(--text-3); }

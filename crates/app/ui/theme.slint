@@ -53,7 +53,9 @@ export global Palette {
     // overlay panels (quick menu, zone edit)
     out property <color> panel: #0A0D14;
     out property <color> canvas: #05070B;
-    // zone kinds: outline and fill on the stage only; lists use grey icons
+    // zone kinds: outline and fill on the stage of 01 and 10 only; lists use grey icons.
+    // 03 and 11 draw every zone grey (Max, 2026-11-22): line text-2, fill zone-fill, tag text-2, dots text-3.
+    out property <color> zone-fill: #A2ABBC24;
     out property <color> z-dialogue: #4FD1E8;
     out property <color> z-dialogue-soft: #4FD1E824;
     out property <color> z-speaker: #C49BFF;

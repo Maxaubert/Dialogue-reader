@@ -230,7 +230,8 @@ export global Palette {
     out property <color> danger: #F87171;
     out property <color> pill-bg: #07090EDB;      // 0.86
     out property <color> pill-line: #FFFFFF1A;    // 0.10
-    // zone kinds (outline and fill on the stage only; lists use grey icons)
+    // zone kinds (outline and fill on the 01 and 10 stages only; lists use grey icons)
+    out property <color> zone-fill: #A2ABBC24;    // grey zone fill on 03 and 11 (0.14)
     out property <color> z-dialogue: #4FD1E8;  out property <color> z-dialogue-soft: #4FD1E824;
     out property <color> z-speaker: #C49BFF;   out property <color> z-speaker-soft: #C49BFF24;
     out property <color> z-pickups: #F5B544;   out property <color> z-pickups-soft: #F5B54424;
@@ -256,7 +257,8 @@ export global Type { out property <length> fs1: 12px; out property <length> fs2:
   femtovg) apply the weight axis. Headings: `letter-spacing` -0.025em on fs5 (about -0.8px, `Type.ls-display`).
 - **Text weight on screen:** Chromium draws the mockup text with ClearType and extra contrast; Slint draws
   grayscale coverage. All text, at every weight, has about 15 to 30% less ink in Slint than in the shots. The
-  weights themselves are right (measured, see `crates/app/README.md`). Open question in section 6.
+  weights themselves are right (measured, see `crates/app/README.md`). Slint's Skia renderer matches the shots
+  (section 6, item 8).
 - **Line height:** Slint 1.18 `Text` has `line-height-factor`, relative to the font's natural line height
   (Geist: 1.3 em). Tokens `Type.lhf-115` to `lhf-150` give the CSS line heights 1.15 to 1.5. `StyledText` has no
   line height, so mixed-color multi-line text is one `Text` with the colored prefix drawn over its start.
@@ -378,11 +380,24 @@ Navigation is one Slint enum property on the main window:
 3. "Import settings" on the welcome page: v1 imports a profile JSON exported from DialogReader (Export is in the
    profile menu). It does not read the old C# app's settings.
 4. Zone kind colors: settled. Max (2026-11-22): make them grey. The zone boxes and labels on the picture (03, 11),
-   the Kind picker dots and the 06 summary dots turn grey, in the app and in those mockups only.
+   the Kind picker dots and the 06 summary dots turn grey, in the app and in those mockups only. Done 2026-11-22:
+   grey `text-2` lines and tags, `zone-fill` fill, `text-3` dots; the selected zone uses the accent for selection.
+   The stages on 01 and 10-main-b still use kind colors, as their mockups do. Open points: item 9.
 5. Settings > Keys: settled. Max picked "D everywhere" (2026-11-22), so Settings shows the same two 04-read-key-d
    cards as setup.
 6. Media pause while speaking. The old app had it; this plan puts it after v1. Is v1 without it acceptable?
 7. Kokoro wording. M3a changes the voice page header, "Get more voices" and Settings > Voices to what v1 ships
    (Windows voices). Max approves the new wording first.
 8. Text weight: Max (2026-11-22) chose a spike on Slint's Skia renderer for the real window (gamma-corrected
-   text). Measure text ink against the mockup shots and the download size before switching.
+   text). Measured 2026-11-22 (`crates/app/README.md`, "Renderer"). At 100% scale, Skia text has 101% of the
+   mockup shots' ink, femtovg and software 79%. At 225% (Max's screen), Skia has 100% of a 225% Chromium shot,
+   femtovg 89%, software 88%. So Skia matches the mockups at both scales, but the gain on Max's screen is 11
+   points, not 21. The exe grows from 19.1 MB to 29.2 MB (MB = 10^6 bytes; zip 8.0 to 12.2 MB). It gets under
+   25 MB (22.1 MB) only with fat LTO and `panic = "abort"`. A named Cargo profile (`[profile.ship]`, inherits
+   release) can carry those settings for the shipped exe only; tests and normal builds keep unwinding. The cost:
+   in the shipped exe, any panic ends the app at once. For now Skia is the opt-in feature `renderer-skia` and
+   femtovg stays the default. Open for Max: accept about 29 MB, or accept `panic = "abort"` in a ship profile,
+   or keep femtovg.
+9. Zone kind colors, open points after item 4: should the stages on 01 and 10-main-b turn grey too? And the five
+   Kind picker dots on 03 and 11 are now the same grey, so they carry no meaning. Keep them, or drop the dots and
+   keep only the kind icons?

@@ -46,6 +46,7 @@ export component ZonesTab inherits Rectangle {
                         width: root.sw;
                         height: root.sw * 9 / 16;
                         zones: root.zones;
+                        grey-kinds: true;
                         selected: root.selected;
                         behind: Palette.canvas;
                         zone-clicked(i) => {

@@ -15,6 +15,8 @@ export component Stage inherits Rectangle {
     in property <bool> round-top: true;
     in property <bool> round-bottom: true;
     in property <color> behind: Palette.bg;
+    // Grey zones (03 and 11, Max 2026-11-22): no kind colors, the selected zone uses the accent.
+    in property <bool> grey-kinds: false;
     out property <float> scale: max(root.width / 1px / root.src-w, root.height / 1px / root.src-h);
     out property <length> off-x: (root.width - root.src-w * root.scale * 1px) / 2;
     out property <length> off-y: (root.height - root.src-h * root.scale * 1px) / 2;
@@ -34,8 +36,11 @@ export component Stage inherits Rectangle {
     }
 
     for z[i] in root.zones: Rectangle {
-        property <color> zc: Kinds.color(z.kind);
+        property <color> zc: root.grey-kinds ? Palette.text-2 : Kinds.color(z.kind);
+        property <color> zf: root.grey-kinds ? Palette.zone-fill : Kinds.soft(z.kind);
         property <bool> sel: i == root.selected;
+        // the outline: the kind color, or with grey kinds the accent on the selected zone
+        property <color> line: self.sel && root.grey-kinds ? Palette.accent : self.zc;
         x: root.off-x + z.x * root.scale * 1px;
         y: root.off-y + z.y * root.scale * 1px;
         width: z.w * root.scale * 1px;
@@ -43,8 +48,8 @@ export component Stage inherits Rectangle {
         border-radius: Radius.xs;
         border-width: self.sel ? 2px : 1.5px;
         // off zones are drawn at 45 %
-        border-color: z.on ? self.zc : self.zc.with-alpha(0.45);
-        background: z.on ? Kinds.soft(z.kind) : Kinds.soft(z.kind).with-alpha(0.063);
+        border-color: z.on ? self.line : self.line.with-alpha(0.45);
+        background: z.on ? self.zf : self.zf.with-alpha(0.063);
         if self.sel: Rectangle {
             for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
                 x: parent.width * p.x - 4px;
@@ -54,7 +59,7 @@ export component Stage inherits Rectangle {
                 border-radius: 2px;
                 background: Palette.knob;
                 border-width: 1.5px;
-                border-color: zc;
+                border-color: line;
             }
         }
         TouchArea {
@@ -66,7 +71,7 @@ export component Stage inherits Rectangle {
     // Tags go above every zone box, so they are drawn after all boxes.
     if root.labels: Rectangle {
         for z[i] in root.zones: Rectangle {
-            property <color> zc: Kinds.color(z.kind);
+            property <color> zc: root.grey-kinds ? Palette.text-2 : Kinds.color(z.kind);
             x: root.off-x + z.x * root.scale * 1px - 1.5px;
             y: root.off-y + z.y * root.scale * 1px - self.height - Space.s1;
             height: 20px;
@@ -157,7 +162,7 @@ export component ZoneRow inherits Rectangle {
     }
 }
 
-// Kind picker with colored dots (.seg in .ztools).
+// Kind picker with grey dots (.seg in .ztools). The kind has no color (Max, 2026-11-22).
 export component KindPicker inherits Rectangle {
     in-out property <Kind> kind: Kind.dialogue;
     height: 32px;
@@ -187,7 +192,7 @@ export component KindPicker inherits Rectangle {
                         width: 8px;
                         height: 8px;
                         border-radius: 4px;
-                        background: Kinds.color(k);
+                        background: Palette.text-3;
                     }
                 }
 

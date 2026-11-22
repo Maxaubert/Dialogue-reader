@@ -195,7 +195,8 @@ export component ModePage inherits Rectangle {
                         for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: VerticalLayout {
                             alignment: center;
                             Dot {
-                                tint: Kinds.color(k);
+                                // grey: zone kinds have no color (Max, 2026-11-22)
+                                tint: Palette.text-3;
                             }
                         }
                     }
