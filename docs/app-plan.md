@@ -75,6 +75,12 @@ not change when it shows, and the see-through parts are really see-through (per-
 **Done when.** A short note in `docs/` says which way M4 draws the overlays: Slint windows on winit, or the
 software renderer into a Win32 layered window (`UpdateLayeredWindow`).
 
+**Result (2026-11-22, [overlay-spike.md](overlay-spike.md)).** Slint windows on winit, with an attributes hook, styles
+set right after a show that gives a new HWND, and a window subclass that keeps them (winit rewrites `GWL_EXSTYLE` on
+every show). All hidden-desktop checks passed. Composed transparency cannot be seen headless (for the quick menu and
+zone edit not even off screen), so Max runs one visible check (`overlay-spike demo`) before M4. If the pill corners
+are not see-through, the pill moves to the fallback; if the menu or zone edit shows black, they move too.
+
 ## M2: profiles, window picking, screenshot, zone drawing
 
 **Scope.** Real data for setup. Profiles saved as JSON in `%APPDATA%\DialogReader\` (spec 2.8). Page 02 lists real
@@ -181,14 +187,37 @@ crates/app/src/overlay/quick_menu.rs  menu state machine (move, change, select, 
 crates/app/src/overlay/zone_edit.rs   add, select, delete, kind, done; saves the profile
 crates/app/tests/quick_menu.rs     state machine: order, wrap, stepper limits, quit twice, Esc
 crates/app/tests/place.rs          placement at 100%, 150%, 200%, two monitors
-crates/app/tests/overlay_win.rs    on a hidden desktop: ex-styles set, foreground unchanged
+crates/app/tests/overlay_win.rs    on a hidden desktop: ex-styles set and kept after hide/show, no activation
+                                   (counted per thread, with a plain-window positive control)
 ```
 
-**Drawing path.** As the overlay spike after M1 decided (Slint windows on winit, or software-rendered layered
-windows through `UpdateLayeredWindow`).
+**Drawing path.** Decided by the overlay spike ([overlay-spike.md](overlay-spike.md)): Slint windows on winit for the
+pill, the quick menu and zone edit, one renderer for all windows: femtovg or `skia-opengl`. Skia's default renderer
+(not OpenGL) draws the see-through margins opaque black, so it cannot serve the overlays. M4 takes over
+`spikes/overlay/src/overlay.rs`:
+- `with_winit_window_attributes_hook`: overlays get `with_active(false)` and `with_skip_taskbar(true)` (a thread-local
+  flag set around the component's `new()`).
+- After every `show()` that gives a new HWND (`overlay::show_overlay`): `SetWindowSubclass`, the extra ex-styles,
+  `SetLayeredWindowAttributes(255)` for the pill, `SetWindowPos(HWND_TOPMOST, SWP_NOACTIVATE)`, a window property
+  that marks the HWND. Every call is checked and a failure is logged. Overlays use no popups (they would get default
+  window attributes).
+- The subclass puts the styles back in `WM_STYLECHANGING`, answers `WM_MOUSEACTIVATE` with `MA_NOACTIVATE` and adds
+  `SWP_NOACTIVATE` in `WM_WINDOWPOSCHANGING`.
+- Zone edit is a frameless window sized to the client rect, never a fullscreen window (winit activates those).
+- The keyboard hook runs on the keys thread with its own message loop (section 2 of the spec), never on the UI
+  thread. Its callback reads atomic "menu open" / "zone edit open" flags, decides, and posts the work with
+  `slint::invoke_from_event_loop` (a slow hook is removed by Windows). A key belongs to whoever got its first
+  key-down until it is released: auto-repeats and the key-up go the same way (`keys::Swallow` in the spike).
+  Injected keys (`LLKHF_INJECTED`, pad mappers) count as real keys in the spike; Max decides before M4.
+- Card margins at least the shadow blur (40 px for the quick menu).
+Condition: Max's visible check (`cargo run -p overlay-spike --release -- demo`) shows see-through pill corners,
+click-through, the game around the menu card and through the zone edit veil. If the pill fails, it is drawn with
+the software renderer into a layered window (`UpdateLayeredWindow`); if the menu or zone edit shows black, they
+move to that fallback too (or the menu becomes an opaque rectangle window).
 
 **Tests.** Quick menu and zone edit state machines as pure Rust. Placement math. Overlay window styles and focus on
-the hidden desktop. Screens of every overlay state rendered headless and compared with golden images.
+the hidden desktop (`GetForegroundWindow` is always NULL there, so focus is checked per thread as in the spike).
+Screens of every overlay state rendered headless and compared with golden images.
 
 **Done when.** On a borderless game the pill shows, the quick menu opens and works with the keyboard only, zone
 edit changes zones that the reader uses at once, the game never loses focus, and all headless tests pass.
