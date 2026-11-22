@@ -130,6 +130,9 @@ impl Editor {
     /// Press at (x, y) image pixels; `scale` is view pixels per image pixel.
     pub fn pointer_down(&mut self, x: f32, y: f32, scale: f32) -> Changed {
         let scale = scale.max(1e-3);
+        // a drag still open here lost its release (focus loss, a lost grab): it is no change, so its zone goes
+        // back before the new press starts
+        self.cancel_drag();
         if let Some(i) = self.selected
             && let Some(handle) = hit_handle(self.zones[i].rect, x, y, HANDLE_RADIUS / scale)
         {
@@ -272,6 +275,25 @@ impl Editor {
         }
     }
 
+    /// A drag (draw, move or resize) is going on.
+    pub fn dragging(&self) -> bool {
+        self.drag != Drag::None
+    }
+
+    /// Ends the drag without a change (a right click or Esc while the left button is down): a moved or resized
+    /// zone goes back to how it was, a zone being drawn is dropped. No save and no undo step. True when a drag
+    /// was going on.
+    pub fn cancel_drag(&mut self) -> bool {
+        match std::mem::replace(&mut self.drag, Drag::None) {
+            Drag::None => false,
+            Drag::Draw { .. } => true,
+            Drag::Move { before, .. } | Drag::Resize { before, .. } => {
+                self.zones = before;
+                true
+            }
+        }
+    }
+
     /// "Dialogue", then "Dialogue 2", ...
     fn new_name(&self, kind: Kind) -> String {
         let base = kind.ui_name();
@@ -346,12 +368,21 @@ impl Editor {
         true
     }
 
-    /// A new screenshot of another size: zones keep their place on the picture.
+    /// A new picture of another size (a new screenshot, or the live view of a game that changed size): zones
+    /// keep their place on the picture, the undo step too. A drag in the old pixels is cancelled (the live view
+    /// waits for the drag to end, so this happens only on a retake).
     pub fn rescale(&mut self, img_w: f32, img_h: f32) {
         if self.img_w > 0.0 && self.img_h > 0.0 && (img_w, img_h) != (self.img_w, self.img_h) {
+            self.cancel_drag();
             let (sx, sy) = (img_w / self.img_w, img_h / self.img_h);
-            for z in &mut self.zones {
-                z.rect = Rect::new(z.rect.x * sx, z.rect.y * sy, z.rect.w * sx, z.rect.h * sy);
+            let scale = |zones: &mut Vec<EdZone>| {
+                for z in zones {
+                    z.rect = Rect::new(z.rect.x * sx, z.rect.y * sy, z.rect.w * sx, z.rect.h * sy);
+                }
+            };
+            scale(&mut self.zones);
+            if let Some(u) = &mut self.undo {
+                scale(&mut u.zones);
             }
         }
         self.img_w = img_w;
@@ -547,9 +578,67 @@ mod tests {
     }
 
     #[test]
+    fn cancel_puts_back_a_move_or_resize_and_drops_a_draw() {
+        let mut e = ed();
+        assert!(!e.cancel_drag(), "no drag");
+        e.pointer_down(1000.0, 100.0, 1.0);
+        e.pointer_move(1200.0, 300.0, 1.0);
+        assert!(e.dragging());
+        assert!(e.cancel_drag());
+        assert!(!e.dragging());
+        assert_eq!(e.draft(), None);
+        // the release after a cancel adds nothing
+        assert!(!e.pointer_up(1300.0, 400.0, 1.0).zones);
+        assert_eq!(e.zones.len(), 2);
+
+        e.draw = false;
+        e.pointer_down(500.0, 760.0, 1.0);
+        e.pointer_move(700.0, 100.0, 1.0);
+        assert_ne!(e.zones[1].rect, Rect::new(400.0, 740.0, 200.0, 40.0));
+        assert!(e.cancel_drag());
+        assert_eq!(e.zones[1].rect, Rect::new(400.0, 740.0, 200.0, 40.0));
+        assert!(!e.pointer_up(700.0, 100.0, 1.0).zones);
+        assert!(!e.can_undo(), "a cancel is no change");
+
+        e.select(Some(0));
+        e.pointer_down(900.0, 860.0, 1.0);
+        e.pointer_move(1500.0, 1000.0, 1.0);
+        assert!(e.cancel_drag());
+        assert_eq!(e.zones[0].rect, Rect::new(100.0, 800.0, 800.0, 60.0));
+    }
+
+    #[test]
+    fn a_press_during_an_open_drag_puts_the_old_drag_back() {
+        // the release of a move was lost: the next press must not keep the zone at the stray place
+        let mut e = ed();
+        e.draw = false;
+        e.pointer_down(500.0, 760.0, 1.0);
+        e.pointer_move(900.0, 100.0, 1.0);
+        assert_ne!(e.zones[1].rect, Rect::new(400.0, 740.0, 200.0, 40.0));
+        e.pointer_down(1500.0, 300.0, 1.0);
+        assert_eq!(e.zones[1].rect, Rect::new(400.0, 740.0, 200.0, 40.0));
+        assert!(!e.pointer_up(1500.0, 300.0, 1.0).zones);
+        assert!(!e.can_undo(), "the lost drag left no undo step");
+        // the same for a resize
+        e.select(Some(0));
+        e.pointer_down(900.0, 860.0, 1.0);
+        e.pointer_move(1500.0, 1000.0, 1.0);
+        e.pointer_down(10.0, 10.0, 1.0);
+        assert_eq!(e.zones[0].rect, Rect::new(100.0, 800.0, 800.0, 60.0));
+    }
+
+    #[test]
     fn rescale_follows_a_new_screenshot() {
         let mut e = ed();
         e.rescale(3840.0, 2160.0);
         assert_eq!(e.zones[0].rect, Rect::new(200.0, 1600.0, 1600.0, 120.0));
+        // the undo step follows the new size, and a drag in the old pixels ends
+        assert!(e.set_on(0, false));
+        e.pointer_down(10.0, 10.0, 1.0);
+        e.rescale(1920.0, 1080.0);
+        assert!(!e.dragging());
+        assert!(e.undo());
+        assert_eq!(e.zones[0].rect, Rect::new(100.0, 800.0, 800.0, 60.0));
+        assert!(e.zones[0].on);
     }
 }
