@@ -3,7 +3,9 @@
 //! It maps the arena layout zones to dr-core zones (`hud` becomes "ignore") and wraps the arena OCR
 //! engines (WinRT; PP-OCR with `--features ppocr`) behind the dr-core `Ocr` trait. It never sees
 //! the truth. With `zones=off` it ignores the layout and runs the no-zone detector on the whole
-//! frame. Design and options: `docs/reader-a1.md`.
+//! frame. With `mode=manual` it runs the dr-core manual mode instead: no automatic reads, and a
+//! simulated key press every `press_every_ms` (a fixed clock, never the truth) reads every zone.
+//! Design and options: `docs/reader-a1.md`.
 
 use crate::model::{Layout, Rect as ARect, ZoneKind as AKind};
 use crate::ocr::{self, Engine, EngineOptions};
@@ -11,7 +13,7 @@ use crate::reader::{FrameRef, ReadEvent, Reader, ReaderContext};
 use anyhow::{Context, Result, bail};
 use dr_core::image::{Channel, Prep};
 use dr_core::pipeline::KindTiming;
-use dr_core::{Config, Frame, Ocr, OcrLine, Pipeline, Rect, Zone, ZoneKind};
+use dr_core::{Config, Frame, Manual, ManualConfig, Ocr, OcrLine, Pipeline, Rect, Zone, ZoneKind};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -22,7 +24,7 @@ pub const OPTIONS: &[&str] = &[
     "change_share", "same_px", "static_ms", "refresh_ms", "idle_ms", "ring_ms", "rescue", "emit_lost", "prompts", "gap_dialogue", "gap_speaker", "gap_notif", "gap_prompt",
     "stable_dialogue", "stable_speaker", "stable_notif", "stable_prompt", "confirm", "gone_reads", "jitter",
     "min_letters", "consensus", "typing_ms", "grow_ms", "change_ms", "lost_letters", "second_ms", "max_reads", "loose", "ref_h", "free_diff", "gone_dialogue", "gone_speaker", "gone_notif", "gone_prompt", "free_cell", "free_edge", "free_change", "free_recent", "free_gap", "free_max", "free_min_cells",
-    "free_expire", "free_stable", "free_move", "trace",
+    "free_expire", "free_stable", "free_move", "trace", "mode", "press_every_ms", "look_ms", "repeats",
 ];
 
 /// The arena OCR engine behind the dr-core trait.
@@ -38,8 +40,19 @@ impl Ocr for EngineOcr {
     }
 }
 
+/// Manual mode: dr-core `Manual` and the simulated key.
+struct ManualRun {
+    m: Manual,
+    every_ms: f64,
+    next_ms: f64,
+    /// Give the "repeat last" lines of an empty press (the arena scores them as hallucinations,
+    /// because the line is no longer on screen).
+    repeats: bool,
+}
+
 pub struct A1 {
     pipe: Pipeline,
+    manual: Option<ManualRun>,
     ocr: EngineOcr,
     use_zones: bool,
     trace: Option<PathBuf>,
@@ -196,7 +209,19 @@ pub fn create(ctx: &ReaderContext) -> Result<Box<dyn Reader>> {
     let use_zones = o.flag("zones", true)?;
     let trace = ctx.options.get("trace").map(|d| PathBuf::from(d).join(format!("{}.txt", ctx.scenario_id)));
     let zones = if use_zones { map_zones(&ctx.layout) } else { Vec::new() };
-    Ok(Box::new(A1 { pipe: Pipeline::new(cfg, &zones), ocr: EngineOcr(engine), use_zones, trace, warned: false }))
+    let manual = match o.get("mode", "auto".to_string())?.as_str() {
+        "auto" => None,
+        "manual" => {
+            let every_ms: f64 = o.get("press_every_ms", 3000.0)?;
+            if every_ms.is_nan() || every_ms <= 0.0 {
+                bail!("a1: press_every_ms must be above 0");
+            }
+            let mcfg = ManualConfig { look_ms: o.get("look_ms", ManualConfig::default().look_ms)?, ..ManualConfig::default() };
+            Some(ManualRun { m: Manual::new(cfg.clone(), mcfg, &zones), every_ms, next_ms: every_ms, repeats: o.flag("repeats", true)? })
+        }
+        v => bail!("a1: mode must be auto or manual, not {v:?}"),
+    };
+    Ok(Box::new(A1 { pipe: Pipeline::new(cfg, &zones), manual, ocr: EngineOcr(engine), use_zones, trace, warned: false }))
 }
 
 fn to_event(e: dr_core::Event) -> ReadEvent {
@@ -211,10 +236,28 @@ impl Reader for A1 {
     fn setup(&mut self, layout: &Layout) {
         let zones = if self.use_zones { map_zones(layout) } else { Vec::new() };
         self.pipe.set_zones(&zones);
+        if let Some(mr) = &mut self.manual {
+            mr.m.set_zones(&zones);
+        }
     }
 
     fn on_frame(&mut self, f: &FrameRef) -> Vec<ReadEvent> {
         let frame = Frame::new(f.t_ms, f.width, f.height, f.rgba);
+        if let Some(mr) = &mut self.manual {
+            // A key press at every multiple of `every_ms` (the first frame at or after it).
+            if f.t_ms >= mr.next_ms {
+                mr.m.press();
+                mr.next_ms = ((f.t_ms / mr.every_ms).floor() + 1.0) * mr.every_ms;
+            }
+            let Some(p) = mr.m.on_frame(&frame, &mut self.ocr) else { return Vec::new() };
+            if let Some(e) = p.errors.first() {
+                panic!("a1: OCR failed at t={} ms: {e}", f.t_ms);
+            }
+            if p.repeat && !mr.repeats {
+                return Vec::new();
+            }
+            return p.events.into_iter().map(to_event).collect();
+        }
         let out = self.pipe.on_frame(&frame, &mut self.ocr);
         if !self.warned && !self.pipe.empty_zones().is_empty() {
             self.warned = true;
@@ -229,6 +272,18 @@ impl Reader for A1 {
     }
 
     fn finish(&mut self, t_ms: f64) -> Vec<ReadEvent> {
+        if let Some(mr) = &self.manual {
+            if let Some(p) = &self.trace {
+                if let Some(dir) = p.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                if let Err(e) = std::fs::write(p, format!("manual mode\nocr runs: {}", mr.m.ocr_runs)) {
+                    eprintln!("a1: cannot write trace {}: {e}", p.display());
+                }
+            }
+            // Manual mode reads only on a press.
+            return Vec::new();
+        }
         let out = self.pipe.finish(t_ms, &mut self.ocr);
         if let Some(e) = out.errors.first() {
             panic!("a1: OCR failed at finish: {e}");
@@ -263,6 +318,10 @@ mod tests {
         assert_eq!(c.prep.scale, 3.0);
         assert_eq!(c.notification.stable_ms, 90.0);
         assert!(c.free_outside);
+        for (k, v) in [("mode", "manual"), ("press_every_ms", "2000"), ("look_ms", "0")] {
+            m.insert(k.to_string(), v.to_string());
+        }
+        assert!(config_from(&m).is_ok());
         m.insert("scael".to_string(), "2".to_string());
         assert!(config_from(&m).is_err());
     }

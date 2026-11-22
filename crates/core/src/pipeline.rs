@@ -330,7 +330,7 @@ pub fn ocr_gray(ocr: &mut dyn Ocr, g: &Gray, prep: &Prep, origin: (f32, f32)) ->
 }
 
 /// The crop is read in one pass as one line (`small_h`, or `loose` times that for one-line kinds).
-fn small_path(g: &Gray, cfg: &Config, one_line: bool) -> bool {
+pub fn small_path(g: &Gray, cfg: &Config, one_line: bool) -> bool {
     let limit = if one_line { cfg.small_h as f32 * cfg.loose.max(1.0) } else { cfg.small_h as f32 };
     g.h as f32 <= limit
 }

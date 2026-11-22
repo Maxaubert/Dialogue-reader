@@ -14,9 +14,12 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
 2. Capture + toast replay: does Windows Graphics Capture work on each game, how long do toasts stay,
    where do they land. Tool: `spikes/recorder`.
 3. Rust runtime: ort + DirectML + Kokoro time-to-first-audio.
-4. UI shell: overlay over borderless games, hotkeys vs elevated games.
+4. UI shell: overlay over borderless games, hotkeys vs elevated games. It also binds the manual-mode read key
+   (`dr_core::Manual`, see [reader-a1.md](reader-a1.md#manual-mode)); the default key is chosen there.
 
 ## Results
 - Spike 2, Satisfactory: [spike2-satisfactory.md](spike2-satisfactory.md)
 - Test arena baseline: [arena-baseline.md](arena-baseline.md)
 - First real reader, A1 (`crates/core`, arena reader `a1`): [reader-a1.md](reader-a1.md)
+- Manual mode (2026-11-22, Max: "click a key and it checks and reads all zones, and never does anything outside"):
+  [reader-a1.md#manual-mode](reader-a1.md#manual-mode)

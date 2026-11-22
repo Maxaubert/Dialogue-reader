@@ -157,6 +157,63 @@ it also runs outside the zones. It never looks inside any zone, ignore zones inc
   pixels did not change since its last read reuses that read, and the reuse is no new evidence. Quiet regions
   expire after 400 ms.
 
+## Manual mode
+
+Added 2026-11-22 on Max's request: "click a key and it checks and reads all zones, and never does anything outside".
+Code: `crates/core/src/manual.rs` (`dr_core::Manual`). Tests: `crates/core/tests/manual.rs`. The product UI (spike 4)
+binds the read key; the default key is chosen there.
+
+What it does:
+- Nothing is read on its own. Between presses no OCR runs, and the no-zone detector never runs (with no zone, or only
+  Ignore zones, a press reads nothing). OCR only ever sees zone crops.
+- A press reads every zone once: not Ignore zones, prompt zones only with `prompts=on`. Order: top to bottom (zones
+  that share most of their height are one row), each row left to right. A speaker zone moves before the first
+  dialogue zone.
+- Each zone is read with the A1 clean-up (`read_zone`: two-pass rows for tall zones, the 2x small-zone path with its
+  second try), and once more with the black and white clean-up when that reads nothing useful. Junk is dropped.
+- It gives every line on screen, also lines spoken before. One line is given once per press (overlapping zones).
+- Clearest frame: the only per-frame work is a ring of grey zone crops (one per zone every 40 ms, the last 500 ms;
+  `look_ms=0` turns it off and makes frames between presses free). At a press, when the sharpest ring crop is at
+  least 1.25 times as sharp as the current crop (a toast that is fading out), that crop is read too. A ring line
+  replaces a shorter read of the same line and fills an empty zone. In toast zones, ring rows the current read lacks
+  are added. In other zones a different ring line is an older line and is dropped.
+- **Empty press (the choice):** when no zone holds text and no zone failed, the press gives the lines of the last
+  press that found text again, all of them (speaker and dialogue together), at the new time, with `Press::repeat`
+  set. It works as "say that again". With no earlier press that found text, it gives nothing. A press with an OCR
+  error never repeats (an error must not look like an empty screen).
+
+API:
+- `Manual::new(cfg: Config, mcfg: ManualConfig, zones)`, `set_zones` (keeps the press history), `empty_zones`.
+- `ManualConfig { look_ms: 500, step_ms: 40, fade_ratio: 1.25 }`.
+- `Manual::read_now(frame, ocr) -> Press`: read now. `Manual::press()` sets a flag (for a hotkey thread), and the
+  next `Manual::on_frame(frame, ocr) -> Option<Press>` reads; without a press `on_frame` only keeps the ring and
+  returns None. `Manual::observe(frame)` is the ring step alone. `Manual::last()` is what an empty press repeats.
+- `Press { t_ms, events: Vec<Event>, errors, repeat }`. `Event` is the same type as in the automatic mode.
+
+Arena: `--reader-opt mode=manual` with `press_every_ms=N` (default 3000) presses the key at every multiple of N ms
+(the first frame at or after it), on a fixed clock that never looks at the truth. `look_ms` sets the ring;
+`repeats=off` drops the repeat lines of empty presses (the arena scores them as hallucinations, because the line has
+left the screen).
+
+Numbers (2026-11-22, release, WinRT, simulated clock, `press_every_ms=2000`). Low recall and many dups are expected:
+a press every 2 s misses short lines and reads long ones again on each press.
+
+| Set | Repeats | Recall | Events | Dup | Noise | Halluc | Bg | CER | CPU p95 ms |
+|---|---|---|---|---|---|---|---|---|---|
+| smoke seed 1 | on | 25/29 (0.862) | 47 | 18 | 0 | 2 | 0 | 0.008 | 0.07 |
+| smoke seed 1 | off | 25/29 (0.862) | 43 | 16 | 0 | 0 | 0 | 0.008 | 0.08 |
+| standard seed 1 | on | 359/489 (0.734) | 739 | 244 | 0 | 60 | 0 | 0.033 | 0.11 |
+| standard seed 1 | off | 359/489 (0.734) | 682 | 213 | 0 | 37 | 0 | 0.033 | 0.10 |
+| standard seed 1, automatic a1 (for reference) | - | 452/489 (0.924) | 677 | 59 | 13 | 54 | - | 0.024 | 17.3 |
+
+- Noise and background reads are 0: only zones are read, and only on a press.
+- With repeats on, the extra hallucinations (2 on smoke, 23 on standard) are all repeat lines of empty presses: the
+  line had left the screen. That is the intended "say that again" behaviour, not a misread.
+- The 37 left on standard are one-shot reads with no second read to confirm them: a press in the middle of a
+  typewriter line ("Go to the lighth"), and garbled reads of subtitles over busy or menu backgrounds. A person
+  presses when the line is done, so the first kind is a test artefact; the second is the cost of trusting one read.
+- Frames between presses cost about 0.1 ms (the ring). A press costs the OCR of every zone.
+
 ## Options (`--reader-opt key=value`)
 
 Defaults are the tuned settings. Unknown keys are an error.
@@ -186,6 +243,7 @@ Defaults are the tuned settings. Unknown keys are an error.
 | `static_ms`, `typing_ms`, `grow_ms`, `change_ms` | 250, 400, 100, 60 | still-screen trust, typing wait, typing look-back, hold time of a changed line |
 | `rescue`, `emit_lost`, `lost_letters`, `second_ms` | on, on, 3, 60 | ring rescue; speak ended lines whose reads agree; letters an ended line needs; still time before a second opinion (negative: off) |
 | `free_cell`, `free_edge`, `free_change`, `free_recent`, `free_gap`, `free_max`, `free_min_cells`, `free_expire`, `free_stable`, `free_move`, `free_diff` | 8, 14, 12, 600, 60, 4, 3, 400, 120, 1000, 30 | no-zone mode |
+| `mode`, `press_every_ms`, `look_ms`, `repeats` | auto, 3000, 500, on | manual mode (see [Manual mode](#manual-mode)) |
 | `trace` | - | folder: write one text trace per scene (every read with row heights, every speak) |
 
 `regrow` is gone: a spoken dialogue line that gains words is now always a new event.
@@ -433,7 +491,8 @@ $A gen --suite hard --seed 59 --out arena-data/suites/hard-s59
 $A run --suite arena-data/suites/standard-s59 --reader a1 --report arena-data/reports/standard-s59-a1
 $A gen --suite standard --seed 1 --fps 60 --out arena-data/suites/standard-60fps
 $A gen --suite standard --seed 1 --loose-px 24 --out arena-data/suites/standard-loose24
-cargo test -p dr-core          # unit tests and the whole-pipeline scenarios
+$A run --suite arena-data/suites/standard --reader a1 --reader-opt mode=manual --reader-opt press_every_ms=2000
+cargo test -p dr-core          # unit tests, the whole-pipeline scenarios and the manual mode
 # Look at one crop with many clean-up settings
 cargo run -p arena --release --example a1_probe -- frame.png <x> <y> <w> <h>
 ```
