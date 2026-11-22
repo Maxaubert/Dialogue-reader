@@ -189,7 +189,12 @@ export component PickWindowPage inherits Rectangle {
                     for o[i] in root.others: Rectangle {
                         property <bool> sel: root.selected == root.games.length + i;
                         height: 52px;
+                        // Selected: accent border and check, like the game cards. Rounded so the fill never
+                        // pokes past the card's corners (Max, 2026-11-23).
                         background: self.sel ? Palette.surface-2 : transparent;
+                        border-radius: Radius.lg - 1px;
+                        border-width: self.sel ? 1px : 0px;
+                        border-color: Palette.accent;
                         accessible-role: button;
                         accessible-label: o.name;
                         accessible-item-selected: self.sel;
@@ -201,10 +206,21 @@ export component PickWindowPage inherits Rectangle {
                                 root.selected = root.games.length + i;
                             }
                         }
-                        if i > 0: Rectangle {
+                        if i > 0 && !self.sel && root.selected != root.games.length + i - 1: Rectangle {
                             y: 0;
                             height: 1px;
                             background: Palette.line;
+                        }
+                        if self.sel: Rectangle {
+                            x: parent.width - Space.s4 - self.width;
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 12px;
+                            background: Palette.accent;
+                            Icon {
+                                source: Icons.check;
+                                color: Palette.on-accent;
+                            }
                         }
                         HorizontalLayout {
                             padding-left: Space.s4;

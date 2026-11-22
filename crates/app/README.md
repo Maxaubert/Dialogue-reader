@@ -220,14 +220,23 @@ show the game live while it runs; "Retake screenshot" still updates the saved st
   thread only wraps it in an `Image`. A session number drops frames of a stopped session.
 - **When**: only while 03 (with a picked window), 10 or 11 shows and the app window is not minimized or hidden. A
   page change checks at once (`page-shown`); a 500 ms UI timer checks the rest. Other pages stop it.
+- **Overview needs the focus** (Max, 2026-11-23): on 10 the live view runs only while the DialogReader window is
+  in front. When the app loses the focus (Max is in the game), the session stops and the last frame stays on the
+  stage, with its note. When the app gets the focus back, it starts again from that frame. 03 and 11 keep running
+  without the focus. The winit `Focused` event calls `focus_lost` / `focus_gained` (`src/lib.rs`).
 - **Zones** stay in capture pixels. Stages map them with the live capture size (`LiveView.w` and `h`). When the
   game changes size, the editor rescales the zones (after a drag ends); edits then save with the new `base`. When
   the live view stops, the zones go back onto the saved screenshot's size. A size change alone is not saved.
 - **Fallback**: a minimized game (no frames for 1.5 s and `IsIconic`), a closed one, or a window Windows will not
   capture shows the saved screenshot with a small note on the stage ("Saved screenshot · the game is
   minimized", "... is closed", "... no live picture from this window"). An end of the session says "closed"
-  only when the window is really gone; otherwise it is "no live picture". A live stage shows a green "Live"
-  chip. The last frame is let go when the saved screenshot shows again.
+  only when the window is really gone; otherwise it is "no live picture". A live stage shows "Live" with a green
+  dot. The last frame is let go when the saved screenshot shows again.
+- **Where the note shows** (Max, 2026-11-23): never on the game picture (it covered the top right corner, where a
+  zone may be). On 11 it is part of the info line under the stage ("Live · W × H · Fit to window" with a green dot,
+  or "Saved screenshot · the game is minimized · W × H ..."). On 03 and 10 it is a small line under the stage (on 10
+  under the zone strip: a long note in the strip pushed the zone toggles out). `LiveNote` in
+  `ui/components/stage.slint`.
 - **Size change during a drag**: the frame waits until the drag ends (release, right click, Esc), then shows
   without a new frame (a paused game sends none).
   A game that does not change sends no frames; that is not an error, the last frame stays. The line under the

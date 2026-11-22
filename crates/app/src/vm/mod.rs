@@ -818,16 +818,12 @@ impl Vm {
                     w.set_shot(image_of(shot.width, shot.height, &shot.rgba));
                     w.set_shot_w(shot.width as f32);
                     w.set_shot_h(shot.height as f32);
-                    w.set_shot_info(
-                        format!(
-                            "Screenshot · {} × {} · Fit to window",
-                            shot.width, shot.height
-                        )
-                        .into(),
-                    );
                 }
                 self.games[i].cover = Some(cover_of(&shot));
                 self.games[i].shot_size = Some((shot.width, shot.height));
+                // the line under the stage on 11 keeps the live view note ("Live", or why the saved
+                // screenshot shows)
+                self.push_shot_info();
                 self.notice("");
                 self.save_main();
                 self.push_main();
