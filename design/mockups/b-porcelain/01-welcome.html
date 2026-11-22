@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Welcome</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+
+.wel { flex:1; display:grid; grid-template-columns: 464px 1fr; gap: var(--sp-8); align-items:center; padding: 0 96px var(--topbar-h); }
+.hero-logo { width: 56px; height: 56px; border-radius: var(--r-3); background: var(--ink); color: var(--on-ink); display:grid; place-items:center; margin-bottom: var(--sp-5); }
+.hero-logo .i { width: var(--icon-lg); height: var(--icon-lg); }
+.wel h1 { margin-bottom: var(--sp-3); }
+.wel .body { margin-bottom: var(--sp-6); }
+.wel-steps { list-style:none; display:flex; flex-direction:column; gap: var(--sp-2); margin-bottom: var(--sp-6); }
+.wel-steps li { display:flex; align-items:center; gap: var(--sp-3); height: 40px; font-size: var(--fs-3); }
+.preview { padding: var(--sp-3); }
+.pill { position:absolute; right: var(--sp-4); top: var(--sp-4); display:flex; align-items:center; gap: var(--sp-2); height: var(--lead); padding: 0 var(--sp-3); border-radius: var(--r-pill); background: rgba(20,20,18,.84); color:#F2F0EB; font-size: var(--fs-2); border: 1px solid rgba(255,255,255,.14); }
+.pill b { color:#fff; font-weight:600; }
+.pill .dot.ok { background:#4CBF7A; }
+.preview-cap { display:flex; align-items:center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-1) var(--sp-1); }
+
+</style>
+</head>
+<body>
+<div class="window">
+<main class="content">
+<div class="topbar"><div class="crumb"></div><div class="winctl"><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span></div></div>
+<div class="wel">
+ <div>
+  <span class="hero-logo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.125" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/></svg></span>
+  <h1 class="t5">Hear your games, not just read them</h1>
+  <p class="body">DialogReader watches the parts of the screen you choose and reads the text out loud as it appears. Set up a game once, then just play.</p>
+  <ol class="wel-steps">
+   <li><span class="lead num">1</span>Choose the game window</li>
+   <li><span class="lead num">2</span>Mark where the text shows up</li>
+   <li><span class="lead num">3</span>Pick a key and a voice</li>
+   <li><span class="lead num">4</span>Choose when it reads</li>
+  </ol>
+  <div class="row" style="gap:var(--sp-3)"><button class="btn btn-primary btn-lg">Set up your first game<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button><button class="btn btn-ghost btn-lg">Not now</button></div>
+  <p class="caption" style="margin-top:var(--sp-3)">Takes about 3 minutes. Everything runs on this PC.</p>
+ </div>
+ <div class="card preview">
+  <div class="shot"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="skyw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#58697F"/><stop offset=".55" stop-color="#B7C0CA"/><stop offset="1" stop-color="#E4E0D8"/></linearGradient>
+<linearGradient id="snoww" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F2F3"/><stop offset="1" stop-color="#BFC6CF"/></linearGradient>
+<linearGradient id="vigw" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#0E1216" stop-opacity="0"/><stop offset="1" stop-color="#0E1216" stop-opacity=".55"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#skyw)"/>
+<g transform="translate(0.0,0)">
+<polygon points="0,470 180,340 330,420 520,250 700,400 860,300 1040,430 1220,280 1400,390 1600,310 1600,580 0,580" fill="#9DA8B5"/>
+<polygon points="470,300 520,250 575,305 548,296 522,318 496,296" fill="#EEF1F4"/>
+<polygon points="815,335 860,300 905,338 880,330 860,345 838,330" fill="#EEF1F4"/>
+<polygon points="1170,325 1220,280 1270,322 1245,316 1222,336 1196,318" fill="#EEF1F4"/>
+<polygon points="0,540 160,470 360,520 560,430 760,500 980,440 1200,505 1420,450 1600,500 1600,620 0,620" fill="#7F8B98"/>
+<polygon points="0,600 260,520 560,575 840,505 1120,570 1380,515 1600,560 1600,900 0,900" fill="url(#snoww)"/>
+<polygon points="250,425 230.2,491.0 239.2,491.0 214.0,545 286.0,545 260.8,491.0 269.8,491.0" fill="#26302F"/><polygon points="300,410 275.25,492.5 286.5,492.5 255.0,560 345.0,560 313.5,492.5 324.75,492.5" fill="#26302F"/><polygon points="345,438 326.85,498.5 335.1,498.5 312.0,548 378.0,548 354.9,498.5 363.15,498.5" fill="#26302F"/><polygon points="395,395 366.95,488.5 379.7,488.5 344.0,565 446.0,565 410.3,488.5 423.05,488.5" fill="#26302F"/><polygon points="450,427 429.375,495.75 438.75,495.75 412.5,552 487.5,552 461.25,495.75 470.625,495.75" fill="#26302F"/><polygon points="500,475 484.325,527.25 491.45,527.25 471.5,570 528.5,570 508.55,527.25 515.675,527.25" fill="#26302F"/><polygon points="1130,430 1111.85,490.5 1120.1,490.5 1097.0,540 1163.0,540 1139.9,490.5 1148.15,490.5" fill="#26302F"/><polygon points="1180,405 1155.25,487.5 1166.5,487.5 1135.0,555 1225.0,555 1193.5,487.5 1204.75,487.5" fill="#26302F"/><polygon points="1230,425 1210.2,491.0 1219.2,491.0 1194.0,545 1266.0,545 1240.8,491.0 1249.8,491.0" fill="#26302F"/><polygon points="1290,385 1261.125,481.25 1274.25,481.25 1237.5,560 1342.5,560 1305.75,481.25 1318.875,481.25" fill="#26302F"/><polygon points="1345,418 1323.55,489.5 1333.3,489.5 1306.0,548 1384.0,548 1356.7,489.5 1366.45,489.5" fill="#26302F"/><polygon points="1400,457 1382.675,514.75 1390.55,514.75 1368.5,562 1431.5,562 1409.45,514.75 1417.325,514.75" fill="#26302F"/><polygon points="1450,410 1426.9,487.0 1437.4,487.0 1408.0,550 1492.0,550 1462.6,487.0 1473.1,487.0" fill="#26302F"/><polygon points="40,380 5.349999999999994,495.5 21.1,495.5 -23.0,590 103.0,590 58.9,495.5 74.65,495.5" fill="#26302F"/><polygon points="110,350 68.75,487.5 87.5,487.5 35.0,600 185.0,600 132.5,487.5 151.25,487.5" fill="#26302F"/><polygon points="1520,340 1477.1,483.0 1496.6,483.0 1442.0,600 1598.0,600 1543.4,483.0 1562.9,483.0" fill="#26302F"/><polygon points="1580,390 1547.0,500.0 1562.0,500.0 1520.0,590 1640.0,590 1598.0,500.0 1613.0,500.0" fill="#26302F"/>
+<path d="M520 900 C640 760 760 690 840 620" stroke="#A9B1BB" stroke-width="22" fill="none" stroke-opacity=".5"/>
+</g>
+<rect width="1600" height="900" fill="url(#vigw)"/>
+
+<g transform="translate(60,62)"><rect width="44" height="44" rx="6" fill="#000" fill-opacity=".45" stroke="#fff" stroke-opacity=".55"/>
+<path d="M22 34v-14M22 22c-6-2-8-8-6-12 4 1 7 5 6 12zM22 24c5-3 9-2 11 1-4 3-8 3-11-1z" fill="#C9D9A6" stroke="#C9D9A6" stroke-width="1"/></g>
+<g transform="translate(135,775)"><circle r="82" fill="#1A2023" fill-opacity=".55" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+<path d="M-60 20 C-20 0 10 30 60 -10" stroke="#C7B48A" stroke-opacity=".7" stroke-width="3" fill="none"/>
+<polygon points="0,-12 9,10 0,5 -9,10" fill="#fff"/></g>
+<g transform="translate(1320,690)"><rect width="40" height="40" rx="6" fill="#000" fill-opacity=".5" stroke="#fff" stroke-opacity=".7"/>
+<rect x="14" y="13" width="12" height="14" rx="2" fill="#fff"/>
+<rect x="54" y="12" width="170" height="16" rx="8" fill="#fff" fill-opacity=".9"/></g>
+<rect x="120" y="72" width="150" height="20" rx="10" fill="#fff" fill-opacity=".9"/>
+<rect x="750.0" y="722" width="100" height="22" rx="11" fill="#E7C36A"/>
+<rect x="360.0" y="772" width="880" height="26" rx="13" fill="#fff" fill-opacity=".95"/>
+</svg><div class="zone k-pickup thin" style="left:2.750%;top:5.333%;width:17.750%;height:8.000%"></div><div class="zone k-speaker thin" style="left:44.875%;top:79.111%;width:10.250%;height:5.111%"></div><div class="zone k-dialogue thin" style="left:18.750%;top:84.889%;width:62.500%;height:5.111%"></div><div class="zone k-prompt thin" style="left:81.625%;top:75.111%;width:16.625%;height:7.556%"></div><div class="zone k-ignore thin" style="left:2.812%;top:76.111%;width:11.250%;height:20.000%"></div>
+   <div class="pill"><span class="dot ok"></span><b>Arthur:</b>We need to get these horses moving…</div></div>
+  <div class="preview-cap"><span class="chip k-dialogue">Dialogue</span><span class="chip k-speaker">Speaker</span><span class="chip k-pickup">Pickups</span><span class="chip k-prompt">Prompts</span><span class="chip k-ignore">Ignore</span><span class="spacer"></span><span class="caption">Each kind of text gets its own zone</span></div>
+ </div>
+</div>
+</main>
+</div>
+</body>
+</html>

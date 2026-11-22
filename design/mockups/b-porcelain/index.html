@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Porcelain mockups</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+body { padding: var(--sp-7) var(--sp-7) var(--sp-8); }
+header { max-width: 1360px; margin: 0 auto var(--sp-6); }
+header .body { margin-top: var(--sp-2); max-width: 720px; }
+.kinds { display:flex; gap: var(--sp-2); margin-top: var(--sp-4); flex-wrap:wrap; }
+.sheet-grid { max-width: 1360px; margin: 0 auto; display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-5); }
+.sheet { overflow:hidden; display:block; }
+.sheet img { width:100%; display:block; aspect-ratio: 16/10; object-fit: cover; border-bottom: 1px solid var(--line); }
+.sm { display:flex; align-items:center; justify-content:space-between; padding: var(--sp-3) var(--sp-4); }
+@media (max-width: 900px) { body { padding: var(--sp-5) var(--sp-4); } .sheet-grid { grid-template-columns: 1fr; } }
+</style></head>
+<body>
+<header><div class="caption" style="font-weight:600">DialogReader · Direction B · revision 2</div><h1 class="t5">Porcelain</h1>
+<p class="body">A calm light UI: off-white surfaces, one ink accent, the same sidebar, header and tabs on every screen. Color is kept for the five zone kinds, plus green for "Reading".</p>
+<div class="kinds"><span class="chip k-dialogue">Dialogue</span><span class="chip k-speaker">Speaker</span><span class="chip k-pickup">Pickups</span><span class="chip k-prompt">Prompts</span><span class="chip k-ignore">Ignore</span></div></header>
+<main class="sheet-grid"><a class="card sheet" href="01-welcome.html"><img src="shots/01-welcome.png" alt="Welcome"><div class="sm"><span class="t3">Welcome</span><span class="caption">01-welcome.html</span></div></a><a class="card sheet" href="02-pick-window.html"><img src="shots/02-pick-window.png" alt="1 · Choose the game window"><div class="sm"><span class="t3">1 · Choose the game window</span><span class="caption">02-pick-window.html</span></div></a><a class="card sheet" href="03-draw-zones.html"><img src="shots/03-draw-zones.png" alt="2 · Draw zones"><div class="sm"><span class="t3">2 · Draw zones</span><span class="caption">03-draw-zones.html</span></div></a><a class="card sheet" href="04-read-key.html"><img src="shots/04-read-key.png" alt="3 · Choose a read key"><div class="sm"><span class="t3">3 · Choose a read key</span><span class="caption">04-read-key.html</span></div></a><a class="card sheet" href="05-voice.html"><img src="shots/05-voice.png" alt="4 · Pick a voice"><div class="sm"><span class="t3">4 · Pick a voice</span><span class="caption">05-voice.html</span></div></a><a class="card sheet" href="06-mode.html"><img src="shots/06-mode.png" alt="5 · Choose a mode"><div class="sm"><span class="t3">5 · Choose a mode</span><span class="caption">06-mode.html</span></div></a><a class="card sheet" href="10-main.html"><img src="shots/10-main.png" alt="Main window"><div class="sm"><span class="t3">Main window</span><span class="caption">10-main.html</span></div></a><a class="card sheet" href="10-main-dark.html"><img src="shots/10-main-dark.png" alt="Main window, dark"><div class="sm"><span class="t3">Main window, dark</span><span class="caption">10-main-dark.html</span></div></a><a class="card sheet" href="11-zones.html"><img src="shots/11-zones.png" alt="Zone editor"><div class="sm"><span class="t3">Zone editor</span><span class="caption">11-zones.html</span></div></a><a class="card sheet" href="12-settings.html"><img src="shots/12-settings.png" alt="Settings"><div class="sm"><span class="t3">Settings</span><span class="caption">12-settings.html</span></div></a><a class="card sheet" href="13-overlay.html"><img src="shots/13-overlay.png" alt="In-game overlay"><div class="sm"><span class="t3">In-game overlay</span><span class="caption">13-overlay.html</span></div></a></main>
+</body></html>

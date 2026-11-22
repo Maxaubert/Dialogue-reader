@@ -18,7 +18,8 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
    (`dr_core::Manual`, see [reader-a1.md](reader-a1.md#manual-mode)). The user picks the key during onboarding
    (Max, 2026-11-22); there is no fixed default.
 5. UI redesign: the whole UI is redesigned from scratch (Max, 2026-11-22). Starts with mockups. Stack: Slint (Rust), chosen 2026-11-22
-   over Tauri, egui and Qt. Mockups with the impeccable skill, kept to what Slint can draw.
+   over Tauri, egui and Qt. Look: concept design/gpt-image/v06.webp, chosen by Max
+   2026-11-22 (compact dark, big game covers in the sidebar, three columns). Full screen set in design/mockups/v06.
 
 ## Results
 - Spike 2, Satisfactory: [spike2-satisfactory.md](spike2-satisfactory.md)
@@ -26,3 +27,11 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
 - First real reader, A1 (`crates/core`, arena reader `a1`): [reader-a1.md](reader-a1.md)
 - Manual mode (2026-11-22, Max: "click a key and it checks and reads all zones, and never does anything outside"):
   [reader-a1.md#manual-mode](reader-a1.md#manual-mode)
+
+## Idea: in-game quick menu (Max, 2026-11-22)
+- A second hotkey (or holding the read key) opens a small menu overlay over the game, like RivaTuner or WeMod.
+- It controls things without leaving the game: mute, stop speaking, pause reading, mode, voice and speed, zones on/off, open the main window or settings, quit.
+- Must work with keyboard only (games capture the mouse): arrow or number keys, Esc closes.
+- An overlay window works over borderless and windowed games. Exclusive fullscreen would need injection; check in spike 4.
+- Mockups: design/mockups/c-midnight/15-quick-menu-*.html.
+

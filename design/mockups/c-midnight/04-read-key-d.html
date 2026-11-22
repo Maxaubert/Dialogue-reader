@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>Read key D</title><link rel="stylesheet" href="tokens.css"><style>
+.ctr{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s-6);padding-bottom:var(--s-6)}
+.kgrid{width:680px;display:flex;flex-direction:column;gap:var(--s-3)}
+.kc{display:flex;align-items:center;gap:var(--s-4);height:72px;padding:0 var(--s-3) 0 var(--s-5)}
+.kc .nm{font-size:var(--fs-3);font-weight:500}
+.kc .ds{font-size:13px;color:var(--text-3);margin-top:2px}
+.kc .itile{width:36px;height:36px}
+.kc .itile .ic{width:18px;height:18px}
+.kc .cap{display:flex;align-items:center;justify-content:center;gap:var(--s-2);height:36px;min-width:104px;padding:0 var(--s-3);border-radius:var(--r-md);background:var(--surface-3);border:1px solid var(--line-2);border-bottom:3px solid #05070B;font:600 13px/1 var(--font);color:var(--text)}
+.kc .cap .ic{width:15px;height:15px;color:var(--text-2)}
+.kc .btn-ghost{color:var(--text-3)}
+.kc.main{height:104px;padding:0 var(--s-3) 0 var(--s-6);border-color:var(--accent);background:linear-gradient(90deg,rgba(91,124,255,0.10),rgba(91,124,255,0.02) 60%),var(--surface)}
+.kc.main .nm{font-size:var(--fs-4);font-weight:600;letter-spacing:-0.015em}
+.kc.main .ds{font-size:var(--fs-2);color:var(--text-2);margin-top:var(--s-1)}
+.kc.main .itile{width:44px;height:44px}
+.kc.main .itile .ic{width:22px;height:22px}
+.kc.main .cap{height:46px;min-width:132px;font-size:var(--fs-3);border-bottom-width:4px}
+.kc.main .cap .ic{width:18px;height:18px}
+
+.kgrid{width:720px}
+.kc,.kc.main{height:92px;gap:20px;padding:0 var(--s-3) 0 var(--s-5)}
+.kc .itile,.kc.main .itile{width:44px;height:44px;border-radius:10px}
+.kc .itile .ic,.kc.main .itile .ic{width:22px;height:22px}
+.kc .nm,.kc.main .nm{font-size:18px;font-weight:600;letter-spacing:-0.01em;line-height:24px}
+.kc .ds,.kc.main .ds{font-size:14px;line-height:20px;margin-top:2px;color:var(--text-3)}
+.kc.main .ds{color:var(--text-2)}
+.kc .cap,.kc.main .cap{box-sizing:border-box;width:140px;min-width:0;height:44px;padding:0;font-size:16px;border-bottom-width:4px}
+.kc .cap .ic,.kc.main .cap .ic{width:18px;height:18px}
+.kc .btn-ghost{width:84px}
+</style></head>
+<body>
+<header class="bar"><div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" style="flex:none;display:block"><rect width="24" height="24" rx="6" fill="#EDF0F6"/><rect x="6.5" y="9" width="2" height="6" rx="1" fill="#07090E"/><rect x="11" y="6" width="2" height="12" rx="1" fill="#07090E"/><rect x="15.5" y="8" width="2" height="8" rx="1" fill="#5B7CFF"/></svg>DialogReader</div><div class="steps"><div class="step done"><span class="n"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>Game</div><span class="step-sep"></span><div class="step done"><span class="n"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>Zones</div><span class="step-sep"></span><div class="step on"><span class="n">3</span>Keys</div><span class="step-sep"></span><div class="step"><span class="n">4</span>Voice</div><span class="step-sep"></span><div class="step"><span class="n">5</span>Mode</div></div><div class="bar-right"><div class="winctl"><span><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span><span><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span><span><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div></header>
+<main class="page"><div class="ctr">
+<h1>Your keys</h1>
+<div class="kgrid">
+<div class="card kc main"><span class="itile on"><svg class="ic" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></span><div class="grow"><div class="nm">Read zones now</div><div class="ds">Reads all your zones out loud</div></div><span class="cap"><svg class="ic" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7M6 10h12"/></svg>Mouse 4</span><span class="btn btn-ghost">Change</span></div>
+<div class="card kc"><span class="itile"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 8.5h18"/><path d="M7 12.5h10M7 16h6"/></svg></span><div class="grow"><div class="nm">Quick menu</div><div class="ds">Opens the quick menu over your game</div></div><span class="cap">F7</span><span class="btn btn-ghost">Change</span></div>
+</div>
+</div></main>
+<footer class="foot"><div class="foot-in"><span class="btn btn-lg"><svg class="ic" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>Back</span><span class="spacer"></span><span class="btn btn-primary btn-lg">Continue<svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></div></footer>
+</body></html>
