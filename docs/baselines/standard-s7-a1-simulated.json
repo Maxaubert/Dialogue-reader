@@ -1,0 +1,2597 @@
+{
+  "suite": "standard",
+  "seed": 7,
+  "truth_fingerprint": "0c1cb48e1f772641",
+  "reader": "a1",
+  "reader_options": {},
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 40,
+    "items_should_read": 503,
+    "items_read": 430,
+    "recall": 0.8548707753479126,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 55,
+        "read": 44,
+        "recall": 0.8
+      },
+      {
+        "name": "1-2s",
+        "total": 138,
+        "read": 116,
+        "recall": 0.8405797101449275
+      },
+      {
+        "name": "2-4s",
+        "total": 236,
+        "read": 199,
+        "recall": 0.8432203389830508
+      },
+      {
+        "name": ">4s",
+        "total": 74,
+        "read": 71,
+        "recall": 0.9594594594594594
+      }
+    ],
+    "mean_cer": 0.02275451557807544,
+    "exact_match_rate": 0.8093023255813954,
+    "prompts_total": 153,
+    "prompts_read": 128,
+    "prompt_recall": 0.8366013071895425,
+    "events_total": 707,
+    "duplicates": 73,
+    "noise_reads": 2,
+    "background_reads": 0,
+    "hallucinations": 74,
+    "latency_p50_ms": 130.3750333333337,
+    "latency_p95_ms": 428.8170179487188,
+    "cpu_ms_p50": 0.335,
+    "cpu_ms_p95": 13.8984,
+    "frames_total": 33058,
+    "frames_processed": 32939
+  },
+  "scenarios": [
+    {
+      "id": "standard-000",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 12,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0514425446878863,
+        "exact_match_rate": 0.4166666666666667,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 24,
+        "duplicates": 12,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 207.2519666666667,
+        "latency_p95_ms": 639.3954000000003,
+        "cpu_ms_p50": 18.6086,
+        "cpu_ms_p95": 36.6074,
+        "frames_total": 674,
+        "frames_processed": 593
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-001",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 16,
+        "items_read": 16,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 16,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 83.51563333333252,
+        "latency_p95_ms": 185.5005000000001,
+        "cpu_ms_p50": 0.3478,
+        "cpu_ms_p95": 13.4479,
+        "frames_total": 696,
+        "frames_processed": 696
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-002",
+      "genres": [
+        "subtitles",
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 18,
+        "items_read": 6,
+        "recall": 0.3333333333333333,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 6,
+            "read": 1,
+            "recall": 0.16666666666666666
+          },
+          {
+            "name": "2-4s",
+            "total": 8,
+            "read": 3,
+            "recall": 0.375
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 2,
+            "recall": 0.6666666666666666
+          }
+        ],
+        "mean_cer": 0.09151798022765766,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 23,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 17,
+        "latency_p50_ms": 334.1197666666667,
+        "latency_p95_ms": 1655.258600000001,
+        "cpu_ms_p50": 0.3121,
+        "cpu_ms_p95": 24.467,
+        "frames_total": 1149,
+        "frames_processed": 1142
+      },
+      "missed": [
+        "sub001 (4841 ms readable): NYX: The reactor is unstable. We have ten minutes at most.",
+        "sub002 (3024 ms readable): LYRA: You finally made it. I was starting to think the storm got you.",
+        "sub003 (2640 ms readable): THE STRANGER: Thank you. I will not forget what you did today.",
+        "sub004 (1861 ms readable): DR. HALVORSEN: Quiet. Let me do the talking when we get inside.",
+        "sub005 (1555 ms readable): MARA: Every name on this wall is someone we lost.",
+        "sub006 (1672 ms readable): NYX: You finally made it. I was starting to think the storm got you.",
+        "sub007 (3166 ms readable): LYRA: Hand me that wrench, would you? No, the other one.",
+        "sub008 (3427 ms readable): MARA: Quiet. Let me do the talking when we get inside.",
+        "sub009 (2131 ms readable): OLD TOBIN: The north gate opens only for those who carry the seal.",
+        "sub010 (713 ms readable): MERCHANT FENN: Thank you. I will not forget what you did today.",
+        "sub011 (1626 ms readable): CAPTAIN REYES: That sword belonged to my father. Treat it well.",
+        "sub012 (1979 ms readable): CAPTAIN REYES: Follow the river until you reach the broken tower."
+      ],
+      "false_reads": [
+        "hallucination @1705: the generator",
+        "hallucination @4065: the-generator •",
+        "hallucination @5006: the generat;r",
+        "hallucination @5210: the genéraGrv",
+        "hallucination @5805: generator4'>1f..",
+        "hallucination @9950: the strange¯siÖna11'CÄ'€",
+        "hallucination @11567: Or et4\\",
+        "hallucination @11605: the strange signal\\kkr.m",
+        "hallucination @12211: strange signaf•y•",
+        "hallucination @13153: the strange",
+        "hallucination @14311: ;ignäi",
+        "hallucination @16720: ss rne",
+        "hallucination @19609: village",
+        "hallucination @23777: the frozen",
+        "hallucination @25100: the frozen",
+        "hallucination @31000: Main the generator",
+        "hallucination @34772: leader"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-003",
+      "genres": [
+        "objective_update",
+        "pickup_stack",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 22,
+        "items_read": 22,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 7,
+            "read": 7,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 9,
+            "read": 9,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.011385918003565062,
+        "exact_match_rate": 0.8636363636363636,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 22,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 90.71693333333315,
+        "latency_p95_ms": 161.01766666666663,
+        "cpu_ms_p50": 1.2748,
+        "cpu_ms_p95": 9.379999999999999,
+        "frames_total": 781,
+        "frames_processed": 781
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-004",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "menu_overlay",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 11,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 7,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 13,
+        "prompts_read": 4,
+        "prompt_recall": 0.3076923076923077,
+        "events_total": 7,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 3.3915,
+        "cpu_ms_p95": 10.6748,
+        "frames_total": 1163,
+        "frames_processed": 1163
+      },
+      "missed": [
+        "tip001 (521 ms readable): Travel Cloak Stackable Quest item Damage 12-18",
+        "tip002 (2531 ms readable): Rusty Longsword Quest item",
+        "tip003 (3129 ms readable): Hunter's Bow Two-handed",
+        "tip004 (1556 ms readable): Leather Boots Deals fire damage Weight 2.5 Weight 2.5",
+        "tip005 (2137 ms readable): Spell Tome Armor +4",
+        "tip006 (2247 ms readable): Cracked Shield Durability 37/50 Restores 40 health Move speed +15% for 30 s",
+        "tip007 (2364 ms readable): Travel Cloak Sell value 120 Stackable Stackable",
+        "tip008 (1134 ms readable): Field Kit Weight 2.5 Deals fire damage Requires level 6",
+        "tip009 (2413 ms readable): Iron Helm Two-handed Armor +4",
+        "tip010 (3401 ms readable): Cracked Shield Armor +4 Restores 40 health Deals fire damage",
+        "tip011 (1588 ms readable): Field Kit Weight 2.5"
+      ],
+      "false_reads": [
+        "hallucination @1702: amage",
+        "hallucination @5336: Loo",
+        "hallucination @7503: wo- an"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-005",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0021929824561403508,
+        "exact_match_rate": 0.875,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 10,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 293.2687999999998,
+        "latency_p95_ms": 428.8170179487188,
+        "cpu_ms_p50": 2.3234000000000004,
+        "cpu_ms_p95": 6.8264,
+        "frames_total": 549,
+        "frames_processed": 549
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @1900: Quit to Juno",
+        "hallucination @4203: Quit to"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-006",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 26,
+        "items_read": 23,
+        "recall": 0.8846153846153846,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 5,
+            "read": 3,
+            "recall": 0.6
+          },
+          {
+            "name": "1-2s",
+            "total": 10,
+            "read": 10,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 9,
+            "read": 8,
+            "recall": 0.8888888888888888
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.046190577680347504,
+        "exact_match_rate": 0.6521739130434783,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 46,
+        "duplicates": 15,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 8,
+        "latency_p50_ms": 208.21480000000156,
+        "latency_p95_ms": 610.7452000000012,
+        "cpu_ms_p50": 0.2,
+        "cpu_ms_p95": 15.3217,
+        "frames_total": 991,
+        "frames_processed": 987
+      },
+      "missed": [
+        "toast007 (461 ms readable): + 10 Cloth Scrap (33)",
+        "toast008 (755 ms readable): + 22 Cloth Scrap (45)",
+        "toast017 (2601 ms readable): + 7 Quartz Shard (34)"
+      ],
+      "false_reads": [
+        "hallucination @4380: 3 Fire (5)",
+        "hallucination @6846: 10th Scrap",
+        "hallucination @7279: 10th Scrap (S )",
+        "hallucination @8074: 4Sil",
+        "hallucination @10292: Scrap\\ 5)",
+        "hallucination @14677: Plate (37)",
+        "hallucination @22147: • 7 uartz 4)",
+        "hallucination @32367: Bre 6)"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-007",
+      "genres": [
+        "subtitles",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 11,
+        "items_read": 11,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 7,
+            "read": 7,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.08403467289458345,
+        "exact_match_rate": 0.09090909090909091,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 11,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 220.83746666666593,
+        "latency_p95_ms": 692.1048999999985,
+        "cpu_ms_p50": 0.1818,
+        "cpu_ms_p95": 17.8631,
+        "frames_total": 1188,
+        "frames_processed": 1188
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-008",
+      "genres": [
+        "objective_update",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.006896551724137931,
+        "exact_match_rate": 0.8,
+        "prompts_total": 16,
+        "prompts_read": 14,
+        "prompt_recall": 0.875,
+        "events_total": 19,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 56.93443333333198,
+        "latency_p95_ms": 216.704633333331,
+        "cpu_ms_p50": 0.0613,
+        "cpu_ms_p95": 4.2017,
+        "frames_total": 1118,
+        "frames_processed": 1118
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-009",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 13,
+        "prompts_read": 10,
+        "prompt_recall": 0.7692307692307693,
+        "events_total": 10,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 1.6700000000000002,
+        "cpu_ms_p95": 4.339499999999999,
+        "frames_total": 728,
+        "frames_processed": 728
+      },
+      "missed": [
+        "tip001 (772 ms readable): Ring of Embers Armor +4 Weight 2.5 Deals fire damage",
+        "tip002 (1611 ms readable): Spell Tome Restores 40 health Quest item",
+        "tip003 (2096 ms readable): Field Kit Move speed +15% for 30 s",
+        "tip004 (1831 ms readable): Signal Flare Requires level 6",
+        "tip005 (3204 ms readable): Field Kit Stackable Damage 12-18 Requires level 6",
+        "tip006 (3275 ms readable): Spell Tome Armor +4 Requires level 6",
+        "tip007 (2266 ms readable): Potion of Swiftness Weight 2.5 Two-handed Durability 37/50"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-010",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 18,
+        "items_read": 17,
+        "recall": 0.9444444444444444,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 8,
+            "read": 8,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          },
+          {
+            "name": ">4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0065359477124183,
+        "exact_match_rate": 0.9411764705882353,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 25,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 54.13549999999998,
+        "latency_p95_ms": 1082.9614666666675,
+        "cpu_ms_p50": 0.2719,
+        "cpu_ms_p95": 4.2075000000000005,
+        "frames_total": 1065,
+        "frames_processed": 1065
+      },
+      "missed": [
+        "spk005 (3430 ms readable): Lyra"
+      ],
+      "false_reads": [
+        "hallucination @8004: -OUY L vaU",
+        "hallucination @8135: L vaU",
+        "hallucination @8169: Luau u",
+        "hallucination @8771: L-vaU\"U Lyra",
+        "hallucination @9000: Lyra LUC*U",
+        "hallucination @28700: Garrick Journa",
+        "noise @32534: Journa",
+        "hallucination @33234: Sister Ilse Journa"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-011",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 15,
+        "items_read": 15,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 7,
+            "read": 7,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.007407407407407407,
+        "exact_match_rate": 0.9333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 18,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 119.65279999999984,
+        "latency_p95_ms": 374.35036666666656,
+        "cpu_ms_p50": 0.21430000000000002,
+        "cpu_ms_p95": 6.2090000000000005,
+        "frames_total": 703,
+        "frames_processed": 703
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3404: ope"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-012",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.00211864406779661,
+        "exact_match_rate": 0.875,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 9,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 123.83426666666674,
+        "latency_p95_ms": 217.23113333333094,
+        "cpu_ms_p50": 0.1707,
+        "cpu_ms_p95": 7.0787,
+        "frames_total": 715,
+        "frames_processed": 715
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-013",
+      "genres": [
+        "objective_update",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 16,
+        "items_read": 16,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.02976190476190476,
+        "exact_match_rate": 0.8125,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 18,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 150.31556666666665,
+        "latency_p95_ms": 3341.521233333333,
+        "cpu_ms_p50": 0.19440000000000002,
+        "cpu_ms_p95": 4.0631,
+        "frames_total": 1122,
+        "frames_processed": 1122
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3767: r hal was dose",
+        "hallucination @24070: Re\\oadiryy"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-014",
+      "genres": [
+        "tooltip",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 6,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.008547008547008546,
+        "exact_match_rate": 0.8333333333333334,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 7,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 142.58160000000134,
+        "latency_p95_ms": 160.4994999999999,
+        "cpu_ms_p50": 0.53,
+        "cpu_ms_p95": 4.1333,
+        "frames_total": 727,
+        "frames_processed": 727
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @22735: kable"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-015",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 12,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 12,
+        "prompts_read": 12,
+        "prompt_recall": 1.0,
+        "events_total": 24,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 94.35183333333043,
+        "latency_p95_ms": 282.4517333333333,
+        "cpu_ms_p50": 0.3984,
+        "cpu_ms_p95": 8.7575,
+        "frames_total": 833,
+        "frames_processed": 833
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-016",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 10,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0125,
+        "exact_match_rate": 0.9,
+        "prompts_total": 6,
+        "prompts_read": 5,
+        "prompt_recall": 0.8333333333333334,
+        "events_total": 21,
+        "duplicates": 5,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 105.9992000000002,
+        "latency_p95_ms": 137.7443999999996,
+        "cpu_ms_p50": 2.8467000000000002,
+        "cpu_ms_p95": 8.101799999999999,
+        "frames_total": 476,
+        "frames_processed": 476
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @12936: Fi[E] climb"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-017",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 6,
+        "recall": 0.75,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 6,
+            "read": 5,
+            "recall": 0.8333333333333334
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 1,
+            "recall": 0.5
+          }
+        ],
+        "mean_cer": 0.1790429472133733,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 8,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 227.18203333333076,
+        "latency_p95_ms": 615.2338999999993,
+        "cpu_ms_p50": 0.2119,
+        "cpu_ms_p95": 16.4832,
+        "frames_total": 645,
+        "frames_processed": 645
+      },
+      "missed": [
+        "sub001 (1832 ms readable): Go to the lighthouse and light the signal fire.",
+        "sub006 (4344 ms readable): I only ask one thing: bring her home safely."
+      ],
+      "false_reads": [
+        "hallucination @811: GO to t\" 110httiouse and t\" stuna• are.",
+        "hallucination @13886: 1 ask onitmng: nnng her nome sat81V."
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-018",
+      "genres": [
+        "objective_update",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 4,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 99.0610333333334,
+        "cpu_ms_p50": 0.060399999999999995,
+        "cpu_ms_p95": 2.7327,
+        "frames_total": 790,
+        "frames_processed": 790
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-019",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 8,
+        "prompts_read": 8,
+        "prompt_recall": 1.0,
+        "events_total": 10,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0288,
+        "cpu_ms_p95": 3.0382000000000002,
+        "frames_total": 633,
+        "frames_processed": 633
+      },
+      "missed": [
+        "tip001 (3099 ms readable): Signal Flare Armor +4 Deals fire damage",
+        "tip002 (926 ms readable): Potion of Swiftness Damage 12-18",
+        "tip003 (1356 ms readable): Rusty Longsword Durability 37/50 Deals fire damage",
+        "tip004 (1672 ms readable): Spell Tome Durability 37/50 Move speed +15% for 30 s",
+        "tip005 (2756 ms readable): Scrap Pistol Durability 37/50 Weight 2.5",
+        "tip006 (1586 ms readable): Scrap Pistol Two-handed",
+        "tip007 (1437 ms readable): Field Kit Armor +4"
+      ],
+      "false_reads": [
+        "hallucination @5101: Potion",
+        "hallucination @16435: Pistol\nlanded"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-020",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 14,
+        "items_read": 14,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.01098901098901099,
+        "exact_match_rate": 0.9285714285714286,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 19,
+        "duplicates": 5,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 121.54663333333338,
+        "latency_p95_ms": 333.2451000000001,
+        "cpu_ms_p50": 0.3696,
+        "cpu_ms_p95": 8.6762,
+        "frames_total": 926,
+        "frames_processed": 926
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-021",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 24,
+        "items_read": 23,
+        "recall": 0.9583333333333334,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 12,
+            "read": 11,
+            "recall": 0.9166666666666666
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.010590858416945374,
+        "exact_match_rate": 0.9130434782608695,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 29,
+        "duplicates": 6,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 110.64423333333434,
+        "latency_p95_ms": 235.8361,
+        "cpu_ms_p50": 0.1917,
+        "cpu_ms_p95": 12.3443,
+        "frames_total": 996,
+        "frames_processed": 996
+      },
+      "missed": [
+        "toast003 (2055 ms readable): + 6 Rusty Gear"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-022",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.017134967435310684,
+        "exact_match_rate": 0.5,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 11,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 258.8370666666665,
+        "latency_p95_ms": 457.7928333333348,
+        "cpu_ms_p50": 0.1848,
+        "cpu_ms_p95": 14.075199999999999,
+        "frames_total": 658,
+        "frames_processed": 658
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @20675: there?",
+        "hallucination @21367: there?"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-023",
+      "genres": [
+        "objective_update",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.01346153846153846,
+        "exact_match_rate": 0.6,
+        "prompts_total": 12,
+        "prompts_read": 12,
+        "prompt_recall": 1.0,
+        "events_total": 20,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 9.355333333334784,
+        "latency_p95_ms": 134.37903333333338,
+        "cpu_ms_p50": 0.0645,
+        "cpu_ms_p95": 5.0399,
+        "frames_total": 864,
+        "frames_processed": 864
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @1871: abetter,weapon",
+        "hallucination @3238: abetter,weapon",
+        "hallucination @24204: Main the bandit leader"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-024",
+      "genres": [
+        "tooltip",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 9,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 12,
+        "prompts_read": 8,
+        "prompt_recall": 0.6666666666666666,
+        "events_total": 13,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0248,
+        "cpu_ms_p95": 6.676699999999999,
+        "frames_total": 910,
+        "frames_processed": 910
+      },
+      "missed": [
+        "tip001 (563 ms readable): Scrap Pistol Armor +4 Durability 37/50",
+        "tip002 (1150 ms readable): Travel Cloak Armor +4 Quest item",
+        "tip003 (2420 ms readable): Travel Cloak Weight 2.5 Quest item",
+        "tip004 (1856 ms readable): Signal Flare Durability 37/50 Deals fire damage",
+        "tip005 (1828 ms readable): Cracked Shield Durability 37/50 Sell value 120",
+        "tip006 (709 ms readable): Potion of Swiftness Deals fire damage",
+        "tip007 (3547 ms readable): Cracked Shield Sell value 120",
+        "tip008 (523 ms readable): Field Kit Quest item Restores 40 health Two-handed",
+        "tip009 (2174 ms readable): Spell Tome Quest item"
+      ],
+      "false_reads": [
+        "hallucination @2403: Quest iten",
+        "hallucination @4937: CloaK\n2.5\nItem",
+        "hallucination @7103: utoaK\n2.5\nitem",
+        "hallucination @25300: net 11\nres 40 health\nlanded"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-025",
+      "genres": [
+        "rpg_dialogue",
+        "tooltip"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 18,
+        "items_read": 11,
+        "recall": 0.6111111111111112,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 3,
+            "read": 2,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 3,
+            "recall": 0.6
+          },
+          {
+            "name": "2-4s",
+            "total": 7,
+            "read": 3,
+            "recall": 0.42857142857142855
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.011086474501108647,
+        "exact_match_rate": 0.9090909090909091,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 12,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 375.72846666666555,
+        "latency_p95_ms": 437.13436666666894,
+        "cpu_ms_p50": 0.3145,
+        "cpu_ms_p95": 7.285,
+        "frames_total": 697,
+        "frames_processed": 697
+      },
+      "missed": [
+        "dlg002 (1906 ms readable): The council will never agree to this plan.",
+        "tip013 (594 ms readable): Leather Boots Stackable",
+        "tip014 (3828 ms readable): Cracked Shield Two-handed Move speed +15% for 30 s Restores 40 health",
+        "tip015 (1830 ms readable): Field Kit Stackable Weight 2.5 Damage 12-18",
+        "tip016 (3278 ms readable): Cracked Shield Armor +4",
+        "tip017 (2214 ms readable): Cracked Shield Durability 37/50 Armor +4 Move speed +15% for 30 s",
+        "tip018 (2145 ms readable): Ring of Embers Deals fire damage Two-handed"
+      ],
+      "false_reads": [
+        "hallucination @3138: The c0"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-026",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 19,
+        "items_read": 19,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 9,
+            "read": 9,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.015866873065015483,
+        "exact_match_rate": 0.8947368421052632,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 24,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 101.03353333333325,
+        "latency_p95_ms": 181.94076666666683,
+        "cpu_ms_p50": 0.1985,
+        "cpu_ms_p95": 6.8254,
+        "frames_total": 894,
+        "frames_processed": 894
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @18110: Rusty ear ) /llli l/",
+        "hallucination @27146: All \\",
+        "hallucination @27146: AJI"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-027",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 9,
+        "items_read": 9,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.19652896094713396,
+        "exact_match_rate": 0.1111111111111111,
+        "prompts_total": 12,
+        "prompts_read": 10,
+        "prompt_recall": 0.8333333333333334,
+        "events_total": 20,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 240.82856666666703,
+        "latency_p95_ms": 263.95663333333323,
+        "cpu_ms_p50": 2.3492,
+        "cpu_ms_p95": 6.4944,
+        "frames_total": 764,
+        "frames_processed": 764
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-028",
+      "genres": [
+        "objective_update",
+        "pickup_stack",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 31,
+        "items_read": 31,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 23,
+            "read": 23,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.011059907834101382,
+        "exact_match_rate": 0.9032258064516129,
+        "prompts_total": 19,
+        "prompts_read": 17,
+        "prompt_recall": 0.8947368421052632,
+        "events_total": 53,
+        "duplicates": 3,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 107.04750000000001,
+        "latency_p95_ms": 163.8240666666661,
+        "cpu_ms_p50": 2.234,
+        "cpu_ms_p95": 6.8186,
+        "frames_total": 1040,
+        "frames_processed": 1040
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @6901: CRIT 41 3.",
+        "hallucination @23135: ,H61d [Q t611Se •"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-029",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 7,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.055702800600759786,
+        "exact_match_rate": 0.7142857142857143,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 11,
+        "duplicates": 3,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 187.64876666666714,
+        "latency_p95_ms": 225.84720000000016,
+        "cpu_ms_p50": 6.487299999999999,
+        "cpu_ms_p95": 16.6394,
+        "frames_total": 657,
+        "frames_processed": 657
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3381: ss"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-030",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 11,
+        "duplicates": 3,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 135.76980000000003,
+        "latency_p95_ms": 237.14789999999994,
+        "cpu_ms_p50": 0.2956,
+        "cpu_ms_p95": 20.2319,
+        "frames_total": 625,
+        "frames_processed": 614
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-031",
+      "genres": [
+        "pickup_stack"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 24,
+        "items_read": 24,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 9,
+            "read": 9,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 9,
+            "read": 9,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.01590909090909091,
+        "exact_match_rate": 0.9166666666666666,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 26,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 103.11403333333328,
+        "latency_p95_ms": 272.83976666666695,
+        "cpu_ms_p50": 0.2054,
+        "cpu_ms_p95": 3.545,
+        "frames_total": 945,
+        "frames_processed": 945
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-032",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 13,
+        "items_read": 12,
+        "recall": 0.9230769230769231,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 13,
+        "prompts_read": 11,
+        "prompt_recall": 0.8461538461538461,
+        "events_total": 27,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 233.34343333333163,
+        "latency_p95_ms": 633.4042666666683,
+        "cpu_ms_p50": 8.8957,
+        "cpu_ms_p95": 22.7881,
+        "frames_total": 1017,
+        "frames_processed": 1011
+      },
+      "missed": [
+        "sub008 (2943 ms readable): Reloading!"
+      ],
+      "false_reads": [
+        "hallucination @4744: Talk 333",
+        "hallucination @19095: , ,-323\nReloading!"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-033",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0797,
+        "cpu_ms_p95": 21.306700000000003,
+        "frames_total": 582,
+        "frames_processed": 582
+      },
+      "missed": [
+        "obj001 (3310 ms readable): New Objective: Defeat the bandit leader",
+        "obj002 (4265 ms readable): Survive until dawn",
+        "obj003 (2922 ms readable): Collect 5 mana crystals"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-034",
+      "genres": [
+        "tooltip",
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 27,
+        "items_read": 18,
+        "recall": 0.6666666666666666,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 6,
+            "read": 4,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "2-4s",
+            "total": 18,
+            "read": 12,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0018214936247723133,
+        "exact_match_rate": 0.9444444444444444,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 25,
+        "duplicates": 3,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 92.4935000000005,
+        "latency_p95_ms": 745.2825333333335,
+        "cpu_ms_p50": 1.5298,
+        "cpu_ms_p95": 8.0326,
+        "frames_total": 994,
+        "frames_processed": 994
+      },
+      "missed": [
+        "tip019 (1458 ms readable): Scrap Pistol Damage 12-18",
+        "tip020 (3717 ms readable): Hunter's Bow Requires level 6 Armor +4 Requires level 6",
+        "tip021 (2552 ms readable): Iron Helm Stackable Durability 37/50 Armor +4",
+        "tip022 (2592 ms readable): Field Kit Quest item Armor +4",
+        "tip023 (2766 ms readable): Potion of Swiftness Two-handed Armor +4 Deals fire damage",
+        "tip024 (565 ms readable): Field Kit Restores 40 health Requires level 6",
+        "tip025 (3121 ms readable): Hunter's Bow Deals fire damage",
+        "tip026 (3224 ms readable): Potion of Swiftness Stackable Restores 40 health Move speed +15% for 30 s",
+        "tip027 (1961 ms readable): Signal Flare Move speed +15% for 30 s Two-handed Move speed +15% for 30 s"
+      ],
+      "false_reads": [
+        "hallucination @1608: Junoe",
+        "hallucination @22741: Marå",
+        "hallucination @24009: Marå",
+        "hallucination @24034: Mårå;"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-035",
+      "genres": [
+        "rpg_dialogue",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 14,
+        "items_read": 14,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 8,
+            "read": 8,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0024630541871921183,
+        "exact_match_rate": 0.9285714285714286,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 19,
+        "duplicates": 4,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 126.5557666666682,
+        "latency_p95_ms": 254.2504000000008,
+        "cpu_ms_p50": 0.2949,
+        "cpu_ms_p95": 26.538800000000002,
+        "frames_total": 800,
+        "frames_processed": 790
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @25141: Commander Vale Save"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-036",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 14,
+        "items_read": 14,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 7,
+            "read": 7,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 14,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 96.35509999999977,
+        "latency_p95_ms": 271.8563666666669,
+        "cpu_ms_p50": 0.1809,
+        "cpu_ms_p95": 3.6755999999999998,
+        "frames_total": 526,
+        "frames_processed": 526
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-037",
+      "genres": [
+        "subtitles",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 4,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 193.52403333333336,
+        "latency_p95_ms": 262.8338666666659,
+        "cpu_ms_p50": 0.17789999999999997,
+        "cpu_ms_p95": 14.345500000000001,
+        "frames_total": 550,
+        "frames_processed": 550
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-038",
+      "genres": [
+        "objective_update",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.034850863422291996,
+        "exact_match_rate": 0.6,
+        "prompts_total": 17,
+        "prompts_read": 17,
+        "prompt_recall": 1.0,
+        "events_total": 24,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 100.49680000000001,
+        "latency_p95_ms": 170.40066666666826,
+        "cpu_ms_p50": 2.7426,
+        "cpu_ms_p95": 7.6872,
+        "frames_total": 1024,
+        "frames_processed": 1024
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @4473: Return to camp before nightfall",
+        "hallucination @18809: Main better.weapon"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-039",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 7,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.030387931034482757,
+        "exact_match_rate": 0.5714285714285714,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 13,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 155.4981000000007,
+        "latency_p95_ms": 399.33439999999973,
+        "cpu_ms_p50": 4.9252,
+        "cpu_ms_p95": 10.3477,
+        "frames_total": 843,
+        "frames_processed": 843
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @8507: II -rome",
+        "hallucination @10274: HP 61 120\nE MP 114/12e",
+        "hallucination @15943: ftness\nealth",
+        "hallucination @24416: HP 30 120\nE MP 114/12e"
+      ],
+      "background_read_texts": []
+    }
+  ]
+}

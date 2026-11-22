@@ -51,6 +51,13 @@ pub struct GenArgs {
     /// Use procedural backgrounds only, even when arena-data/backgrounds exists
     #[arg(long)]
     pub procedural_only: bool,
+    /// Frame rate the scenes play at (only the `fps` field changes; 30 gives the normal suite)
+    #[arg(long, default_value_t = 30.0)]
+    pub fps: f64,
+    /// Draw the read zones this many pixels looser on each side where there is room (a user who
+    /// draws zones roughly); 0 gives the normal suite
+    #[arg(long, default_value_t = 0.0)]
+    pub loose_px: f32,
 }
 
 #[derive(clap::Args, Debug)]
@@ -141,7 +148,15 @@ fn cmd_gen(a: &GenArgs) -> Result<()> {
     let kind = SuiteKind::parse(&a.suite)?;
     let opts = if a.procedural_only { GenOptions::procedural_only() } else { GenOptions::from_pc() };
     let out = a.out.clone().unwrap_or_else(|| crate::data_dir().join("suites").join(kind.name()));
-    let scenarios = generator::generate_suite(kind, a.seed, &opts);
+    let mut scenarios = generator::generate_suite(kind, a.seed, &opts);
+    for s in &mut scenarios {
+        if a.fps != 30.0 {
+            s.fps = a.fps;
+        }
+        if a.loose_px > 0.0 {
+            generator::loosen_zones(s, a.loose_px);
+        }
+    }
     generator::write_suite(&out, kind.name(), a.seed, &scenarios)?;
     let items: usize = scenarios.iter().map(|s| s.items.len()).sum();
     let read: usize = scenarios.iter().flat_map(|s| &s.items).filter(|i| i.should_read).count();

@@ -54,6 +54,37 @@ What it says in short words:
 - It repeats itself a lot (317 duplicates on standard) and reads text that is not there (310 hallucinations).
 - When it does read an item, the text is mostly right (CER 0.05 on standard).
 
+## a1 (2026-11-22)
+
+`a1` is the first real reader (the `dr-core` engine). Its design, options, tuning log and the review fixes are in
+[`reader-a1.md`](reader-a1.md). Same rules as above: release build, WinRT, simulated clock, one job.
+
+Seed 1 and the real-world set were used for tuning. Seed 59 was made after the last code change and scored once,
+so it is the honest number. "In zones" leaves out tooltips, which sit in no zone.
+
+| Set | Reader | Recall | In zones | Under 1 s | CER | Dup | Noise | Halluc | Unwanted | Latency p50 / p95 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| smoke | winocr-naive | 0.759 | 22/26 | 1/1 | 0.045 | 24 | 0 | 19 | 0.62 | 257 / 664 ms |
+| smoke | a1 | 0.966 | 25/26 | 0/1 | 0.008 | 3 | 0 | 1 | 0.11 | 154 / 439 ms |
+| standard | winocr-naive | 0.644 | 314/419 | 19/47 | 0.053 | 317 | 84 | 310 | 0.64 | 259 / 1248 ms |
+| standard | a1 | 0.924 | 408/419 | 41/47 | 0.024 | 59 | 13 | 54 | 0.19 | 151 / 431 ms |
+| real world | winocr-naive | 0.733 (11/15) | - | - | 0.143 | 43 | 0 | 34 | 0.71 | 403 / 604 ms |
+| real world | a1 | 1.000 (15/15) | - | - | 0.078 | 2 | 2 | 6 | 0.28 | 205 / 333 ms |
+| standard seed 59 (unseen) | winocr-naive | 0.558 | 290/411 | 31/78 | 0.055 | 309 | 60 | 348 | 0.63 | 195 / 1218 ms |
+| standard seed 59 (unseen) | a1 | 0.788 | 373/411 | 56/78 | 0.022 | 83 | 20 | 117 | 0.28 | 138 / 441 ms |
+| hard seed 59 (unseen) | winocr-naive | 0.320 | 228/584 | 100/407 | 0.057 | 134 | 2 | 244 | 0.57 | 197 / 751 ms |
+| hard seed 59 (unseen) | a1 | 0.390 | 277/584 | 131/407 | 0.037 | 29 | 19 | 130 | 0.35 | 169 / 796 ms |
+| hard seed 1 | winocr-naive | 0.368 | 224/534 | 96/344 | 0.082 | 127 | 2 | 273 | 0.56 | 244 / 909 ms |
+| hard seed 1 | a1 | 0.549 | 312/534 | 167/344 | 0.036 | 32 | 18 | 152 | 0.31 | 197 / 728 ms |
+
+"Unwanted" is duplicates, noise, hallucinations and background reads over all spoken events.
+
+What it says in short words:
+- In zones, A1 reads about 9 of 10 lines on an unseen standard suite. The naive reader reads about 7 of 10.
+- About 1 spoken line in 4 to 5 is still unwanted. For the naive reader it is about 2 in 3.
+- On the hard suite A1 gains less: recall 0.390 against 0.320 on seed 59. It reads about 1 in 3 items under 1 s.
+- Tooltips outside zones are mostly missed (39 of 112 on seed 59).
+
 ## OCR bench (WinRT OCR, standard suite, scale 1)
 
 1402 single-line crops. Mean CER 0.231, micro CER 0.178, exact 0.614, empty 0.185, 0.6 ms p50 / 1.7 ms p95 per crop.
@@ -118,3 +149,4 @@ moved, by 0.1 ms) and exited 0.
 | `baselines/standard-winocr-naive-simulated.json` | winocr-naive on standard |
 | `baselines/recorded-winocr-naive-simulated.json` | winocr-naive on the real-world set |
 | `baselines/ocr-bench-standard-winocr.json` | WinRT OCR bench on standard |
+| `baselines/*-a1-*.json` and the seed 7, 23, 41, 59 and hard naive runs | a1 section; full list in [`reader-a1.md`](reader-a1.md#files) |

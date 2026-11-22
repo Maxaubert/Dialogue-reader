@@ -22,6 +22,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.154"
 ab_glyph = "0.2.32"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
+# The reader engine under test (reader "a1").
+dr-core = { path = "../core" }
 
 # ---- deps added by the live-mode agent (src/live.rs) ----
 

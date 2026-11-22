@@ -138,6 +138,47 @@ pub fn generate_suite(kind: SuiteKind, seed: u64, opts: &GenOptions) -> Vec<Scen
         .collect()
 }
 
+/// Grows every read zone (not `hud`) by `pad` pixels per side, one side at a time, where the
+/// grown zone stays in the frame, 4 px away from the other zones, and away from text items that
+/// the zone did not hold before (so no new text falls inside). Models zones drawn loosely.
+pub fn loosen_zones(s: &mut Scenario, pad: f32) {
+    let (fw, fh) = (s.width as f32, s.height as f32);
+    let orig: Vec<Rect> = s.layout.zones.iter().map(|z| z.rect).collect();
+    for i in 0..s.layout.zones.len() {
+        if s.layout.zones[i].kind == crate::model::ZoneKind::Hud {
+            continue;
+        }
+        let mut r = orig[i];
+        for side in 0..4 {
+            let mut c = r;
+            match side {
+                0 => {
+                    c.x -= pad;
+                    c.w += pad;
+                }
+                1 => c.w += pad,
+                2 => {
+                    c.y -= pad;
+                    c.h += pad;
+                }
+                _ => c.h += pad,
+            }
+            if c.x < 0.0 || c.y < 0.0 || c.right() > fw || c.bottom() > fh {
+                continue;
+            }
+            let big = c.inflate(4.0);
+            if orig.iter().enumerate().any(|(j, o)| j != i && big.intersects(o)) {
+                continue;
+            }
+            if s.items.iter().any(|it| big.intersects(&it.rect) && !orig[i].intersects(&it.rect)) {
+                continue;
+            }
+            r = c;
+        }
+        s.layout.zones[i].rect = r;
+    }
+}
+
 fn generate_scenario(kind: SuiteKind, index: usize, seed: u64, opts: &GenOptions, images: &[ImageBg]) -> Scenario {
     let mut rng = Rng::new(seed);
     let (width, height, fps) = (1280u32, 720u32, 30.0);

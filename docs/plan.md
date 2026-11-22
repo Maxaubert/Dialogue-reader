@@ -18,3 +18,5 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
 
 ## Results
 - Spike 2, Satisfactory: [spike2-satisfactory.md](spike2-satisfactory.md)
+- Test arena baseline: [arena-baseline.md](arena-baseline.md)
+- First real reader, A1 (`crates/core`, arena reader `a1`): [reader-a1.md](reader-a1.md)

@@ -1,5 +1,6 @@
 //! Reader registry. To add a reader: one line in `registry()` plus its module.
 
+pub mod a1;
 pub mod noop;
 pub mod oracle;
 pub mod winocr;
@@ -16,6 +17,7 @@ pub fn registry() -> Vec<(&'static str, Ctor)> {
         ("oracle", oracle::create),
         ("noop", noop::create),
         ("winocr-naive", winocr::create),
+        ("a1", a1::create),
     ]
 }
 

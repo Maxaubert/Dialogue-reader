@@ -96,6 +96,7 @@ dependencies = [
  "ab_glyph",
  "anyhow",
  "clap",
+ "dr-core",
  "image",
  "ort",
  "serde",
@@ -286,6 +287,10 @@ dependencies = [
  "pem-rfc7468",
  "zeroize",
 ]
+
+[[package]]
+name = "dr-core"
+version = "0.1.0"
 
 [[package]]
 name = "either"
