@@ -17,8 +17,26 @@ path = "src/main.rs"
 name = "render-screens"
 path = "src/bin/render-screens.rs"
 
+[features]
+# The real window draws with femtovg (OpenGL). The software renderer is always built in: render-screens and the
+# tests use it, and it is the fallback at run time (SLINT_BACKEND=winit-software).
+default = ["renderer-femtovg"]
+renderer-femtovg = ["slint/renderer-femtovg"]
+# Skia spike (2026-11-22, README "Renderer"): its text matches the mockups, but the exe grows from 19.1 to 29.2 MB.
+# Build it with `--no-default-features --features renderer-skia`. With both features on, Slint picks Skia.
+renderer-skia = ["slint/renderer-skia"]
+
 [dependencies]
-slint = { version = "=1.18.1", features = ["unstable-winit-030"] }
+# No default features: the window renderer comes from the features above, not from slint's defaults.
+slint = { version = "=1.18.1", default-features = false, features = [
+    "std",
+    "backend-winit",
+    "renderer-software",
+    "accessibility",
+    "compat-1-2",
+    "system-tray",
+    "unstable-winit-030",
+] }
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 
 [dev-dependencies]
