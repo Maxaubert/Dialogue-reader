@@ -81,6 +81,7 @@ pub fn capture(hwnd: isize) -> Result<Shot, String> {
 pub fn capture_with(hwnd: isize, timeout: Duration) -> Result<Shot, String> {
     let mut cursor = CursorCaptureSettings::WithoutCursor;
     let mut border = DrawBorderSettings::WithoutBorder;
+    let mut every = MinimumUpdateIntervalSettings::Default;
     loop {
         let (tx, rx) = mpsc::sync_channel(1);
         let settings = Settings::new(
@@ -88,14 +89,14 @@ pub fn capture_with(hwnd: isize, timeout: Duration) -> Result<Shot, String> {
             cursor,
             border,
             SecondaryWindowSettings::Default,
-            MinimumUpdateIntervalSettings::Default,
+            every,
             DirtyRegionSettings::Default,
             ColorFormat::Rgba8,
             tx,
         );
         let control = match One::start_free_threaded(settings) {
             Ok(c) => c,
-            Err(e) if relax(&e, &mut cursor, &mut border) => continue,
+            Err(e) if relax(&e, &mut cursor, &mut border, &mut every) => continue,
             Err(e) => return Err(format!("Windows could not capture this window ({e})")),
         };
         let got = rx.recv_timeout(timeout);
@@ -110,13 +111,14 @@ pub fn capture_with(hwnd: isize, timeout: Duration) -> Result<Shot, String> {
     }
 }
 
-/// Older Windows 10 builds cannot hide the yellow border or the cursor in a capture. That is cosmetic, not an
-/// error (spec 2.3): switch that setting back to the Windows default and try again. False when nothing is left
-/// to relax.
-fn relax<E>(
+/// Older Windows 10 builds cannot hide the yellow border or the cursor in a capture, or set the frame interval
+/// (the live view). That is cosmetic, not an error (spec 2.3): switch that setting back to the Windows default
+/// and try again. False when nothing is left to relax.
+pub(crate) fn relax<E>(
     e: &GraphicsCaptureApiError<E>,
     cursor: &mut CursorCaptureSettings,
     border: &mut DrawBorderSettings,
+    every: &mut MinimumUpdateIntervalSettings,
 ) -> bool {
     match e {
         GraphicsCaptureApiError::GraphicsCaptureApiError(ApiError::BorderConfigUnsupported)
@@ -131,6 +133,12 @@ fn relax<E>(
             *cursor = CursorCaptureSettings::Default;
             true
         }
+        GraphicsCaptureApiError::GraphicsCaptureApiError(
+            ApiError::MinimumUpdateIntervalUnsupported,
+        ) if *every != MinimumUpdateIntervalSettings::Default => {
+            *every = MinimumUpdateIntervalSettings::Default;
+            true
+        }
         _ => false,
     }
 }
@@ -142,19 +150,24 @@ mod tests {
     #[test]
     fn unsupported_border_or_cursor_falls_back_to_the_default() {
         type E = GraphicsCaptureApiError<String>;
-        let (mut c, mut b) = (
+        let (mut c, mut b, mut i) = (
             CursorCaptureSettings::WithoutCursor,
             DrawBorderSettings::WithoutBorder,
+            MinimumUpdateIntervalSettings::Custom(Duration::from_millis(66)),
         );
         let border = E::GraphicsCaptureApiError(ApiError::BorderConfigUnsupported);
         let cursor = E::GraphicsCaptureApiError(ApiError::CursorConfigUnsupported);
-        assert!(relax(&border, &mut c, &mut b));
+        assert!(relax(&border, &mut c, &mut b, &mut i));
         assert_eq!(b, DrawBorderSettings::Default);
         // already at the default: a real error now
-        assert!(!relax(&border, &mut c, &mut b));
-        assert!(relax(&cursor, &mut c, &mut b));
+        assert!(!relax(&border, &mut c, &mut b, &mut i));
+        assert!(relax(&cursor, &mut c, &mut b, &mut i));
         assert_eq!(c, CursorCaptureSettings::Default);
-        assert!(!relax(&cursor, &mut c, &mut b));
-        assert!(!relax(&E::ItemConvertFailed, &mut c, &mut b));
+        assert!(!relax(&cursor, &mut c, &mut b, &mut i));
+        let every = E::GraphicsCaptureApiError(ApiError::MinimumUpdateIntervalUnsupported);
+        assert!(relax(&every, &mut c, &mut b, &mut i));
+        assert_eq!(i, MinimumUpdateIntervalSettings::Default);
+        assert!(!relax(&every, &mut c, &mut b, &mut i));
+        assert!(!relax(&E::ItemConvertFailed, &mut c, &mut b, &mut i));
     }
 }

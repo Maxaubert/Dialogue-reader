@@ -5,8 +5,8 @@ The Slint UI of DialogReader. It builds `DialogReader.exe`.
 **Status: M2.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
 are saved as JSON in `%APPDATA%\DialogReader\profiles`, page 02 lists the running windows (games first), Continue
 takes one screenshot with Windows Graphics Capture, and pages 03 and 11 draw, select, move, resize, rename,
-re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). Onboarding runs only when there is no
-profile yet. Voices, the activity log, reading, keys and the overlays still show fake data (M3 and M4). The plan
+re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). The stages of 03, 10 and 11 show the
+game live while it runs (see "Live view"). Onboarding runs only when there is no profile yet. Voices, the activity log, reading, keys and the overlays still show fake data (M3 and M4). The plan
 is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
 
 ## Run, test, render
@@ -50,6 +50,7 @@ src/main.rs              DialogReader.exe: renderer (skia-opengl), crash hook, r
 src/lib.rs               build_window(source) and build_main_window() (fake): window + view model + window buttons
 src/vm/mod.rs            view-model layer: profiles, windows, screenshots, Slint models, callbacks; Desktop trait
 src/vm/zones.rs          zone drawing state: draw, select, move, resize, rename, kind, on/off, delete, undo
+src/vm/live.rs           live view of the game on the stages of 03, 10 and 11: start, stop, frames, fallback
 src/crash.rs             panic hook: crash log in %LOCALAPPDATA%\DialogReader\logs
 src/fake.rs              fake data of the mockups (behind vm::Source::Fake) and the zone edit callbacks
 src/geom.rs              stage mapping, drag to zone, hit tests, dim path (unit-tested)
@@ -64,8 +65,9 @@ ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout, w
                          quick_menu_preview (review only: menu over the game and its two other states), zone_edit
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
 ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
-tests/                   nav.rs, zones.rs, setup_flow.rs (testing backend), screens.rs (renders, compares with
-                         the mockups), common/ (fake desktop, temp data folder, pointer input)
+tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs (testing backend),
+                         screens.rs (renders, compares with the mockups), common/ (fake desktop with a fake live
+                         view, temp data folder, pointer input)
 examples/snapshot.rs     one page in a real window with a chosen renderer, saved as PNG (run on a hidden desktop)
 tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits for it
 ```
@@ -174,6 +176,106 @@ first build needs the internet (or `SKIA_BINARIES_URL` pointing at a local copy)
 included); a release rebuild of dr-app alone takes about 51 s. The fat LTO build took 4 min 20 s. No build errors.
 Skia's window surface on Windows is wgpu (GPU), with a CPU surface (softbuffer) as its fallback.
 
+## Zone drags and the other mouse buttons (fixed 2026-11-22)
+
+Max found that a right click while drawing a zone froze the box, and the left release then put the zone where
+the cursor was. Cause: a Slint `TouchArea` ends its mouse grab on the release of ANY button. After that its
+`moved` callback no longer fires, but `pressed` stays true (only a left release clears it), so the stage stopped
+following the mouse. The left release still reached the stage, and `Editor::pointer_up` moved the zone to the
+release point first. Now:
+
+- `ui/components/stage.slint` tracks the left drag itself and takes moves from `pointer-event` (it fires with or
+  without the grab). A right press during a drag sends a cancel (kind 3); so does a lost pointer (`cancel`, or
+  the mouse leaving the stage after the grab is gone).
+- Cancel (`Editor::cancel_drag`) puts a moved or resized zone back and drops a zone being drawn. It is no change:
+  no save, no undo step. Esc does the same while a drag is on (`zone-cancel`); without a drag Esc is not used.
+- In the real window, `keep_left_drags` (src/lib.rs) keeps the middle, back and forward buttons away from Slint
+  while the left button is down, so they never end or freeze a drag. The right button still goes through.
+- When the app window loses the focus (Alt+Tab, a UAC prompt), the left release may never come: `focus_lost`
+  (src/lib.rs) sends the stage a pointer exit and cancels the drag. A press that finds a drag still open (a
+  release lost some other way) cancels that drag first, so a zone is never left at a stray place.
+- Tests: `tests/zone_cancel.rs` (right click during draw, move and resize, Esc, middle click, lost grab, focus
+  loss) and `Editor` unit tests.
+
+## Live view (added 2026-11-22)
+
+Max asked for a live view of the game in the zone editor. The stages of 03, 10 (Overview) and 11 (Zones) now
+show the game live while it runs; "Retake screenshot" still updates the saved still.
+
+- **Capture** (`dr_runtime::live`): one Windows Graphics Capture session on the game window (the window picked
+  on 02, or a running window of the current profile), frames at most every 66 ms (about 15 fps:
+  `MinimumUpdateIntervalSettings` plus a time check before the readback). On the capture thread the GPU makes
+  the frame exactly the stage size in physical pixels (never larger than the capture): a mip chain, then one
+  draw with a trilinear sampler into a texture of that size, which is the only thing read back. So the cost
+  does not depend on how big the stage is next to the game. If any D3D call fails (or the shader compiler,
+  `d3dcompiler_47.dll`, is missing), it reads the full frame and box-filters it on the CPU instead.
+- **Start and stop never wait on the UI thread.** Windows took 39 to 271 ms to build a capture session (the
+  review of 2026-11-22 measured the old start on the calling thread), so
+  `Live::start` does that on a helper thread and returns at once; a start Windows refuses comes back as the end
+  of the session. The game's window is searched on another thread too (`Desktop::windows_quick_then`: the window
+  list takes about 9 ms). `stop` waits at most for a frame being handed over (about 1 to 3 ms); the capture
+  thread is stopped on a helper thread.
+- **To the UI** (`src/vm/live.rs`): the sink copies the frame into a `SharedPixelBuffer`, keeps only the newest
+  one in a slot, and wakes the UI thread once with `invoke_from_event_loop` until the UI has taken it. The UI
+  thread only wraps it in an `Image`. A session number drops frames of a stopped session.
+- **When**: only while 03 (with a picked window), 10 or 11 shows and the app window is not minimized or hidden. A
+  page change checks at once (`page-shown`); a 500 ms UI timer checks the rest. Other pages stop it.
+- **Zones** stay in capture pixels. Stages map them with the live capture size (`LiveView.w` and `h`). When the
+  game changes size, the editor rescales the zones (after a drag ends); edits then save with the new `base`. When
+  the live view stops, the zones go back onto the saved screenshot's size. A size change alone is not saved.
+- **Fallback**: a minimized game (no frames for 1.5 s and `IsIconic`), a closed one, or a window Windows will not
+  capture shows the saved screenshot with a small note on the stage ("Saved screenshot · the game is
+  minimized", "... is closed", "... no live picture from this window"). An end of the session says "closed"
+  only when the window is really gone; otherwise it is "no live picture". A live stage shows a green "Live"
+  chip. The last frame is let go when the saved screenshot shows again.
+- **Size change during a drag**: the frame waits until the drag ends (release, right click, Esc), then shows
+  without a new frame (a paused game sends none).
+  A game that does not change sends no frames; that is not an error, the last frame stays. The line under the
+  stage on page 11 says "Live · W × H" or "Screenshot · W × H".
+- **Tests**: `crates/runtime/tests/live.rs` captures a test window left of every monitor that repaints every
+  20 ms: frames arrive about 66 ms apart at the asked size, a new target takes effect, nothing arrives after
+  `stop`, a resized window gives its new size, a closed window ends the session, the start returns at once and
+  a stop during the start ends it. It also compares the GPU scale with the CPU box filter on a static picture
+  of four colored quarters at a ratio of 0.65 (same size, same corners, small mean difference).
+  `tests/live_view.rs` (fake desktop) covers start and stop on page changes, the hidden app, the window search
+  off the UI thread, zones on a game that changed size, the size change during a drag, and each fallback note.
+
+**Cost** (measured 2026-11-22 on this PC: Ryzen 9 9950X3D, 32 threads, RTX 5090; release build;
+`cargo test --release -p dr-runtime --test live -- --ignored --nocapture live_cost_4k`, about 2 minutes). Source:
+an off-screen window that repaints every 30 ms, so a frame comes every 66 ms (14.4 fps in every row). CPU is
+this process minus the test window's own painting thread, in percent of ONE core (one core is about 3 % of the
+whole CPU here). Each row ran 5 s, and Windows counts CPU time in 15.6 ms steps, so a row is good to about
+0.3 points (the three rows at exactly 3.1 % are the same step). Another build may have run on the PC at the same
+time, so single numbers can be off by a point or two.
+
+The GPU path is the normal one. The stage sizes are those of page 03 (`DrawZones`), page 10 (Overview, the start
+page) and page 11 (Zones) at 225 % and 150 %.
+
+| Game | Stage (physical px) | GPU path: per frame readback / copy / hand-over | GPU path CPU | CPU path: box filter per frame | CPU path CPU |
+|---|---|---|---|---|---|
+| 3840 x 2160 | 1962 x 1102 (page 03, 225 %) | 0.4 / 0.7 / 1.2 ms | 3.1 % | 16.8 ms | 25.9 % |
+| 3840 x 2160 | 2516 x 1415 (Overview, 225 %) | 0.5 / 1.0 / 2.0 ms | 5.6 % | 22.4 ms | 36.6 % |
+| 3840 x 2160 | 2286 x 1286 (Zones, 1440 x 900 window, 225 %) | 0.5 / 0.9 / 1.6 ms | 5.0 % | 20.1 ms | 33.4 % |
+| 3840 x 2160 | 2880 x 1620 (Zones, maximized, 225 %) | 0.6 / 1.3 / 2.6 ms | 7.8 % | 21.7 ms | 36.6 % |
+| 3840 x 2160 | 1677 x 944 (Overview, 150 %) | 0.4 / 0.6 / 0.9 ms | 3.1 % | 16.1 ms | 26.2 % |
+| 3840 x 2160 | 872 x 490 (page 03, 100 %) | 0.3 / 0.2 / 0.2 ms | 3.1 % | 5.0 ms | 10.0 % |
+| 2560 x 1440 | 1962 x 1102 | 0.4 / 0.6 / 1.2 ms | 4.1 % | 10.2 ms | 17.5 % |
+| 2560 x 1440 | 2516 x 1415 | 0.5 / 1.0 / 2.0 ms | 7.2 % | 14.7 ms | 24.7 % |
+
+- The readback on the GPU path is the time to queue the scale and map the small texture; the GPU work itself is
+  not CPU time. "Copy" is the copy out of the mapped texture. The hand-over in the test checks every pixel; in
+  the app it is one copy into the `SharedPixelBuffer`.
+- The CPU path runs only when D3D fails. The same command measures it (`Live::start_with(.., cpu_only: true,
+  ..)`).
+- On the calling thread: `Live::start` took 0.02 to 0.15 ms and `stop` 0.04 to 0.10 ms in every row.
+- The window search the app runs every 3 s while a stage page shows and the game is closed (window list without
+  icons): median 9.1 ms, now on its own thread.
+- Not measured: the UI thread's texture upload of each frame (about 14 MB at 2516 x 1415) in the real Skia
+  window.
+- Overview is the start page, and the live view runs whenever a stage page shows and the app is not minimized
+  or hidden, also when the app is behind the game. Whether it should run only while the app is in front is
+  open (Max's call).
+
 ## Known gaps (M2)
 
 - Key capture ("Change"), voice test, Import settings and the Settings buttons do nothing yet (M3, M5).
@@ -182,3 +284,5 @@ Skia's window surface on Windows is wgpu (GPU), with a CPU surface (softbuffer) 
 - The zone strip on Overview shows every zone in one row; many zones run past the edge (no "+N" chip with real
   data yet).
 - Page 02 shows the exe icon for real windows, not a live picture of the window.
+- A game in exclusive fullscreen gives a black or missing live view, as it does for the screenshot (spec
+  section 5).

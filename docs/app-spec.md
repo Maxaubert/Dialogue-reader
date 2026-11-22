@@ -103,6 +103,10 @@ view models and wiring. That keeps the reading path testable without a UI, and t
   matches a profile.
 - Black frames (loading screens) are passed on; `dr-core` reads nothing from them.
 - Screenshot for drawing zones: one captured frame saved as PNG next to the profile.
+- Live view (added 2026-11-22, Max asked for it): the stages of pages 03, 10 and 11 show the game live (about
+  15 fps, made the stage size on the GPU) while the game runs and the app is not minimized or hidden. Zones stay
+  in capture pixels. A minimized, closed or uncapturable game shows the saved screenshot with a note. Details
+  and cost: `crates/app/README.md`, "Live view".
 
 ### 2.4 OCR (`crates/ocr`)
 

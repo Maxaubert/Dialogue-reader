@@ -36,8 +36,8 @@ use windows::Win32::UI::Shell::{SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGetF
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GetClassNameW, GetClientRect,
     GetIconInfo, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    GetWindowThreadProcessId, HICON, ICONINFO, IsIconic, IsWindowVisible, WS_CAPTION, WS_CHILD,
-    WS_EX_TOOLWINDOW,
+    GetWindowThreadProcessId, HICON, ICONINFO, IsIconic, IsWindow, IsWindowVisible, WS_CAPTION,
+    WS_CHILD, WS_EX_TOOLWINDOW,
 };
 use windows::core::{BOOL, PCWSTR};
 
@@ -135,6 +135,11 @@ pub fn is_game(f: GameFacts) -> bool {
 /// window gives no picture, so the caller says so at once instead of waiting for the capture timeout.
 pub fn is_minimized(hwnd: isize) -> bool {
     unsafe { IsIconic(HWND(hwnd as *mut std::ffi::c_void)).as_bool() }
+}
+
+/// The window still exists (a closed game's handle is gone, or may belong to a new window later).
+pub fn is_open(hwnd: isize) -> bool {
+    unsafe { IsWindow(Some(HWND(hwnd as *mut std::ffi::c_void))).as_bool() }
 }
 
 /// Borderless when the window covers its monitor and has no title bar.
