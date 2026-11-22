@@ -17,8 +17,8 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
 4. UI shell: overlay over borderless games, hotkeys vs elevated games. It also binds the manual-mode read key
    (`dr_core::Manual`, see [reader-a1.md](reader-a1.md#manual-mode)). The user picks the key during onboarding
    (Max, 2026-11-22); there is no fixed default.
-5. UI redesign: the whole UI is redesigned from scratch (Max, 2026-11-22). Starts with mockups. Stack still open;
-   Max leans to Rust or C++.
+5. UI redesign: the whole UI is redesigned from scratch (Max, 2026-11-22). Starts with mockups. Stack: Slint (Rust), chosen 2026-11-22
+   over Tauri, egui and Qt. Mockups with the impeccable skill, kept to what Slint can draw.
 
 ## Results
 - Spike 2, Satisfactory: [spike2-satisfactory.md](spike2-satisfactory.md)
