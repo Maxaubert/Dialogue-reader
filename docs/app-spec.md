@@ -135,7 +135,9 @@ pub trait Tts: Send {
 ### 2.7 Windows and overlays
 
 All windows are Slint windows on the winit backend, on the UI thread. Each overlay gets extra Win32 styles through
-its HWND (winit accessor), right after it is created and before it is shown.
+its HWND (winit accessor) right after its first show, because the HWND exists only then, and again whenever Slint
+gives it a new HWND. A window subclass keeps the styles, because winit rewrites them on every show. The recipe is
+in [overlay-spike.md](overlay-spike.md).
 
 | Window | Mockup | Styles | Input |
 |---|---|---|---|
@@ -360,7 +362,7 @@ Navigation is one Slint enum property on the main window:
 | Elevated games | A game that runs as admin: low-level hooks of a normal-level app do not see its input (UIPI), the overlay may not stay on top, capture may fail (unverified). | Detect it: `OpenProcess` + `GetTokenInformation(TokenElevation)`; access denied also counts as elevated. Show "This game runs as administrator. DialogReader needs to run as administrator too." with a button that restarts DialogReader elevated (`ShellExecuteW` "runas"). Start with Windows "as administrator" uses a Task Scheduler task with highest privileges instead of the Run key. Check in M3b whether `RegisterHotKey` still fires for keyboard keys in that case and use it as a fallback for keyboard read keys. |
 | Hook timeouts and anti-cheat | Slow hook callbacks get removed by Windows. Some anti-cheat dislikes low-level hooks (unverified). | Callback only posts a message. Re-install the hooks when they stop firing (watchdog). Hooks are installed only while a profile is active. Document games where anti-cheat complains. |
 | Games that lock the mouse | In zone edit, a game with a captured or clipped cursor may keep the mouse. | Zone edit releases the clip (`ClipCursor(None)`) while open. If the game takes it back, the hint bar says "Use Zones in the main window" and Esc closes. The main window Zones tab always works. |
-| Focus | An overlay that activates would minimise or pause some games. | `WS_EX_NOACTIVATE` on every overlay, keyboard only through the hook, `ShowWindow(SW_SHOWNOACTIVATE)`. A test checks the foreground window did not change. |
+| Focus | An overlay that activates would minimise or pause some games. | `WS_EX_NOACTIVATE` on every overlay, keyboard only through the hook, `ShowWindow(SW_SHOWNOACTIVATE)`. A test on a hidden desktop counts activation per thread (`GetForegroundWindow` is always NULL there; see overlay-spike.md). |
 | DPI and mixed monitors | Zones, overlays and screenshots could be off by the scale factor. | Per-monitor DPI aware v2. Zones in capture pixels (never in logical px). Overlays placed in physical px from the game's client rect, then sized with that monitor's scale. Re-place on `WM_DPICHANGED` and when the game window moves or changes size. Tests for the mapping at 100%, 150% and 200%. |
 | Frameless main window | Own title bar loses some native behaviour (snap layouts, resize borders). | winit `drag_window` and `drag_resize_window` from the title bar and edges. If snap layouts matter, keep the native frame and theme it dark later. |
 | Speed of 4K frames | Copying 33 MB per frame costs CPU next to a game. | 25 fps cap, newest-frame slot, later zone-only copies. Measure CPU in M3b with Satisfactory. |
