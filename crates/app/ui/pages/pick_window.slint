@@ -37,11 +37,23 @@ component WindowCard inherits Card {
 
     VerticalLayout {
         padding: Space.s2 + 1px;
-        Thumb {
+        if root.win.icon.width == 0: Thumb {
             height: 120px;
             art: root.win.art;
             radius: Radius.md;
             behind: Palette.surface;
+        }
+        // a real window: its exe icon on a plain tile (no live picture before Continue)
+        if root.win.icon.width > 0: Rectangle {
+            height: 120px;
+            border-radius: Radius.md;
+            background: Palette.surface-2;
+            Image {
+                width: 40px;
+                height: 40px;
+                source: root.win.icon;
+                image-fit: contain;
+            }
         }
 
         VerticalLayout {
@@ -86,109 +98,145 @@ component WindowCard inherits Card {
 export component PickWindowPage inherits Rectangle {
     in property <[WindowData]> games;
     in property <[WindowData]> others;
+    // games are 0 .. games.length - 1, other windows follow
     in-out property <int> selected: 0;
     in-out property <string> search;
-    VerticalLayout {
-        x: (parent.width - Size.col) / 2;
-        width: Size.col;
-        padding-top: Space.s7;
-        alignment: start;
-        ObHead {
-            title: "Pick your game";
-            lead: "Start your game first. It shows up here while it is running.";
-        }
-
-        Rectangle {
-            height: Space.s6;
-        }
-
-        HorizontalLayout {
-            alignment: space-between;
-            TextField {
-                width: 360px;
-                icon: Icons.search;
-                placeholder: "Search windows";
-                text <=> root.search;
+    callback refresh();
+    callback search-changed(string);
+    changed search => {
+        root.search-changed(root.search);
+    }
+    // games wrap three to a row; the page scrolls when the lists are longer than the window
+    property <length> card-w: (Size.col - 2 * Space.s4) / 3;
+    property <int> game-rows: Math.ceil(root.games.length / 3);
+    flick := Flickable {
+        content-height: col.preferred-height + Space.s7;
+        col := VerticalLayout {
+            x: (flick.width - Size.col) / 2;
+            width: Size.col;
+            padding-top: Space.s7;
+            alignment: start;
+            ObHead {
+                title: "Pick your game";
+                lead: "Start your game first. It shows up here while it is running.";
             }
 
-            Button {
-                text: "Refresh";
-                icon: Icons.refresh;
+            Rectangle {
+                height: Space.s6;
             }
-        }
 
-        Rectangle {
-            height: Space.s6;
-        }
+            HorizontalLayout {
+                alignment: space-between;
+                TextField {
+                    width: 360px;
+                    icon: Icons.search;
+                    placeholder: "Search windows";
+                    text <=> root.search;
+                }
 
-        SectionLabel {
-            text: "Games running now";
-            count: root.games.length;
-        }
-
-        Rectangle {
-            height: Space.s3;
-        }
-
-        HorizontalLayout {
-            spacing: Space.s4;
-            for g[i] in root.games: WindowCard {
-                width: (Size.col - 2 * Space.s4) / 3;
-                win: g;
-                selected: i == root.selected;
-                clicked => {
-                    root.selected = i;
+                Button {
+                    text: "Refresh";
+                    icon: Icons.refresh;
+                    clicked => {
+                        root.refresh();
+                    }
                 }
             }
-        }
 
-        Rectangle {
-            height: Space.s6;
-        }
+            Rectangle {
+                height: Space.s6;
+            }
 
-        SectionLabel {
-            text: "Other windows";
-            count: root.others.length;
-        }
+            SectionLabel {
+                text: "Games running now";
+                count: root.games.length;
+            }
 
-        Rectangle {
-            height: Space.s3;
-        }
+            Rectangle {
+                height: Space.s3;
+            }
 
-        Card {
-            VerticalLayout {
-                padding: 1px;
-                for o[i] in root.others: Rectangle {
-                    height: 52px;
-                    if i > 0: Rectangle {
-                        y: 0;
-                        height: 1px;
-                        background: Palette.line;
+            Rectangle {
+                height: root.game-rows * 192px + Math.max(0, root.game-rows - 1) * Space.s4;
+                for g[i] in root.games: WindowCard {
+                    x: Math.mod(i, 3) * (root.card-w + Space.s4);
+                    y: Math.floor(i / 3) * (192px + Space.s4);
+                    width: root.card-w;
+                    win: g;
+                    selected: i == root.selected;
+                    clicked => {
+                        root.selected = i;
                     }
-                    HorizontalLayout {
-                        padding-left: Space.s4;
-                        padding-right: Space.s4;
-                        spacing: Space.s3;
-                        alignment: start;
-                        VerticalLayout {
-                            alignment: center;
-                            ITile {
-                                icon: Icons.window;
+                }
+            }
+
+            Rectangle {
+                height: Space.s6;
+            }
+
+            SectionLabel {
+                text: "Other windows";
+                count: root.others.length;
+            }
+
+            Rectangle {
+                height: Space.s3;
+            }
+
+            Card {
+                VerticalLayout {
+                    padding: 1px;
+                    for o[i] in root.others: Rectangle {
+                        property <bool> sel: root.selected == root.games.length + i;
+                        height: 52px;
+                        background: self.sel ? Palette.surface-2 : transparent;
+                        accessible-role: button;
+                        accessible-label: o.name;
+                        accessible-item-selected: self.sel;
+                        accessible-action-default => {
+                            root.selected = root.games.length + i;
+                        }
+                        TouchArea {
+                            clicked => {
+                                root.selected = root.games.length + i;
                             }
                         }
-
-                        Text {
-                            text: o.name;
-                            font-weight: Type.w-medium;
-                            color: Palette.text;
-                            vertical-alignment: center;
+                        if i > 0: Rectangle {
+                            y: 0;
+                            height: 1px;
+                            background: Palette.line;
                         }
+                        HorizontalLayout {
+                            padding-left: Space.s4;
+                            padding-right: Space.s4;
+                            spacing: Space.s3;
+                            alignment: start;
+                            VerticalLayout {
+                                alignment: center;
+                                if o.icon.width == 0: ITile {
+                                    icon: Icons.window;
+                                }
+                                if o.icon.width > 0: Image {
+                                    width: 28px;
+                                    height: 28px;
+                                    source: o.icon;
+                                    image-fit: contain;
+                                }
+                            }
 
-                        Text {
-                            text: o.exe;
-                            font-size: Type.fs1;
-                            color: Palette.text-3;
-                            vertical-alignment: center;
+                            Text {
+                                text: o.name;
+                                font-weight: Type.w-medium;
+                                color: Palette.text;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: o.exe;
+                                font-size: Type.fs1;
+                                color: Palette.text-3;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }

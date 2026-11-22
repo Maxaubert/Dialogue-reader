@@ -16,8 +16,9 @@ name = "overlay-spike"
 path = "src/main.rs"
 
 [features]
-# Also offer the Skia renderer (`probe --renderer skia`). Off by default so it never changes the features
-# of dr-app when the workspace is built together.
+# Also offer the Skia renderer (`probe --renderer skia`) when this crate is built alone. In a workspace build,
+# dr-app (default feature renderer-skia) already turns on Slint's Skia with OpenGL for every crate; the probe
+# picks its renderer by name, so that changes nothing here.
 skia = ["slint/renderer-skia"]
 
 [dependencies]

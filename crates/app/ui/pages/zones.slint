@@ -1,5 +1,5 @@
 // 11 zone editor tab.
-import { Palette, Space, Radius, Size, Type, Icons, Kind } from "../theme.slint";
+import { Palette, Space, Radius, Size, Type, Icons, Art, Kind } from "../theme.slint";
 import { ZoneData } from "../data.slint";
 import { Icon, CIcon, Button, BtnKind, CardHead } from "../components/base.slint";
 import { Stage, ZoneRow, ZoneTools } from "../components/stage.slint";
@@ -15,6 +15,22 @@ export component ZonesTab inherits Rectangle {
     property <length> sw: min(root.win-w - 360px - 2 * Size.page-x, (root.win-h - Size.bar - 64px - 44px - 2 * Size.page-x) * 16 / 9);
     callback add-zone();
     callback delete-zone(int);
+    // zone editing (src/vm): the picture, the box being drawn, the kind picker
+    in property <image> shot: Art.scene;
+    in property <float> shot-w: 1600;
+    in property <float> shot-h: 900;
+    in property <bool> contain: false;
+    in property <bool> drafting: false;
+    in property <ZoneData> draft;
+    in property <Kind> kind: Kind.dialogue;
+    callback pointer(int, float, float, float);
+    callback select(int);
+    callback toggle(int, bool);
+    callback rename(int, string);
+    callback rename-done(bool);
+    callback kind-picked(Kind);
+    callback retake();
+
     HorizontalLayout {
         Rectangle {
             horizontal-stretch: 1;
@@ -29,6 +45,13 @@ export component ZonesTab inherits Rectangle {
                             alignment: center;
                             ZoneTools {
                                 draw <=> root.draw;
+                                kind: root.kind;
+                                kind-picked(k) => {
+                                    root.kind-picked(k);
+                                }
+                                retake => {
+                                    root.retake();
+                                }
                             }
                         }
                     }
@@ -45,12 +68,18 @@ export component ZonesTab inherits Rectangle {
                     Stage {
                         width: root.sw;
                         height: root.sw * 9 / 16;
+                        source: root.shot;
+                        src-w: root.shot-w;
+                        src-h: root.shot-h;
+                        contain: root.contain;
+                        interactive: true;
+                        drafting: root.drafting;
+                        draft: root.draft;
                         zones: root.zones;
-                        grey-kinds: true;
                         selected: root.selected;
                         behind: Palette.canvas;
-                        zone-clicked(i) => {
-                            root.selected = i;
+                        pointer(k, x, y, s) => {
+                            root.pointer(k, x, y, s);
                         }
                     }
                 }
@@ -112,19 +141,34 @@ export component ZonesTab inherits Rectangle {
                     }
                 }
 
-                for z[i] in root.zones: ZoneRow {
-                    zone: z;
-                    first: i == 0;
-                    selected: i == root.selected;
-                    clicked => {
-                        root.selected = i;
-                    }
-                    toggled(v) => {
-                        z.on = v;
-                    }
-                }
-                Rectangle {
+                // a long zone list scrolls
+                Flickable {
                     vertical-stretch: 1;
+                    content-height: rows.preferred-height;
+                    rows := VerticalLayout {
+                        width: parent.width;
+                        alignment: start;
+                        for z[i] in root.zones: ZoneRow {
+                            zone: z;
+                            first: i == 0;
+                            selected: i == root.selected;
+                            editable: true;
+                            clicked => {
+                                root.selected = i;
+                                root.select(i);
+                            }
+                            toggled(v) => {
+                                z.on = v;
+                                root.toggle(i, v);
+                            }
+                            renamed(t) => {
+                                root.rename(i, t);
+                            }
+                            rename-done(e) => {
+                                root.rename-done(e);
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {

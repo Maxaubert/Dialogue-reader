@@ -1,3 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["spikes/recorder", "spikes/overlay", "crates/core", "crates/arena", "crates/app"]
+members = ["spikes/recorder", "spikes/overlay", "crates/core", "crates/arena", "crates/runtime", "crates/app"]
+
+# The shipped DialogReader.exe (Max, 2026-11-22): Skia with fat LTO and panic = "abort", about 22 MB.
+# `cargo build --profile ship -p dr-app --bin DialogReader` writes target\ship\DialogReader.exe.
+# Tests, the arena and normal release builds keep unwinding. In this profile any panic ends the app at once;
+# the panic hook in crates/app/src/crash.rs writes a crash log first.
+[profile.ship]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+panic = "abort"

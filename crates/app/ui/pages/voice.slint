@@ -48,7 +48,7 @@ export component VoicePage inherits Rectangle {
                     // six rows show; the rest scroll (11 voices in all)
                     Flickable {
                         height: 6 * 60px;
-                        viewport-height: root.voices.length * 60px;
+                        content-height: root.voices.length * 60px;
                         VerticalLayout {
                             for v[i] in root.voices: Rectangle {
                                 height: 60px;
@@ -167,8 +167,9 @@ export component VoicePage inherits Rectangle {
                                     horizontal-stretch: 1;
                                 }
 
+                                // the slider runs from 0 to 2x speed; the profile keeps at least 0.5x
                                 Text {
-                                    text: "1.1×";
+                                    text: Math.round(Math.max(0.25, root.speed) * 20) / 10 + "×";
                                     font-family: Type.mono;
                                     font-size: Type.fs1;
                                     color: Palette.text-2;

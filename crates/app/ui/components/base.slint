@@ -82,8 +82,10 @@ export component CornerMask {
 }
 
 // Game art with rounded corners. `behind` is the color around it (used by the mask in software renders only).
+// A game picture: `picture` when set (a real screenshot), else the fake art named by `art`.
 export component Thumb {
     in property <string> art: "rdr2";
+    in property <image> picture;
     in property <length> radius: Radius.sm;
     in property <color> behind: Palette.surface;
     Rectangle {
@@ -94,7 +96,7 @@ export component Thumb {
         Image {
             width: 100%;
             height: 100%;
-            source: Art.get(root.art);
+            source: root.picture.width > 0 ? root.picture : Art.get(root.art);
             image-fit: cover;
         }
     }

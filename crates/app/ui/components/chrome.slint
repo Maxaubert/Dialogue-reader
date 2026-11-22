@@ -226,6 +226,8 @@ export component ObBar inherits Bar {
 export component ObFoot inherits Rectangle {
     in property <string> primary: "Continue";
     in property <image> primary-icon: Icons.arrow-right;
+    // a problem with this step, said in plain words (no screenshot, could not save)
+    in property <string> notice;
     callback back();
     callback next();
     height: 72px;
@@ -248,6 +250,15 @@ export component ObFoot inherits Rectangle {
             clicked => {
                 root.back();
             }
+        }
+
+        if root.notice != "": Text {
+            text: root.notice;
+            horizontal-stretch: 1;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+            color: Palette.danger;
         }
 
         Button {
@@ -290,6 +301,7 @@ export component ObHead inherits VerticalLayout {
 export component GameButton inherits Rectangle {
     in property <string> name: "Red Dead Redemption 2";
     in property <string> art: "rdr2";
+    in property <image> cover;
     callback clicked();
     height: Size.ctl;
     border-radius: Radius.md;
@@ -312,6 +324,7 @@ export component GameButton inherits Rectangle {
                 width: 24px;
                 height: 24px;
                 art: root.art;
+                picture: root.cover;
                 radius: Radius.xs;
                 behind: Palette.surface;
             }
@@ -393,6 +406,7 @@ export component MainBar inherits Bar {
     in property <int> tab: 0;
     in property <string> game: "Red Dead Redemption 2";
     in property <string> art: "rdr2";
+    in property <image> cover;
     in property <string> status: "Reading";
     callback tab-clicked(int);
     callback game-clicked();
@@ -405,6 +419,7 @@ export component MainBar inherits Bar {
             GameButton {
                 name: root.game;
                 art: root.art;
+                cover: root.cover;
                 clicked => {
                     root.game-clicked();
                 }

@@ -78,15 +78,29 @@ view models and wiring. That keeps the reading path testable without a UI, and t
 
 ### 2.3 Capture
 
-- Window list: `windows_capture::window::Window::enumerate()`, plus for each window: title, process exe name,
-  client size, mode (borderless when the window covers its monitor and has no caption, else windowed), and an
+- Window list: `EnumWindows` (the windows of the caller's desktop), plus for each window: title, process exe
+  name, client size, mode (borderless when the window covers its monitor and has no caption, else windowed), and an
   icon from the exe (`SHGetFileInfoW`) for the list.
-- "Games running now" vs "Other windows" (page 02): a window is in the game group when its exe has a profile, or it
-  covers a whole monitor, or the process has `d3d11.dll`, `d3d12.dll`, `dxgi.dll` or `vulkan-1.dll` loaded.
-  When the process cannot be read (elevated), only the first two checks apply.
-- Settings: `CursorCaptureSettings::WithoutCursor`, `DrawBorderSettings::WithoutBorder`, `ColorFormat::Bgra8`.
-  On systems that refuse "no border", the yellow border shows. That is cosmetic, not an error.
-- The window is found again by exe name when the game restarts. `Status(NoWindow)` while it is gone.
+- "Games running now" vs "Other windows" (page 02): a window is in the game group when its exe has a profile, or its
+  client area covers a whole monitor, or the process has `d3d11.dll`, `d3d12.dll`, `dxgi.dll` or `vulkan-1.dll`
+  loaded. When the process cannot be read (elevated), only the first two checks apply. Browser and Electron windows
+  (classes `Chrome_WidgetWin_1`, `MozillaWindowClass`) always load those libraries, so the library check is skipped
+  for them (M2, 2026-11-22: without that, Zen and an Electron app showed as games). Other apps that draw with
+  Direct3D still show as games (on this PC: Flare); see section 6, item 10.
+- Settings: `CursorCaptureSettings::WithoutCursor`, `DrawBorderSettings::WithoutBorder`, `ColorFormat::Rgba8`
+  (tight RGBA rows, as `dr-core` takes them). On systems that refuse "no border" or "no cursor" (older Windows 10),
+  the capture starts again with the Windows default for that setting, so the yellow border shows. That is
+  cosmetic, not an error.
+- WGC captures the whole window. For a windowed game that includes the title bar and frame, so the screenshot can
+  be larger than the client size page 02 shows. Zones are stored in these capture pixels. M4 places overlays by
+  the client rect, so it must add the offset of the client area inside the captured window.
+- A minimized window gives no picture. Page 02 and Retake refuse it at once with a plain message instead of
+  waiting for the 3 s capture timeout. In M2 the capture still runs on the UI thread (up to 3 s, plus PNG
+  encoding at Finish). Proposal, not yet planned: move capture to its own thread in M3b.
+- The window is found again by exe name when the game restarts. `Status(NoWindow)` while it is gone. When the
+  game's process cannot be read (it runs as administrator, or anti-cheat protects it), the exe is empty. Such a
+  profile is saved with `title_contains` set to the window title and matches by title only. An empty exe never
+  matches a profile.
 - Black frames (loading screens) are passed on; `dr-core` reads nothing from them.
 - Screenshot for drawing zones: one captured frame saved as PNG next to the profile.
 
@@ -185,11 +199,17 @@ Profile JSON (version field so later changes can migrate):
 }
 ```
 
+- `mode` is `auto` (reads new text as it appears) or `manual` (on the read key).
 - Zone rects are in capture pixels of the screenshot they were drawn on (`base`), exactly what `dr_core::Zone`
   takes. They scale when the game runs at another size. DPI does not touch them.
 - Kind names on disk and in the UI: `dialogue` = Dialogue, `speaker` = Speaker, `notification` = Pickups,
   `prompt` = Prompts, `ignore` = Ignore.
 - Zones that are switched off (main page toggles) are not passed to `dr-core`.
+- The file name is the id: on load, `id` is set from the file name, so a copied or hand-edited file always saves
+  back to itself. A new profile takes an id that no file in `profiles\` uses yet (`.json`, `.json.bad`, `.png`;
+  case does not matter), so a file that was not loaded (newer format, damaged) is never overwritten.
+- One profile per game: page 02 refuses a window that already has a profile and points to the game switcher.
+- `voice.id` stays empty until real voices exist (M3a); `speed` (0.5 to 2.0) and `volume` come from page 05.
 - The active profile follows the game: when a window whose exe matches a profile appears, that profile starts.
 - Writes are atomic (write to `.tmp`, then rename). A broken file is kept as `.bad` and the app starts with
   defaults and says so.
@@ -232,13 +252,8 @@ export global Palette {
     out property <color> danger: #F87171;
     out property <color> pill-bg: #07090EDB;      // 0.86
     out property <color> pill-line: #FFFFFF1A;    // 0.10
-    // zone kinds (outline and fill on the 01 and 10 stages only; lists use grey icons)
-    out property <color> zone-fill: #A2ABBC24;    // grey zone fill on 03 and 11 (0.14)
-    out property <color> z-dialogue: #4FD1E8;  out property <color> z-dialogue-soft: #4FD1E824;
-    out property <color> z-speaker: #C49BFF;   out property <color> z-speaker-soft: #C49BFF24;
-    out property <color> z-pickups: #F5B544;   out property <color> z-pickups-soft: #F5B54424;
-    out property <color> z-prompts: #FF7AB6;   out property <color> z-prompts-soft: #FF7AB624;
-    out property <color> z-ignore: #8A94A8;    out property <color> z-ignore-soft: #8A94A824;
+    // zones on every stage are grey; zone kinds carry no color (section 6, item 4)
+    out property <color> zone-fill: #A2ABBC24;    // grey zone fill (0.14)
 }
 export global Space { out property <length> s1: 4px; out property <length> s2: 8px; out property <length> s3: 12px;
     out property <length> s4: 16px; out property <length> s5: 24px; out property <length> s6: 32px; out property <length> s7: 48px; }
@@ -255,12 +270,12 @@ export global Type { out property <length> fs1: 12px; out property <length> fs2:
 
 - **Fonts:** Geist and Geist Mono (SIL OFL) are bundled as variable TTFs in `crates/app/ui/fonts/` (the Google
   Fonts builds, as the mockups load them) and loaded with `import "fonts/Geist-Variable.ttf";`. Weights used: 400,
-  500, 600, as tokens `Type.w-regular`, `w-medium`, `w-semibold`. Both Slint renderers in use (software and
-  femtovg) apply the weight axis. Headings: `letter-spacing` -0.025em on fs5 (about -0.8px, `Type.ls-display`).
+  500, 600, as tokens `Type.w-regular`, `w-medium`, `w-semibold`. The Slint renderers in use (software for
+  tests and renders, Skia for the window, femtovg as fallback) apply the weight axis. Headings: `letter-spacing` -0.025em on fs5 (about -0.8px, `Type.ls-display`).
 - **Text weight on screen:** Chromium draws the mockup text with ClearType and extra contrast; Slint draws
-  grayscale coverage. All text, at every weight, has about 15 to 30% less ink in Slint than in the shots. The
-  weights themselves are right (measured, see `crates/app/README.md`). Slint's Skia renderer matches the shots
-  (section 6, item 8).
+  grayscale coverage. With the software and femtovg renderers, all text has about 15 to 30% less
+  ink than in the shots; the weights themselves are right (measured, see `crates/app/README.md`). The real window
+  uses Skia, which matches the shots (section 6, item 8).
 - **Line height:** Slint 1.18 `Text` has `line-height-factor`, relative to the font's natural line height
   (Geist: 1.3 em). Tokens `Type.lhf-115` to `lhf-150` give the CSS line heights 1.15 to 1.5. `StyledText` has no
   line height, so mixed-color multi-line text is one `Text` with the colored prefix drawn over its start.
@@ -276,7 +291,7 @@ export global Type { out property <length> fs1: 12px; out property <length> fs2:
   exported once to `crates/app/ui/icons/<name>.svg` by a small script (`crates/app/tools/export_icons.py`).
   Slint shows them with `Image { source: @image-url("icons/x.svg"); colorize: <color>; width: 16px; }`.
   Kind icons: `k-dialogue` (speech bubble), `k-speaker` (person), `k-pickups` (box), `k-prompts` (keycap),
-  `k-ignore` (eye-off). Always grey (`text-2` or `text-3`), never a kind color.
+  `k-ignore` (eye-off). Always grey (`text-2` or `text-3`). There are no kind colors (section 6, item 4).
 - **Game art** in M1 (fake data): the SVG scenes the mockups draw are exported to `crates/app/ui/art/*.svg`.
   From M2 on, the real screenshot of the game takes their place.
 - **No CSS-only effects:** no blur, no backdrop filter. All mockups were made inside that rule.
@@ -298,7 +313,7 @@ export global Type { out property <length> fs1: 12px; out property <length> fs2:
 | `ZoneRow`, `ZoneList` | `.zrow` (round 4) | icon, name, toggle |
 | `ZoneBox`, `Handle`, `ZoneBadge` | `.zone`, `.handle` | on the stage and in zone edit |
 | `Stage` | `.stage` | 16:9 image with zones on top, maps image px to view px |
-| `ZoneTools`, `KindPicker` | `.ztools` | Select / Draw zone, kind segmented, Retake screenshot |
+| `ZoneTools`, `KindPicker` | `.ztools` | Select / Draw zone, kind segmented (grey kind icon + name), Retake screenshot |
 | `Waveform`, `PillWave` | `.wave`, `.pill-wave` | bars from a model of heights |
 | `TitleBar`, `Tabs`, `GameButton`, `WinControls` | `.bar`, `.tabs`, `.switcher`, `.winctl` | drag and resize via winit |
 | `StepsBar`, `ObHead`, `ObFoot` | `.steps`, `.ob-*`, `.foot` | onboarding chrome |
@@ -328,9 +343,10 @@ screens) and lays out to the size it gets.
 | 15-quick-menu-voice | same file | `QmVoiceList`: voice sub-list (Space preview, Enter choose, Left back). The review previews (menu over the game, the two other states) are in `overlays/quick_menu_preview.slint`, so the overlay window imports only the menu |
 | 16-zone-edit | `overlays/zone_edit.slint` | `ZoneEditWindow`: hint bar with Done, zone boxes with grey kind badges, selected zone with handles and x, kind picker popover, size tag while drawing |
 
-View state lives in Rust and is pushed to Slint through `in` properties and `ModelRc<VecModel<...>>`. In M1,
-`src/fake.rs` fills the window directly. The view-model layer (`crates/app/src/vm/*.rs`) starts in M2 with real
-data, and the fake data moves behind it. Slint callbacks go back to Rust (`clicked`, `zone-drawn(rect)`, `key-change(which)`).
+View state lives in Rust and is pushed to Slint through `in` properties and `ModelRc<VecModel<...>>`. Since M2 the
+view-model layer (`crates/app/src/vm/`) owns it: `vm::Source::Real` (profiles in a data folder and a `Desktop` for
+windows and screenshots) or `vm::Source::Fake` (the mockup data of `src/fake.rs`, for render-screens and tests).
+`vm/zones.rs` holds the zone drawing state with one step of undo. Slint callbacks go back to Rust (`clicked`, `zone-drawn(rect)`, `key-change(which)`).
 Navigation is one Slint enum property on the main window:
 `Page { welcome, pick-window, draw-zones, keys, voice, mode, overview, zones, settings }` plus `switcher-open`.
 
@@ -381,25 +397,31 @@ Navigation is one Slint enum property on the main window:
    is later.
 3. "Import settings" on the welcome page: v1 imports a profile JSON exported from DialogReader (Export is in the
    profile menu). It does not read the old C# app's settings.
-4. Zone kind colors: settled. Max (2026-11-22): make them grey. The zone boxes and labels on the picture (03, 11),
-   the Kind picker dots and the 06 summary dots turn grey, in the app and in those mockups only. Done 2026-11-22:
-   grey `text-2` lines and tags, `zone-fill` fill, `text-3` dots; the selected zone uses the accent for selection.
-   The stages on 01 and 10-main-b still use kind colors, as their mockups do. Open points: item 9.
+4. Zone kind colors: settled. Max (2026-11-22): zone kinds carry no color anywhere, one grey line icon per kind.
+   Every stage (01, 03, 10-main-b, 11) draws zones with grey `text-2` lines and tags and the `zone-fill` fill; the
+   selected zone uses the accent for selection only. The 06 summary dots are `text-3`. The `z-*` color tokens and
+   `Kinds.color` / `Kinds.soft` are gone from the app. The "Dialogue" chip under the 01 picture is a grey icon and
+   name in the app (its mockup chip was left as it was, see item 9).
 5. Settings > Keys: settled. Max picked "D everywhere" (2026-11-22), so Settings shows the same two 04-read-key-d
    cards as setup.
 6. Media pause while speaking. The old app had it; this plan puts it after v1. Is v1 without it acceptable?
 7. Kokoro wording. M3a changes the voice page header, "Get more voices" and Settings > Voices to what v1 ships
    (Windows voices). Max approves the new wording first.
-8. Text weight: Max (2026-11-22) chose a spike on Slint's Skia renderer for the real window (gamma-corrected
-   text). Measured 2026-11-22 (`crates/app/README.md`, "Renderer"). At 100% scale, Skia text has 101% of the
-   mockup shots' ink, femtovg and software 79%. At 225% (Max's screen), Skia has 100% of a 225% Chromium shot,
-   femtovg 89%, software 88%. So Skia matches the mockups at both scales, but the gain on Max's screen is 11
-   points, not 21. The exe grows from 19.1 MB to 29.2 MB (MB = 10^6 bytes; zip 8.0 to 12.2 MB). It gets under
-   25 MB (22.1 MB) only with fat LTO and `panic = "abort"`. A named Cargo profile (`[profile.ship]`, inherits
-   release) can carry those settings for the shipped exe only; tests and normal builds keep unwinding. The cost:
-   in the shipped exe, any panic ends the app at once. For now Skia is the opt-in feature `renderer-skia` and
-   femtovg stays the default. Open for Max: accept about 29 MB, or accept `panic = "abort"` in a ship profile,
-   or keep femtovg.
-9. Zone kind colors, open points after item 4: should the stages on 01 and 10-main-b turn grey too? And the five
-   Kind picker dots on 03 and 11 are now the same grey, so they carry no meaning. Keep them, or drop the dots and
-   keep only the kind icons?
+8. Renderer: settled. Max (2026-11-22): Skia with `panic = "abort"` in a ship-only profile. Measured before
+   (`crates/app/README.md`, "Renderer"): Skia text has 100 to 101% of the mockup shots' ink at 100% and 225%
+   scale, femtovg 79 to 89%. The workspace `Cargo.toml` has `[profile.ship]` (inherits release, fat LTO, one
+   codegen unit, `panic = "abort"`); only `cargo build --profile ship` uses it, so tests, the arena and normal
+   builds keep unwinding. `renderer-skia` is the default feature of dr-app and turns on Slint's
+   `renderer-skia-opengl`; `main.rs` asks for the `skia-opengl` renderer by name, because overlays need OpenGL
+   Skia (Skia's default surface draws their see-through margins black, docs/overlay-spike.md). femtovg stays as an
+   opt-in fallback (`--no-default-features --features renderer-femtovg`). render-screens and the tests keep the
+   software renderer. A panic hook (`crates/app/src/crash.rs`) writes a crash log to
+   `%LOCALAPPDATA%\DialogReader\logs` before the abort.
+9. Kind picker and the 01 and 10 stages: settled. Max (2026-11-22): the stages on 01 and 10-main-b turn grey (app
+   and those two mockups, nothing else on them changed), and the Kind picker on 03 and 11 shows the grey kind line
+   icons instead of five identical grey dots (app and those two mockups). Done 2026-11-22. Open: the 01 mockup
+   still shows a colored "Dialogue" chip under the picture (the app shows it grey), and the 06 summary still shows
+   five identical grey dots; both were left alone because Max named only the stages and the picker.
+10. Game check on page 02 (M2): any app that draws with Direct3D counts as a game by the library check (on this
+   PC, Flare). Browsers and Electron are left out by window class. Is that good enough, or should the library
+   check go (games would then need a full-monitor window or a profile)?

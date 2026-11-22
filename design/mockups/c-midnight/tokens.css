@@ -316,3 +316,7 @@ h3 { font-size: var(--fs-3); font-weight: 500; line-height: 1.3; }
 .kgrey .zone.sel { border-color: var(--accent); }
 .kgrey .zone.sel .handle { border-color: var(--accent); }
 .kgrey .dot[class*=" k-"] { background: var(--text-3); }
+
+/* 2026-11-22 (Max): zone kinds carry no color anywhere. The stages on 01 and 10-main-b are marked .kgrey too,
+   so their zone boxes are grey like 03 and 11. The Kind picker on 03 and 11 shows the grey kind line icons
+   instead of five identical grey dots (_build.py kindpicker). No new rules are needed for that. */

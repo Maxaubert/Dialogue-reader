@@ -3,11 +3,19 @@ import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } f
 import { ZoneData } from "../data.slint";
 import { Icon, CIcon, Button, Toggle, CornerMask } from "base.slint";
 
-// Maps image pixels (src-w x src-h, shown with "cover") to view pixels. Rust has the same math in geom.rs.
+// Maps image pixels (src-w x src-h, shown with "cover", or "contain" for real screenshots) to view pixels.
+// Rust has the same math in geom.rs. With `interactive`, presses, drags and releases go to `pointer` in image
+// pixels (src/vm/zones.rs draws, selects, moves and resizes).
 export component Stage inherits Rectangle {
     in property <image> source: Art.scene;
     in property <float> src-w: 1600;
     in property <float> src-h: 900;
+    // real screenshots are shown whole (contain); the fake 16:9 art fills the stage (cover)
+    in property <bool> contain: false;
+    in property <bool> interactive: false;
+    // the box being drawn (image px)
+    in property <bool> drafting: false;
+    in property <ZoneData> draft;
     in property <[ZoneData]> zones;
     in property <bool> labels: true;
     in property <int> selected: -1;
@@ -15,12 +23,12 @@ export component Stage inherits Rectangle {
     in property <bool> round-top: true;
     in property <bool> round-bottom: true;
     in property <color> behind: Palette.bg;
-    // Grey zones (03 and 11, Max 2026-11-22): no kind colors, the selected zone uses the accent.
-    in property <bool> grey-kinds: false;
-    out property <float> scale: max(root.width / 1px / root.src-w, root.height / 1px / root.src-h);
+    out property <float> scale: root.contain ? min(root.width / 1px / root.src-w, root.height / 1px / root.src-h) : max(root.width / 1px / root.src-w, root.height / 1px / root.src-h);
     out property <length> off-x: (root.width - root.src-w * root.scale * 1px) / 2;
     out property <length> off-y: (root.height - root.src-h * root.scale * 1px) / 2;
     callback zone-clicked(int);
+    // 0 press, 1 move, 2 release; x and y in image px; scale = view px per image px
+    callback pointer(int, float, float, float);
     background: Palette.stage-bg;
     // The real window clips to these corners. Software renders cannot, so the CornerMask below paints them.
     border-top-left-radius: root.round-top ? root.radius : 0px;
@@ -29,18 +37,19 @@ export component Stage inherits Rectangle {
     border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
     clip: true;
     Image {
-        width: 100%;
-        height: 100%;
+        x: root.off-x;
+        y: root.off-y;
+        width: root.src-w * root.scale * 1px;
+        height: root.src-h * root.scale * 1px;
         source: root.source;
-        image-fit: cover;
+        image-fit: fill;
     }
 
     for z[i] in root.zones: Rectangle {
-        property <color> zc: root.grey-kinds ? Palette.text-2 : Kinds.color(z.kind);
-        property <color> zf: root.grey-kinds ? Palette.zone-fill : Kinds.soft(z.kind);
+        // Zone kinds carry no color (Max, 2026-11-22): every zone is grey, the selected one uses the accent.
+        property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
-        // the outline: the kind color, or with grey kinds the accent on the selected zone
-        property <color> line: self.sel && root.grey-kinds ? Palette.accent : self.zc;
+        property <color> line: self.sel ? Palette.accent : Palette.text-2;
         x: root.off-x + z.x * root.scale * 1px;
         y: root.off-y + z.y * root.scale * 1px;
         width: z.w * root.scale * 1px;
@@ -62,16 +71,43 @@ export component Stage inherits Rectangle {
                 border-color: line;
             }
         }
-        TouchArea {
+        if !root.interactive: TouchArea {
             clicked => {
                 root.zone-clicked(i);
+            }
+        }
+    }
+    if root.drafting: Rectangle {
+        x: root.off-x + root.draft.x * root.scale * 1px;
+        y: root.off-y + root.draft.y * root.scale * 1px;
+        width: root.draft.w * root.scale * 1px;
+        height: root.draft.h * root.scale * 1px;
+        border-radius: Radius.xs;
+        border-width: 1.5px;
+        border-color: Palette.edit-draft-line;
+        background: Palette.edit-draft-fill;
+    }
+    if root.interactive: TouchArea {
+        mouse-cursor: crosshair;
+        accessible-role: image;
+        accessible-label: "Screenshot";
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.pointer(0, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.pointer(2, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.pointer(1, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
             }
         }
     }
     // Tags go above every zone box, so they are drawn after all boxes.
     if root.labels: Rectangle {
         for z[i] in root.zones: Rectangle {
-            property <color> zc: root.grey-kinds ? Palette.text-2 : Kinds.color(z.kind);
+            property <color> zc: Palette.text-2;
             x: root.off-x + z.x * root.scale * 1px - 1.5px;
             y: root.off-y + z.y * root.scale * 1px - self.height - Space.s1;
             height: 20px;
@@ -109,11 +145,16 @@ export component Stage inherits Rectangle {
     }
 }
 
-// Zone list row (round 4): grey kind icon, name, toggle.
+// Zone list row (round 4): grey kind icon, name, toggle. With `editable`, the name of the selected row is a
+// text field (rename).
 export component ZoneRow inherits Rectangle {
     in property <ZoneData> zone;
     in property <bool> selected;
     in property <bool> first;
+    in property <bool> editable: false;
+    callback renamed(string);
+    // true when Enter ended it (the window then takes the keys again)
+    callback rename-done(bool);
     in property <length> pad-x: Space.s5;
     in property <length> row-h: Size.row;
     callback toggled(bool);
@@ -140,13 +181,40 @@ export component ZoneRow inherits Rectangle {
             color: root.selected ? Palette.text : Palette.text-2;
         }
 
-        Text {
+        if !(root.editable && root.selected): Text {
             text: root.zone.name;
             horizontal-stretch: 1;
             font-weight: Type.w-medium;
             overflow: elide;
             vertical-alignment: center;
             color: root.zone.on ? Palette.text : Palette.text-2;
+        }
+        if root.editable && root.selected: TextInput {
+            text: root.zone.name;
+            horizontal-stretch: 1;
+            font-weight: Type.w-medium;
+            vertical-alignment: center;
+            single-line: true;
+            color: root.zone.on ? Palette.text : Palette.text-2;
+            selection-background-color: Palette.accent-soft;
+            accessible-label: "Zone name";
+            // the typed text waits in Rust; Enter or leaving the field saves it as one change (one undo step)
+            edited => {
+                root.renamed(self.text);
+            }
+            accepted => {
+                root.rename-done(true);
+            }
+            changed has-focus => {
+                if !self.has-focus {
+                    root.rename-done(false);
+                }
+            }
+            // follow the model when it changes from outside (undo), since typing breaks the text binding
+            property <string> model-name: root.zone.name;
+            changed model-name => {
+                self.text = self.model-name;
+            }
         }
 
         VerticalLayout {
@@ -162,9 +230,10 @@ export component ZoneRow inherits Rectangle {
     }
 }
 
-// Kind picker with grey dots (.seg in .ztools). The kind has no color (Max, 2026-11-22).
+// Kind picker (.seg in .ztools): the grey kind line icons. The kind has no color (Max, 2026-11-22).
 export component KindPicker inherits Rectangle {
-    in-out property <Kind> kind: Kind.dialogue;
+    in property <Kind> kind: Kind.dialogue;
+    callback picked(Kind);
     height: 32px;
     border-radius: Radius.md;
     background: Palette.surface-2;
@@ -180,20 +249,15 @@ export component KindPicker inherits Rectangle {
             accessible-label: Kinds.name(k);
             accessible-item-selected: k == root.kind;
             accessible-action-default => {
-                root.kind = k;
+                root.picked(k);
             }
             HorizontalLayout {
                 padding-left: Space.s3;
                 padding-right: Space.s3;
                 spacing: Space.s2;
-                VerticalLayout {
-                    alignment: center;
-                    Rectangle {
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 4px;
-                        background: Palette.text-3;
-                    }
+                CIcon {
+                    source: Kinds.icon(k);
+                    color: k == root.kind ? Palette.text : Palette.text-2;
                 }
 
                 Text {
@@ -206,7 +270,7 @@ export component KindPicker inherits Rectangle {
 
             TouchArea {
                 clicked => {
-                    root.kind = k;
+                    root.picked(k);
                 }
             }
         }
@@ -216,7 +280,9 @@ export component KindPicker inherits Rectangle {
 // Select / Draw zone, kind picker, Retake screenshot.
 export component ZoneTools inherits HorizontalLayout {
     in-out property <bool> draw: true;
-    in-out property <Kind> kind: Kind.dialogue;
+    in property <Kind> kind: Kind.dialogue;
+    callback kind-picked(Kind);
+    callback retake();
     spacing: Space.s3;
     alignment: stretch;
     Rectangle {
@@ -279,7 +345,10 @@ export component ZoneTools inherits HorizontalLayout {
 
     KindPicker {
         horizontal-stretch: 0;
-        kind <=> root.kind;
+        kind: root.kind;
+        picked(k) => {
+            root.kind-picked(k);
+        }
     }
 
     Rectangle {
@@ -289,5 +358,8 @@ export component ZoneTools inherits HorizontalLayout {
     Button {
         text: "Retake screenshot";
         icon: Icons.camera;
+        clicked => {
+            root.retake();
+        }
     }
 }
