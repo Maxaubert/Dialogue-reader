@@ -1,7 +1,7 @@
 // The game picture with zones on top (.stage, .zone, .ztag, .handle), the zone list row and the zone tools.
 import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, Toggle, CornerMask, Chip } from "base.slint";
+import { Icon, CIcon, Button, Toggle, CornerMask, Dot } from "base.slint";
 
 // The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
 // Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
@@ -78,6 +78,9 @@ export component Stage inherits Rectangle {
         height: root.ph * root.scale * 1px;
         source: root.live ? LiveView.frame : root.source;
         image-fit: fill;
+        // the game picture itself (the tests check that the live view note is never on it)
+        accessible-role: image;
+        accessible-label: "Game picture";
     }
 
     for z[i] in root.zones: Rectangle {
@@ -195,19 +198,6 @@ export component Stage inherits Rectangle {
             }
         }
     }
-    // "Live", or why the saved screenshot shows; only real stages
-    if root.contain && LiveView.note != "": Chip {
-        width: self.preferred-width;
-        x: parent.width - self.width - Space.s3;
-        y: Space.s3;
-        text: LiveView.note;
-        dot: LiveView.note-live;
-        fg: LiveView.note-live ? Palette.ok : Palette.text-2;
-        bg: Palette.pill-bg;
-        accessible-role: text;
-        accessible-label: "Live view";
-        accessible-value: LiveView.note;
-    }
     if Render.software: CornerMask {
         width: 100%;
         height: 100%;
@@ -215,6 +205,35 @@ export component Stage inherits Rectangle {
         color: root.behind;
         top: root.round-top;
         bottom: root.round-bottom;
+    }
+}
+
+// "Live" (with a green dot), or why the saved screenshot shows (LiveView.note). It sits in the line under a stage,
+// never on the game picture (Max, 2026-11-23: the chip covered the top right corner, where a zone may be).
+// Empty note: nothing.
+export component LiveNote inherits Rectangle {
+    width: row.preferred-width;
+    height: 22px;
+    horizontal-stretch: 0;
+    accessible-role: text;
+    accessible-label: "Live view";
+    accessible-value: LiveView.note;
+    row := HorizontalLayout {
+        spacing: 6px;
+        if LiveView.note-live: VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+                tint: Palette.ok;
+            }
+        }
+        Text {
+            text: LiveView.note;
+            font-size: Type.fs1;
+            font-weight: LiveView.note-live ? Type.w-medium : Type.w-regular;
+            color: LiveView.note-live ? Palette.ok : Palette.text-3;
+            vertical-alignment: center;
+        }
     }
 }
 

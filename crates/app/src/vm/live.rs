@@ -7,6 +7,10 @@
 //! - It runs only while a page with a real stage shows (03 with a picked window, 10 and 11 with a current game)
 //!   and the app window is not minimized or hidden. A UI timer checks that twice a second; a page change checks
 //!   at once.
+//! - Overview (10) runs it only while the app window has the focus (Max, 2026-11-23): when he goes back to the
+//!   game, the session stops and the last frame stays on the stage (no switch to the saved screenshot, the note
+//!   stays). It starts again when the app gets the focus back. Pages 03 and 11 do not care about the focus.
+//! - The note ("Live", or why the saved screenshot shows) is in the line under the stage, never on the picture.
 //! - Zones stay in capture pixels. While frames show, the editor uses the capture size (`Editor::rescale` when
 //!   the game changes size, after a drag ends). When the live view stops, it goes back to the saved screenshot's
 //!   size, and a small note on the stage says why the saved screenshot shows. A frame of a new size that comes
@@ -149,6 +153,8 @@ pub struct LiveState {
     /// The stage size in physical pixels the session was given.
     target: (u32, u32),
     note: String,
+    /// The app window has the focus (winit `Focused`, see `crate::focus_lost` and `crate::focus_gained`).
+    focused: bool,
     /// The note of a failed start, kept until the page or game changes.
     failed: Option<(For, &'static str)>,
     /// The search for the game's window (the window list takes about 10 ms, so it runs on another thread):
@@ -175,6 +181,7 @@ impl Default for LiveState {
             stage: std::rc::Rc::new(std::cell::Cell::new((1280.0, 720.0))),
             target: (1280, 720),
             note: String::new(),
+            focused: true,
             failed: None,
             lookup: 0,
             looking: false,
@@ -193,6 +200,20 @@ impl Vm {
     /// Live frames are on the stage (tests).
     pub fn live_showing(&self) -> bool {
         self.live.showing
+    }
+
+    /// The app window got (`true`) or lost the focus. Overview pauses its live view without it.
+    pub fn live_focus(&mut self, focused: bool) {
+        if self.live.focused != focused {
+            self.live.focused = focused;
+            self.live_tick();
+        }
+    }
+
+    /// The page on screen wants a live view but must not run one now: Overview while the app window has no
+    /// focus (the game is in front). The last frame stays.
+    fn live_paused(&self, w: &MainWindow) -> bool {
+        !self.live.focused && w.get_page() == Page::Overview
     }
 
     /// What the page on screen wants a live view of, if anything.
@@ -299,6 +320,10 @@ impl Vm {
             self.live_note(&w, "");
             return;
         };
+        if self.live_paused(&w) {
+            self.live_pause();
+            return;
+        }
         if self.live.run.is_none() {
             if self.live.next_try.is_some_and(|t| Instant::now() < t) {
                 return;
@@ -406,6 +431,28 @@ impl Vm {
         }
     }
 
+    /// Ends the session but keeps what the stage shows: the last frame (or the saved screenshot) and the note. The
+    /// next start (when the app has the focus again) goes on from there without a flicker.
+    fn live_pause(&mut self) {
+        if self.live.run.is_none() && !self.live.looking {
+            return;
+        }
+        self.live.run = None;
+        self.live.session += 1;
+        if let Ok(mut d) = self.live.slot.0.lock() {
+            d.session = self.live.session;
+            d.frame = None;
+            d.ended = None;
+        }
+        self.live.pending = None;
+        // a window search still running is not used: the next start asks again
+        self.live.looking = false;
+        self.live.lookup += 1;
+        self.live.last_frame = None;
+        self.live.started = None;
+        self.live.next_try = None;
+    }
+
     /// Shows the saved screenshot with a note that says why. The session (if any) keeps running: a game that is
     /// opened again sends frames again.
     fn live_fallback(&mut self, w: &MainWindow, note: &str) {
@@ -453,6 +500,10 @@ impl Vm {
             let g = w.global::<LiveView>();
             g.set_note(note.into());
             g.set_note_live(note == NOTE_LIVE);
+            // page 11 shows the note in its line under the stage
+            if self.live.of != Some(For::Setup) {
+                self.push_shot_info();
+            }
         }
     }
 
@@ -553,15 +604,21 @@ impl Vm {
         }
     }
 
-    /// The line under the stage on page 11: what shows and its size.
+    /// The line under the stage on page 11: what shows (with the live view note: "Live", or why the saved
+    /// screenshot shows) and its size. The stage itself has no note on it.
     pub(super) fn push_shot_info(&self) {
         let Some(w) = self.win() else { return };
         let (what, sw, sh) = if self.live.showing {
             let g = w.global::<LiveView>();
-            ("Live", g.get_w(), g.get_h())
+            (NOTE_LIVE, g.get_w(), g.get_h())
         } else {
+            let what = if self.live.note.is_empty() || self.live.note == NOTE_LIVE {
+                "Screenshot"
+            } else {
+                self.live.note.as_str()
+            };
             match self.still_size(false) {
-                Some((sw, sh)) => ("Screenshot", sw, sh),
+                Some((sw, sh)) => (what, sw, sh),
                 None => return,
             }
         };

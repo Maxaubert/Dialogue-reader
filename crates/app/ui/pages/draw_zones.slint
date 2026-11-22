@@ -3,7 +3,7 @@ import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../
 import { ZoneData } from "../data.slint";
 import { Icon, CIcon, Card, CardHead, SmallLabel } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
-import { Stage, ZoneRow, ZoneTools } from "../components/stage.slint";
+import { Stage, ZoneRow, ZoneTools, LiveNote, LiveView } from "../components/stage.slint";
 
 export component KindHelp inherits VerticalLayout {
     for k in [
@@ -167,6 +167,13 @@ export component DrawZonesPage inherits Rectangle {
                     }
                 }
             }
+        }
+
+        // "Live", or why the saved screenshot shows: in a line under the picture, never on it
+        if root.contain && LiveView.note != "": HorizontalLayout {
+            alignment: start;
+            padding-top: Space.s2;
+            LiveNote { }
         }
     }
 }
