@@ -1,0 +1,239 @@
+// 01 welcome.
+import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+import { Icon, Button, BtnKind, Card, Dot, PillWave } from "../components/base.slint";
+import { Stage } from "../components/stage.slint";
+import { ZoneData } from "../data.slint";
+import { OverlayPill } from "../overlays/pill.slint";
+
+component StepItem inherits HorizontalLayout {
+    in property <string> n;
+    in property <string> title;
+    in property <string> desc;
+    spacing: Space.s3;
+    VerticalLayout {
+        alignment: start;
+        Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: Palette.surface-3;
+            Text {
+                text: root.n;
+                font-size: Type.fs1;
+                font-weight: Type.w-semibold;
+                color: Palette.text;
+            }
+        }
+    }
+
+    VerticalLayout {
+        Text {
+            text: root.title;
+            height: Type.lh2;
+            font-weight: Type.w-medium;
+            color: Palette.text;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.desc;
+            height: Type.lh2;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component WelcomePage inherits Rectangle {
+    in property <[ZoneData]> zones;
+    callback get-started();
+    callback import-settings();
+    HorizontalLayout {
+        x: (parent.width - Size.col) / 2;
+        width: Size.col;
+        spacing: Space.s7;
+        alignment: start;
+        VerticalLayout {
+            width: 400px;
+            alignment: center;
+            Text {
+                text: "Hear the text in your games.";
+                font-size: Type.fs5;
+                font-weight: Type.w-semibold;
+                letter-spacing: Type.ls-display;
+                line-height-factor: Type.lhf-115;
+                wrap: word-wrap;
+                color: Palette.text;
+            }
+
+            Rectangle {
+                height: Space.s3;
+            }
+
+            Text {
+                text: "DialogReader watches your game and reads dialogue, item pickups and other on-screen text out loud, with a voice that runs on your PC.";
+                font-size: Type.fs3;
+                line-height-factor: Type.lhf-145;
+                wrap: word-wrap;
+                color: Palette.text-2;
+            }
+
+            VerticalLayout {
+                padding-top: Space.s6;
+                padding-bottom: Space.s6;
+                spacing: Space.s4;
+                StepItem {
+                    n: "1";
+                    title: "Pick your game";
+                    desc: "Start the game first. DialogReader finds it.";
+                }
+
+                StepItem {
+                    n: "2";
+                    title: "Mark where text shows up";
+                    desc: "Draw boxes over subtitles, names and pop-ups.";
+                }
+
+                StepItem {
+                    n: "3";
+                    title: "Choose a key, a voice and a mode";
+                    desc: "Then play. The window can stay closed.";
+                }
+            }
+
+            HorizontalLayout {
+                spacing: Space.s3;
+                alignment: start;
+                Button {
+                    text: "Get started";
+                    trail: Icons.arrow-right;
+                    kind: BtnKind.primary;
+                    large: true;
+                    clicked => {
+                        root.get-started();
+                    }
+                }
+
+                Button {
+                    text: "Import settings";
+                    icon: Icons.upload;
+                    large: true;
+                    clicked => {
+                        root.import-settings();
+                    }
+                }
+            }
+
+            Rectangle {
+                height: Space.s4;
+            }
+
+            Text {
+                text: "Takes about two minutes. You can change everything later.";
+                font-size: Type.fs1;
+                color: Palette.text-3;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Card {
+                VerticalLayout {
+                    padding: 1px;
+                    Stage {
+                        height: 287px;
+                        labels: false;
+                        zones: root.zones;
+                        radius: Radius.lg;
+                        round-bottom: false;
+                        behind: Palette.bg;
+                        OverlayPill {
+                            x: parent.width - self.width - 12px;
+                            y: 12px;
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Space.s5;
+                        padding-right: Space.s5;
+                        padding-top: Space.s4;
+                        padding-bottom: Space.s4;
+                        spacing: Space.s3;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon-only: true;
+                                icon: Icons.volume;
+                                label: "Play the line";
+                            }
+                        }
+
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: "Arthur:";
+                                    height: Type.lh2;
+                                    font-weight: Type.w-medium;
+                                    color: Palette.text-2;
+                                    horizontal-stretch: 0;
+                                }
+
+                                Text {
+                                    text: "We need to get these horses moving before the snow buries us.";
+                                    height: Type.lh2;
+                                    color: Palette.text;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                    min-width: 0px;
+                                }
+                            }
+
+                            Text {
+                                text: "Read just now · Kokoro · Adam";
+                                height: Type.lh1;
+                                font-size: Type.fs1;
+                                color: Palette.text-3;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 22px;
+                                border-radius: Radius.sm;
+                                background: Palette.z-dialogue-soft;
+                                HorizontalLayout {
+                                    padding-left: Space.s2;
+                                    padding-right: Space.s2;
+                                    spacing: 6px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Dot {
+                                            size: 6px;
+                                            tint: Palette.z-dialogue;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "Dialogue";
+                                        font-size: Type.fs1;
+                                        font-weight: Type.w-medium;
+                                        color: Palette.z-dialogue;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

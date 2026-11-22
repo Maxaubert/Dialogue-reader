@@ -1,0 +1,242 @@
+// 06 mode, with the setup summary.
+import { Palette, Space, Radius, Size, Type, Icons, Kind, Kinds } from "../theme.slint";
+import { Icon, CIcon, Card, Radio, Dot, Kbd, Thumb, SmallLabel } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+component ModeCard inherits Card {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> line1;
+    in property <string> line2;
+    callback clicked();
+    height: 187px;
+    accessible-role: radio-button;
+    accessible-label: root.title;
+    accessible-checked: root.selected;
+    accessible-action-default => {
+        root.clicked();
+    }
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    VerticalLayout {
+        padding: Space.s5 + 1px;
+        spacing: Space.s3;
+        HorizontalLayout {
+            alignment: space-between;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: Radius.md;
+                background: root.selected ? Palette.accent-soft : Palette.surface-3;
+                Icon {
+                    source: root.icon;
+                    color: root.selected ? Palette.accent : Palette.text;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Radio {
+                    on: root.selected;
+                }
+            }
+        }
+
+        Text {
+            text: root.title;
+            height: 21px;
+            font-size: Type.fs3;
+            font-weight: Type.w-medium;
+            color: Palette.text;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.line1;
+            height: Type.lh2;
+            color: Palette.text;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.line2;
+            height: Type.lh2;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component SumRow inherits Rectangle {
+    in property <string> key;
+    in property <bool> first;
+    height: 48px;
+    if !root.first: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.line;
+    }
+    HorizontalLayout {
+        padding-left: Space.s5;
+        padding-right: Space.s5;
+        spacing: Space.s4;
+        alignment: start;
+        Text {
+            width: 120px;
+            text: root.key;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+
+        @children
+    }
+}
+
+export component ModePage inherits Rectangle {
+    in-out property <bool> automatic: true;
+    in property <string> game: "Red Dead Redemption 2";
+    in property <string> art: "rdr2";
+    in property <int> zone-count: 5;
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    in property <string> voice: "Kokoro · Adam";
+    VerticalLayout {
+        x: (parent.width - Size.col) / 2;
+        width: Size.col;
+        padding-top: Space.s7;
+        alignment: start;
+        ObHead {
+            title: "How should it read?";
+            lead: "You can switch any time from the main window.";
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        HorizontalLayout {
+            spacing: Space.s4;
+            ModeCard {
+                width: (Size.col - Space.s4) / 2;
+                icon: Icons.zap;
+                title: "Automatic";
+                line1: "Reads new text the moment it appears in a zone.";
+                line2: "Good for story games and long talks.";
+                selected: root.automatic;
+                clicked => {
+                    root.automatic = true;
+                }
+            }
+
+            ModeCard {
+                width: (Size.col - Space.s4) / 2;
+                icon: Icons.mouse;
+                title: "On key press";
+                line1: "Reads every zone once when you press your read key.";
+                line2: "Good when you only want some lines.";
+                selected: !root.automatic;
+                clicked => {
+                    root.automatic = false;
+                }
+            }
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        SmallLabel {
+            text: "Your setup for " + root.game;
+        }
+
+        Rectangle {
+            height: Space.s3;
+        }
+
+        Card {
+            VerticalLayout {
+                padding: 1px;
+                SumRow {
+                    key: "Game";
+                    first: true;
+                    VerticalLayout {
+                        alignment: center;
+                        Thumb {
+                            width: 24px;
+                            height: 24px;
+                            art: root.art;
+                            radius: Radius.xs;
+                        }
+                    }
+
+                    Text {
+                        text: root.game;
+                        font-weight: Type.w-medium;
+                        color: Palette.text;
+                        vertical-alignment: center;
+                    }
+                }
+
+                SumRow {
+                    key: "Zones";
+                    Text {
+                        text: root.zone-count + " zones";
+                        font-weight: Type.w-medium;
+                        color: Palette.text;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Space.s2;
+                        for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: VerticalLayout {
+                            alignment: center;
+                            Dot {
+                                tint: Kinds.color(k);
+                            }
+                        }
+                    }
+                }
+
+                SumRow {
+                    key: "Read key";
+                    VerticalLayout {
+                        alignment: center;
+                        Kbd {
+                            text: root.read-key;
+                        }
+                    }
+                }
+
+                SumRow {
+                    key: "Quick menu key";
+                    VerticalLayout {
+                        alignment: center;
+                        Kbd {
+                            text: root.menu-key;
+                        }
+                    }
+                }
+
+                SumRow {
+                    key: "Voice";
+                    Text {
+                        text: root.voice;
+                        font-weight: Type.w-medium;
+                        color: Palette.text;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "1.1× speed";
+                        color: Palette.text-2;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

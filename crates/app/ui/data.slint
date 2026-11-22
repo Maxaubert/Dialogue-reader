@@ -1,0 +1,70 @@
+// View-model rows. Rust fills them (src/fake.rs in M1) and pushes them as models.
+import { Kind } from "theme.slint";
+
+// A zone in image pixels of the screenshot it was drawn on (the fake scene is 1600 x 900).
+export struct ZoneData {
+    name: string,
+    kind: Kind,
+    on: bool,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+}
+
+// Page 02: a window that can be read.
+export struct WindowData {
+    name: string,
+    exe: string,
+    meta: string,
+    art: string,
+}
+
+// Page 05 and the quick menu: one voice.
+export struct VoiceData {
+    name: string,
+    desc: string,
+    short: string,
+}
+
+// Recent lines on the overview and the activity list.
+export struct LineData {
+    time: string,
+    kind: Kind,
+    who: string,
+    line: string,
+    skip: string,
+}
+
+// Game switcher rows.
+export struct GameData {
+    name: string,
+    meta: string,
+    art: string,
+    running: bool,
+}
+
+// Zone edit overlay: a zone in frame pixels.
+export struct EditZone {
+    kind: Kind,
+    x: length,
+    y: length,
+    w: length,
+    h: length,
+}
+
+export enum Page {
+    welcome,
+    pick-window,
+    draw-zones,
+    keys,
+    voice,
+    mode,
+    overview,
+    zones,
+    settings,
+    activity,
+}
+
+// Debug preview of the in-game overlays inside the main window (M1: components, not real overlay windows yet).
+export enum OverlayPreview { none, pill, quick-menu, quick-menu-voice, zone-edit }

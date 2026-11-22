@@ -1,0 +1,127 @@
+// 03 draw zones.
+import { Palette, Space, Radius, Size, Type, Icons, Kind, Kinds } from "../theme.slint";
+import { ZoneData } from "../data.slint";
+import { Icon, CIcon, Card, CardHead, SmallLabel } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+import { Stage, ZoneRow, ZoneTools } from "../components/stage.slint";
+
+export component KindHelp inherits VerticalLayout {
+    for k in [
+        { kind: Kind.dialogue, d: "Spoken lines" },
+        { kind: Kind.speaker, d: "Who is talking" },
+        { kind: Kind.pickups, d: "Item pop-ups" },
+        { kind: Kind.prompts, d: "Button hints" },
+        { kind: Kind.ignore, d: "Never read" },
+    ]: HorizontalLayout {
+        height: 28px;
+        spacing: Space.s3;
+        CIcon {
+            source: Kinds.icon(k.kind);
+        }
+
+        Text {
+            text: Kinds.name(k.kind);
+            width: 72px;
+            font-weight: Type.w-medium;
+            color: Palette.text;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: k.d;
+            color: Palette.text-2;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+    }
+}
+
+export component DrawZonesPage inherits Rectangle {
+    in-out property <[ZoneData]> zones;
+    in-out property <int> selected: 1;
+    VerticalLayout {
+        x: (parent.width - Size.col) / 2;
+        width: Size.col;
+        padding-top: Space.s7;
+        alignment: start;
+        ObHead {
+            title: "Mark where text shows up";
+            lead: "Drag on the screenshot to draw a zone, then pick what kind of text it holds.";
+        }
+    }
+
+    VerticalLayout {
+        x: (parent.width - 1216px) / 2;
+        y: Space.s7 + 37px + Space.s2 + 23px + Space.s5;
+        width: 1216px;
+        height: self.preferred-height;
+        alignment: start;
+        ZoneTools {
+            draw: true;
+        }
+
+        Rectangle {
+            height: Space.s4;
+        }
+
+        HorizontalLayout {
+            spacing: Space.s5;
+            height: 490px;
+            Stage {
+                width: 872px;
+                zones: root.zones;
+                selected: root.selected;
+                behind: Palette.bg;
+                zone-clicked(i) => {
+                    root.selected = i;
+                }
+            }
+
+            Card {
+                VerticalLayout {
+                    padding: 1px;
+                    CardHead {
+                        title: "Zones";
+                        count: root.zones.length;
+                    }
+
+                    for z[i] in root.zones: ZoneRow {
+                        zone: z;
+                        first: i == 0;
+                        selected: i == root.selected;
+                        clicked => {
+                            root.selected = i;
+                        }
+                        toggled(v) => {
+                            z.on = v;
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    VerticalLayout {
+                        padding-left: Space.s5;
+                        padding-right: Space.s5;
+                        padding-top: Space.s3;
+                        padding-bottom: Space.s4;
+                        SmallLabel {
+                            text: "What each kind does";
+                        }
+
+                        Rectangle {
+                            height: Space.s1;
+                        }
+
+                        KindHelp { }
+                    }
+                }
+            }
+        }
+    }
+}

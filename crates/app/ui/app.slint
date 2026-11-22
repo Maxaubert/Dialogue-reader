@@ -1,0 +1,297 @@
+// DialogReader main window: page navigation, the game switcher and the overlay previews.
+import "fonts/Geist-Variable.ttf";
+import "fonts/GeistMono-Variable.ttf";
+
+import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "theme.slint";
+import { ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Page, OverlayPreview } from "data.slint";
+import { Chrome, ObBar, ObFoot, MainBar } from "components/chrome.slint";
+import { WelcomePage } from "pages/welcome.slint";
+import { PickWindowPage } from "pages/pick_window.slint";
+import { DrawZonesPage } from "pages/draw_zones.slint";
+import { KeysPage } from "pages/keys.slint";
+import { VoicePage } from "pages/voice.slint";
+import { ModePage } from "pages/mode.slint";
+import { OverviewTab } from "pages/overview.slint";
+import { ZonesTab } from "pages/zones.slint";
+import { SettingsTab } from "pages/settings.slint";
+import { ActivityTab } from "pages/activity.slint";
+import { PillPreview } from "overlays/pill.slint";
+import { GameSwitcher } from "overlays/game_switcher.slint";
+import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
+import { ZoneEdit } from "overlays/zone_edit.slint";
+
+export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome }
+
+export component MainWindow inherits Window {
+    in-out property <Page> page: Page.welcome;
+    in-out property <OverlayPreview> overlay: OverlayPreview.none;
+    in-out property <bool> switcher-open: false;
+    // fake data (src/fake.rs)
+    in-out property <[WindowData]> games-running;
+    in-out property <[WindowData]> other-windows;
+    in-out property <int> picked-window: 0;
+    in-out property <[ZoneData]> setup-zones;
+    in-out property <[ZoneData]> zones;
+    in-out property <[ZoneData]> extra-zones;
+    in-out property <[VoiceData]> voices;
+    in-out property <[VoiceData]> menu-voices;
+    in-out property <[LineData]> recent;
+    in-out property <[LineData]> log;
+    in-out property <[GameData]> games;
+    in-out property <int> current-game: 0;
+    in-out property <[EditZone]> edit-zones;
+    in-out property <int> edit-selected: 1;
+    in property <string> edit-dim;
+    in-out property <bool> edit-draft: true;
+    in-out property <length> edit-draft-x: 930px;
+    in-out property <length> edit-draft-y: 150px;
+    in-out property <length> edit-draft-w: 360px;
+    in-out property <length> edit-draft-h: 112px;
+    in-out property <bool> automatic: true;
+    in-out property <string> read-key: "Mouse 4";
+    in-out property <string> menu-key: "F7";
+    in property <string> version: "0.1.0";
+    property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
+    property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
+    property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
+    property <string> game-name: root.games.length > 0 ? root.games[root.current-game].name : "";
+    property <string> game-art: root.games.length > 0 ? root.games[root.current-game].art : "rdr2";
+
+    // zone edit (Rust: add, remove, hit test, dim path)
+    callback edit-commit(Kind, length, length, length, length);
+    callback edit-remove(int);
+    callback edit-pick(length, length) -> int;
+    callback settings-jump(int);
+    settings-jump(i) => {
+        settings.jump(i);
+    }
+
+    title: "DialogReader";
+    preferred-width: 1440px;
+    preferred-height: 900px;
+    min-width: 1100px;
+    min-height: 700px;
+    no-frame: true;
+    background: Palette.bg;
+    default-font-family: Type.font;
+    default-font-size: Type.fs2;
+    function back() {
+        if root.page == Page.pick-window {
+            root.page = Page.welcome;
+        } else if root.page == Page.draw-zones {
+            root.page = Page.pick-window;
+        } else if root.page == Page.keys {
+            root.page = Page.draw-zones;
+        } else if root.page == Page.voice {
+            root.page = Page.keys;
+        } else if root.page == Page.mode {
+            root.page = Page.voice;
+        }
+    }
+    function next() {
+        if root.page == Page.welcome {
+            root.page = Page.pick-window;
+        } else if root.page == Page.pick-window {
+            root.page = Page.draw-zones;
+        } else if root.page == Page.draw-zones {
+            root.page = Page.keys;
+        } else if root.page == Page.keys {
+            root.page = Page.voice;
+        } else if root.page == Page.voice {
+            root.page = Page.mode;
+        } else if root.page == Page.mode {
+            root.page = Page.overview;
+        }
+    }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if root.overlay == OverlayPreview.quick-menu || root.overlay == OverlayPreview.quick-menu-voice {
+                if qm.key(e.text) {
+                    return accept;
+                }
+            }
+            if root.overlay == OverlayPreview.zone-edit {
+                if ze.key(e.text) {
+                    return accept;
+                }
+            }
+            if root.overlay == OverlayPreview.pill && e.text == Key.Escape {
+                root.overlay = OverlayPreview.none;
+                return accept;
+            }
+            if root.switcher-open {
+                if e.text == Key.Escape {
+                    root.switcher-open = false;
+                    return accept;
+                }
+                if e.text == Key.UpArrow {
+                    switcher.highlight = Math.max(0, switcher.highlight - 1);
+                    return accept;
+                }
+                if e.text == Key.DownArrow {
+                    switcher.highlight = Math.min(root.games.length - 1, switcher.highlight + 1);
+                    return accept;
+                }
+                if e.text == Key.Return {
+                    root.current-game = switcher.highlight;
+                    root.switcher-open = false;
+                    return accept;
+                }
+            }
+            if !root.setup && e.modifiers.control && (e.text == "k" || e.text == "K" || e.text == "\u{b}") {
+                root.switcher-open = !root.switcher-open;
+                return accept;
+            }
+            reject
+        }
+        VerticalLayout {
+            if root.setup: ObBar {
+                step: root.step;
+            }
+            if !root.setup: MainBar {
+                tab: root.tab;
+                game: root.game-name;
+                art: root.game-art;
+                tab-clicked(i) => {
+                    root.page = i == 0 ? Page.overview : i == 1 ? Page.zones : Page.settings;
+                }
+                game-clicked => {
+                    root.switcher-open = true;
+                }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                if root.page == Page.welcome: WelcomePage {
+                    zones: root.setup-zones;
+                    get-started => {
+                        root.next();
+                    }
+                }
+                if root.page == Page.pick-window: PickWindowPage {
+                    games: root.games-running;
+                    others: root.other-windows;
+                    selected <=> root.picked-window;
+                }
+                if root.page == Page.draw-zones: DrawZonesPage {
+                    zones <=> root.setup-zones;
+                }
+                if root.page == Page.keys: KeysPage {
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                }
+                if root.page == Page.voice: VoicePage {
+                    voices: root.voices;
+                }
+                if root.page == Page.mode: ModePage {
+                    automatic <=> root.automatic;
+                    game: root.games-running.length > 0 ? root.games-running[root.picked-window].name : "";
+                    art: root.games-running.length > 0 ? root.games-running[root.picked-window].art : "rdr2";
+                    zone-count: root.setup-zones.length;
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                }
+                if root.page == Page.overview: OverviewTab {
+                    zones <=> root.zones;
+                    extra-zones <=> root.extra-zones;
+                    recent: root.recent;
+                    automatic <=> root.automatic;
+                    read-key: root.read-key;
+                    edit-zones => {
+                        root.page = Page.zones;
+                    }
+                    show-all => {
+                        root.page = Page.activity;
+                    }
+                }
+                if root.page == Page.zones: ZonesTab {
+                    zones <=> root.zones;
+                    win-w: root.width;
+                    win-h: root.height;
+                }
+                if root.page == Page.activity: ActivityTab {
+                    log: root.log;
+                    back => {
+                        root.page = Page.overview;
+                    }
+                }
+                // Settings stays alive so settings-jump can reach it.
+                settings := SettingsTab {
+                    visible: root.page == Page.settings;
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                    version: root.version;
+                }
+            }
+
+            if root.setup && root.page != Page.welcome: ObFoot {
+                primary: root.page == Page.mode ? "Finish" : "Continue";
+                primary-icon: root.page == Page.mode ? Icons.check : Icons.arrow-right;
+                back => {
+                    root.back();
+                }
+                next => {
+                    root.next();
+                }
+            }
+        }
+
+        switcher := GameSwitcher {
+            visible: root.switcher-open;
+            games: root.games;
+            current: root.current-game;
+            close => {
+                root.switcher-open = false;
+            }
+            choose(i) => {
+                root.current-game = i;
+                root.switcher-open = false;
+            }
+        }
+
+        if root.overlay == OverlayPreview.pill: PillPreview { }
+        qm := QuickMenuPreview {
+            visible: root.overlay == OverlayPreview.quick-menu || root.overlay == OverlayPreview.quick-menu-voice;
+            voices: root.menu-voices;
+            voice-open: root.overlay == OverlayPreview.quick-menu-voice;
+            highlight: 0;
+            close => {
+                root.overlay = OverlayPreview.none;
+            }
+            manage-zones => {
+                root.overlay = OverlayPreview.zone-edit;
+            }
+            open-settings => {
+                root.overlay = OverlayPreview.none;
+                root.page = Page.settings;
+            }
+        }
+
+        ze := ZoneEdit {
+            visible: root.overlay == OverlayPreview.zone-edit;
+            zones <=> root.edit-zones;
+            selected <=> root.edit-selected;
+            dim-commands: root.edit-dim;
+            draft <=> root.edit-draft;
+            draft-x <=> root.edit-draft-x;
+            draft-y <=> root.edit-draft-y;
+            draft-w <=> root.edit-draft-w;
+            draft-h <=> root.edit-draft-h;
+            done => {
+                root.overlay = OverlayPreview.none;
+            }
+            remove(i) => {
+                root.edit-remove(i);
+            }
+            commit(k) => {
+                root.edit-commit(k, root.edit-draft-x, root.edit-draft-y, root.edit-draft-w, root.edit-draft-h);
+            }
+            pick(x, y) => {
+                return root.edit-pick(x, y);
+            }
+        }
+    }
+
+    init => {
+        keys.focus();
+    }
+}

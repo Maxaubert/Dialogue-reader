@@ -1,0 +1,198 @@
+// 02 pick window.
+import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+import { WindowData } from "../data.slint";
+import { Icon, CIcon, Button, Card, Count, ITile, Thumb, TextField, SmallLabel } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+component SectionLabel inherits HorizontalLayout {
+    in property <string> text;
+    in property <int> count;
+    spacing: Space.s2;
+    alignment: start;
+    height: 20px;
+    SmallLabel {
+        text: root.text;
+    }
+
+    Count {
+        text: root.count;
+    }
+}
+
+component WindowCard inherits Card {
+    in property <WindowData> win;
+    callback clicked();
+    height: 192px;
+    accessible-role: button;
+    accessible-label: root.win.name;
+    accessible-item-selected: root.selected;
+    accessible-action-default => {
+        root.clicked();
+    }
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    VerticalLayout {
+        padding: Space.s2 + 1px;
+        Thumb {
+            height: 120px;
+            art: root.win.art;
+            radius: Radius.md;
+            behind: Palette.surface;
+        }
+
+        VerticalLayout {
+            padding-left: Space.s2;
+            padding-right: Space.s2;
+            padding-top: Space.s3;
+            padding-bottom: Space.s1;
+            Text {
+                text: root.win.name;
+                height: Type.lh2;
+                font-weight: Type.w-medium;
+                color: Palette.text;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.win.exe + " · " + root.win.meta;
+                height: Type.lh1;
+                font-size: Type.fs1;
+                color: Palette.text-3;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+
+    if root.selected: Rectangle {
+        x: parent.width - 16px - self.width;
+        y: 16px;
+        width: 24px;
+        height: 24px;
+        border-radius: 12px;
+        background: Palette.accent;
+        Icon {
+            source: Icons.check;
+            color: Palette.on-accent;
+        }
+    }
+}
+
+export component PickWindowPage inherits Rectangle {
+    in property <[WindowData]> games;
+    in property <[WindowData]> others;
+    in-out property <int> selected: 0;
+    in-out property <string> search;
+    VerticalLayout {
+        x: (parent.width - Size.col) / 2;
+        width: Size.col;
+        padding-top: Space.s7;
+        alignment: start;
+        ObHead {
+            title: "Pick your game";
+            lead: "Start your game first. It shows up here while it is running.";
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+            TextField {
+                width: 360px;
+                icon: Icons.search;
+                placeholder: "Search windows";
+                text <=> root.search;
+            }
+
+            Button {
+                text: "Refresh";
+                icon: Icons.refresh;
+            }
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        SectionLabel {
+            text: "Games running now";
+            count: root.games.length;
+        }
+
+        Rectangle {
+            height: Space.s3;
+        }
+
+        HorizontalLayout {
+            spacing: Space.s4;
+            for g[i] in root.games: WindowCard {
+                width: (Size.col - 2 * Space.s4) / 3;
+                win: g;
+                selected: i == root.selected;
+                clicked => {
+                    root.selected = i;
+                }
+            }
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        SectionLabel {
+            text: "Other windows";
+            count: root.others.length;
+        }
+
+        Rectangle {
+            height: Space.s3;
+        }
+
+        Card {
+            VerticalLayout {
+                padding: 1px;
+                for o[i] in root.others: Rectangle {
+                    height: 52px;
+                    if i > 0: Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+                    HorizontalLayout {
+                        padding-left: Space.s4;
+                        padding-right: Space.s4;
+                        spacing: Space.s3;
+                        alignment: start;
+                        VerticalLayout {
+                            alignment: center;
+                            ITile {
+                                icon: Icons.window;
+                            }
+                        }
+
+                        Text {
+                            text: o.name;
+                            font-weight: Type.w-medium;
+                            color: Palette.text;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: o.exe;
+                            font-size: Type.fs1;
+                            color: Palette.text-3;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,57 @@
+// 13 in-game status pill: dot, speaker, small live waveform.
+import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art } from "../theme.slint";
+import { Dot, PillWave } from "../components/base.slint";
+
+// The small in-game pill (13), reused on the welcome preview.
+export component OverlayPill inherits Rectangle {
+    in property <string> speaker: "Arthur";
+    height: 32px;
+    width: row.preferred-width;
+    border-radius: 16px;
+    background: Palette.pill-bg;
+    border-width: 1px;
+    border-color: Palette.pill-line;
+    drop-shadow-offset-y: Shadow.low-y;
+    drop-shadow-blur: Shadow.low-blur;
+    drop-shadow-color: Shadow.low-color;
+    row := HorizontalLayout {
+        padding-left: Space.s3 + 1px;
+        padding-right: Space.s3 + 1px;
+        spacing: Space.s2;
+        VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+            }
+        }
+
+        Text {
+            text: root.speaker;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: Palette.text;
+            vertical-alignment: center;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            PillWave { }
+        }
+    }
+}
+
+
+// Preview of the pill over the game (13-overlay). The real pill is a click-through overlay window (M4).
+export component PillPreview inherits Rectangle {
+    Image {
+        width: 100%;
+        height: 100%;
+        source: Render.software ? Art.scene-full : Art.scene;
+        image-fit: cover;
+    }
+
+    OverlayPill {
+        x: parent.width - self.width - 24px;
+        y: 24px;
+    }
+}

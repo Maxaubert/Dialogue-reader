@@ -1,0 +1,508 @@
+// 15-quick-menu-a and 15-quick-menu-voice: the centered in-game quick menu, its key hints and the voice flyout.
+// This file holds only what the overlay window (M4) needs. The review previews are in quick_menu_preview.slint.
+// Order (design rule): Manage zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit (press twice).
+import { Palette, Shadow, Space, Radius, Size, Type, Icons, Art } from "../theme.slint";
+import { VoiceData } from "../data.slint";
+import { Icon, CIcon, Toggle, Segmented, Slider } from "../components/base.slint";
+
+// Keycap in the quick menu hints (.q9k).
+component QKey inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    min-width: 22px;
+    horizontal-stretch: 0;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.surface-2;
+    HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 7px;
+        alignment: center;
+        Text {
+            text: root.text;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: Palette.text-2;
+            letter-spacing: root.text == "↑↓" || root.text == "←→" ? Type.ls-arrows : 0px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export struct Hint {
+    key: string,
+    text: string,
+}
+
+// The key hint pill under the menu (.q9-pill).
+export component QmHints inherits Rectangle {
+    in property <[Hint]> hints;
+    height: 38px;
+    width: row.preferred-width;
+    border-radius: 19px;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.panel;
+    drop-shadow-offset-y: Shadow.pop-y;
+    drop-shadow-blur: Shadow.pop-blur;
+    drop-shadow-color: Shadow.pop-color;
+    row := HorizontalLayout {
+        padding-left: Space.s4 + 1px;
+        padding-right: Space.s4 + 1px;
+        spacing: 18px;
+        for h in root.hints: HorizontalLayout {
+            spacing: 7px;
+            VerticalLayout {
+                alignment: center;
+                QKey {
+                    text: h.key;
+                }
+            }
+
+            Text {
+                text: h.text;
+                font-size: Type.fs1;
+                font-weight: Type.w-medium;
+                color: Palette.text-3;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// One menu row (.qa9 .r). `hi` = keyboard focus, `arm` = Quit pressed once, `faint` = Quit at rest.
+export component QmRow inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> hi;
+    in property <bool> open;
+    in property <bool> arm;
+    in property <bool> faint;
+    in property <length> row-h: 42px;
+    in property <length> icon-size: 16px;
+    in property <length> font-size: Type.fs2;
+    in property <length> gap: 14px;
+    in property <length> pad: Space.s3;
+    callback clicked();
+    height: root.row-h;
+    border-radius: Radius.md;
+    background: root.arm ? Palette.danger-soft : root.hi ? Palette.surface-3 : transparent;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => {
+        root.clicked();
+    }
+    if root.hi || root.arm: Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 2px;
+        height: parent.height - 22px;
+        border-radius: 1px;
+        background: root.arm ? Palette.danger : root.open ? Palette.text-3 : Palette.accent;
+    }
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: root.pad;
+        padding-right: root.pad;
+        spacing: root.gap;
+        CIcon {
+            source: root.icon;
+            size: root.icon-size;
+            color: root.arm ? Palette.danger : root.hi ? Palette.text : Palette.text-3;
+        }
+
+        Text {
+            text: root.text;
+            font-size: root.font-size;
+            font-weight: Type.w-medium;
+            color: root.arm ? Palette.danger : root.faint ? Palette.text-3 : Palette.text;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+
+        @children
+    }
+}
+
+export component QmNote inherits Text {
+    font-size: Type.fs1;
+    color: Palette.text-3;
+    vertical-alignment: center;
+}
+
+component QmLine inherits Rectangle {
+    height: 1px;
+    background: Palette.line;
+}
+
+export component QmStatus inherits HorizontalLayout {
+    in property <bool> on: true;
+    spacing: 7px;
+    horizontal-stretch: 0;
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.on ? Palette.accent : Palette.text-3;
+        }
+    }
+
+    Text {
+        text: root.on ? "Reading" : "Stopped";
+        font-size: Type.fs1;
+        font-weight: Type.w-medium;
+        color: Palette.text-2;
+        vertical-alignment: center;
+    }
+}
+
+// The quick menu panel. All state is plain properties; the overlay window (M4) drives them from the key hook.
+export component QuickMenu inherits Rectangle {
+    in property <string> game: "Red Dead Redemption 2";
+    in-out property <int> highlight: 0;
+    in-out property <bool> stopped: false;
+    in-out property <bool> muted: false;
+    in-out property <string> voice: "Adam";
+    in-out property <float> speed: 1.1;
+    in-out property <float> volume: 0.7;
+    in-out property <bool> automatic: true;
+    in-out property <bool> quit-armed: false;
+    in property <bool> voice-open: false;
+    callback activate(int);
+    width: 440px;
+    height: col.preferred-height;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.panel;
+    drop-shadow-offset-y: Shadow.pop-y;
+    drop-shadow-blur: Shadow.pop-blur;
+    drop-shadow-color: Shadow.pop-color;
+    col := VerticalLayout {
+        padding: 1px;
+        Rectangle {
+            height: 54px;
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                spacing: Space.s3;
+                Text {
+                    text: root.game;
+                    font-size: 15px;
+                    font-weight: Type.w-semibold;
+                    letter-spacing: Type.ls-menu-title;
+                    color: Palette.text;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                QmStatus {
+                    on: !root.stopped;
+                }
+            }
+        }
+
+        QmLine { }
+
+        VerticalLayout {
+            padding: 6px;
+            QmRow {
+                icon: Icons.zone;
+                text: "Manage zones";
+                hi: root.highlight == 0 && !root.voice-open;
+                clicked => {
+                    root.activate(0);
+                }
+                CIcon {
+                    source: Icons.chev-right;
+                    size: 14px;
+                }
+            }
+        }
+
+        QmLine { }
+
+        VerticalLayout {
+            padding: 6px;
+            QmRow {
+                icon: root.stopped ? Icons.resume : Icons.stop;
+                text: root.stopped ? "Resume" : "Stop";
+                hi: root.highlight == 1 && !root.voice-open;
+                clicked => {
+                    root.activate(1);
+                }
+                QmNote {
+                    text: "Play / pause";
+                }
+            }
+
+            QmRow {
+                icon: Icons.speaker;
+                text: "Mute";
+                hi: root.highlight == 2 && !root.voice-open;
+                clicked => {
+                    root.activate(2);
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Toggle {
+                        track-w: 34px;
+                        on: root.muted;
+                        label: "Mute";
+                        toggled(v) => {
+                            root.muted = v;
+                        }
+                    }
+                }
+            }
+        }
+
+        QmLine { }
+
+        VerticalLayout {
+            padding: 6px;
+            QmRow {
+                icon: Icons.audio;
+                text: "Voice";
+                hi: root.highlight == 3 || root.voice-open;
+                open: root.voice-open;
+                clicked => {
+                    root.activate(3);
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    Text {
+                        text: root.voice;
+                        font-size: 13px;
+                        color: Palette.text-2;
+                        vertical-alignment: center;
+                    }
+
+                    CIcon {
+                        source: Icons.chev-right;
+                        size: 14px;
+                    }
+                }
+            }
+
+            QmRow {
+                icon: Icons.speed;
+                text: "Speed";
+                hi: root.highlight == 4 && !root.voice-open;
+                HorizontalLayout {
+                    spacing: 2px;
+                    CIcon {
+                        source: Icons.chev-left;
+                        size: 14px;
+                    }
+
+                    Text {
+                        width: 44px;
+                        text: Math.round(root.speed * 10) / 10 + "x";
+                        font-size: 13px;
+                        font-weight: Type.w-medium;
+                        color: Palette.text;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    CIcon {
+                        source: Icons.chev-right;
+                        size: 14px;
+                    }
+                }
+            }
+
+            QmRow {
+                icon: Icons.volume;
+                text: "Volume";
+                hi: root.highlight == 5 && !root.voice-open;
+                HorizontalLayout {
+                    width: 214px;
+                    spacing: Space.s3;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Slider {
+                            knob: 14px;
+                            value <=> root.volume;
+                        }
+                    }
+
+                    Text {
+                        width: 34px;
+                        text: Math.round(root.volume * 100) + "%";
+                        font-size: Type.fs1;
+                        color: Palette.text-2;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            QmRow {
+                icon: Icons.mode;
+                text: "Mode";
+                hi: root.highlight == 6 && !root.voice-open;
+                VerticalLayout {
+                    alignment: center;
+                    Segmented {
+                        width: 214px;
+                        items: ["Automatic", "On key press"];
+                        selected: root.automatic ? 0 : 1;
+                        accent-on: true;
+                        fill: true;
+                        item-w: (214px - 6px - 2px) / 2;
+                        font-size: 13px;
+                        select(i) => {
+                            root.automatic = i == 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        QmLine { }
+
+        VerticalLayout {
+            padding: 6px;
+            QmRow {
+                icon: Icons.settings;
+                text: "Settings";
+                hi: root.highlight == 7 && !root.voice-open;
+                clicked => {
+                    root.activate(7);
+                }
+                CIcon {
+                    source: Icons.open;
+                    size: 14px;
+                }
+            }
+
+            QmRow {
+                icon: Icons.power;
+                text: "Quit";
+                hi: root.highlight == 8 && !root.voice-open && !root.quit-armed;
+                arm: root.quit-armed;
+                faint: !root.quit-armed;
+                clicked => {
+                    root.activate(8);
+                }
+                QmNote {
+                    text: root.quit-armed ? "Press again to quit" : "Press twice";
+                    color: root.quit-armed ? Palette.danger-dim : Palette.text-3;
+                }
+            }
+        }
+    }
+}
+
+// Voice flyout to the right of the Voice row (15-quick-menu-voice).
+export component QmVoices inherits Rectangle {
+    in property <[VoiceData]> voices;
+    in property <int> chosen: 0;
+    in-out property <int> highlight: 1;
+    callback choose(int);
+    callback preview(int);
+    width: 270px;
+    height: col.preferred-height;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.panel;
+    drop-shadow-offset-y: Shadow.pop-y;
+    drop-shadow-blur: Shadow.pop-blur;
+    drop-shadow-color: Shadow.pop-color;
+    col := VerticalLayout {
+        padding: 7px;
+        for v[i] in root.voices: Rectangle {
+            property <bool> hi: i == root.highlight;
+            property <bool> sel: i == root.chosen;
+            height: 36px;
+            border-radius: Radius.md;
+            background: self.hi ? Palette.surface-3 : transparent;
+            accessible-role: list-item;
+            accessible-label: v.name;
+            accessible-item-selected: self.sel;
+            accessible-action-default => {
+                root.choose(i);
+            }
+            if hi: Rectangle {
+                x: 0;
+                y: 9px;
+                width: 2px;
+                height: parent.height - 18px;
+                border-radius: 1px;
+                background: Palette.accent;
+            }
+            TouchArea {
+                clicked => {
+                    root.choose(i);
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 6px;
+                spacing: 10px;
+                Rectangle {
+                    width: 16px;
+                    if sel: CIcon {
+                        source: Icons.check;
+                        color: Palette.accent;
+                    }
+                }
+
+                Text {
+                    text: v.name;
+                    font-size: Type.fs2;
+                    font-weight: Type.w-medium;
+                    color: hi || sel ? Palette.text : Palette.text-2;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                Text {
+                    text: v.short;
+                    font-size: Type.fs1;
+                    color: Palette.text-3;
+                    vertical-alignment: center;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 26px;
+                        height: 26px;
+                        border-radius: 13px;
+                        background: hi ? Palette.surface-2 : transparent;
+                        border-width: hi ? 1px : 0px;
+                        border-color: Palette.line-2;
+                        accessible-role: button;
+                        accessible-label: "Preview " + v.name;
+                        Icon {
+                            source: Icons.play-fill;
+                            width: 12px;
+                            height: 12px;
+                            color: hi ? Palette.text : Palette.text-3;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.preview(i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
