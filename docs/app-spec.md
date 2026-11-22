@@ -377,15 +377,12 @@ Navigation is one Slint enum property on the main window:
    is later.
 3. "Import settings" on the welcome page: v1 imports a profile JSON exported from DialogReader (Export is in the
    profile menu). It does not read the old C# app's settings.
-4. Zone kind colors. design/README.md says "no colored dots, pills or labels". The approved 03, 11 and 06 mockups
-   still show colored dots in the Kind picker, colored tags on the stage and colored dots in the 06 summary. M1
-   follows the mockups. If the rule means everywhere, those three places turn grey and the mockup HTML and shots
-   are updated with them. (The shots in `shots/` match the current HTML: re-drawn on 2026-11-22, 0 pixels differ.)
+4. Zone kind colors: settled. Max (2026-11-22): make them grey. The zone boxes and labels on the picture (03, 11),
+   the Kind picker dots and the 06 summary dots turn grey, in the app and in those mockups only.
 5. Settings > Keys: settled. Max picked "D everywhere" (2026-11-22), so Settings shows the same two 04-read-key-d
    cards as setup.
 6. Media pause while speaking. The old app had it; this plan puts it after v1. Is v1 without it acceptable?
 7. Kokoro wording. M3a changes the voice page header, "Get more voices" and Settings > Voices to what v1 ships
    (Windows voices). Max approves the new wording first.
-8. Text weight. Slint text looks lighter than the Chromium shots at every weight (grayscale against ClearType).
-   Options: accept it; or raise the weights one step in the tokens (heavier, but the hierarchy stays); or try the
-   Skia renderer for the real window (gamma-corrected text, bigger download), measured in a spike.
+8. Text weight: Max (2026-11-22) chose a spike on Slint's Skia renderer for the real window (gamma-corrected
+   text). Measure text ink against the mockup shots and the download size before switching.
