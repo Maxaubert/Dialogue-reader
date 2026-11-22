@@ -425,3 +425,8 @@ Navigation is one Slint enum property on the main window:
 10. Game check on page 02 (M2): any app that draws with Direct3D counts as a game by the library check (on this
    PC, Flare). Browsers and Electron are left out by window class. Is that good enough, or should the library
    check go (games would then need a full-monitor window or a profile)?
+### Decisions after M2 (Max, 2026-11-22)
+- Games that share one exe (emulators, javaw.exe, Game.exe): allow several profiles per exe and tell them apart by
+  exe plus window title. Replaces the "one profile per exe" refusal from M2.
+- UI bits added in M2 without a mockup (rename field, notice strip, exe icons on page 02, scrolling lists, the blue
+  box while drawing) are accepted as built. Max flags anything he dislikes when he sees it.
