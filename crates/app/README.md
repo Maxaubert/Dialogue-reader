@@ -2,30 +2,40 @@
 
 The Slint UI of DialogReader. It builds `DialogReader.exe`.
 
-**Status: M1.** Every approved screen from `design/mockups/c-midnight` is built in Slint and filled with the
-fake data of the mockups. Navigation works. There is no capture, OCR, speech or global key yet. The plan is in
-[docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
+**Status: M2.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
+are saved as JSON in `%APPDATA%\DialogReader\profiles`, page 02 lists the running windows (games first), Continue
+takes one screenshot with Windows Graphics Capture, and pages 03 and 11 draw, select, move, resize, rename,
+re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). Onboarding runs only when there is no
+profile yet. Voices, the activity log, reading, keys and the overlays still show fake data (M3 and M4). The plan
+is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
 
 ## Run, test, render
 
 | What | Command |
 |---|---|
-| Build | `cargo build -p dr-app` |
+| Build (Skia, the default) | `cargo build -p dr-app` |
+| Shipped exe (Skia, fat LTO, `panic = "abort"`) | `cargo build --profile ship -p dr-app --bin DialogReader` (writes `target\ship\DialogReader.exe`) |
+| Build with the femtovg fallback | `cargo build --release -p dr-app --bin DialogReader --no-default-features --features renderer-femtovg` |
 | Tests (headless) | `cargo test -p dr-app` |
 | Mockup comparison numbers | `cargo test -p dr-app --test screens -- --nocapture screens_match` |
 | Render every screen to PNG | `cargo run -p dr-app --bin render-screens -- [out-dir]` |
-| Open the app (shows a window) | `cargo run -p dr-app --bin DialogReader` |
-| Build with the Skia renderer | `cargo build --release -p dr-app --bin DialogReader --no-default-features --features renderer-skia` |
+| Open the app (shows a window) | `cargo run -p dr-app --bin DialogReader` (real profiles) or `-- --fake` (mockup data) |
 
 - `render-screens` draws each screen with Slint's software renderer at 1440 x 900 into a buffer and saves it as
   PNG. It opens no window. The default out-dir is `target/screens`. File names match the mockup shots
   (`01-welcome.png` to `16-zone-edit.png`), plus `12-settings-keys.png` (Settings scrolled to the keys) and
   `17-activity.png` (the list behind "Show all").
 - The app options are for checks by hand: `--page <welcome|pick-window|draw-zones|keys|voice|mode|overview|zones|settings|activity>`
-  opens a page, and `--preview-overlay <pill|quick-menu|quick-menu-voice|zone-edit>` shows an in-game overlay inside
-  the main window. `--version` prints the version.
-- Never run the app window from a test. Tests use the Slint testing backend (`tests/nav.rs`) or the software
-  renderer (`tests/screens.rs`), so nothing shows on screen.
+  opens a page, `--preview-overlay <pill|quick-menu|quick-menu-voice|zone-edit>` shows an in-game overlay inside
+  the main window, `--fake` shows the mockup data instead of real profiles. `--version` prints the version.
+- Never run the app window from a test. Tests use the Slint testing backend (`tests/nav.rs`, `tests/zones.rs`,
+  `tests/setup_flow.rs`) or the software renderer (`tests/screens.rs`), so nothing shows on screen. Tests with real
+  data use a temp folder (`Paths::at`) and a fake `Desktop`, never `%APPDATA%` or the real windows.
+- A panic writes `%LOCALAPPDATA%\DialogReader\logs\crash-<unix seconds>-<pid>.log` (`src/crash.rs`). In the ship
+  profile the app then ends at once (`panic = "abort"`). A window that cannot open (for example OpenGL fails) writes
+  `start-error.log` in the same folder; `renderer.log` says when skia-opengl could not be selected.
+- `--version` attaches to the console of the terminal that started it, so it prints there although the exe is a
+  windows-subsystem app. Without `APPDATA` the app shows the sample data with a notice that nothing can be saved.
 - `tests/screens.rs` also compares every render with its mockup shot in `design/mockups/c-midnight/shots/`. Both
   pictures are averaged over 10 x 10 px cells; the mean difference and the share of cells that move by more than
   32 must stay under a limit per screen. Screens that differ by design compare only a region (14: the switcher
@@ -36,9 +46,12 @@ fake data of the mockups. Navigation works. There is no capture, OCR, speech or 
 
 ```
 build.rs                 compiles ui/app.slint (with debug info outside release, for the testing backend)
-src/main.rs              DialogReader.exe: window, command-line options
-src/lib.rs               build_main_window(): window + fake data + window buttons
-src/fake.rs              fake data and the zone edit callbacks
+src/main.rs              DialogReader.exe: renderer (skia-opengl), crash hook, real or fake source, options
+src/lib.rs               build_window(source) and build_main_window() (fake): window + view model + window buttons
+src/vm/mod.rs            view-model layer: profiles, windows, screenshots, Slint models, callbacks; Desktop trait
+src/vm/zones.rs          zone drawing state: draw, select, move, resize, rename, kind, on/off, delete, undo
+src/crash.rs             panic hook: crash log in %LOCALAPPDATA%\DialogReader\logs
+src/fake.rs              fake data of the mockups (behind vm::Source::Fake) and the zone edit callbacks
 src/geom.rs              stage mapping, drag to zone, hit tests, dim path (unit-tested)
 src/screens.rs           headless renderer and the screen list (sets Render.software)
 src/bin/render-screens.rs
@@ -51,7 +64,8 @@ ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout, w
                          quick_menu_preview (review only: menu over the game and its two other states), zone_edit
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
 ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
-tests/                   nav.rs (testing backend), screens.rs (renders every screen, compares with the mockups)
+tests/                   nav.rs, zones.rs, setup_flow.rs (testing backend), screens.rs (renders, compares with
+                         the mockups), common/ (fake desktop, temp data folder, pointer input)
 examples/snapshot.rs     one page in a real window with a chosen renderer, saved as PNG (run on a hidden desktop)
 tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits for it
 ```
@@ -62,9 +76,11 @@ tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits fo
   writes a color by hand. Colors with alpha are 8-digit hex. In `@markdown` text, write `\{Palette.text-2}`.
 - Icons are white SVG files drawn with `colorize`. `<name>.svg` is drawn for 16 px, `-sm` for 12 px, `-lg` for 22 px,
   so the line is as thin as in the mockups. Kind icons are always grey.
-- Zone kinds have no color on 03 and 11 (Max, 2026-11-22): `Stage { grey-kinds: true; }` draws every zone and tag
-  in grey (`text-2`, `zone-fill`), and the selected zone's outline and handles in the accent. The Kind picker dots
-  and the 06 summary dots are `text-3`. The 01 and 10 stages still use the kind colors, as their mockups do.
+- Zone kinds carry no color anywhere (Max, 2026-11-22): every `Stage` draws zones and tags in grey (`text-2`,
+  `zone-fill`), and the selected zone's outline and handles in the accent. The Kind picker shows the grey kind
+  icons; the 06 summary dots are `text-3`. There are no kind color tokens.
+- The stage shows the fake 16:9 art with "cover" and a real screenshot whole with "contain" (`real-shots`), so a
+  window that is not 16:9 is never cropped. Zones are in screenshot pixels; the stage maps them.
 - After a change to the mockup icons or art, run `python -I crates/app/tools/export_icons.py`.
 - Text heights follow the CSS line boxes (`Type.lh1` to `lh3`), so blocks stack as in the mockups. Multi-line
   text uses `line-height-factor` (`Type.lhf-115` to `lhf-150`; Geist's natural line height is 1.3 em).
@@ -80,9 +96,9 @@ tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits fo
 - The fonts are the variable Geist and Geist Mono from Google Fonts (github.com/google/fonts, `ofl/geist`,
   `ofl/geistmono`), the same builds the mockup pages load. Weights are the tokens `Type.w-regular` (400),
   `w-medium` (500) and `w-semibold` (600).
-- Both renderers apply the weight axis: the software renderer passes the variation to swash, and femtovg (the
-  real window; Slint builds it with only its `swash` feature) builds glyphs with swash using the same values and
-  keys its glyph cache by them.
+- The renderers apply the weight axis: the software renderer passes the variation to swash, and femtovg (the
+  fallback; Slint builds it with only its `swash` feature) builds glyphs with swash using the same values and
+  keys its glyph cache by them. The real window draws with Skia since M2 (see "Renderer").
 - The M1 review said bold text draws as regular. That did not reproduce. With the earlier static TTFs the brand
   word "DialogReader" had 415.6 / 434.5 / 447.7 units of ink at 400 / 500 / 600, so each weight draws differently.
   The mockup shot has 517.4 at 600.
@@ -91,11 +107,14 @@ tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits fo
   shot and 1362.7 in Slint (+29%). Raising the weight does not close it: at 700 the brand word reaches only 474.6.
   The Skia renderer closes this gap; see "Renderer" below.
 
-## Renderer (Skia spike, measured 2026-11-22)
+## Renderer (Skia, decided 2026-11-22)
 
-The real window draws with femtovg (OpenGL), the default feature `renderer-femtovg`. The software renderer is
-always built in: render-screens and the tests use it, and `SLINT_BACKEND=winit-software` makes the window use it
-when OpenGL fails. Skia is an opt-in feature, `renderer-skia` (same Slint 1.18.1).
+Max chose Skia with `panic = "abort"` in a ship-only profile (docs/app-spec.md, section 6, item 8). The default
+feature `renderer-skia` turns on Slint's `renderer-skia-opengl`, and `main.rs` selects the `skia-opengl` renderer
+by name: the M4 overlays need OpenGL Skia, because Skia's default surface draws their see-through margins black
+(docs/overlay-spike.md). femtovg is the opt-in fallback `renderer-femtovg`. The software renderer is always built
+in: render-screens and the tests use it, and `SLINT_BACKEND=winit-software` makes the window use it when OpenGL
+fails. The measurements below are from the spike, when femtovg was still the default.
 
 **Text ink.** `examples/snapshot.rs` opens the window on a hidden desktop (`tools/hidden-run.ps1`) on the overview
 page (10-main-b) and saves `Window::take_snapshot()`. For Skia that is a CPU re-render of the scene, not a
@@ -142,13 +161,11 @@ codegen-units = 1
 panic = "abort"
 ```
 
-`cargo build --profile ship -p dr-app --bin DialogReader --no-default-features --features renderer-skia` writes to
-`target\ship` (checked 2026-11-22 with the same settings passed as `--config profile.ship.*`: 22,085,632 bytes,
-2 min 49 s). Tests, the arena and normal release builds keep unwinding. The cost is in the shipped exe only: a
-panic in any thread ends the app at once, with no `Drop` cleanup. With unwinding, a panic in a worker thread ends
-only that thread, and a panic on the UI thread still ends the app, but runs `Drop` first. The app has no
-`catch_unwind` or panic hook today. Skia stays off by default until Max decides (docs/app-spec.md, section 6,
-item 8).
+The workspace `Cargo.toml` now has this profile. `cargo build --profile ship -p dr-app --bin DialogReader` writes
+`target\ship\DialogReader.exe` (spike, Skia default surface: 22,085,632 bytes, 2 min 49 s; with `skia-opengl` and
+M2, measured 2026-11-22: 22,675,456 bytes, 2 min 36 s; it ran 8 s on a hidden desktop with no crash). Tests, the arena and normal release builds keep unwinding. The cost is in the
+shipped exe only: a panic in any thread ends the app at once, with no `Drop` cleanup. The panic hook in
+`src/crash.rs` writes the crash log first.
 
 **Build.** `skia-bindings` downloads a prebuilt Skia (about 10 MB,
 `skia-binaries-...-x86_64-pc-windows-msvc-d3d-ganesh-gl-jpegd-jpege-pdf.tar.gz`) from GitHub at build time, so the
@@ -157,9 +174,11 @@ first build needs the internet (or `SKIA_BINARIES_URL` pointing at a local copy)
 included); a release rebuild of dr-app alone takes about 51 s. The fat LTO build took 4 min 20 s. No build errors.
 Skia's window surface on Windows is wgpu (GPU), with a CPU surface (softbuffer) as its fallback.
 
-## Known gaps (M1)
+## Known gaps (M2)
 
-- The game pictures are the fake SVG scenes from the mockups. M2 uses real screenshots.
-- Key capture ("Change"), voice test, Refresh, Retake screenshot, Import settings and the Settings buttons do nothing yet.
-- Overlays are previews inside the main window. Real overlay windows come in M4, after the overlay spike.
-- No view-model layer yet: `src/fake.rs` fills the window directly. `src/vm/` starts in M2.
+- Key capture ("Change"), voice test, Import settings and the Settings buttons do nothing yet (M3, M5).
+- Voices, the Recent and activity lists, the status chip and "Read now" are fake or empty (M3a, M3b).
+- Overlays are previews inside the main window. Real overlay windows come in M4.
+- The zone strip on Overview shows every zone in one row; many zones run past the edge (no "+N" chip with real
+  data yet).
+- Page 02 shows the exe icon for real windows, not a live picture of the window.

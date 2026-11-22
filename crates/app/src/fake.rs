@@ -1,11 +1,14 @@
 //! Fake data from the approved mockups (Red Dead Redemption 2, five zones, Kokoro · Adam, Mouse 4 and F7).
-//! From M2 on, profiles, the window list and the log replace it.
+//! It sits behind the view-model layer (`vm::Source::Fake`): render-screens and the tests use it. With real data
+//! (M2), profiles and the window list replace the zones, windows and games; voices (M3a), the activity log
+//! (M3b) and zone edit (M4) are still filled from here.
 
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::geom::{self, Rect};
+use crate::vm::zones::EdZone;
 use crate::{EditZone, GameData, Kind, LineData, MainWindow, VoiceData, WindowData, ZoneData};
 
 /// Zones of the fake scene (1600 x 900 image px): kind, name, x1, y1, x2, y2.
@@ -52,6 +55,19 @@ pub fn zones(prompts_on: bool) -> Vec<ZoneData> {
         .collect()
 }
 
+/// The fake zones for the zone editor (1600 x 900 image px).
+pub fn ed_zones(prompts_on: bool) -> Vec<EdZone> {
+    zones(prompts_on)
+        .into_iter()
+        .map(|z| EdZone {
+            name: z.name.to_string(),
+            kind: crate::vm::disk_kind(z.kind),
+            on: z.on,
+            rect: Rect::new(z.x, z.y, z.w, z.h),
+        })
+        .collect()
+}
+
 fn extra_zones() -> Vec<ZoneData> {
     [
         (Kind::Dialogue, "Letters"),
@@ -87,12 +103,13 @@ pub fn edit_zones() -> Vec<EditZone> {
         .collect()
 }
 
-fn windows() -> (Vec<WindowData>, Vec<WindowData>) {
+pub fn windows() -> (Vec<WindowData>, Vec<WindowData>) {
     let w = |name: &str, exe: &str, meta: &str, art: &str| WindowData {
         name: s(name),
         exe: s(exe),
         meta: s(meta),
         art: s(art),
+        icon: Default::default(),
     };
     (
         vec![
@@ -239,7 +256,7 @@ pub fn log() -> Vec<LineData> {
     .collect()
 }
 
-fn games() -> Vec<GameData> {
+pub fn games() -> Vec<GameData> {
     [
         ("Red Dead Redemption 2", "Reading · 5 zones", "rdr2", true),
         ("Satisfactory", "Paused · 4 zones", "satis", true),
@@ -268,6 +285,7 @@ fn games() -> Vec<GameData> {
         meta: s(m),
         art: s(a),
         running: r,
+        cover: Default::default(),
     })
     .collect()
 }
@@ -281,20 +299,15 @@ fn refresh_dim(w: &MainWindow) {
     w.set_edit_dim(geom::dim_path(FRAME_W, FRAME_H, &rects).into());
 }
 
-/// Puts the fake data into the window and wires the zone edit callbacks.
+/// Puts the fake data that has no real source yet into the window and wires the zone edit callbacks.
+/// Zones, windows and games come through the view-model layer (`vm::install`).
 pub fn fill(w: &MainWindow) {
-    let (running, others) = windows();
-    w.set_games_running(model(running));
-    w.set_other_windows(model(others));
-    w.set_setup_zones(model(zones(true)));
-    w.set_zones(model(zones(false)));
     w.set_extra_zones(model(extra_zones()));
     w.set_voices(model(voices()));
     w.set_menu_voices(model(menu_voices()));
     let log = log();
     w.set_recent(model(log[..5].to_vec()));
     w.set_log(model(log));
-    w.set_games(model(games()));
     w.set_edit_zones(model(edit_zones()));
     w.set_version(env!("CARGO_PKG_VERSION").into());
     refresh_dim(w);

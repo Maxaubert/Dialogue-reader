@@ -1,22 +1,31 @@
-//! DialogReader app: the Slint UI. M1 shows every approved screen on fake data.
+//! DialogReader app: the Slint UI.
 //!
-//! `build_main_window` is shared by the app binary, the tests and the `render-screens` tool.
+//! `build_window(source)` is shared by the app binary, the tests and the `render-screens` tool. The app passes
+//! real profiles and the real desktop; render-screens and most tests pass the fake data of the mockups.
 
 slint::include_modules!();
 
+pub mod crash;
 pub mod fake;
 pub mod geom;
 pub mod screens;
+pub mod vm;
 
-/// Creates the main window with the fake data of the mockups and wires the callbacks.
+/// The main window with the fake data of the mockups (render-screens and the screen and nav tests).
 pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
-    let w = MainWindow::new()?;
-    fake::fill(&w);
-    wire(&w);
-    Ok(w)
+    build_window(vm::Source::Fake).map(|(w, _)| w)
 }
 
-fn wire(w: &MainWindow) {
+/// The main window on `source`, with every callback wired. Keep the returned view model alive as long as the
+/// window (the callbacks hold it too).
+pub fn build_window(source: vm::Source) -> Result<(MainWindow, vm::Shared), slint::PlatformError> {
+    let w = MainWindow::new()?;
+    let vm = vm::install(&w, source);
+    wire(&w, &vm);
+    Ok((w, vm))
+}
+
+fn wire(w: &MainWindow, vm: &vm::Shared) {
     let chrome = w.global::<Chrome>();
     let weak = w.as_weak();
     chrome.on_minimize(move || {
@@ -31,7 +40,15 @@ fn wire(w: &MainWindow) {
             w.window().set_maximized(!max);
         }
     });
-    chrome.on_close(|| {
+    let v = vm.clone();
+    w.window().on_close_requested(move || {
+        v.borrow_mut().commit_rename();
+        slint::CloseRequestResponse::HideWindow
+    });
+    let v = vm.clone();
+    chrome.on_close(move || {
+        // a zone name still being typed is saved first
+        v.borrow_mut().commit_rename();
         let _ = slint::quit_event_loop();
     });
     let weak = w.as_weak();

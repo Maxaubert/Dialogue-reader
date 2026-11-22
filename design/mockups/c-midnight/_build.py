@@ -1,5 +1,6 @@
 import os, random
-OUT = r"C:\Users\Admin\Documents\Claude\Github\dialogue-reader-rs\design\mockups\c-midnight"
+# the mockup folder is the folder of this script
+OUT = os.path.dirname(os.path.abspath(__file__))
 
 P = {
  "chev-down": '<path d="m6 9 6 6 6-6"/>',
@@ -168,8 +169,9 @@ def zonerow_x(k, n, sel=False, on=True):
 def zonelist_x(sel=None, off=()):
     return "".join(zonerow_x(k, n, n == sel, k not in off) for k, n, *_ in ZONES)
 
+# 2026-11-22 (Max): the Kind picker shows the grey kind line icons, not five identical grey dots
 def kindpicker(active="dialogue"):
-    return '<div class="seg">' + "".join(f'<span class="{"on" if k==active else ""}"><span class="dot k-{k}"></span>{KIND[k]}</span>' for k in KIND) + '</div>'
+    return '<div class="seg">' + "".join(f'<span class="{"on" if k==active else ""}">{ic("k-" + k)}{KIND[k]}</span>' for k in KIND) + '</div>'
 
 def zonetools(draw=True, zoom=False):
     z = '<div class="seg"><span>Fit</span><span class="on">100%</span></div>' if zoom else ""
@@ -231,7 +233,7 @@ css01 = """
 .nowline{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-4) var(--s-5);border-top:1px solid var(--line)}
 """
 pill = f'<div style="position:absolute;top:12px;right:12px">{overlay_pill()}</div>'
-html = head("Welcome", css01) + obbar(0) + f'''<main class="page"><div class="wrap">
+html = head("Welcome", css01) + obbar(0) + f'''<main class="page kgrey"><div class="wrap">
 <section class="left">
 <h1>Hear the text in your games.</h1>
 <p class="lead" style="margin-top:var(--s-3)">DialogReader watches your game and reads dialogue, item pickups and other on-screen text out loud, with a voice that runs on your PC.</p>
@@ -732,7 +734,7 @@ ZONES_B = [(k, n) for k, n, *_ in ZONES] + [("dialogue", "Letters"), ("pickups",
 def zstrip(off=("prompts",)):
     items = "".join(f'<span class="zp{" off" if k in off else ""}"><span class="zic" title="{KIND[k]}">{ic("k-" + k)}</span>{n}<span class="toggle{"" if k in off else " on"}"></span></span>' for k, n in ZONES_B)
     return f'<div class="zstrip"><div class="zviz">{items}</div><span class="zmore" title="3 more zones">+3{ic("chev-down")}</span>{EDITBTN}</div>'
-html = head("Overview B", css10B) + nav("Overview") + f'''<main class="page"><div class="mw">
+html = head("Overview B", css10B) + nav("Overview") + f'''<main class="page kgrey"><div class="mw">
 {sbar()}
 <div class="hero">
 <section class="card pic">

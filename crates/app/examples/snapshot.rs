@@ -2,9 +2,9 @@
 //! Used for the text ink check of the Skia spike (README, "Renderer"). It shows a window, so it runs only on a
 //! hidden desktop (tools/hidden-run.ps1). On the normal desktop ("Default") it refuses to start.
 //!
-//! Build: `cargo build --release -p dr-app --features renderer-skia --example snapshot` (femtovg, Skia and software
-//! all built in). Run through tools/hidden-run.ps1:
-//! `snapshot <skia|femtovg|software> <page> <out.png> [scale]`. The scale is the window scale factor
+//! Build: `cargo build --release -p dr-app --features renderer-femtovg --example snapshot` (Skia, femtovg and
+//! software all built in). Run through tools/hidden-run.ps1:
+//! `snapshot <skia|skia-opengl|femtovg|software> <page> <out.png> [scale]`. The scale is the window scale factor
 //! (SLINT_SCALE_FACTOR); the default is 1, which gives a 1440 x 900 PNG. Use 2.25 for a 225% screen.
 
 use std::time::Duration;
@@ -36,7 +36,9 @@ fn main() {
     match desktop::current_name() {
         Some(name) if !name.eq_ignore_ascii_case("Default") => eprintln!("desktop: {name}"),
         other => {
-            eprintln!("refused: this would show a window on the user's screen (desktop {other:?}). Run it through tools/hidden-run.ps1.");
+            eprintln!(
+                "refused: this would show a window on the user's screen (desktop {other:?}). Run it through tools/hidden-run.ps1."
+            );
             std::process::exit(3);
         }
     }
@@ -59,8 +61,14 @@ fn main() {
     slint::Timer::single_shot(Duration::from_millis(1500), move || {
         let w = weak.unwrap();
         let buf = w.window().take_snapshot().expect("snapshot");
-        image::save_buffer(&out, buf.as_bytes(), buf.width(), buf.height(), image::ColorType::Rgba8)
-            .expect("save png");
+        image::save_buffer(
+            &out,
+            buf.as_bytes(),
+            buf.width(),
+            buf.height(),
+            image::ColorType::Rgba8,
+        )
+        .expect("save png");
         println!("saved {} x {} to {out}", buf.width(), buf.height());
         slint::quit_event_loop().expect("quit");
     });
@@ -77,8 +85,13 @@ mod desktop {
     #[link(name = "user32")]
     unsafe extern "system" {
         fn GetThreadDesktop(thread_id: u32) -> *mut c_void;
-        fn GetUserObjectInformationW(obj: *mut c_void, index: i32, info: *mut c_void, len: u32, needed: *mut u32)
-        -> i32;
+        fn GetUserObjectInformationW(
+            obj: *mut c_void,
+            index: i32,
+            info: *mut c_void,
+            len: u32,
+            needed: *mut u32,
+        ) -> i32;
     }
     #[link(name = "kernel32")]
     unsafe extern "system" {
@@ -95,7 +108,13 @@ mod desktop {
             if desk.is_null() {
                 return None;
             }
-            GetUserObjectInformationW(desk, UOI_NAME, buf.as_mut_ptr().cast(), size_of_val(&buf) as u32, &mut needed)
+            GetUserObjectInformationW(
+                desk,
+                UOI_NAME,
+                buf.as_mut_ptr().cast(),
+                size_of_val(&buf) as u32,
+                &mut needed,
+            )
         };
         if ok == 0 {
             return None;

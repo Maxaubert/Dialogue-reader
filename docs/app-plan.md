@@ -112,6 +112,27 @@ game is listed in the PR.
 **Done when.** A profile made through onboarding is saved, survives a restart, and its zones load as
 `dr_core::Zone`s with the right size on a frame of another size. All headless tests pass.
 
+**Result (2026-11-22, branch `feat/app-m2`).** Built as planned, with these notes:
+- `crates/runtime` also has `shot.rs` (a screenshot in memory, PNG load and save) and `testwin.rs` (test windows:
+  a hidden desktop, and an off-screen layered window for capture tests). `examples/list_windows.rs` prints what
+  page 02 would list.
+- The window list test runs on a hidden desktop. The screenshot test captures an off-screen layered window it
+  makes (WGC refuses windows on another desktop here), so it is not `#[ignore]`d. A manual check with a real game
+  is still listed for the PR: pick a running game on page 02, Continue, and see its screenshot on page 03.
+- `crates/app/tests/setup_flow.rs` is the done-when test: onboarding on a temp data folder with a fake desktop,
+  Finish, then a second window on the same folder opens the profile on Overview, and the saved zones scale to 4K.
+- Undo is one step, Ctrl+Z on pages 03 and 11. Rename is a text field in the selected zone row (no mockup for it).
+- The game switcher lists real profiles with their screenshot as cover; "Add game" starts at page 02.
+- Not real yet: voices (M3a), the activity log and status (M3b), zone edit and key capture (M3b, M4).
+- Review fixes (2026-11-22): a new id never takes a file that was not loaded, and `id` comes from the file name;
+  Delete during a drag ends the drag; page 02 and the zone lists scroll; only the current game's screenshot is
+  decoded at full size, other covers are made small when the switcher first opens; an empty exe never matches
+  (title only); Back on page 02 of "Add game" returns to Overview; a minimized window is refused at once; an
+  unsupported "no border" or "no cursor" setting falls back to the default; speed, volume and the Overview mode
+  are saved; a rename is saved on Enter or focus loss as one undo step; a tab or game change clears the notice.
+- Still open: capture and PNG encoding run on the UI thread (up to 3 s for a window that gives no picture).
+  Proposal, not yet planned: move capture to its own thread in M3b.
+
 ## M3a: OCR, speech and the voice screens (headless)
 
 **Scope.** Everything of the reading path that needs no game and no keys: the WinRT OCR moves into `crates/ocr`,

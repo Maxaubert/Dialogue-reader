@@ -2,7 +2,7 @@
 name = "dr-app"
 version = "0.1.0"
 edition = "2024"
-description = "DialogReader Windows app: Slint UI (M1: every approved screen on fake data)"
+description = "DialogReader Windows app: Slint UI"
 
 [lib]
 name = "dr_app"
@@ -18,13 +18,14 @@ name = "render-screens"
 path = "src/bin/render-screens.rs"
 
 [features]
-# The real window draws with femtovg (OpenGL). The software renderer is always built in: render-screens and the
-# tests use it, and it is the fallback at run time (SLINT_BACKEND=winit-software).
-default = ["renderer-femtovg"]
+# The real window draws with Skia through OpenGL (Max, 2026-11-22): its text matches the mockups. Overlays need
+# OpenGL Skia, not Skia's default surface, which draws their see-through margins black (docs/overlay-spike.md).
+# main.rs asks for the "skia-opengl" renderer by name. The software renderer is always built in: render-screens
+# and the tests use it, and SLINT_BACKEND=winit-software makes the window use it when OpenGL fails.
+default = ["renderer-skia"]
+renderer-skia = ["slint/renderer-skia-opengl"]
+# Fallback, opt-in: `--no-default-features --features renderer-femtovg` (19 MB exe, lighter text).
 renderer-femtovg = ["slint/renderer-femtovg"]
-# Skia spike (2026-11-22, README "Renderer"): its text matches the mockups, but the exe grows from 19.1 to 29.2 MB.
-# Build it with `--no-default-features --features renderer-skia`. With both features on, Slint picks Skia.
-renderer-skia = ["slint/renderer-skia"]
 
 [dependencies]
 # No default features: the window renderer comes from the features above, not from slint's defaults.
@@ -38,9 +39,12 @@ slint = { version = "=1.18.1", default-features = false, features = [
     "unstable-winit-030",
 ] }
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
+dr-runtime = { path = "../runtime" }
 
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"
+tempfile = "=3.27.0"
+dr-core = { path = "../core" }
 
 [build-dependencies]
 slint-build = "=1.18.1"

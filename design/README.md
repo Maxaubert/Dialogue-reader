@@ -18,6 +18,7 @@ Chosen by Max on 2026-11-22. The pages are built by `_build.py` from `tokens.css
 ## Rules Max set (2026-11-22)
 - Clean, uniform, sleek, modern, easy to navigate. No themes or gimmicks.
 - Zone kinds are shown with one grey line icon: Dialogue (speech bubble), Speaker (person), Pickups (box), Prompts (keycap), Ignore (eye-off). No colored dots, pills or labels.
+- Zone kinds carry no color anywhere (2026-11-22): the zone boxes on 01, 03, 10-main-b and 11 are grey, and the Kind picker on 03 and 11 shows the kind icons. Pages marked `.kgrey` in `_build.py`; notes at the end of `tokens.css`.
 - Keys: one read key and one quick menu key. No other hotkeys.
 - Quick menu: centered. Order: Manage zones, Stop (play/pause toggle), Mute, Voice, Speed, Volume, Mode, Settings, Quit (press twice).
 - Zone edit: drag on empty space adds a zone, click selects it, Delete/Backspace or the small x removes it, Esc finishes.

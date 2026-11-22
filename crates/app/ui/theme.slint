@@ -23,7 +23,7 @@ export global Palette {
     // text and marks drawn on the accent color, the white knobs and handles
     out property <color> on-accent: #FFFFFF;
     out property <color> knob: #FFFFFF;
-    // dark text on the colored zone tags of the stage
+    // dark text on the grey zone tags of the stage
     out property <color> on-tag: #07090E;
     // behind the game picture (shows only while it loads or at its edges)
     out property <color> stage-bg: #0E141E;
@@ -53,19 +53,9 @@ export global Palette {
     // overlay panels (quick menu, zone edit)
     out property <color> panel: #0A0D14;
     out property <color> canvas: #05070B;
-    // zone kinds: outline and fill on the stage of 01 and 10 only; lists use grey icons.
-    // 03 and 11 draw every zone grey (Max, 2026-11-22): line text-2, fill zone-fill, tag text-2, dots text-3.
+    // zones on every stage are grey: line text-2, fill zone-fill, tag text-2; the selected zone uses the accent.
+    // Zone kinds carry no color anywhere (Max, 2026-11-22): one grey line icon per kind.
     out property <color> zone-fill: #A2ABBC24;
-    out property <color> z-dialogue: #4FD1E8;
-    out property <color> z-dialogue-soft: #4FD1E824;
-    out property <color> z-speaker: #C49BFF;
-    out property <color> z-speaker-soft: #C49BFF24;
-    out property <color> z-pickups: #F5B544;
-    out property <color> z-pickups-soft: #F5B54424;
-    out property <color> z-prompts: #FF7AB6;
-    out property <color> z-prompts-soft: #FF7AB624;
-    out property <color> z-ignore: #8A94A8;
-    out property <color> z-ignore-soft: #8A94A824;
 }
 
 export global Space {
@@ -152,20 +142,6 @@ export global Render {
 export enum Kind { dialogue, speaker, pickups, prompts, ignore }
 
 export global Kinds {
-    public pure function color(k: Kind) -> color {
-        if k == Kind.dialogue { return Palette.z-dialogue; }
-        if k == Kind.speaker { return Palette.z-speaker; }
-        if k == Kind.pickups { return Palette.z-pickups; }
-        if k == Kind.prompts { return Palette.z-prompts; }
-        return Palette.z-ignore;
-    }
-    public pure function soft(k: Kind) -> color {
-        if k == Kind.dialogue { return Palette.z-dialogue-soft; }
-        if k == Kind.speaker { return Palette.z-speaker-soft; }
-        if k == Kind.pickups { return Palette.z-pickups-soft; }
-        if k == Kind.prompts { return Palette.z-prompts-soft; }
-        return Palette.z-ignore-soft;
-    }
     public pure function name(k: Kind) -> string {
         if k == Kind.dialogue { return "Dialogue"; }
         if k == Kind.speaker { return "Speaker"; }

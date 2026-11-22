@@ -26,7 +26,7 @@ export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
     in-out property <OverlayPreview> overlay: OverlayPreview.none;
     in-out property <bool> switcher-open: false;
-    // fake data (src/fake.rs)
+    // view models (src/vm): real profiles and windows, or the fake data of the mockups (src/fake.rs)
     in-out property <[WindowData]> games-running;
     in-out property <[WindowData]> other-windows;
     in-out property <int> picked-window: 0;
@@ -50,12 +50,42 @@ export component MainWindow inherits Window {
     in-out property <bool> automatic: true;
     in-out property <string> read-key: "Mouse 4";
     in-out property <string> menu-key: "F7";
+    in-out property <int> picked-voice: 0;
+    // page 05 sliders (0 to 1): kept here so they outlive the page and Finish can save them
+    in-out property <float> voice-speed: 0.55;
+    in-out property <float> voice-volume: 0.8;
+    // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
+    in-out property <bool> adding-game: false;
     in property <string> version: "0.1.0";
+    // the game being set up (page 06 summary)
+    in property <string> setup-game: "Red Dead Redemption 2";
+    in property <string> setup-art: "rdr2";
+    in property <image> setup-cover;
+    // screenshots: setup (page 03) and the current profile (10, 11). Real ones are shown whole (contain).
+    in property <image> setup-shot: Art.scene;
+    in property <float> setup-shot-w: 1600;
+    in property <float> setup-shot-h: 900;
+    in property <image> shot: Art.scene;
+    in property <float> shot-w: 1600;
+    in property <float> shot-h: 900;
+    in property <bool> real-shots: false;
+    in property <string> shot-info: "Screenshot 21:30 · 3840 × 2160 · Fit to window";
+    // zone editing on 03 (setup-*) and 11 (zones-*)
+    in-out property <int> setup-selected: 1;
+    in-out property <int> zones-selected: 1;
+    in-out property <bool> setup-draw: true;
+    in-out property <bool> zones-draw: false;
+    in property <Kind> zone-kind: Kind.dialogue;
+    in property <bool> drafting: false;
+    in property <ZoneData> draft;
+    // a problem said in plain words: in the onboarding footer, or under the title bar. A tab change clears it.
+    in-out property <string> notice;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
     property <string> game-name: root.games.length > 0 ? root.games[root.current-game].name : "";
     property <string> game-art: root.games.length > 0 ? root.games[root.current-game].art : "rdr2";
+    property <image> game-cover: root.games.length > 0 ? root.games[root.current-game].cover : Art.scene;
 
     // zone edit (Rust: add, remove, hit test, dim path)
     callback edit-commit(Kind, length, length, length, length);
@@ -64,6 +94,32 @@ export component MainWindow inherits Window {
     callback settings-jump(int);
     settings-jump(i) => {
         settings.jump(i);
+    }
+    // zone editing (Rust: src/vm). The page says which list: draw-zones = setup, zones and overview = profile.
+    callback zone-pointer(int, float, float, float);
+    callback zone-select(int);
+    callback zone-toggle(int, bool);
+    callback zone-rename(int, string);
+    callback zone-rename-done();
+    callback zone-kind-picked(Kind);
+    callback zone-delete();
+    callback zone-undo();
+    callback retake-shot();
+    // page 02 and the game switcher
+    callback windows-refresh();
+    callback windows-search(string);
+    callback game-chosen(int);
+    // the switcher opened: covers of the other games are made the first time
+    callback switcher-opened();
+    callback add-game();
+    // Back on page 02 of "Add game": the main pages show the current game again
+    callback setup-cancelled();
+    // the mode button on Overview (saved into the current profile)
+    callback mode-changed(bool);
+    // asked before leaving a setup page forward: false stays (Continue on 02 takes the screenshot, Finish saves)
+    callback leave(Page) -> bool;
+    leave(p) => {
+        return true;
     }
 
     title: "DialogReader";
@@ -76,8 +132,16 @@ export component MainWindow inherits Window {
     default-font-family: Type.font;
     default-font-size: Type.fs2;
     function back() {
+        root.zone-rename-done();
         if root.page == Page.pick-window {
-            root.page = Page.welcome;
+            if root.adding-game {
+                root.adding-game = false;
+                root.notice = "";
+                root.setup-cancelled();
+                root.page = Page.overview;
+            } else {
+                root.page = Page.welcome;
+            }
         } else if root.page == Page.draw-zones {
             root.page = Page.pick-window;
         } else if root.page == Page.keys {
@@ -89,6 +153,9 @@ export component MainWindow inherits Window {
         }
     }
     function next() {
+        if !root.leave(root.page) {
+            return;
+        }
         if root.page == Page.welcome {
             root.page = Page.pick-window;
         } else if root.page == Page.pick-window {
@@ -132,15 +199,31 @@ export component MainWindow inherits Window {
                     switcher.highlight = Math.min(root.games.length - 1, switcher.highlight + 1);
                     return accept;
                 }
-                if e.text == Key.Return {
+                if e.text == Key.Return && switcher.highlight >= 0 && switcher.highlight < root.games.length {
+                    root.notice = "";
                     root.current-game = switcher.highlight;
                     root.switcher-open = false;
+                    root.game-chosen(switcher.highlight);
                     return accept;
                 }
             }
             if !root.setup && e.modifiers.control && (e.text == "k" || e.text == "K" || e.text == "\u{b}") {
                 root.switcher-open = !root.switcher-open;
+                if root.switcher-open {
+                    root.zone-rename-done();
+                    root.switcher-opened();
+                }
                 return accept;
+            }
+            if root.overlay == OverlayPreview.none && !root.switcher-open && (root.page == Page.draw-zones || root.page == Page.zones) {
+                if e.text == Key.Delete || e.text == Key.Backspace {
+                    root.zone-delete();
+                    return accept;
+                }
+                if e.modifiers.control && (e.text == "z" || e.text == "Z" || e.text == "\u{1a}") {
+                    root.zone-undo();
+                    return accept;
+                }
             }
             reject
         }
@@ -152,11 +235,30 @@ export component MainWindow inherits Window {
                 tab: root.tab;
                 game: root.game-name;
                 art: root.game-art;
+                cover: root.game-cover;
                 tab-clicked(i) => {
+                    // a zone name still being typed is saved before its page goes
+                    root.zone-rename-done();
+                    root.notice = "";
                     root.page = i == 0 ? Page.overview : i == 1 ? Page.zones : Page.settings;
                 }
                 game-clicked => {
+                    root.zone-rename-done();
                     root.switcher-open = true;
+                    root.switcher-opened();
+                }
+            }
+            if (!root.setup || root.page == Page.welcome) && root.notice != "": Rectangle {
+                height: 32px;
+                background: Palette.danger-soft;
+                Text {
+                    x: Size.page-x;
+                    width: parent.width - 2 * Size.page-x;
+                    text: root.notice;
+                    font-size: Type.fs1;
+                    color: Palette.danger;
+                    vertical-alignment: center;
+                    overflow: elide;
                 }
             }
             Rectangle {
@@ -171,9 +273,49 @@ export component MainWindow inherits Window {
                     games: root.games-running;
                     others: root.other-windows;
                     selected <=> root.picked-window;
+                    refresh => {
+                        root.windows-refresh();
+                    }
+                    search-changed(t) => {
+                        root.windows-search(t);
+                    }
                 }
                 if root.page == Page.draw-zones: DrawZonesPage {
                     zones <=> root.setup-zones;
+                    selected <=> root.setup-selected;
+                    draw <=> root.setup-draw;
+                    shot: root.setup-shot;
+                    shot-w: root.setup-shot-w;
+                    shot-h: root.setup-shot-h;
+                    contain: root.real-shots;
+                    drafting: root.drafting;
+                    draft: root.draft;
+                    kind: root.zone-kind;
+                    pointer(k, x, y, s) => {
+                        keys.focus();
+                        root.zone-pointer(k, x, y, s);
+                    }
+                    select(i) => {
+                        root.zone-select(i);
+                    }
+                    toggle(i, v) => {
+                        root.zone-toggle(i, v);
+                    }
+                    rename(i, t) => {
+                        root.zone-rename(i, t);
+                    }
+                    rename-done(enter) => {
+                        root.zone-rename-done();
+                        if enter {
+                            keys.focus();
+                        }
+                    }
+                    kind-picked(k) => {
+                        root.zone-kind-picked(k);
+                    }
+                    retake => {
+                        root.retake-shot();
+                    }
                 }
                 if root.page == Page.keys: KeysPage {
                     read-key: root.read-key;
@@ -181,21 +323,35 @@ export component MainWindow inherits Window {
                 }
                 if root.page == Page.voice: VoicePage {
                     voices: root.voices;
+                    selected <=> root.picked-voice;
+                    speed <=> root.voice-speed;
+                    volume <=> root.voice-volume;
                 }
                 if root.page == Page.mode: ModePage {
                     automatic <=> root.automatic;
-                    game: root.games-running.length > 0 ? root.games-running[root.picked-window].name : "";
-                    art: root.games-running.length > 0 ? root.games-running[root.picked-window].art : "rdr2";
+                    game: root.setup-game;
+                    art: root.setup-art;
+                    cover: root.setup-cover;
                     zone-count: root.setup-zones.length;
                     read-key: root.read-key;
                     menu-key: root.menu-key;
                 }
                 if root.page == Page.overview: OverviewTab {
+                    shot: root.shot;
+                    shot-w: root.shot-w;
+                    shot-h: root.shot-h;
+                    contain: root.real-shots;
+                    toggle(i, v) => {
+                        root.zone-toggle(i, v);
+                    }
                     zones <=> root.zones;
                     extra-zones <=> root.extra-zones;
                     recent: root.recent;
                     automatic <=> root.automatic;
                     read-key: root.read-key;
+                    mode-changed(a) => {
+                        root.mode-changed(a);
+                    }
                     edit-zones => {
                         root.page = Page.zones;
                     }
@@ -206,7 +362,48 @@ export component MainWindow inherits Window {
                 if root.page == Page.zones: ZonesTab {
                     zones <=> root.zones;
                     win-w: root.width;
-                    win-h: root.height;
+                    win-h: root.height - (root.notice != "" ? 32px : 0px);
+                    selected <=> root.zones-selected;
+                    draw <=> root.zones-draw;
+                    shot: root.shot;
+                    shot-w: root.shot-w;
+                    shot-h: root.shot-h;
+                    contain: root.real-shots;
+                    shot-info: root.shot-info;
+                    drafting: root.drafting;
+                    draft: root.draft;
+                    kind: root.zone-kind;
+                    pointer(k, x, y, s) => {
+                        keys.focus();
+                        root.zone-pointer(k, x, y, s);
+                    }
+                    select(i) => {
+                        root.zone-select(i);
+                    }
+                    toggle(i, v) => {
+                        root.zone-toggle(i, v);
+                    }
+                    rename(i, t) => {
+                        root.zone-rename(i, t);
+                    }
+                    rename-done(enter) => {
+                        root.zone-rename-done();
+                        if enter {
+                            keys.focus();
+                        }
+                    }
+                    kind-picked(k) => {
+                        root.zone-kind-picked(k);
+                    }
+                    retake => {
+                        root.retake-shot();
+                    }
+                    add-zone => {
+                        root.zones-draw = true;
+                    }
+                    delete-zone(i) => {
+                        root.zone-delete();
+                    }
                 }
                 if root.page == Page.activity: ActivityTab {
                     log: root.log;
@@ -224,6 +421,7 @@ export component MainWindow inherits Window {
             }
 
             if root.setup && root.page != Page.welcome: ObFoot {
+                notice: root.notice;
                 primary: root.page == Page.mode ? "Finish" : "Continue";
                 primary-icon: root.page == Page.mode ? Icons.check : Icons.arrow-right;
                 back => {
@@ -243,8 +441,14 @@ export component MainWindow inherits Window {
                 root.switcher-open = false;
             }
             choose(i) => {
+                root.notice = "";
                 root.current-game = i;
                 root.switcher-open = false;
+                root.game-chosen(i);
+            }
+            add-game => {
+                root.switcher-open = false;
+                root.add-game();
             }
         }
 

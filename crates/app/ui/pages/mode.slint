@@ -100,6 +100,7 @@ export component ModePage inherits Rectangle {
     in-out property <bool> automatic: true;
     in property <string> game: "Red Dead Redemption 2";
     in property <string> art: "rdr2";
+    in property <image> cover;
     in property <int> zone-count: 5;
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
@@ -169,6 +170,7 @@ export component ModePage inherits Rectangle {
                             width: 24px;
                             height: 24px;
                             art: root.art;
+                            picture: root.cover;
                             radius: Radius.xs;
                         }
                     }

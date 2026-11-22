@@ -1135,15 +1135,31 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 name = "dr-app"
 version = "0.1.0"
 dependencies = [
+ "dr-core",
+ "dr-runtime",
  "i-slint-backend-testing",
  "image",
  "slint",
  "slint-build",
+ "tempfile",
 ]
 
 [[package]]
 name = "dr-core"
 version = "0.1.0"
+
+[[package]]
+name = "dr-runtime"
+version = "0.1.0"
+dependencies = [
+ "dr-core",
+ "image",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows",
+ "windows-capture",
+]
 
 [[package]]
 name = "drm"

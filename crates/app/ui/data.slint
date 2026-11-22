@@ -12,12 +12,13 @@ export struct ZoneData {
     h: float,
 }
 
-// Page 02: a window that can be read.
+// Page 02: a window that can be read. Fake windows have `art`; real ones have the exe `icon`.
 export struct WindowData {
     name: string,
     exe: string,
     meta: string,
     art: string,
+    icon: image,
 }
 
 // Page 05 and the quick menu: one voice.
@@ -36,12 +37,13 @@ export struct LineData {
     skip: string,
 }
 
-// Game switcher rows.
+// Game switcher rows. Fake games have `art`; real profiles have their screenshot as `cover`.
 export struct GameData {
     name: string,
     meta: string,
     art: string,
     running: bool,
+    cover: image,
 }
 
 // Zone edit overlay: a zone in frame pixels.

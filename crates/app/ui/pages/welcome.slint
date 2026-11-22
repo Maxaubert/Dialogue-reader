@@ -1,6 +1,6 @@
 // 01 welcome.
 import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
-import { Icon, Button, BtnKind, Card, Dot, PillWave } from "../components/base.slint";
+import { Icon, Button, BtnKind, Card, Chip, Dot, PillWave } from "../components/base.slint";
 import { Stage } from "../components/stage.slint";
 import { ZoneData } from "../data.slint";
 import { OverlayPill } from "../overlays/pill.slint";
@@ -205,30 +205,13 @@ export component WelcomePage inherits Rectangle {
 
                         VerticalLayout {
                             alignment: center;
-                            Rectangle {
-                                height: 22px;
-                                border-radius: Radius.sm;
-                                background: Palette.z-dialogue-soft;
-                                HorizontalLayout {
-                                    padding-left: Space.s2;
-                                    padding-right: Space.s2;
-                                    spacing: 6px;
-                                    VerticalLayout {
-                                        alignment: center;
-                                        Dot {
-                                            size: 6px;
-                                            tint: Palette.z-dialogue;
-                                        }
-                                    }
-
-                                    Text {
-                                        text: "Dialogue";
-                                        font-size: Type.fs1;
-                                        font-weight: Type.w-medium;
-                                        color: Palette.z-dialogue;
-                                        vertical-alignment: center;
-                                    }
-                                }
+                            // the kind as a grey line icon, no color (Max, 2026-11-22)
+                            Chip {
+                                text: Kinds.name(Kind.dialogue);
+                                dot: false;
+                                icon: Kinds.icon(Kind.dialogue);
+                                fg: Palette.text-2;
+                                bg: Palette.surface-2;
                             }
                         }
                     }
