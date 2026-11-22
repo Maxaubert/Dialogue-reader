@@ -9,11 +9,11 @@ Chosen by Max on 2026-11-22. The pages are built by `_build.py` from `tokens.css
 |---|---|
 | 01 welcome, 02 pick window, 05 voice, 06 mode, 12 settings, 13 overlay pill, 14 game switcher | approved as first made |
 | 03 draw zones, 11 zone editor | approved after changes: grey kind icons, no colored tags, no "Text found now" panel |
-| 04-read-key-d "Your keys" | approved: 2 keys only, Read zones now (Mouse 4) and Quick menu (F7) |
-| 04-read-key-c (mouse drawing) | liked; onboarding uses either C or D (open) |
+| 04-read-key-d "Your keys" | chosen for setup and Settings: 2 keys only, Read zones now (Mouse 4) and Quick menu (F7) |
+| 04-read-key-c (mouse drawing) | not used |
 | 15-quick-menu-a, 15-quick-menu-voice | approved: centered in-game quick menu |
 | 16-zone-edit | approved: in-game zone editing from the quick menu |
-| 10-main-a / b / c | open: Max picks one (B is the reviewer's choice) |
+| 10-main-b | chosen main page (overview), 2026-11-22. 10-main-a and 10-main-c not used |
 
 ## Rules Max set (2026-11-22)
 - Clean, uniform, sleek, modern, easy to navigate. No themes or gimmicks.
