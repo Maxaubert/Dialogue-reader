@@ -1,0 +1,259 @@
+// Midnight design tokens (design/mockups/c-midnight/tokens.css) as Slint globals.
+// Colors with alpha use 8-digit hex (#RRGGBBAA).
+
+export global Palette {
+    out property <color> bg: #07090E;
+    out property <color> surface: #0C1018;
+    out property <color> surface-2: #121825;
+    out property <color> surface-3: #1A2232;
+    out property <color> line: #1C2331;
+    out property <color> line-2: #283143;
+    out property <color> scrim: #030509A8;
+    out property <color> text: #EDF0F6;
+    out property <color> text-2: #A2ABBC;
+    out property <color> text-3: #7F899D;
+    out property <color> accent: #5B7CFF;
+    out property <color> accent-soft: #5B7CFF2E;
+    out property <color> accent-ring: #5B7CFF73;
+    out property <color> ok: #4ADE80;
+    out property <color> ok-soft: #4ADE801F;
+    out property <color> danger: #F87171;
+    out property <color> pill-bg: #07090EDB;
+    out property <color> pill-line: #FFFFFF1A;
+    // text and marks drawn on the accent color, the white knobs and handles
+    out property <color> on-accent: #FFFFFF;
+    out property <color> knob: #FFFFFF;
+    // dark text on the colored zone tags of the stage
+    out property <color> on-tag: #07090E;
+    // behind the game picture (shows only while it loads or at its edges)
+    out property <color> stage-bg: #0E141E;
+    // bottom edge of the big keycap (04-read-key-d)
+    out property <color> keycap-edge: #05070B;
+    // window close button on hover (the Windows red)
+    out property <color> win-close: #C42B1C;
+    // quit row in the quick menu: red wash and dimmed red text
+    out property <color> danger-soft: #F871711A;
+    out property <color> danger-dim: #F87171CC;
+    // surface at zero alpha, the start of a fade to the card color
+    out property <color> surface-clear: #0C101800;
+    // accent wash from the left on the main key card (04-read-key-d)
+    out property <color> accent-wash: #5B7CFF1A;
+    out property <color> accent-wash-mid: #5B7CFF05;
+    out property <color> accent-clear: #5B7CFF00;
+    // zone edit (16): shade outside the zones, zone outline, selection and the box being drawn
+    out property <color> edit-shade: #05070B57;
+    out property <color> edit-line: #EDF0F69E;
+    out property <color> edit-sel-fill: #5B7CFF24;
+    out property <color> edit-sel-ring: #5B7CFF38;
+    out property <color> edit-draft-line: #5B7CFF80;
+    out property <color> edit-draft-fill: #5B7CFF0D;
+    // text-2 as text, for colors inside @markdown strings (Slint cannot print a color).
+    // tests/tokens.rs checks that it equals text-2.
+    out property <string> text-2-hex: "#A2ABBC";
+    // overlay panels (quick menu, zone edit)
+    out property <color> panel: #0A0D14;
+    out property <color> canvas: #05070B;
+    // zone kinds: outline and fill on the stage only; lists use grey icons
+    out property <color> z-dialogue: #4FD1E8;
+    out property <color> z-dialogue-soft: #4FD1E824;
+    out property <color> z-speaker: #C49BFF;
+    out property <color> z-speaker-soft: #C49BFF24;
+    out property <color> z-pickups: #F5B544;
+    out property <color> z-pickups-soft: #F5B54424;
+    out property <color> z-prompts: #FF7AB6;
+    out property <color> z-prompts-soft: #FF7AB624;
+    out property <color> z-ignore: #8A94A8;
+    out property <color> z-ignore-soft: #8A94A824;
+}
+
+export global Space {
+    out property <length> s1: 4px;
+    out property <length> s2: 8px;
+    out property <length> s3: 12px;
+    out property <length> s4: 16px;
+    out property <length> s5: 24px;
+    out property <length> s6: 32px;
+    out property <length> s7: 48px;
+}
+
+export global Radius {
+    out property <length> xs: 4px;
+    out property <length> sm: 6px;
+    out property <length> md: 8px;
+    out property <length> lg: 12px;
+    out property <length> pill: 999px;
+}
+
+export global Size {
+    out property <length> ctl: 32px;
+    out property <length> ctl-lg: 40px;
+    out property <length> bar: 52px;
+    out property <length> row: 44px;
+    out property <length> icon: 16px;
+    out property <length> icon-sm: 12px;
+    out property <length> kbd: 24px;
+    out property <length> kbd-sm: 20px;
+    out property <length> col: 960px;
+    out property <length> page-x: 32px;
+    out property <length> page-max: 1376px;
+}
+
+export global Type {
+    out property <length> fs1: 12px;
+    out property <length> fs2: 14px;
+    out property <length> fs3: 16px;
+    out property <length> fs4: 20px;
+    out property <length> fs5: 32px;
+    out property <string> font: "Geist";
+    out property <string> mono: "Geist Mono";
+    // Font weights (Geist and Geist Mono are variable fonts, so these are exact). The mockup shots look heavier
+    // because Chromium draws text with ClearType and extra contrast; Slint draws grayscale coverage. That makes
+    // all text, at every weight, about 15 to 30% lighter in ink. It is not a weight problem (README, Fonts).
+    out property <int> w-regular: 400;
+    out property <int> w-medium: 500;
+    out property <int> w-semibold: 600;
+    // CSS line boxes (font size x line height), used as Text heights so blocks stack as in the mockups
+    out property <length> lh1: 17px;
+    out property <length> lh2: 20px;
+    out property <length> lh3: 23px;
+    // Text line-height-factor is relative to Geist's natural line height (1.3 em: ascent + descent, no gap).
+    // lhf-N gives CSS line-height N / 100, so lhf-140 = 1.4 / 1.3.
+    out property <float> lhf-115: 0.8846;
+    out property <float> lhf-140: 1.0769;
+    out property <float> lhf-145: 1.1154;
+    out property <float> lhf-150: 1.1538;
+    // letter spacing: page headings (fs5, -0.025em), key card titles (18 px, -0.01em),
+    // quick menu title (-0.01em), small caps labels in the quick menu (0.06em), arrow key hints
+    out property <length> ls-display: -0.8px;
+    out property <length> ls-card-title: -0.18px;
+    out property <length> ls-menu-title: -0.15px;
+    out property <length> ls-caps: 0.66px;
+    out property <length> ls-arrows: 2px;
+}
+
+// Shadows (tokens.css --shadow-1 and --shadow-pop). The software renderer draws none; the real window does.
+export global Shadow {
+    out property <length> low-y: 1px;
+    out property <length> low-blur: 2px;
+    out property <color> low-color: #00000066;
+    out property <length> pop-y: 16px;
+    out property <length> pop-blur: 40px;
+    out property <color> pop-color: #0000008C;
+}
+
+// How the window is drawn. `software` is set by the headless renderer (src/screens.rs): the software renderer
+// does not clip to rounded corners, so CornerMask paints them. The real window clips and needs no mask.
+export global Render {
+    in-out property <bool> software: false;
+}
+
+export enum Kind { dialogue, speaker, pickups, prompts, ignore }
+
+export global Kinds {
+    public pure function color(k: Kind) -> color {
+        if k == Kind.dialogue { return Palette.z-dialogue; }
+        if k == Kind.speaker { return Palette.z-speaker; }
+        if k == Kind.pickups { return Palette.z-pickups; }
+        if k == Kind.prompts { return Palette.z-prompts; }
+        return Palette.z-ignore;
+    }
+    public pure function soft(k: Kind) -> color {
+        if k == Kind.dialogue { return Palette.z-dialogue-soft; }
+        if k == Kind.speaker { return Palette.z-speaker-soft; }
+        if k == Kind.pickups { return Palette.z-pickups-soft; }
+        if k == Kind.prompts { return Palette.z-prompts-soft; }
+        return Palette.z-ignore-soft;
+    }
+    public pure function name(k: Kind) -> string {
+        if k == Kind.dialogue { return "Dialogue"; }
+        if k == Kind.speaker { return "Speaker"; }
+        if k == Kind.pickups { return "Pickups"; }
+        if k == Kind.prompts { return "Prompts"; }
+        return "Ignore";
+    }
+    public pure function icon(k: Kind) -> image {
+        if k == Kind.dialogue { return Icons.k-dialogue; }
+        if k == Kind.speaker { return Icons.k-speaker; }
+        if k == Kind.pickups { return Icons.k-pickups; }
+        if k == Kind.prompts { return Icons.k-prompts; }
+        return Icons.k-ignore;
+    }
+}
+
+// Line icons exported from the mockups by tools/export_icons.py. All white: draw them with `colorize`.
+// No suffix: stroke for 16 px. -sm: for 12 px. -lg: for 22 px. -fill: filled shape.
+export global Icons {
+    out property <image> logo: @image-url("icons/logo.svg");
+    out property <image> chev-down: @image-url("icons/chev-down.svg");
+    out property <image> chev-down-sm: @image-url("icons/chev-down-sm.svg");
+    out property <image> chev-right: @image-url("icons/chev-right.svg");
+    out property <image> chev-left: @image-url("icons/r10-chev-left.svg");
+    out property <image> arrow-left: @image-url("icons/arrow-left.svg");
+    out property <image> arrow-right: @image-url("icons/arrow-right.svg");
+    out property <image> check: @image-url("icons/check.svg");
+    out property <image> check-sm: @image-url("icons/check-sm.svg");
+    out property <image> plus: @image-url("icons/plus.svg");
+    out property <image> search: @image-url("icons/search.svg");
+    out property <image> refresh: @image-url("icons/refresh.svg");
+    out property <image> play: @image-url("icons/play.svg");
+    out property <image> play-fill: @image-url("icons/r8-play-fill.svg");
+    out property <image> resume: @image-url("icons/r8-play.svg");
+    out property <image> pause: @image-url("icons/pause.svg");
+    out property <image> stop: @image-url("icons/stop.svg");
+    out property <image> replay: @image-url("icons/replay.svg");
+    out property <image> volume: @image-url("icons/volume.svg");
+    out property <image> volume-lg: @image-url("icons/volume-lg.svg");
+    out property <image> speaker: @image-url("icons/r11-spk.svg");
+    out property <image> mouse: @image-url("icons/mouse.svg");
+    out property <image> window: @image-url("icons/window.svg");
+    out property <image> zone: @image-url("icons/zone.svg");
+    out property <image> settings: @image-url("icons/settings.svg");
+    out property <image> x: @image-url("icons/x.svg");
+    out property <image> x-sm: @image-url("icons/x-sm.svg");
+    out property <image> minus: @image-url("icons/minus.svg");
+    out property <image> square: @image-url("icons/square.svg");
+    out property <image> grid: @image-url("icons/grid.svg");
+    out property <image> pointer: @image-url("icons/pointer.svg");
+    out property <image> camera: @image-url("icons/camera.svg");
+    out property <image> trash: @image-url("icons/trash.svg");
+    out property <image> zap: @image-url("icons/zap.svg");
+    out property <image> download: @image-url("icons/download.svg");
+    out property <image> upload: @image-url("icons/upload.svg");
+    out property <image> ban-sm: @image-url("icons/ban-sm.svg");
+    out property <image> pencil: @image-url("icons/pencil.svg");
+    out property <image> audio: @image-url("icons/audio.svg");
+    out property <image> mode: @image-url("icons/r8-mode.svg");
+    out property <image> open: @image-url("icons/r8-open.svg");
+    out property <image> speed: @image-url("icons/r10-speed.svg");
+    out property <image> power: @image-url("icons/r10-power.svg");
+    out property <image> cross: @image-url("icons/r10-cross.svg");
+    out property <image> panel: @image-url("icons/r9-panel.svg");
+    out property <image> panel-lg: @image-url("icons/r9-panel-lg.svg");
+    out property <image> k-dialogue: @image-url("icons/k-dialogue.svg");
+    out property <image> k-speaker: @image-url("icons/k-speaker.svg");
+    out property <image> k-pickups: @image-url("icons/k-pickups.svg");
+    out property <image> k-prompts: @image-url("icons/k-prompts.svg");
+    out property <image> k-ignore: @image-url("icons/k-ignore.svg");
+}
+
+// Fake game art for M1 (from the mockups). From M2 on, real screenshots take their place.
+export global Art {
+    out property <image> scene: @image-url("art/scene.svg");
+    // the same scene drawn by Chromium at 1440 x 900 (as in the mockups). Software renders of the full-window
+    // overlay previews use it: a 1:1 copy with no scaling, so they line up with the mockup shots. The real
+    // window keeps the SVG, which stays sharp at any window size.
+    out property <image> scene-full: @image-url("art/scene-1440.png");
+    out property <image> rdr2: @image-url("art/rdr2.svg");
+    out property <image> satis: @image-url("art/satis.svg");
+    out property <image> p4g: @image-url("art/p4g.svg");
+    out property <image> e33: @image-url("art/e33.svg");
+    out property <image> kcd2: @image-url("art/kcd2.svg");
+    public pure function get(key: string) -> image {
+        if key == "rdr2" { return self.rdr2; }
+        if key == "satis" { return self.satis; }
+        if key == "p4g" { return self.p4g; }
+        if key == "e33" { return self.e33; }
+        if key == "kcd2" { return self.kcd2; }
+        return self.scene;
+    }
+}

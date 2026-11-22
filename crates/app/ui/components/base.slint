@@ -1,0 +1,659 @@
+// Shared building blocks (tokens.css: .btn, .kbd, .toggle, .seg, .radio, .slider, .card, .count, .dot, .status, .itile).
+import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+
+export component Icon inherits Image {
+    in property <color> color: Palette.text-3;
+    width: Size.icon;
+    height: Size.icon;
+    colorize: root.color;
+    image-fit: contain;
+}
+
+// Icon centered on the cross axis of a HorizontalLayout.
+export component CIcon inherits VerticalLayout {
+    in property <image> source;
+    in property <color> color: Palette.text-3;
+    in property <length> size: Size.icon;
+    alignment: center;
+    Icon {
+        source: root.source;
+        color: root.color;
+        width: root.size;
+        height: root.size;
+    }
+}
+
+// Text with the app defaults. Height is the CSS line box, so blocks stack as in the mockups.
+export component Label inherits Text {
+    color: Palette.text;
+    font-size: Type.fs2;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// Covers the corners of a box with the color behind it. Only for the software renderer (Render.software), which
+// does not clip to rounded corners. The real window clips instead, so the mask never shows a wrong color there.
+export component CornerMask {
+    in property <length> radius: Radius.md;
+    in property <color> color: Palette.bg;
+    in property <bool> top: true;
+    in property <bool> bottom: true;
+    property <float> r: root.radius / 1px;
+    if root.top: Path {
+        x: 0;
+        y: 0;
+        width: root.radius;
+        height: root.radius;
+        viewbox-width: root.r;
+        viewbox-height: root.r;
+        fill: root.color;
+        commands: "M 0 0 L \{root.r} 0 A \{root.r} \{root.r} 0 0 0 0 \{root.r} Z";
+    }
+    if root.top: Path {
+        x: root.width - root.radius;
+        y: 0;
+        width: root.radius;
+        height: root.radius;
+        viewbox-width: root.r;
+        viewbox-height: root.r;
+        fill: root.color;
+        commands: "M 0 0 L \{root.r} 0 L \{root.r} \{root.r} A \{root.r} \{root.r} 0 0 0 0 0 Z";
+    }
+    if root.bottom: Path {
+        x: 0;
+        y: root.height - root.radius;
+        width: root.radius;
+        height: root.radius;
+        viewbox-width: root.r;
+        viewbox-height: root.r;
+        fill: root.color;
+        commands: "M 0 0 A \{root.r} \{root.r} 0 0 0 \{root.r} \{root.r} L 0 \{root.r} Z";
+    }
+    if root.bottom: Path {
+        x: root.width - root.radius;
+        y: root.height - root.radius;
+        width: root.radius;
+        height: root.radius;
+        viewbox-width: root.r;
+        viewbox-height: root.r;
+        fill: root.color;
+        commands: "M \{root.r} 0 L \{root.r} \{root.r} L 0 \{root.r} A \{root.r} \{root.r} 0 0 0 \{root.r} 0 Z";
+    }
+}
+
+// Game art with rounded corners. `behind` is the color around it (used by the mask in software renders only).
+export component Thumb {
+    in property <string> art: "rdr2";
+    in property <length> radius: Radius.sm;
+    in property <color> behind: Palette.surface;
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: root.radius;
+        clip: true;
+        Image {
+            width: 100%;
+            height: 100%;
+            source: Art.get(root.art);
+            image-fit: cover;
+        }
+    }
+
+    if Render.software: CornerMask {
+        width: 100%;
+        height: 100%;
+        radius: root.radius;
+        color: root.behind;
+    }
+}
+
+export component Kbd inherits Rectangle {
+    in property <string> text;
+    in property <bool> small: false;
+    in property <color> fg: Palette.text-2;
+    in property <length> pad: root.small ? 6px : 8px;
+    height: root.small ? Size.kbd-sm : Size.kbd;
+    min-width: self.height;
+    horizontal-stretch: 0;
+    border-radius: Radius.sm;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.surface-2;
+    HorizontalLayout {
+        padding-left: root.pad + 1px;
+        padding-right: root.pad + 1px;
+        alignment: center;
+        Text {
+            text: root.text;
+            font-family: Type.mono;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: root.fg;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export enum BtnKind { default, primary, ghost, danger }
+
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <image> trail;
+    in property <string> kbd;
+    in property <BtnKind> kind: BtnKind.default;
+    in property <bool> large: false;
+    in property <bool> icon-only: false;
+    in property <string> label: root.text;
+    in property <length> icon-size: Size.icon;
+    in property <length> pad-x: root.large ? Space.s4 : Space.s3;
+    in property <color> fg: root.kind == BtnKind.primary ? Palette.bg : root.kind == BtnKind.ghost ? Palette.text-2 : root.kind == BtnKind.danger ? Palette.danger : Palette.text;
+    in property <color> icon-color: root.fg;
+    in property <LayoutAlignment> align: center;
+    callback clicked();
+    height: root.large ? Size.ctl-lg : Size.ctl;
+    min-width: root.icon-only ? self.height : 0px;
+    horizontal-stretch: 0;
+    border-radius: Radius.md;
+    border-width: 1px;
+    border-color: root.kind == BtnKind.primary ? Palette.text : root.kind == BtnKind.default ? Palette.line-2 : transparent;
+    background: root.kind == BtnKind.primary ? Palette.text : root.kind == BtnKind.default ? (touch.has-hover ? Palette.surface-3 : Palette.surface-2) : (touch.has-hover ? Palette.surface-2 : transparent);
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        root.clicked();
+    }
+    HorizontalLayout {
+        padding-left: root.icon-only ? 0px : root.pad-x + 1px;
+        padding-right: root.icon-only ? 0px : root.pad-x + 1px;
+        spacing: Space.s2;
+        alignment: root.icon-only ? LayoutAlignment.center : root.align;
+        if root.icon.width > 0: CIcon {
+            source: root.icon;
+            color: root.icon-color;
+            size: root.icon-size;
+        }
+        if root.text != "": Text {
+            text: root.text;
+            color: root.fg;
+            font-size: Type.fs2;
+            font-weight: Type.w-medium;
+            vertical-alignment: center;
+        }
+        if root.kbd != "": VerticalLayout {
+            alignment: center;
+            Kbd {
+                text: root.kbd;
+                small: true;
+            }
+        }
+        if root.trail.width > 0: CIcon {
+            source: root.trail;
+            color: root.icon-color;
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component Toggle inherits Rectangle {
+    in property <bool> on;
+    in property <string> label;
+    in property <length> track-w: 32px;
+    callback toggled(bool);
+    width: root.track-w;
+    height: 20px;
+    border-radius: 10px;
+    background: root.on ? Palette.accent : Palette.line-2;
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.on;
+    accessible-action-default => {
+        root.toggled(!root.on);
+    }
+    Rectangle {
+        x: root.on ? root.width - 17px : 3px;
+        y: 3px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: root.on ? Palette.knob : Palette.text-2;
+        animate x { duration: 120ms; }
+    }
+
+    TouchArea {
+        clicked => {
+            root.toggled(!root.on);
+        }
+    }
+}
+
+// Segmented control. `accent-on` draws the chosen item in the accent color (quick menu).
+export component Segmented inherits Rectangle {
+    in property <[string]> items;
+    in property <int> selected;
+    in property <bool> accent-on: false;
+    in property <length> item-h: 26px;
+    in property <length> item-pad: Space.s3;
+    in property <length> font-size: Type.fs2;
+    in property <bool> fill: false;
+    // fixed item width (equal items); 0 = size to the label
+    in property <length> item-w: 0px;
+    callback select(int);
+    height: root.item-h + 6px;
+    horizontal-stretch: root.fill ? 1 : 0;
+    border-radius: Radius.md;
+    background: Palette.surface-2;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for item[i] in root.items: Rectangle {
+            height: root.item-h;
+            horizontal-stretch: root.fill ? 1 : 0;
+            min-width: root.item-w;
+            max-width: root.item-w > 0 ? root.item-w : 100000px;
+            border-radius: Radius.sm;
+            background: i == root.selected ? (root.accent-on ? Palette.accent : Palette.surface-3) : transparent;
+            accessible-role: tab;
+            accessible-label: item;
+            accessible-item-selected: i == root.selected;
+            accessible-action-default => {
+                root.select(i);
+            }
+            HorizontalLayout {
+                padding-left: root.item-pad;
+                padding-right: root.item-pad;
+                alignment: center;
+                Text {
+                    text: item;
+                    font-size: root.font-size;
+                    font-weight: Type.w-medium;
+                    vertical-alignment: center;
+                    color: i == root.selected ? (root.accent-on ? Palette.on-accent : Palette.text) : Palette.text-2;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.select(i);
+                }
+            }
+        }
+    }
+}
+
+export component Radio inherits Rectangle {
+    in property <bool> on;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border-width: root.on ? 5px : 1.5px;
+    border-color: root.on ? Palette.accent : Palette.line-2;
+}
+
+export component Slider {
+    in-out property <float> value: 0.5;
+    in property <length> knob: 16px;
+    callback changed(float);
+    // 4 px track; the knob hangs over it (it does not add to the height, as in the mockups)
+    height: 4px;
+    min-width: 40px;
+    accessible-role: slider;
+    accessible-value: Math.round(root.value * 100);
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 100;
+    Rectangle {
+        y: 0;
+        height: 4px;
+        border-radius: 2px;
+        background: Palette.line-2;
+    }
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width * root.value;
+        height: 4px;
+        border-radius: 2px;
+        background: Palette.accent;
+    }
+
+    Rectangle {
+        x: root.width * root.value - root.knob / 2;
+        y: 2px - root.knob / 2;
+        width: root.knob;
+        height: root.knob;
+        border-radius: root.knob / 2;
+        background: Palette.knob;
+        drop-shadow-offset-y: Shadow.low-y;
+        drop-shadow-blur: Shadow.low-blur;
+        drop-shadow-color: Shadow.low-color;
+    }
+
+    TouchArea {
+        y: -8px;
+        height: 20px;
+        moved => {
+            if self.pressed {
+                root.value = Math.clamp(self.mouse-x / root.width, 0, 1);
+                root.changed(root.value);
+            }
+        }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.value = Math.clamp(self.mouse-x / root.width, 0, 1);
+                root.changed(root.value);
+            }
+        }
+    }
+}
+
+export component Card inherits Rectangle {
+    in property <bool> selected: false;
+    background: Palette.surface;
+    border-width: 1px;
+    border-color: root.selected ? Palette.accent : Palette.line;
+    border-radius: Radius.lg;
+    // Selection ring: 1 px, 3 px outside the box (CSS outline with outline-offset 2px).
+    if root.selected: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        border-radius: root.border-radius + 3px;
+        border-width: 1px;
+        border-color: Palette.accent-ring;
+    }
+}
+
+export component Count inherits Rectangle {
+    in property <string> text;
+    height: 20px;
+    min-width: 20px;
+    horizontal-stretch: 0;
+    border-radius: 10px;
+    background: Palette.surface-3;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        alignment: center;
+        Text {
+            text: root.text;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Card header: title, optional count, then anything on the right.
+export component CardHead inherits Rectangle {
+    in property <string> title;
+    in property <string> count;
+    in property <length> pad-left: Space.s5;
+    in property <length> pad-right: Space.s5;
+    in property <length> title-size: Type.fs2;
+    height: 56px;
+    HorizontalLayout {
+        padding-left: root.pad-left;
+        padding-right: root.pad-right;
+        spacing: Space.s2;
+        alignment: stretch;
+        Text {
+            text: root.title;
+            font-size: root.title-size;
+            font-weight: Type.w-semibold;
+            color: Palette.text;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
+        }
+        if root.count != "": VerticalLayout {
+            alignment: center;
+            Count { text: root.count; }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        @children
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Palette.line;
+    }
+}
+
+export component Dot inherits Rectangle {
+    in property <color> tint: Palette.ok;
+    in property <length> size: 8px;
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: root.tint;
+}
+
+export component StatusChip inherits Rectangle {
+    in property <string> text: "Reading";
+    height: 28px;
+    horizontal-stretch: 0;
+    border-radius: 14px;
+    background: Palette.ok-soft;
+    HorizontalLayout {
+        padding-left: Space.s3;
+        padding-right: Space.s3;
+        spacing: Space.s2;
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            Dot { }
+        }
+
+        Text {
+            text: root.text;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: Palette.ok;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Icon tile in lists (.itile).
+export component ITile inherits Rectangle {
+    in property <image> icon: Icons.window;
+    in property <bool> on: false;
+    in property <length> icon-size: Size.icon;
+    width: 32px;
+    height: 32px;
+    border-radius: Radius.md;
+    background: root.on ? Palette.accent-soft : Palette.surface-3;
+    Icon {
+        source: root.icon;
+        color: root.on ? Palette.accent : Palette.text-2;
+        width: root.icon-size;
+        height: root.icon-size;
+    }
+}
+
+// Waveform from a list of bar heights (.wave and .pill-wave). Bars at index >= played are grey.
+export component Wave {
+    in property <[int]> bars;
+    in property <int> played: 999;
+    in property <length> bar-w: 3px;
+    in property <length> gap: 3px;
+    HorizontalLayout {
+        spacing: root.gap;
+        alignment: start;
+        for h[i] in root.bars: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.bar-w;
+                height: h * 1px;
+                border-radius: root.bar-w / 2 + 0.5px;
+                background: i < root.played ? Palette.accent : Palette.line-2;
+            }
+        }
+    }
+}
+
+// Pill waveform with fixed heights from the mockups (14 bars at 14 px, or 18 bars at 16 px).
+export component PillWave inherits Wave {
+    in property <bool> big: false;
+    bars: root.big ? [4, 15, 10, 12, 14, 7, 15, 8, 14, 13, 9, 15, 6, 15, 11, 11, 15, 6] : [4, 13, 9, 10, 12, 6, 13, 7, 12, 11, 8, 13, 5, 13];
+    bar-w: 2px;
+    gap: 2px;
+    height: root.big ? 16px : 14px;
+}
+
+// Kind as a grey line icon.
+export component KindIcon inherits Icon {
+    in property <Kind> kind;
+    source: Kinds.icon(root.kind);
+}
+
+export component VSep inherits Rectangle {
+    width: 1px;
+    height: 20px;
+    background: Palette.line-2;
+}
+
+export component HLine inherits Rectangle {
+    height: 1px;
+    background: Palette.line;
+}
+
+// Text field with a leading icon and a placeholder (.input).
+export component TextField inherits Rectangle {
+    in property <image> icon;
+    in property <string> placeholder;
+    in-out property <string> text;
+    height: Size.ctl;
+    border-radius: Radius.md;
+    border-width: 1px;
+    border-color: input.has-focus ? Palette.accent : Palette.line-2;
+    background: Palette.surface-2;
+    HorizontalLayout {
+        padding-left: Space.s3 + 1px;
+        padding-right: Space.s3 + 1px;
+        spacing: Space.s2;
+        if root.icon.width > 0: CIcon {
+            source: root.icon;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+            if root.text == "": Text {
+                x: 0;
+                width: parent.width;
+                text: root.placeholder;
+                color: Palette.text-3;
+                vertical-alignment: center;
+            }
+            input := TextInput {
+                text <=> root.text;
+                color: Palette.text;
+                vertical-alignment: center;
+                single-line: true;
+                accessible-label: root.placeholder;
+            }
+        }
+    }
+}
+
+// A key as a raised keycap (04-read-key-d): 1 px border, thick dark bottom edge.
+export component KeyCap inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <length> bottom: 4px;
+    width: 140px;
+    height: 44px;
+    border-radius: Radius.md;
+    background: Palette.keycap-edge;
+    Rectangle {
+        x: 0;
+        y: 0;
+        height: parent.height - root.bottom + 1px;
+        border-radius: Radius.md;
+        background: Palette.line-2;
+    }
+
+    Rectangle {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: parent.height - root.bottom - 1px;
+        border-radius: Radius.md - 1px;
+        background: Palette.surface-3;
+        HorizontalLayout {
+            alignment: center;
+            spacing: Space.s2;
+            if root.icon.width > 0: CIcon {
+                source: root.icon;
+                size: 18px;
+                color: Palette.text-2;
+            }
+            Text {
+                text: root.text;
+                font-size: Type.fs3;
+                font-weight: Type.w-semibold;
+                color: Palette.text;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// A chip: colored text on a soft background with an optional leading dot or icon (.chip).
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <color> fg: Palette.ok;
+    in property <color> bg: Palette.ok-soft;
+    in property <bool> dot: true;
+    in property <image> icon;
+    height: 22px;
+    horizontal-stretch: 0;
+    border-radius: Radius.sm;
+    background: root.bg;
+    HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: Space.s2;
+        spacing: 6px;
+        if root.dot: VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+                tint: root.fg;
+            }
+        }
+        if root.icon.width > 0: CIcon {
+            source: root.icon;
+            size: Size.icon-sm;
+            color: root.fg;
+        }
+        Text {
+            text: root.text;
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: root.fg;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Section label (.label): small, medium weight, faint.
+export component SmallLabel inherits Text {
+    font-size: Type.fs1;
+    font-weight: Type.w-medium;
+    color: Palette.text-3;
+    vertical-alignment: center;
+    height: Type.lh1;
+}

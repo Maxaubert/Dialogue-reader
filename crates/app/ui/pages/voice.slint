@@ -1,0 +1,243 @@
+// 05 voice.
+import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+import { VoiceData } from "../data.slint";
+import { Icon, CIcon, Button, BtnKind, Card, CardHead, ITile, Chip, Slider, Wave, SmallLabel } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+export component VoicePage inherits Rectangle {
+    in property <[VoiceData]> voices;
+    in-out property <int> selected: 0;
+    in-out property <float> speed: 0.55;
+    in-out property <float> volume: 0.8;
+    VerticalLayout {
+        x: (parent.width - Size.col) / 2;
+        width: Size.col;
+        padding-top: Space.s7;
+        alignment: start;
+        ObHead {
+            title: "Pick a voice";
+            lead: "Voices run on your PC. Nothing is sent online.";
+        }
+
+        Rectangle {
+            height: Space.s6;
+        }
+
+        HorizontalLayout {
+            spacing: Space.s5;
+            height: 460px;
+            Card {
+                VerticalLayout {
+                    padding: 1px;
+                    alignment: start;
+                    CardHead {
+                        title: "Kokoro voices";
+                        count: root.voices.length;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                text: "Get more voices";
+                                icon: Icons.download;
+                                kind: BtnKind.ghost;
+                                fg: Palette.text-2;
+                                icon-color: Palette.text-2;
+                            }
+                        }
+                    }
+
+                    // six rows show; the rest scroll (11 voices in all)
+                    Flickable {
+                        height: 6 * 60px;
+                        viewport-height: root.voices.length * 60px;
+                        VerticalLayout {
+                            for v[i] in root.voices: Rectangle {
+                                height: 60px;
+                                background: i == root.selected ? Palette.surface-2 : transparent;
+                                accessible-role: list-item;
+                                accessible-label: v.name;
+                                accessible-item-selected: i == root.selected;
+                                accessible-action-default => {
+                                    root.selected = i;
+                                }
+                                if i > 0: Rectangle {
+                                    y: 0;
+                                    height: 1px;
+                                    background: Palette.line;
+                                }
+                                TouchArea {
+                                    clicked => {
+                                        root.selected = i;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Space.s5;
+                                    padding-right: Space.s5;
+                                    spacing: Space.s3;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        ITile {
+                                            icon: Icons.audio;
+                                            on: i == root.selected;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 1;
+                                        Text {
+                                            text: v.name;
+                                            height: Type.lh2;
+                                            font-weight: Type.w-medium;
+                                            color: Palette.text;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: v.desc;
+                                            height: Type.lh1;
+                                            font-size: Type.fs1;
+                                            color: Palette.text-3;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    if i == root.selected: VerticalLayout {
+                                        alignment: center;
+                                        Chip {
+                                            text: "Selected";
+                                            dot: false;
+                                            icon: Icons.check-sm;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card {
+                width: 400px;
+                VerticalLayout {
+                    padding: 1px;
+                    CardHead {
+                        title: "Test it";
+                        Text {
+                            text: "Kokoro · " + (root.voices.length > 0 ? root.voices[root.selected].name : "");
+                            font-size: Type.fs1;
+                            color: Palette.text-3;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        padding: Space.s5;
+                        spacing: Space.s5;
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: Space.s2;
+                            SmallLabel {
+                                text: "Sample line";
+                            }
+
+                            Rectangle {
+                                height: 68px;
+                                border-radius: Radius.md;
+                                border-width: 1px;
+                                border-color: Palette.line-2;
+                                background: Palette.surface-2;
+                                Text {
+                                    x: Space.s3 + 1px;
+                                    y: Space.s3 + 1px;
+                                    width: parent.width - 2 * (Space.s3 + 1px);
+                                    text: "Arthur: We need to get these horses moving before the snow buries us.";
+                                    color: Palette.text;
+                                    wrap: word-wrap;
+                                    line-height-factor: Type.lhf-150;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: Space.s2;
+                            HorizontalLayout {
+                                SmallLabel {
+                                    text: "Speed";
+                                    horizontal-stretch: 1;
+                                }
+
+                                Text {
+                                    text: "1.1×";
+                                    font-family: Type.mono;
+                                    font-size: Type.fs1;
+                                    color: Palette.text-2;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Slider {
+                                value <=> root.speed;
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: Space.s2;
+                            HorizontalLayout {
+                                SmallLabel {
+                                    text: "Volume";
+                                    horizontal-stretch: 1;
+                                }
+
+                                Text {
+                                    text: Math.round(root.volume * 100) + "%";
+                                    font-family: Type.mono;
+                                    font-size: Type.fs1;
+                                    color: Palette.text-2;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Slider {
+                                value <=> root.volume;
+                            }
+                        }
+
+                        Rectangle {
+                            height: 66px;
+                            border-radius: Radius.lg;
+                            border-width: 1px;
+                            border-color: Palette.line;
+                            background: Palette.surface-2;
+                            HorizontalLayout {
+                                padding-left: Space.s4 + 1px;
+                                padding-right: Space.s4 + 1px;
+                                spacing: Space.s3;
+                                Wave {
+                                    horizontal-stretch: 1;
+                                    bars: [12, 20, 30, 29, 25, 21, 18, 12, 17, 24, 16, 10, 17, 24, 30, 37, 30, 21, 11, 23, 24, 17, 10, 21, 31, 27, 35, 31, 21, 12, 17, 26, 15, 11];
+                                    played: 20;
+                                }
+
+                                Text {
+                                    text: "0:02 / 0:04";
+                                    font-family: Type.mono;
+                                    font-size: Type.fs1;
+                                    color: Palette.text-2;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Stop";
+                            icon: Icons.stop;
+                            large: true;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

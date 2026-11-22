@@ -1,0 +1,28 @@
+[package]
+name = "dr-app"
+version = "0.1.0"
+edition = "2024"
+description = "DialogReader Windows app: Slint UI (M1: every approved screen on fake data)"
+
+[lib]
+name = "dr_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "DialogReader"
+path = "src/main.rs"
+
+# Renders every screen to PNG with the software renderer. No window is opened.
+[[bin]]
+name = "render-screens"
+path = "src/bin/render-screens.rs"
+
+[dependencies]
+slint = { version = "=1.18.1", features = ["unstable-winit-030"] }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+
+[dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
+
+[build-dependencies]
+slint-build = "=1.18.1"

@@ -35,3 +35,6 @@ Source report (2026-11-21): `C:\Users\Admin\Documents\Claude\research\dialogue-r
 - An overlay window works over borderless and windowed games. Exclusive fullscreen would need injection; check in spike 4.
 - Mockups: design/mockups/c-midnight/15-quick-menu-*.html.
 
+## The app (2026-11-22)
+- Spec: [app-spec.md](app-spec.md) (architecture, Slint tokens and page map, risks).
+- Milestones M1 to M5: [app-plan.md](app-plan.md).

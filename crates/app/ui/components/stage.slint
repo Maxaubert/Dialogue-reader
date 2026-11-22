@@ -1,0 +1,288 @@
+// The game picture with zones on top (.stage, .zone, .ztag, .handle), the zone list row and the zone tools.
+import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+import { ZoneData } from "../data.slint";
+import { Icon, CIcon, Button, Toggle, CornerMask } from "base.slint";
+
+// Maps image pixels (src-w x src-h, shown with "cover") to view pixels. Rust has the same math in geom.rs.
+export component Stage inherits Rectangle {
+    in property <image> source: Art.scene;
+    in property <float> src-w: 1600;
+    in property <float> src-h: 900;
+    in property <[ZoneData]> zones;
+    in property <bool> labels: true;
+    in property <int> selected: -1;
+    in property <length> radius: Radius.md;
+    in property <bool> round-top: true;
+    in property <bool> round-bottom: true;
+    in property <color> behind: Palette.bg;
+    out property <float> scale: max(root.width / 1px / root.src-w, root.height / 1px / root.src-h);
+    out property <length> off-x: (root.width - root.src-w * root.scale * 1px) / 2;
+    out property <length> off-y: (root.height - root.src-h * root.scale * 1px) / 2;
+    callback zone-clicked(int);
+    background: Palette.stage-bg;
+    // The real window clips to these corners. Software renders cannot, so the CornerMask below paints them.
+    border-top-left-radius: root.round-top ? root.radius : 0px;
+    border-top-right-radius: root.round-top ? root.radius : 0px;
+    border-bottom-left-radius: root.round-bottom ? root.radius : 0px;
+    border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
+    clip: true;
+    Image {
+        width: 100%;
+        height: 100%;
+        source: root.source;
+        image-fit: cover;
+    }
+
+    for z[i] in root.zones: Rectangle {
+        property <color> zc: Kinds.color(z.kind);
+        property <bool> sel: i == root.selected;
+        x: root.off-x + z.x * root.scale * 1px;
+        y: root.off-y + z.y * root.scale * 1px;
+        width: z.w * root.scale * 1px;
+        height: z.h * root.scale * 1px;
+        border-radius: Radius.xs;
+        border-width: self.sel ? 2px : 1.5px;
+        // off zones are drawn at 45 %
+        border-color: z.on ? self.zc : self.zc.with-alpha(0.45);
+        background: z.on ? Kinds.soft(z.kind) : Kinds.soft(z.kind).with-alpha(0.063);
+        if self.sel: Rectangle {
+            for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
+                x: parent.width * p.x - 4px;
+                y: parent.height * p.y - 4px;
+                width: 8px;
+                height: 8px;
+                border-radius: 2px;
+                background: Palette.knob;
+                border-width: 1.5px;
+                border-color: zc;
+            }
+        }
+        TouchArea {
+            clicked => {
+                root.zone-clicked(i);
+            }
+        }
+    }
+    // Tags go above every zone box, so they are drawn after all boxes.
+    if root.labels: Rectangle {
+        for z[i] in root.zones: Rectangle {
+            property <color> zc: Kinds.color(z.kind);
+            x: root.off-x + z.x * root.scale * 1px - 1.5px;
+            y: root.off-y + z.y * root.scale * 1px - self.height - Space.s1;
+            height: 20px;
+            width: tag.preferred-width;
+            border-radius: Radius.xs;
+            background: self.zc;
+            // an off zone is drawn at 45 %, tag text included (CSS .zone.off { opacity: 0.45 })
+            opacity: z.on ? 1 : 0.45;
+            tag := HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                spacing: Space.s1;
+                if z.kind == Kind.ignore: CIcon {
+                    source: Icons.ban-sm;
+                    size: Size.icon-sm;
+                    color: Palette.on-tag;
+                }
+                Text {
+                    text: Kinds.name(z.kind) + (z.on ? "" : " · off");
+                    font-size: Type.fs1;
+                    font-weight: Type.w-semibold;
+                    color: Palette.on-tag;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+    if Render.software: CornerMask {
+        width: 100%;
+        height: 100%;
+        radius: root.radius;
+        color: root.behind;
+        top: root.round-top;
+        bottom: root.round-bottom;
+    }
+}
+
+// Zone list row (round 4): grey kind icon, name, toggle.
+export component ZoneRow inherits Rectangle {
+    in property <ZoneData> zone;
+    in property <bool> selected;
+    in property <bool> first;
+    in property <length> pad-x: Space.s5;
+    in property <length> row-h: Size.row;
+    callback toggled(bool);
+    callback clicked();
+    height: root.row-h;
+    background: root.selected ? Palette.surface-2 : transparent;
+    if !root.first: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.line;
+    }
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: root.pad-x;
+        padding-right: root.pad-x;
+        spacing: Space.s3;
+        CIcon {
+            source: Kinds.icon(root.zone.kind);
+            color: root.selected ? Palette.text : Palette.text-2;
+        }
+
+        Text {
+            text: root.zone.name;
+            horizontal-stretch: 1;
+            font-weight: Type.w-medium;
+            overflow: elide;
+            vertical-alignment: center;
+            color: root.zone.on ? Palette.text : Palette.text-2;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Toggle {
+                on: root.zone.on;
+                label: root.zone.name;
+                toggled(v) => {
+                    root.toggled(v);
+                }
+            }
+        }
+    }
+}
+
+// Kind picker with colored dots (.seg in .ztools).
+export component KindPicker inherits Rectangle {
+    in-out property <Kind> kind: Kind.dialogue;
+    height: 32px;
+    border-radius: Radius.md;
+    background: Palette.surface-2;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
+            border-radius: Radius.sm;
+            background: k == root.kind ? Palette.surface-3 : transparent;
+            accessible-role: tab;
+            accessible-label: Kinds.name(k);
+            accessible-item-selected: k == root.kind;
+            accessible-action-default => {
+                root.kind = k;
+            }
+            HorizontalLayout {
+                padding-left: Space.s3;
+                padding-right: Space.s3;
+                spacing: Space.s2;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Kinds.color(k);
+                    }
+                }
+
+                Text {
+                    text: Kinds.name(k);
+                    font-weight: Type.w-medium;
+                    vertical-alignment: center;
+                    color: k == root.kind ? Palette.text : Palette.text-2;
+                }
+            }
+
+            TouchArea {
+                clicked => {
+                    root.kind = k;
+                }
+            }
+        }
+    }
+}
+
+// Select / Draw zone, kind picker, Retake screenshot.
+export component ZoneTools inherits HorizontalLayout {
+    in-out property <bool> draw: true;
+    in-out property <Kind> kind: Kind.dialogue;
+    spacing: Space.s3;
+    alignment: stretch;
+    Rectangle {
+        height: 32px;
+        horizontal-stretch: 0;
+        border-radius: Radius.md;
+        background: Palette.surface-2;
+        border-width: 1px;
+        border-color: Palette.line-2;
+        HorizontalLayout {
+            padding: 3px;
+            spacing: 2px;
+            for t[i] in [{ label: "Select", icon: Icons.pointer }, { label: "Draw zone", icon: Icons.plus }]: Rectangle {
+                property <bool> on: (i == 1) == root.draw;
+                border-radius: Radius.sm;
+                background: self.on ? Palette.surface-3 : transparent;
+                accessible-role: tab;
+                accessible-label: t.label;
+                accessible-item-selected: self.on;
+                accessible-action-default => {
+                    root.draw = i == 1;
+                }
+                HorizontalLayout {
+                    padding-left: Space.s3;
+                    padding-right: Space.s3;
+                    spacing: Space.s2;
+                    CIcon {
+                        source: t.icon;
+                        color: on ? Palette.text : Palette.text-2;
+                    }
+
+                    Text {
+                        text: t.label;
+                        font-weight: Type.w-medium;
+                        vertical-alignment: center;
+                        color: on ? Palette.text : Palette.text-2;
+                    }
+                }
+
+                TouchArea {
+                    clicked => {
+                        root.draw = i == 1;
+                    }
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Space.s2;
+        horizontal-stretch: 0;
+        Text {
+            text: "Kind";
+            font-size: Type.fs1;
+            font-weight: Type.w-medium;
+            color: Palette.text-3;
+            vertical-alignment: center;
+        }
+    }
+
+    KindPicker {
+        horizontal-stretch: 0;
+        kind <=> root.kind;
+    }
+
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+
+    Button {
+        text: "Retake screenshot";
+        icon: Icons.camera;
+    }
+}

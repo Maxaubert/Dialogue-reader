@@ -1,0 +1,151 @@
+// 04-read-key-d "Your keys": the read key and the quick menu key (onboarding step 3). Settings shows the same
+// KeysCard (Max picked "D everywhere", 2026-11-22).
+import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+import { Icon, CIcon, Button, BtnKind, Card, KeyCap } from "../components/base.slint";
+
+component KeyRow inherits Card {
+    in property <string> name;
+    in property <string> desc;
+    in property <string> key;
+    in property <image> icon;
+    in property <image> key-icon;
+    in property <bool> main: false;
+    callback change();
+    height: 92px;
+    border-color: root.main ? Palette.accent : Palette.line;
+    // main card: a light accent wash from the left
+    if root.main: Rectangle {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: parent.height - 2px;
+        border-radius: Radius.lg - 1px;
+        background: @linear-gradient(90deg, Palette.accent-wash 0%, Palette.accent-wash-mid 60%, Palette.accent-clear 100%);
+    }
+    HorizontalLayout {
+        padding-left: Space.s5 + 1px;
+        padding-right: Space.s3 + 1px;
+        spacing: 20px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 10px;
+                background: root.main ? Palette.accent-soft : Palette.surface-3;
+                Icon {
+                    source: root.icon;
+                    width: 22px;
+                    height: 22px;
+                    color: root.main ? Palette.accent : Palette.text-2;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.name;
+                height: 24px;
+                font-size: 18px;
+                font-weight: Type.w-semibold;
+                letter-spacing: Type.ls-card-title;
+                color: Palette.text;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.desc;
+                height: 20px;
+                font-size: Type.fs2;
+                color: root.main ? Palette.text-2 : Palette.text-3;
+                vertical-alignment: center;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            KeyCap {
+                text: root.key;
+                icon: root.key-icon;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Button {
+                width: 84px;
+                text: "Change";
+                label: "Change " + root.name;
+                kind: BtnKind.ghost;
+                fg: Palette.text-3;
+                clicked => {
+                    root.change();
+                }
+            }
+        }
+    }
+}
+
+export component KeysCard inherits VerticalLayout {
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    callback change(int);
+    spacing: Space.s3;
+    KeyRow {
+        name: "Read zones now";
+        desc: "Reads all your zones out loud";
+        key: root.read-key;
+        icon: Icons.volume-lg;
+        key-icon: Icons.mouse;
+        main: true;
+        change => {
+            root.change(0);
+        }
+    }
+
+    KeyRow {
+        name: "Quick menu";
+        desc: "Opens the quick menu over your game";
+        key: root.menu-key;
+        icon: Icons.panel-lg;
+        change => {
+            root.change(1);
+        }
+    }
+}
+
+export component KeysPage inherits Rectangle {
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    callback change(int);
+    VerticalLayout {
+        alignment: center;
+        spacing: Space.s6;
+        padding-bottom: Space.s6;
+        Text {
+            text: "Your keys";
+            height: 37px;
+            font-size: Type.fs5;
+            font-weight: Type.w-semibold;
+            letter-spacing: Type.ls-display;
+            color: Palette.text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            KeysCard {
+                width: 720px;
+                read-key: root.read-key;
+                menu-key: root.menu-key;
+                change(i) => {
+                    root.change(i);
+                }
+            }
+        }
+    }
+}

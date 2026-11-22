@@ -1,0 +1,230 @@
+# App plan: milestones
+
+Written 2026-11-22. Build order for the app in [app-spec.md](app-spec.md). Each milestone is one PR (or a short
+stack), ships something that works, and is tested headless. Nothing in a test shows a window, plays sound or takes
+the foreground.
+
+Shared rules for every milestone:
+- Build with the session's `CARGO_TARGET_DIR` (the repo target). Never pass `--target-dir`.
+- `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` pass.
+- Arena numbers do not change unless the milestone says so (`docs/arena-baseline.md`, `docs/reader-a1.md`).
+- New dependencies are pinned to an exact version.
+- Plain-English docs, no em-dashes.
+
+## M1: UI shell on fake data
+
+**Scope.** Every approved screen in Slint, filled with the fake data of the mockups (Red Dead Redemption 2, five
+zones, Kokoro · Adam, Mouse 4 and F7). Navigation works: onboarding 01 > 02 > 03 > 04 > 05 > 06 > main, Back on
+every step, tabs Overview / Zones / Settings, Ctrl K and the game button open the game switcher, Esc closes it.
+Overlays (pill, quick menu, quick menu voice list, zone edit) render as components on fake data; they are not yet
+real overlay windows. No capture, OCR, speech or global keys.
+
+**Files.**
+```
+Cargo.toml                         add "crates/app" to members
+crates/app/Cargo.toml              dr-app; slint (exact), slint-build; dev: i-slint-backend-testing (same version), image
+crates/app/build.rs                slint_build::compile("ui/app.slint")
+crates/app/src/main.rs             windows_subsystem = "windows", starts MainWindow with fake data
+crates/app/src/lib.rs              app setup shared by main, the tests and the render-screens bin
+crates/app/src/fake.rs             fake profiles, zones, voices, recent lines, windows list (fills the window
+                                   directly; the view-model layer src/vm/ starts in M2, see there)
+crates/app/ui/app.slint            MainWindow, Page enum, navigation
+crates/app/ui/theme.slint          Palette, Space, Radius, Size, Type globals (spec section 3)
+crates/app/ui/components/*.slint   shared components (spec section 3.1)
+crates/app/ui/pages/*.slint        welcome, pick_window, draw_zones, keys, voice, mode, overview, zones, settings
+crates/app/ui/overlays/*.slint     pill, quick_menu, zone_edit, game_switcher; quick_menu_preview (review only)
+crates/app/ui/fonts/*.ttf          Geist and Geist Mono variable fonts (OFL, Google Fonts builds), with the licence
+crates/app/ui/icons/*.svg          exported from design/mockups/c-midnight/_build.py
+crates/app/ui/art/*                fake game scenes from the mockups (SVG; scene-1440.png for software renders)
+crates/app/tools/export_icons.py   writes icons/ and art/ from _build.py
+crates/app/src/bin/render-screens.rs  renders every page and overlay to PNG (software renderer, no window)
+crates/app/tests/screens.rs        each page renders at 1440x900, is not blank, and matches its mockup shot
+                                   within a tolerance (10 px cells); golden images once approved
+crates/app/tests/nav.rs            testing backend: click through onboarding, tabs, switcher, Esc
+crates/app/README.md               how to run, test and render screens
+```
+
+**Tests.**
+- `tests/screens.rs`: every page and overlay renders headless to PNG with no panic. Each PNG is not one flat color.
+  Each screen is compared with its mockup shot in `design/mockups/c-midnight/shots/`: both are averaged over
+  10 x 10 px cells, and the mean difference and the share of changed cells must stay under a limit per screen.
+  It catches moved, missing or recolored blocks, not font weight or 1 to 2 px shifts.
+- Golden images (`crates/app/tests/golden/`) come only after Max approves the screens and the open questions in
+  spec section 6 (kind colors, Settings keys) are settled, so they start from a fixed reference.
+- `tests/nav.rs` (testing backend): Get started goes to page 02; Continue and Back walk all five steps; Finish
+  lands on Overview; tabs switch; Ctrl K opens the switcher and Esc closes it; zone toggles change the view model.
+- Unit tests for the stage mapping (image px to view px and back) and for zone drawing math (normalize a drag,
+  minimum size, clamp to the image, hit test of handles).
+
+**Review aid.** `cargo run -p dr-app --bin render-screens -- <scratch dir>` writes all PNGs. A side-by-side page
+(mockup shot and Slint render) is built in the scratchpad for Max. All 14 approved mockup shots are in `shots/`
+(01, 02, 05, 06, 12, 13 and 14 were added on 2026-11-22, drawn from the HTML with headless Edge).
+
+**Done when.** All tests pass headless; the screens PNGs match the mockups closely (same layout, colors, type,
+icons; small text-height differences allowed); Max has seen the side-by-side page. The app window is opened only if
+Max says yes in that session.
+
+## Spike after M1: overlay windows
+
+The biggest risk of the app is the overlay window, so it is checked right after M1, not in M4. One small test
+program (in `spikes/`) makes a Slint window on winit that is transparent, frameless, topmost and never takes focus
+(`WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`, `WS_EX_TOPMOST`, and `WS_EX_LAYERED` + `WS_EX_TRANSPARENT` for the
+click-through pill). It runs on a hidden second desktop and checks: the styles are set, `GetForegroundWindow` does
+not change when it shows, and the see-through parts are really see-through (per-pixel alpha).
+
+**Done when.** A short note in `docs/` says which way M4 draws the overlays: Slint windows on winit, or the
+software renderer into a Win32 layered window (`UpdateLayeredWindow`).
+
+## M2: profiles, window picking, screenshot, zone drawing
+
+**Scope.** Real data for setup. Profiles saved as JSON in `%APPDATA%\DialogReader\` (spec 2.8). Page 02 lists real
+windows (games first) with icons, size and mode. Continue takes one screenshot with WGC. Pages 03 and 11 draw,
+select, resize, rename, re-kind and delete zones on that screenshot and save them in capture pixels with `base`.
+Keys and voice pages save their choices into the profile (key capture itself is M3b). The game switcher lists real
+profiles. Onboarding runs on first start only (no profile yet).
+
+**Files.**
+```
+crates/runtime/Cargo.toml          dr-runtime; windows, windows-capture, serde, serde_json
+crates/runtime/src/profile.rs      Profile, ZoneCfg, load/save (atomic), migration by "version", kind names
+crates/runtime/src/paths.rs        %APPDATA% folders (overridable root for tests)
+crates/runtime/src/windows_list.rs enumerate windows, exe, size, mode, icon, game check
+crates/runtime/src/screenshot.rs   one WGC frame -> PNG
+crates/app/src/vm/mod.rs           view-model layer: plain Rust types for zones, voices, lines, windows,
+                                   settings, and their Slint models; fake.rs moves behind it
+crates/app/src/vm/zones.rs         drawing state, undo of the last change
+crates/runtime/tests/profile.rs    round trip, bad file kept as .bad, migration, base scaling to dr_core::Zone
+crates/app/tests/zones.rs          testing backend: drag to add, click to select, drag a corner, Delete, kind change
+```
+
+**Tests.** Profile round trip and `Zone::rect_in` scaling at 1080p, 1440p and 4K. Zone drawing through simulated
+pointer events. The window list test runs against a window the test creates on a hidden desktop (no window on
+Max's screen). Screenshot test captures that hidden test window, or is marked `#[ignore]` with a reason if WGC
+refuses windows on another desktop (arena-spec.md notes that it does on this PC); then a manual check with a real
+game is listed in the PR.
+
+**Done when.** A profile made through onboarding is saved, survives a restart, and its zones load as
+`dr_core::Zone`s with the right size on a frame of another size. All headless tests pass.
+
+## M3a: OCR, speech and the voice screens (headless)
+
+**Scope.** Everything of the reading path that needs no game and no keys: the WinRT OCR moves into `crates/ocr`,
+`crates/tts` with Windows voices, audio out with volume, speed, mute and stop, the speech queue (spec 2.5), and the
+small `dr-core` change for skipped lines. M3a also owns the voice screens, because v1 ships Windows voices and the
+mockups say Kokoro (spec section 6, question 1):
+- page 05: the list header ("Kokoro voices") and the "Get more voices" button,
+- Settings > Voices (Kokoro and Piper rows),
+- the fake data behind them,
+- Max approves the new wording before it is built.
+
+**Files.**
+```
+crates/ocr/                        dr-ocr: WinOcr moved from crates/arena/src/ocr/winrt.rs, impl dr_core::Ocr
+crates/arena/src/ocr/winrt.rs      becomes a thin adapter over dr_ocr::WinOcr
+crates/tts/                        dr-tts: Tts trait, Voice, Pcm, WinTts (SpeechSynthesizer), WAV parse
+crates/runtime/src/speech.rs       queue rules (spec 2.5), audio sink (rodio), null sink for tests
+crates/core/src/pipeline.rs        skipped list in Output (already read, prompts off), small change
+crates/core/src/manual.rs          same for Press
+crates/app/ui/pages/voice.slint    voice page header and button (new wording)
+crates/app/ui/pages/settings.slint Voices section (new wording)
+crates/ocr/tests/fixtures.rs       WinRT OCR reads fixture PNGs (skips if no en-US pack)
+crates/tts/tests/voices.rs         lists voices, synth "test" to PCM (no playback)
+crates/runtime/tests/speech.rs     queue order, Stop clears, old lines dropped, speaker + line joined
+```
+
+**Tests.** OCR move: the arena gives the same numbers on seed 59 (standard and hard) before and after. TTS: voices
+list not empty, PCM length grows with text, speed changes length. Speech queue with a fake TTS and a null sink. No
+test plays sound.
+
+**Done when.** The arena numbers are unchanged, the Windows voices synthesize headless, the voice screens show
+the wording Max approved, and all headless tests pass.
+
+## M3b: capture, keys and live reading
+
+**Scope.** The real loop (spec 2.2): capture thread, reader thread with `Pipeline` (auto) or `Manual` (read key),
+and global keys through low-level hooks with key capture on the keys page. Main page shows real status, the line
+being spoken, and Recent from the log. Pause, Read now, mode, voice and key controls work. Elevated and exclusive
+fullscreen games are detected and explained.
+
+**Files.**
+```
+crates/runtime/src/capture.rs      FrameSource trait, WGC source (newest-frame slot, 40 ms), file source for tests
+crates/runtime/src/reader.rs       reader thread: Pipeline / Manual, ReadNow, zone on/off, prompts
+crates/runtime/src/keys.rs         Key type and text form, LL hooks thread, pure decode function, capture mode
+crates/runtime/src/elevation.rs    elevated game check, restart as admin
+crates/runtime/src/runtime.rs      Runtime handle: Cmd in, Ev out
+crates/runtime/tests/live.rs       arena scene frames -> runtime -> fake TTS: lines spoken in order, Stop, Pause
+```
+
+**Tests.** Runtime test with arena frames: auto mode speaks the expected lines; manual mode speaks nothing until a
+press; Stop clears the queue; Pause stops OCR (OCR call count stays flat). Keys: decode table for keyboard keys,
+mouse 3/4/5, modifiers, refused left/right click.
+
+**Manual check (listed in the PR, done by Max or with his yes).** Satisfactory borderless 4K: read key reads the
+zones, auto mode reads dialogue, CPU use of DialogReader noted. One elevated program to see the warning.
+
+**Done when.** A profile reads a live game in both modes with Windows voices, keys work in the game, CPU use is
+noted in `docs/`, and all headless tests pass.
+
+## M4: overlays
+
+**Scope.** The pill, the quick menu (with voice list) and zone edit become real overlay windows (spec 2.7):
+topmost, non-activating, click-through for the pill. The quick menu key opens the menu centered on the game; the
+hook takes arrows, Enter, Space, Esc while it is open. Manage zones opens zone edit over a frozen screenshot. Quit
+needs two presses. Overlays follow the game window, its monitor and its DPI.
+
+**Files.**
+```
+crates/app/src/overlay/mod.rs      create overlay windows, apply Win32 ex-styles through the HWND, place them
+crates/app/src/overlay/place.rs    client rect -> screen px -> Slint logical px per monitor scale
+crates/app/src/overlay/quick_menu.rs  menu state machine (move, change, select, back, quit twice)
+crates/app/src/overlay/zone_edit.rs   add, select, delete, kind, done; saves the profile
+crates/app/tests/quick_menu.rs     state machine: order, wrap, stepper limits, quit twice, Esc
+crates/app/tests/place.rs          placement at 100%, 150%, 200%, two monitors
+crates/app/tests/overlay_win.rs    on a hidden desktop: ex-styles set, foreground unchanged
+```
+
+**Drawing path.** As the overlay spike after M1 decided (Slint windows on winit, or software-rendered layered
+windows through `UpdateLayeredWindow`).
+
+**Tests.** Quick menu and zone edit state machines as pure Rust. Placement math. Overlay window styles and focus on
+the hidden desktop. Screens of every overlay state rendered headless and compared with golden images.
+
+**Done when.** On a borderless game the pill shows, the quick menu opens and works with the keyboard only, zone
+edit changes zones that the reader uses at once, the game never loses focus, and all headless tests pass.
+
+## M5: settings, tray, start with Windows, installer, version
+
+**Scope.** Settings tab works: Startup (start with Windows, open minimized, show in taskbar), In-game overlay
+(position, show speaker), Keys (the read key and the quick menu key with Change, as the two 04-read-key-d
+cards; Max: "D everywhere"), Voices, Updates (version, check now). Tray icon with Open,
+Pause/Resume, Quit. Single instance. Closing the window keeps the app in the tray. Profile export and import
+("Import settings" on the welcome page). Installer with the version in its name. Release follows the `shipping`
+skill.
+
+**Files.**
+```
+crates/app/src/tray.rs             tray-icon on the UI thread
+crates/app/src/single.rs           named mutex + message-only window, "show" from a second start
+crates/runtime/src/autostart.rs    HKCU Run key, or a scheduled task when run as admin
+crates/runtime/src/settings.rs     settings.json load/save
+crates/app/app.manifest            per-monitor DPI v2, common controls, asInvoker
+installer/                         installer script (per-user install, no admin), version from Cargo
+.github/workflows/ci.yml, release.yml   per the shipping skill
+CLAUDE.md                          build, test and release block (shipping skill)
+```
+
+**Tests.** Settings round trip. Autostart writes and removes the Run value (on a test value name, cleaned up).
+Single instance: a second process started by the test exits and the first gets the "show" message (no visible
+window: the first instance runs with `--minimized` on a hidden desktop). Version string equals the workspace
+version. Installer builds in CI.
+
+**Done when.** Install from the installer on this PC, the version shows in Settings and in `--version`, start with
+Windows works after a sign-out, and all headless tests pass. Merge only after Max's yes (global rules).
+
+## After v1
+
+- Kokoro voices behind the `Tts` trait (needs the ort + Kokoro spike, plan.md spike 3).
+- Zone-only frame copies in `dr-core` to cut CPU on 4K.
+- Per-speaker voices, OCR languages beyond en-US.
+- Media pause while speaking. The old app had it. Max to confirm that v1 may ship without it (spec section 6).

@@ -1,0 +1,158 @@
+// 11 zone editor tab.
+import { Palette, Space, Radius, Size, Type, Icons, Kind } from "../theme.slint";
+import { ZoneData } from "../data.slint";
+import { Icon, CIcon, Button, BtnKind, CardHead } from "../components/base.slint";
+import { Stage, ZoneRow, ZoneTools } from "../components/stage.slint";
+
+export component ZonesTab inherits Rectangle {
+    in-out property <[ZoneData]> zones;
+    in-out property <int> selected: 1;
+    in-out property <bool> draw: false;
+    in property <string> shot-info: "Screenshot 21:30 · 3840 × 2160 · Fit to window";
+    // window size, so the stage size does not depend on its own layout
+    in property <length> win-w: 1440px;
+    in property <length> win-h: 900px;
+    property <length> sw: min(root.win-w - 360px - 2 * Size.page-x, (root.win-h - Size.bar - 64px - 44px - 2 * Size.page-x) * 16 / 9);
+    callback add-zone();
+    callback delete-zone(int);
+    HorizontalLayout {
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Palette.canvas;
+            VerticalLayout {
+                Rectangle {
+                    height: 64px;
+                    HorizontalLayout {
+                        padding-left: Size.page-x;
+                        padding-right: Size.page-x;
+                        VerticalLayout {
+                            alignment: center;
+                            ZoneTools {
+                                draw <=> root.draw;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        y: parent.height - 1px;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                    Stage {
+                        width: root.sw;
+                        height: root.sw * 9 / 16;
+                        zones: root.zones;
+                        selected: root.selected;
+                        behind: Palette.canvas;
+                        zone-clicked(i) => {
+                            root.selected = i;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 44px;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Size.page-x;
+                        padding-right: Size.page-x;
+                        Text {
+                            text: "Drag on the screenshot to draw a zone. Drag a corner to resize.";
+                            font-size: Type.fs1;
+                            color: Palette.text-3;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+
+                        Text {
+                            text: root.shot-info;
+                            font-size: Type.fs1;
+                            color: Palette.text-3;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            width: 360px;
+            background: Palette.surface;
+            Rectangle {
+                x: 0;
+                width: 1px;
+                background: Palette.line;
+            }
+
+            VerticalLayout {
+                padding-left: 1px;
+                CardHead {
+                    height: 64px;
+                    title: "Zones";
+                    count: root.zones.length;
+                    VerticalLayout {
+                        alignment: center;
+                        Button {
+                            text: "Add zone";
+                            icon: Icons.plus;
+                            clicked => {
+                                root.add-zone();
+                            }
+                        }
+                    }
+                }
+
+                for z[i] in root.zones: ZoneRow {
+                    zone: z;
+                    first: i == 0;
+                    selected: i == root.selected;
+                    clicked => {
+                        root.selected = i;
+                    }
+                    toggled(v) => {
+                        z.on = v;
+                    }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                }
+
+                Rectangle {
+                    height: 64px;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Space.s5;
+                        padding-right: Space.s5;
+                        alignment: start;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                text: "Delete zone";
+                                icon: Icons.trash;
+                                kind: BtnKind.danger;
+                                pad-x: -1px;
+                                clicked => {
+                                    root.delete-zone(root.selected);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

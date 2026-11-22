@@ -1,0 +1,312 @@
+// 12 settings. The Shortcuts section of the mockup becomes "Keys": the same two 04-read-key-d cards as onboarding
+// (read key and quick menu key). Max picked "D everywhere", 2026-11-22.
+import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+import { Icon, CIcon, Button, BtnKind, Card, Toggle, Segmented, Kbd } from "../components/base.slint";
+import { KeysCard } from "keys.slint";
+
+component SetRow inherits Rectangle {
+    in property <string> title;
+    in property <string> desc;
+    in property <bool> first;
+    height: root.desc != "" ? 63px : 57px;
+    if !root.first: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.line;
+    }
+    HorizontalLayout {
+        padding-left: Space.s5;
+        padding-right: Space.s5;
+        spacing: Space.s4;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.title;
+                height: Type.lh2;
+                font-weight: Type.w-medium;
+                color: Palette.text;
+                vertical-alignment: center;
+            }
+
+            if root.desc != "": Text {
+                text: root.desc;
+                height: Type.lh1;
+                font-size: Type.fs1;
+                color: Palette.text-3;
+                vertical-alignment: center;
+            }
+        }
+
+        @children
+    }
+}
+
+component Section inherits VerticalLayout {
+    in property <string> title;
+    spacing: Space.s3;
+    Text {
+        text: root.title;
+        height: 23px;
+        font-size: Type.fs3;
+        font-weight: Type.w-semibold;
+        color: Palette.text;
+        vertical-alignment: center;
+    }
+
+    @children
+}
+
+component RowToggle inherits VerticalLayout {
+    in-out property <bool> on;
+    in property <string> label;
+    alignment: center;
+    Toggle {
+        on: root.on;
+        label: root.label;
+        toggled(v) => {
+            root.on = v;
+        }
+    }
+}
+
+export component SettingsTab inherits Rectangle {
+    in-out property <bool> start-with-windows: true;
+    in-out property <bool> open-minimized: true;
+    in-out property <bool> show-in-taskbar: false;
+    in-out property <int> pill-position: 0;
+    in-out property <bool> show-speaker: true;
+    in-out property <bool> auto-update: true;
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    in property <string> version: "0.1.0";
+    in property <string> default-voice: "Kokoro · Adam";
+    in-out property <int> section: 0;
+    callback change-key(int);
+    public function jump(i: int) {
+        root.section = i;
+        flick.content-y = -max(0px, min(
+            i == 0 ? startup.y : i == 1 ? overlay.y : i == 2 ? keys.y : i == 3 ? voices.y : updates.y,
+            col.preferred-height + 2 * Size.page-x - flick.height));
+    }
+    HorizontalLayout {
+        padding-left: Size.page-x;
+        spacing: Space.s7;
+        VerticalLayout {
+            padding-top: Size.page-x;
+            width: 200px;
+            spacing: 2px;
+            alignment: start;
+            for s[i] in ["Startup", "In-game overlay", "Keys", "Voices", "Updates"]: Rectangle {
+                height: Size.ctl;
+                border-radius: Radius.md;
+                background: i == root.section ? Palette.surface-2 : (nav-touch.has-hover ? Palette.surface : transparent);
+                accessible-role: tab;
+                accessible-label: s;
+                accessible-item-selected: i == root.section;
+                accessible-action-default => {
+                    root.jump(i);
+                }
+                Text {
+                    x: Space.s3;
+                    text: s;
+                    font-weight: Type.w-medium;
+                    color: i == root.section ? Palette.text : Palette.text-2;
+                    vertical-alignment: center;
+                }
+
+                nav-touch := TouchArea {
+                    clicked => {
+                        root.jump(i);
+                    }
+                }
+            }
+        }
+
+        flick := Flickable {
+            horizontal-stretch: 1;
+            content-height: col.preferred-height + 2 * Size.page-x;
+            col := VerticalLayout {
+                x: (flick.width - 720px) / 2 - Size.page-x / 2;
+                y: Size.page-x;
+                width: 720px;
+                spacing: Space.s6;
+                alignment: start;
+                startup := Section {
+                    title: "Startup";
+                    Card {
+                        VerticalLayout {
+                            padding: 1px;
+                            SetRow {
+                                first: true;
+                                title: "Start with Windows";
+                                desc: "Runs in the tray, ready when a game starts.";
+                                RowToggle {
+                                    on <=> root.start-with-windows;
+                                    label: "Start with Windows";
+                                }
+                            }
+
+                            SetRow {
+                                title: "Open minimized";
+                                desc: "Skip the main window at startup.";
+                                RowToggle {
+                                    on <=> root.open-minimized;
+                                    label: "Open minimized";
+                                }
+                            }
+
+                            SetRow {
+                                title: "Show in the taskbar";
+                                desc: "Otherwise only the tray icon shows.";
+                                RowToggle {
+                                    on <=> root.show-in-taskbar;
+                                    label: "Show in the taskbar";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                overlay := Section {
+                    title: "In-game overlay";
+                    Card {
+                        VerticalLayout {
+                            padding: 1px;
+                            SetRow {
+                                first: true;
+                                title: "Position";
+                                desc: "Where the small status pill sits.";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Segmented {
+                                        items: ["Top right", "Bottom center", "Off"];
+                                        selected: root.pill-position;
+                                        select(i) => {
+                                            root.pill-position = i;
+                                        }
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Show the speaker";
+                                desc: "Otherwise only the status dot shows.";
+                                RowToggle {
+                                    on <=> root.show-speaker;
+                                    label: "Show the speaker";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                keys := Section {
+                    title: "Keys";
+                    KeysCard {
+                        read-key: root.read-key;
+                        menu-key: root.menu-key;
+                        change(i) => {
+                            root.change-key(i);
+                        }
+                    }
+                }
+
+                voices := Section {
+                    title: "Voices";
+                    Card {
+                        VerticalLayout {
+                            padding: 1px;
+                            SetRow {
+                                first: true;
+                                title: "Kokoro";
+                                desc: "Installed · 11 voices · 312 MB";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Button {
+                                        text: "Manage";
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Piper";
+                                desc: "Not installed · 48 voices · about 60 MB each";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Button {
+                                        text: "Download";
+                                        icon: Icons.download;
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Default voice for new games";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 200px;
+                                        height: Size.ctl;
+                                        border-radius: Radius.md;
+                                        border-width: 1px;
+                                        border-color: Palette.line-2;
+                                        background: Palette.surface-2;
+                                        accessible-role: combobox;
+                                        accessible-label: "Default voice for new games";
+                                        accessible-value: root.default-voice;
+                                        HorizontalLayout {
+                                            padding-left: Space.s3 + 1px;
+                                            padding-right: Space.s3 + 1px;
+                                            Text {
+                                                text: root.default-voice;
+                                                color: Palette.text;
+                                                vertical-alignment: center;
+                                                horizontal-stretch: 1;
+                                            }
+
+                                            CIcon {
+                                                source: Icons.chev-down;
+                                                color: Palette.text-2;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                updates := Section {
+                    title: "Updates";
+                    Card {
+                        VerticalLayout {
+                            padding: 1px;
+                            SetRow {
+                                first: true;
+                                title: "Version " + root.version;
+                                desc: "You have the latest version.";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Button {
+                                        text: "Check now";
+                                        icon: Icons.refresh;
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Install updates automatically";
+                                desc: "Only when no game is running.";
+                                RowToggle {
+                                    on <=> root.auto-update;
+                                    label: "Install updates automatically";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
