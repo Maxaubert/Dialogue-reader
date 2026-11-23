@@ -259,6 +259,26 @@ fallback too (or, for the menu, an opaque rectangle window). If 4 fails, the key
 loses focus or 6 fails, the decision changes and this file is updated. The `demo` mode compiles but was never
 run (it shows windows on the real screen); its hook thread and key-up rule have not run with real keys either.
 
+## Visible check result (2026-11-23, run by Claude with Max's yes)
+
+Max handed the PC over ("pc is yours"), so Claude ran `demo` itself against a stand-in game: a borderless 3840 x 2160
+Tk window with a bright checker pattern that logs every key, click and focus change. Input came from
+`keybd_event` / `mouse_event`. Script: session scratchpad `overlay/drive.py` and `fakegame.py` (not kept).
+
+| Step | Result |
+|---|---|
+| 1 Pill | Pass. "all overlay styles set" (ex-style 0x080801B8). Corners show the game, no taskbar flash. |
+| 2 Click through | Pass. A click on the pill reached the game (game log: click at 3614,110), game stayed in front. |
+| 3 Quick menu (F8) | Pass. Menu centered, corners and shadow margin show the game. Arrows moved, game kept focus. |
+| 4 Esc after menu | Pass. The game got no F8, arrow or Esc key at all. |
+| 5 Zone edit (F9) | Pass. Game dimmed, not black; a drag drew a box; the drag did not reach the game; F8 swapped to the menu. |
+| 6 Taskbar, Alt+Tab | Pass. Every demo window has WS_EX_TOOLWINDOW, no WS_EX_APPWINDOW. |
+| 7 F10 | Pass. "Seconds the game was not in front: 0", exit code 0. |
+
+Seen: while the menu or zone edit is open, the pill shows at the top center instead of the top right (the demo
+moves it; check the wanted place in M4). Not covered: a real DirectX game (flip model, raw input, games that pause
+on focus loss). Try one in the M4 manual check.
+
 ## For the M4 overlay test
 
 `crates/app/tests/overlay_win.rs` (M4) should reuse the probe's way of checking: the hidden desktop runner
