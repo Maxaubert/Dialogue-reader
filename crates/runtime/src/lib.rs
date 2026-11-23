@@ -2,12 +2,13 @@
 //!
 //! M2: profiles on disk ([`profile`], [`paths`]), the list of windows to read ([`windows_list`]) and one
 //! screenshot of a window with Windows Graphics Capture ([`screenshot`]), and the live view of the zone editor
-//! ([`live`]). Capture, the reader thread, speech and
-//! keys come in M3.
+//! ([`live`]). M3a: the speech queue, the speech thread and audio out ([`speech`]). Capture, the reader thread
+//! and keys come in M3b.
 
 pub mod paths;
 pub mod profile;
 pub mod shot;
+pub mod speech;
 
 #[cfg(windows)]
 pub mod live;

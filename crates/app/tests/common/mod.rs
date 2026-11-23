@@ -7,8 +7,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use dr_app::MainWindow;
+use dr_app::vm::voices::Voices;
 use dr_app::vm::{Desktop, LiveRun, Source};
 use dr_runtime::live::{LiveFrame, LiveSink};
+use dr_runtime::speech::{NullSink, Speech, VoiceSettings};
 use dr_runtime::windows_list::{WinInfo, WinMode};
 use dr_runtime::{Paths, Shot};
 use i_slint_backend_testing::{AccessibleRole, ElementHandle};
@@ -25,6 +27,8 @@ pub struct FakeDesktop {
     pub windows: Vec<WinInfo>,
     pub fail: Rc<Cell<bool>>,
     pub front: Rc<RefCell<Vec<WinInfo>>>,
+    /// How often "Add voices" asked to open the Windows speech settings.
+    pub opened_settings: Rc<Cell<u32>>,
     pub live: FakeLive,
 }
 
@@ -126,6 +130,7 @@ impl FakeDesktop {
             ],
             fail: Rc::new(Cell::new(false)),
             front: Rc::new(RefCell::new(Vec::new())),
+            opened_settings: Rc::new(Cell::new(0)),
             live: FakeLive::default(),
         }
     }
@@ -141,6 +146,10 @@ impl Desktop for FakeDesktop {
             }
         }
         v
+    }
+
+    fn open_speech_settings(&self) {
+        self.opened_settings.set(self.opened_settings.get() + 1);
     }
 
     fn is_minimized(&self, w: &WinInfo) -> bool {
@@ -214,8 +223,30 @@ pub fn temp_paths() -> (tempfile::TempDir, Paths) {
     (dir, p)
 }
 
+/// Two fake voices ("David", "Zira") and a speech thread with a fake engine and a null sink: nothing plays.
+pub fn fake_voices() -> Voices {
+    // Windows voices only (no Kokoro), through the same engine router as the app
+    let engines = || dr_tts::Engines::new(None, Some(Box::new(dr_tts::FakeTts::new())));
+    let mut v = Voices::of(&engines(), 2, None);
+    v.speech = Some(Speech::start(
+        Box::new(engines()),
+        || Box::new(NullSink::timed(1.0)),
+        VoiceSettings::default(),
+    ));
+    v
+}
+
 /// A window on a temp data folder and a fake desktop, at 1440 x 900, with no event loop.
 pub fn real_window(paths: &Paths, desktop: FakeDesktop) -> (MainWindow, dr_app::vm::Shared) {
+    real_window_with(paths, desktop, fake_voices())
+}
+
+/// [`real_window`] with these voices.
+pub fn real_window_with(
+    paths: &Paths,
+    desktop: FakeDesktop,
+    voices: Voices,
+) -> (MainWindow, dr_app::vm::Shared) {
     thread_local!(static INIT: Cell<bool> = const { Cell::new(false) });
     // the testing platform can be set once per thread
     if !INIT.with(|i| i.replace(true)) {
@@ -224,6 +255,7 @@ pub fn real_window(paths: &Paths, desktop: FakeDesktop) -> (MainWindow, dr_app::
     let (w, vm) = dr_app::build_window(Source::Real {
         paths: paths.clone(),
         desktop: Box::new(desktop),
+        voices: Box::new(voices),
     })
     .expect("window");
     w.window().set_size(slint::LogicalSize::new(1440.0, 900.0));

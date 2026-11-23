@@ -1,7 +1,8 @@
 // 12 settings. The Shortcuts section of the mockup becomes "Keys": the same two 04-read-key-d cards as onboarding
 // (read key and quick menu key). Max picked "D everywhere", 2026-11-22.
 import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
-import { Icon, CIcon, Button, BtnKind, Card, Toggle, Segmented, Kbd } from "../components/base.slint";
+import { Icon, CIcon, Button, BtnKind, Card, Toggle, Segmented, Kbd, Slider } from "../components/base.slint";
+import { VoiceData } from "../data.slint";
 import { KeysCard } from "keys.slint";
 
 component SetRow inherits Rectangle {
@@ -80,9 +81,33 @@ export component SettingsTab inherits Rectangle {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     in property <string> version: "0.1.0";
-    in property <string> default-voice: "Kokoro · Adam";
+    // Voices: Kokoro (first, as in mockup 12) and the Windows voices, and the current game's voice, speed and
+    // volume (saved in its profile)
+    in property <[VoiceData]> voices;
+    in property <string> voices-desc: "Built into Windows · 11 voices";
+    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
+    in property <string> game: "Red Dead Redemption 2";
+    in property <bool> has-game: true;
+    in-out property <int> game-voice: 0;
+    in-out property <float> game-speed: 0.55;
+    in-out property <float> game-volume: 0.8;
+    in property <bool> testing;
+    callback add-voices();
+    callback voice-picked(int);
+    // a slider moves (sent to speech at once), then is let go (saved in the profile)
+    callback voice-changed();
+    callback voice-saved();
+    callback test();
+    callback stop-test();
     in-out property <int> section: 0;
     callback change-key(int);
+    // opens the voice picker (render-screens shows it open)
+    public function open-voice-list() {
+        list.show();
+    }
+    public function close-voice-list() {
+        list.close();
+    }
     public function jump(i: int) {
         root.section = i;
         flick.content-y = -max(0px, min(
@@ -220,56 +245,196 @@ export component SettingsTab inherits Rectangle {
                             SetRow {
                                 first: true;
                                 title: "Kokoro";
-                                desc: "Installed · 11 voices · 312 MB";
-                                VerticalLayout {
-                                    alignment: center;
-                                    Button {
-                                        text: "Manage";
-                                    }
-                                }
+                                desc: root.kokoro-desc;
                             }
 
                             SetRow {
-                                title: "Piper";
-                                desc: "Not installed · 48 voices · about 60 MB each";
+                                title: "Windows voices";
+                                desc: root.voices-desc;
                                 VerticalLayout {
                                     alignment: center;
                                     Button {
-                                        text: "Download";
+                                        text: "Add voices";
                                         icon: Icons.download;
+                                        clicked => {
+                                            root.add-voices();
+                                        }
                                     }
                                 }
                             }
 
                             SetRow {
-                                title: "Default voice for new games";
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 200px;
-                                        height: Size.ctl;
-                                        border-radius: Radius.md;
-                                        border-width: 1px;
-                                        border-color: Palette.line-2;
-                                        background: Palette.surface-2;
-                                        accessible-role: combobox;
-                                        accessible-label: "Default voice for new games";
-                                        accessible-value: root.default-voice;
-                                        HorizontalLayout {
-                                            padding-left: Space.s3 + 1px;
-                                            padding-right: Space.s3 + 1px;
-                                            Text {
-                                                text: root.default-voice;
-                                                color: Palette.text;
-                                                vertical-alignment: center;
-                                                horizontal-stretch: 1;
+                                title: "Voice for this game";
+                                desc: root.has-game ? root.game : "Set up a game first.";
+                                HorizontalLayout {
+                                    spacing: Space.s2;
+                                    alignment: end;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 200px;
+                                            height: Size.ctl;
+                                            border-radius: Radius.md;
+                                            border-width: 1px;
+                                            border-color: Palette.line-2;
+                                            background: Palette.surface-2;
+                                            accessible-role: combobox;
+                                            accessible-label: "Voice for this game";
+                                            accessible-value: root.voices.length > 0 ? root.voices[root.game-voice].name : "No voice";
+                                            accessible-action-default => {
+                                                if root.voices.length > 0 && root.has-game {
+                                                    list.show();
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                padding-left: Space.s3 + 1px;
+                                                padding-right: Space.s3 + 1px;
+                                                Text {
+                                                    text: root.voices.length > 0 ? root.voices[root.game-voice].engine + " · " + root.voices[root.game-voice].name : "No voice";
+                                                    color: Palette.text;
+                                                    vertical-alignment: center;
+                                                    horizontal-stretch: 1;
+                                                }
+
+                                                CIcon {
+                                                    source: Icons.chev-down;
+                                                    color: Palette.text-2;
+                                                }
                                             }
 
-                                            CIcon {
-                                                source: Icons.chev-down;
-                                                color: Palette.text-2;
+                                            TouchArea {
+                                                clicked => {
+                                                    if root.voices.length > 0 && root.has-game {
+                                                        list.show();
+                                                    }
+                                                }
+                                            }
+
+                                            list := PopupWindow {
+                                                x: 0;
+                                                y: parent.height + Space.s1;
+                                                width: parent.width;
+                                                height: Math.min(root.voices.length, 6) * Size.ctl + 2 * Space.s1;
+                                                Rectangle {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    background: Palette.surface-2;
+                                                    border-radius: Radius.md;
+                                                    border-width: 1px;
+                                                    border-color: Palette.line-2;
+                                                    // six rows show; the rest scroll
+                                                    Flickable {
+                                                        x: Space.s1;
+                                                        y: Space.s1;
+                                                        width: parent.width - 2 * Space.s1;
+                                                        height: Math.min(root.voices.length, 6) * Size.ctl;
+                                                        content-height: root.voices.length * Size.ctl;
+                                                    VerticalLayout {
+                                                        for v[i] in root.voices: Rectangle {
+                                                            height: Size.ctl;
+                                                            border-radius: Radius.sm;
+                                                            background: i == root.game-voice || row-touch.has-hover ? Palette.surface-3 : transparent;
+                                                            accessible-role: list-item;
+                                                            accessible-label: v.name;
+                                                            accessible-item-selected: i == root.game-voice;
+                                                            Text {
+                                                                x: Space.s2;
+                                                                text: v.name + "  ·  " + v.short;
+                                                                color: Palette.text;
+                                                                vertical-alignment: center;
+                                                            }
+
+                                                            row-touch := TouchArea {
+                                                                clicked => {
+                                                                    root.game-voice = i;
+                                                                    root.voice-picked(i);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    }
+                                                }
                                             }
                                         }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Button {
+                                            text: root.testing ? "Stop" : "Test";
+                                            label: "Test the voice";
+                                            icon: root.testing ? Icons.stop : Icons.play;
+                                            enabled: root.voices.length > 0 && root.has-game;
+                                            clicked => {
+                                                if root.testing {
+                                                    root.stop-test();
+                                                } else {
+                                                    root.test();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Speed";
+                                HorizontalLayout {
+                                    spacing: Space.s3;
+                                    width: 260px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 1;
+                                        Slider {
+                                            value <=> root.game-speed;
+                                            changed => {
+                                                root.voice-changed();
+                                            }
+                                            released => {
+                                                root.voice-saved();
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        width: 40px;
+                                        text: Math.round(Math.max(0.25, root.game-speed) * 20) / 10 + "×";
+                                        font-family: Type.mono;
+                                        font-size: Type.fs1;
+                                        color: Palette.text-2;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Volume";
+                                HorizontalLayout {
+                                    spacing: Space.s3;
+                                    width: 260px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 1;
+                                        Slider {
+                                            value <=> root.game-volume;
+                                            changed => {
+                                                root.voice-changed();
+                                            }
+                                            released => {
+                                                root.voice-saved();
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        width: 40px;
+                                        text: Math.round(root.game-volume * 100) + "%";
+                                        font-family: Type.mono;
+                                        font-size: Type.fs1;
+                                        color: Palette.text-2;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
                                     }
                                 }
                             }

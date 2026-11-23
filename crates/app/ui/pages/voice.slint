@@ -1,4 +1,4 @@
-// 05 voice.
+// 05 voice. Kokoro voices (as in the approved mockup); the Windows voices when Kokoro's files are missing.
 import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
 import { VoiceData } from "../data.slint";
 import { Icon, CIcon, Button, BtnKind, Card, CardHead, ITile, Chip, Slider, Wave, SmallLabel } from "../components/base.slint";
@@ -9,6 +9,19 @@ export component VoicePage inherits Rectangle {
     in-out property <int> selected: 0;
     in-out property <float> speed: 0.55;
     in-out property <float> volume: 0.8;
+    // engine of the list, for its header ("Kokoro voices", "Windows voices")
+    in property <string> engine: "Kokoro";
+    // why the list is empty (no Kokoro files and no Windows voice installed)
+    in property <string> problem;
+    // a sample is playing: the button says Stop, the wave shows how far it got
+    in property <bool> testing;
+    in property <int> test-played: 0;
+    in property <string> test-time: "0:00";
+    callback test();
+    callback stop-test();
+    callback add-voices();
+    // the Volume slider moved (a playing sample follows it)
+    callback volume-moved();
     VerticalLayout {
         x: (parent.width - Size.col) / 2;
         width: Size.col;
@@ -31,23 +44,40 @@ export component VoicePage inherits Rectangle {
                     padding: 1px;
                     alignment: start;
                     CardHead {
-                        title: "Kokoro voices";
+                        title: root.engine + " voices";
                         count: root.voices.length;
                         VerticalLayout {
                             alignment: center;
                             Button {
-                                text: "Get more voices";
+                                text: "Add voices";
                                 icon: Icons.download;
                                 kind: BtnKind.ghost;
                                 fg: Palette.text-2;
                                 icon-color: Palette.text-2;
+                                clicked => {
+                                    root.add-voices();
+                                }
                             }
                         }
                     }
 
-                    // six rows show; the rest scroll (11 voices in all)
+                    if root.voices.length == 0: HorizontalLayout {
+                        padding-left: Space.s5;
+                        padding-right: Space.s5;
+                        height: 120px;
+                        Text {
+                            text: root.problem != "" ? root.problem : "No voice found.";
+                            color: Palette.text-2;
+                            wrap: word-wrap;
+                            vertical-alignment: center;
+                            line-height-factor: Type.lhf-150;
+                        }
+                    }
+
+                    // six rows show; the rest scroll (11 voices in the sample data). With no voice the list takes no
+                    // room and the message above shows instead.
                     Flickable {
-                        height: 6 * 60px;
+                        height: root.voices.length > 0 ? 6 * 60px : 0px;
                         content-height: root.voices.length * 60px;
                         VerticalLayout {
                             for v[i] in root.voices: Rectangle {
@@ -124,7 +154,7 @@ export component VoicePage inherits Rectangle {
                     CardHead {
                         title: "Test it";
                         Text {
-                            text: "Kokoro · " + (root.voices.length > 0 ? root.voices[root.selected].name : "");
+                            text: root.voices.length > 0 ? root.voices[root.selected].engine + " · " + root.voices[root.selected].name : "No voice";
                             font-size: Type.fs1;
                             color: Palette.text-3;
                             vertical-alignment: center;
@@ -201,6 +231,9 @@ export component VoicePage inherits Rectangle {
 
                             Slider {
                                 value <=> root.volume;
+                                changed => {
+                                    root.volume-moved();
+                                }
                             }
                         }
 
@@ -217,11 +250,11 @@ export component VoicePage inherits Rectangle {
                                 Wave {
                                     horizontal-stretch: 1;
                                     bars: [12, 20, 30, 29, 25, 21, 18, 12, 17, 24, 16, 10, 17, 24, 30, 37, 30, 21, 11, 23, 24, 17, 10, 21, 31, 27, 35, 31, 21, 12, 17, 26, 15, 11];
-                                    played: 20;
+                                    played: root.testing ? root.test-played : 0;
                                 }
 
                                 Text {
-                                    text: "0:02 / 0:04";
+                                    text: root.test-time;
                                     font-family: Type.mono;
                                     font-size: Type.fs1;
                                     color: Palette.text-2;
@@ -231,10 +264,19 @@ export component VoicePage inherits Rectangle {
                         }
 
                         Button {
-                            text: "Stop";
-                            icon: Icons.stop;
+                            text: root.testing ? "Stop" : "Play sample";
+                            icon: root.testing ? Icons.stop : Icons.play;
                             large: true;
                             horizontal-stretch: 1;
+                            // with no voice there is nothing to play (the list says why)
+                            enabled: root.voices.length > 0;
+                            clicked => {
+                                if root.testing {
+                                    root.stop-test();
+                                } else {
+                                    root.test();
+                                }
+                            }
                         }
                     }
                 }

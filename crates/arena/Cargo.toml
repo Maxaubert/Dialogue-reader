@@ -24,6 +24,8 @@ ab_glyph = "0.2.32"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 # The reader engine under test (reader "a1").
 dr-core = { path = "../core" }
+# The WinRT OCR engine (moved out of src/ocr/winrt.rs in M3a; that file is now an adapter).
+dr-ocr = { path = "../ocr" }
 
 # ---- deps added by the live-mode agent (src/live.rs) ----
 

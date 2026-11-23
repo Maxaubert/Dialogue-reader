@@ -152,8 +152,11 @@ export component Button inherits Rectangle {
     in property <color> fg: root.kind == BtnKind.primary ? Palette.bg : root.kind == BtnKind.ghost ? Palette.text-2 : root.kind == BtnKind.danger ? Palette.danger : Palette.text;
     in property <color> icon-color: root.fg;
     in property <LayoutAlignment> align: center;
+    // false: dimmed, and a click does nothing
+    in property <bool> enabled: true;
     callback clicked();
     height: root.large ? Size.ctl-lg : Size.ctl;
+    opacity: root.enabled ? 1 : 0.4;
     min-width: root.icon-only ? self.height : 0px;
     horizontal-stretch: 0;
     border-radius: Radius.md;
@@ -162,8 +165,11 @@ export component Button inherits Rectangle {
     background: root.kind == BtnKind.primary ? Palette.text : root.kind == BtnKind.default ? (touch.has-hover ? Palette.surface-3 : Palette.surface-2) : (touch.has-hover ? Palette.surface-2 : transparent);
     accessible-role: button;
     accessible-label: root.label;
+    accessible-enabled: root.enabled;
     accessible-action-default => {
-        root.clicked();
+        if root.enabled {
+            root.clicked();
+        }
     }
     HorizontalLayout {
         padding-left: root.icon-only ? 0px : root.pad-x + 1px;
@@ -196,6 +202,7 @@ export component Button inherits Rectangle {
     }
 
     touch := TouchArea {
+        enabled: root.enabled;
         clicked => {
             root.clicked();
         }
@@ -304,6 +311,8 @@ export component Slider {
     in-out property <float> value: 0.5;
     in property <length> knob: 16px;
     callback changed(float);
+    // the pointer let go of the slider (save here; `changed` comes on every move)
+    callback released(float);
     // 4 px track; the knob hangs over it (it does not add to the height, as in the mockups)
     height: 4px;
     min-width: 40px;
@@ -352,6 +361,9 @@ export component Slider {
             if e.kind == PointerEventKind.down {
                 root.value = Math.clamp(self.mouse-x / root.width, 0, 1);
                 root.changed(root.value);
+            }
+            if e.kind == PointerEventKind.up {
+                root.released(root.value);
             }
         }
     }

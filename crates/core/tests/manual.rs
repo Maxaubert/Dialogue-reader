@@ -222,3 +222,23 @@ fn a_clear_current_line_is_not_mixed_with_an_older_ring_line() {
     let p = m.read_now(&Frame::new(340.0, FW, FH, &frame(&[((16, 40), 7, 0.6)])), &mut ocr);
     assert_eq!(texts(&p), vec!["Map ready"]);
 }
+
+#[test]
+fn with_prompts_off_a_prompt_zone_is_read_for_the_log_only() {
+    let zones = [Zone::new("dlg", ZoneKind::Dialogue, r(16.0, 40.0)), Zone::new("prompt", ZoneKind::Prompt, r(140.0, 100.0))];
+    let cfg = Config { read_prompts: false, ..Config::default() };
+    let mut m = Manual::new(cfg, ManualConfig::default(), &zones);
+    let mut ocr = Coded::default();
+    let px = frame(&[((16, 40), 3, 1.0), ((140, 100), 6, 1.0)]);
+    let p = m.read_now(&Frame::new(0.0, FW, FH, &px), &mut ocr);
+    assert_eq!(texts(&p), vec!["Stay close to the wall."]);
+    assert_eq!(p.skipped.len(), 1);
+    assert_eq!(p.skipped[0].line.text, "Press E to open");
+    assert_eq!(p.skipped[0].reason, dr_core::SkipReason::PromptsOff);
+    // only the prompt in view: nothing to speak, and no repeat of a skipped line later
+    let px = frame(&[((140, 100), 6, 1.0)]);
+    let p = m.read_now(&Frame::new(100.0, FW, FH, &px), &mut ocr);
+    assert_eq!(texts(&p), vec!["Stay close to the wall."], "the last spoken lines are repeated");
+    assert!(p.repeat);
+    assert_eq!(p.skipped[0].line.text, "Press E to open");
+}

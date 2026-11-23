@@ -24,5 +24,5 @@ pub use frame::Frame;
 pub use geom::Rect;
 pub use manual::{Manual, ManualConfig, Press};
 pub use ocr::{Ocr, OcrLine};
-pub use pipeline::{Config, Event, Pipeline};
+pub use pipeline::{Config, Event, Output, Pipeline, SkipReason, Skipped};
 pub use zone::{Zone, ZoneKind};

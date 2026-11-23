@@ -96,6 +96,8 @@ fn real_frames_reach_the_stage_and_stop_with_the_page() {
     let (w, vm) = dr_app::build_window(Source::Real {
         paths: paths.clone(),
         desktop: Box::new(OneWindow(info)),
+        // no voices and no speech thread: nothing can play
+        voices: Box::new(dr_app::vm::voices::Voices::none()),
     })
     .unwrap();
     w.window().set_size(slint::LogicalSize::new(1440.0, 900.0));

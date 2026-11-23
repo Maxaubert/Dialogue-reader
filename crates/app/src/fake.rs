@@ -160,6 +160,7 @@ fn voices() -> Vec<VoiceData> {
         name: s(n),
         desc: s(d),
         short: s(sh),
+        engine: s("Kokoro"),
     })
     .collect()
 }
@@ -177,6 +178,7 @@ fn menu_voices() -> Vec<VoiceData> {
         name: s(n),
         desc: s(sh),
         short: s(sh),
+        engine: s("Kokoro"),
     })
     .collect()
 }

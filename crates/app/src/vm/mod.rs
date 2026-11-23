@@ -10,6 +10,7 @@
 //! keep a small cover, made the first time the game switcher opens, and the screenshot size from the PNG header.
 
 mod live;
+pub mod voices;
 pub mod zones;
 
 pub use live::{LiveRun, NOTE_CLOSED, NOTE_FAILED, NOTE_LIVE, NOTE_MINIMIZED};
@@ -26,6 +27,7 @@ use slint::{
 
 use crate::geom::Rect;
 use crate::{GameData, Kind, MainWindow, Page, WindowData, ZoneData};
+use voices::Voices;
 use zones::{EdZone, Editor};
 
 /// Where windows and screenshots come from.
@@ -38,6 +40,8 @@ pub trait Desktop {
     fn is_minimized(&self, win: &WinInfo) -> bool {
         win.minimized
     }
+    /// Opens the Windows speech settings, where voices are added ("Add voices"). Nothing by default.
+    fn open_speech_settings(&self) {}
     /// The window still exists.
     fn is_open(&self, _win: &WinInfo) -> bool {
         true
@@ -85,6 +89,13 @@ impl Desktop for RealDesktop {
         dr_runtime::windows_list::is_minimized(win.hwnd)
     }
 
+    fn open_speech_settings(&self) {
+        // the Settings app opens the page of the ms-settings link
+        let _ = std::process::Command::new("explorer.exe")
+            .arg("ms-settings:speech")
+            .spawn();
+    }
+
     fn is_open(&self, win: &WinInfo) -> bool {
         dr_runtime::windows_list::is_open(win.hwnd)
     }
@@ -128,7 +139,17 @@ pub enum Source {
     Real {
         paths: Paths,
         desktop: Box<dyn Desktop>,
+        /// The voices (Kokoro, or the Windows voices) and the speech thread for the voice test.
+        voices: Box<Voices>,
     },
+}
+
+/// The voice list and the voice texts of `v` to the window (page 05 and Settings > Voices).
+fn push_voice_list(w: &MainWindow, v: &Voices) {
+    w.set_voices(ModelRc::new(VecModel::from(v.rows())));
+    w.set_voices_problem(v.problem_text().into());
+    w.set_voices_desc(v.desc().into());
+    w.set_kokoro_desc(v.kokoro_desc().into());
 }
 
 /// Slint kind from a profile kind, and back.
@@ -176,20 +197,144 @@ pub fn cover_of(s: &Shot) -> Image {
     image_of(small.width(), small.height(), small.as_raw())
 }
 
-/// The profile is for this window: same exe (case does not matter), and the title holds `title_contains` when it
-/// is set. A profile without an exe (the game's process could not be read) matches by title only, and an
-/// unreadable window never matches by its empty exe.
+/// The profile can be for this window: same exe (case does not matter), and the title holds `title_contains` when
+/// it is set. A profile without an exe (the game's process could not be read) matches by title only, and an
+/// unreadable window never matches by its empty exe. Several profiles can match one window (games that share
+/// an exe, such as emulators); [`best_profile`] picks the one it belongs to.
 pub fn profile_matches(p: &Profile, w: &WinInfo) -> bool {
-    let title_ok = |t: &str| w.title.to_lowercase().contains(&t.to_lowercase());
+    match_score(p, w).is_some()
+}
+
+/// A window title without the parts that change while a game runs, so a saved title still fits: numbers with a
+/// point, comma or colon ("59.94", "1,234", "12:34", "0.0.30"), numbers with a unit ("60 fps", "16 ms",
+/// "100%", "60 Hz"), and numbers after a label ("FPS: 60", "VPS 60"). Other numbers stay, so "Persona 4" and
+/// "Persona 5" stay apart (but "HD 1.5" and "HD 2.5" do not). Lowercase, with single spaces.
+pub fn stable_title(title: &str) -> String {
+    const UNITS: [&str; 5] = ["fps", "vps", "ms", "hz", "%"];
+    const LABELS: [&str; 2] = ["fps", "vps"];
+    let c: Vec<char> = title.to_lowercase().chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < c.len() {
+        // a number that starts here (not inside a word such as "doom3")
+        let starts = c[i].is_ascii_digit() && (i == 0 || !c[i - 1].is_alphanumeric());
+        if !starts {
+            out.push(c[i]);
+            i += 1;
+            continue;
+        }
+        let mut j = i;
+        let mut sep = false;
+        while j < c.len() {
+            if c[j].is_ascii_digit() {
+                j += 1;
+            } else if matches!(c[j], '.' | ',' | ':')
+                && c.get(j + 1).is_some_and(char::is_ascii_digit)
+            {
+                sep = true;
+                j += 1;
+            } else {
+                break;
+            }
+        }
+        let rest: String = c[j..].iter().collect();
+        let gap = rest.len() - rest.trim_start().len();
+        let unit = UNITS.iter().find(|u| {
+            let r = rest.trim_start();
+            r.starts_with(**u) && !r[u.len()..].starts_with(char::is_alphanumeric)
+        });
+        let before = out.trim_end().trim_end_matches(':').trim_end();
+        let labelled = LABELS.iter().any(|l| before.ends_with(l));
+        if sep || unit.is_some() || labelled {
+            // the unit is ASCII: as many chars as bytes
+            i = j + unit.map_or(0, |u| gap + u.len());
+            out.push(' ');
+        } else {
+            out.extend(&c[i..j]);
+            i = j;
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The window title `live` holds the saved title `saved`, with [`stable_title`] applied to both. The number is the
+/// length of the saved part that fits (longer is a better fit).
+fn title_fits(saved: &str, live: &str) -> Option<usize> {
+    let key = stable_title(saved);
+    let (key, live) = if key.is_empty() {
+        // a title made only of counters: as it is
+        (saved.trim().to_lowercase(), live.to_lowercase())
+    } else {
+        (key, stable_title(live))
+    };
+    (!key.is_empty() && live.contains(&key)).then(|| key.chars().count())
+}
+
+/// How well a profile fits a window: `None` when it does not match; a profile with a title beats one with the
+/// exe only, and a longer title beats a shorter one. Titles are compared with [`stable_title`], so a frame
+/// counter in the title does not break the match.
+pub fn match_score(p: &Profile, w: &WinInfo) -> Option<usize> {
     let title = p
         .matches
         .title_contains
         .as_deref()
-        .filter(|t| !t.trim().is_empty());
+        .map(str::trim)
+        .filter(|t| !t.is_empty());
     if p.matches.exe.is_empty() {
-        return title.is_some_and(title_ok);
+        return title.and_then(|t| title_fits(t, &w.title)).map(|n| 1 + n);
     }
-    !w.exe.is_empty() && w.exe.eq_ignore_ascii_case(&p.matches.exe) && title.is_none_or(title_ok)
+    if w.exe.is_empty() || !w.exe.eq_ignore_ascii_case(&p.matches.exe) {
+        return None;
+    }
+    match title {
+        None => Some(0),
+        Some(t) => title_fits(t, &w.title).map(|n| 1 + n),
+    }
+}
+
+/// The profile a window belongs to: the best [`match_score`], the first of `profiles` on a tie.
+pub fn best_profile<'a>(
+    profiles: impl IntoIterator<Item = &'a Profile>,
+    w: &WinInfo,
+) -> Option<usize> {
+    let mut best: Option<(usize, usize)> = None;
+    for (i, p) in profiles.into_iter().enumerate() {
+        if let Some(sc) = match_score(p, w)
+            && best.is_none_or(|(_, b)| sc > b)
+        {
+            best = Some((i, sc));
+        }
+    }
+    best.map(|(i, _)| i)
+}
+
+/// For each profile: a window it is the best match of runs now. One window makes one profile "Running".
+pub fn running(profiles: &[&Profile], windows: &[WinInfo]) -> Vec<bool> {
+    let mut on = vec![false; profiles.len()];
+    for w in windows {
+        if let Some(i) = best_profile(profiles.iter().copied(), w) {
+            on[i] = true;
+        }
+    }
+    on
+}
+
+/// The profile already set up for this window: the window's best profile, when it matched by its title (the
+/// same rule as [`match_score`]), or, for a profile with the exe only, when its name (the window title at setup)
+/// is this title, apart from counters ([`stable_title`]). Another window of the same exe with another title gets
+/// its own profile.
+pub fn same_game<'a>(
+    profiles: impl IntoIterator<Item = &'a Profile> + Clone,
+    w: &WinInfo,
+) -> Option<usize> {
+    let i = best_profile(profiles.clone(), w)?;
+    let p = profiles.into_iter().nth(i)?;
+    let titled = p
+        .matches
+        .title_contains
+        .as_deref()
+        .is_some_and(|t| !t.trim().is_empty());
+    (titled || stable_title(&p.name) == stable_title(&w.title)).then_some(i)
 }
 
 fn zone_row(z: &EdZone) -> ZoneData {
@@ -313,6 +458,15 @@ pub struct Vm {
     games_running: Rc<VecModel<WindowData>>,
     other_windows: Rc<VecModel<WindowData>>,
     game_rows: Rc<VecModel<GameData>>,
+    /// Installed voices and the speech thread (none with the fake source).
+    voices: Voices,
+    /// Polls the voice test while it plays (real app only; tests call [`Vm::poll_test`]).
+    test_timer: slint::Timer,
+    /// The id of the last voice test sent, and the one that plays now (or is being made).
+    test_id: u64,
+    test_running: Option<u64>,
+    /// The Settings sliders moved and the profile is not saved yet (it is saved when they are let go).
+    voice_dirty: bool,
 }
 
 pub type Shared = Rc<RefCell<Vm>>;
@@ -340,6 +494,11 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         games_running: Rc::new(VecModel::default()),
         other_windows: Rc::new(VecModel::default()),
         game_rows: Rc::new(VecModel::default()),
+        voices: Voices::none(),
+        test_timer: slint::Timer::default(),
+        test_id: 0,
+        test_running: None,
+        voice_dirty: false,
     };
     w.set_setup_zones(ModelRc::from(vm.setup_zones.clone()));
     w.set_zones(ModelRc::from(vm.zones.clone()));
@@ -359,9 +518,22 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             vm.other_windows.set_vec(crate::fake::windows().1);
             vm.game_rows.set_vec(crate::fake::games());
         }
-        Source::Real { paths, desktop } => {
-            // voices, the activity log and zone edit stay fake until M3 and M4
+        Source::Real {
+            paths,
+            desktop,
+            voices,
+        } => {
+            // the activity log and zone edit stay fake until M3b and M4
             crate::fake::fill(w);
+            vm.voices = *voices;
+            vm.voices.check_kokoro();
+            push_voice_list(w, &vm.voices);
+            w.set_voice_testing(false);
+            w.set_test_played(0);
+            w.set_test_time("0:00".into());
+            w.set_picked_voice(0);
+            w.set_voice_speed(0.5);
+            w.set_voice_label(vm.voices.label("").into());
             w.set_real_shots(true);
             w.set_extra_zones(ModelRc::default());
             w.set_recent(ModelRc::default());
@@ -439,13 +611,18 @@ impl Vm {
             .collect()
     }
 
+    fn profiles(&self) -> Vec<&Profile> {
+        self.games.iter().map(|g| &g.profile).collect()
+    }
+
     fn push_games(&self) {
+        let on = running(&self.profiles(), &self.windows);
         let rows = self
             .games
             .iter()
-            .map(|g| {
+            .zip(on)
+            .map(|(g, is_running)| {
                 let n = g.profile.zones.len();
-                let is_running = self.windows.iter().any(|w| profile_matches(&g.profile, w));
                 GameData {
                     name: g.profile.name.as_str().into(),
                     meta: format!(
@@ -528,6 +705,216 @@ impl Vm {
         w.set_automatic(g.profile.mode == dr_runtime::Mode::Auto);
         w.set_read_key(g.profile.keys.read.as_str().into());
         w.set_menu_key(g.profile.keys.quick_menu.as_str().into());
+        let v = &g.profile.voice;
+        w.set_game_voice(self.voices.index_of(&v.id) as i32);
+        w.set_game_speed(voices::slider_of_speed(v.speed));
+        w.set_game_volume(v.volume.clamp(0.0, 1.0));
+        w.set_voice_label(self.voices.label(&v.id).into());
+        self.send_voice();
+    }
+
+    /// The current game's voice, speed and volume to the speech thread (what M3b reads with).
+    fn send_voice(&self) {
+        let (Some(sp), Some(g)) = (
+            &self.voices.speech,
+            self.current.and_then(|i| self.games.get(i)),
+        ) else {
+            return;
+        };
+        let v = &g.profile.voice;
+        sp.send(dr_runtime::speech::Cmd::SetVoice(
+            self.voices.effective(&v.id),
+        ));
+        sp.send(dr_runtime::speech::Cmd::SetSpeed(v.speed));
+        sp.send(dr_runtime::speech::Cmd::SetVolume(v.volume));
+    }
+
+    /// Settings > Voices: a voice picked for the current game.
+    fn pick_game_voice(&mut self, i: i32) {
+        let Some(g) = self.current else { return };
+        let Some(v) = usize::try_from(i)
+            .ok()
+            .and_then(|i| self.voices.list.get(i))
+        else {
+            return;
+        };
+        let voice = &mut self.games[g].profile.voice;
+        voice.engine = v.engine.to_string();
+        voice.id = v.id.clone();
+        self.save_current();
+        self.push_profile_settings();
+    }
+
+    /// Settings > Voices: the speed or volume slider of the current game moved. The speech thread gets it at
+    /// once (also a sample that plays); the profile is saved when the slider is let go ([`Vm::game_voice_saved`]).
+    pub fn game_voice_changed(&mut self) {
+        let (Some(w), Some(g)) = (self.win(), self.current) else {
+            return;
+        };
+        let speed = voices::speed_of_slider(w.get_game_speed());
+        let volume = w.get_game_volume().clamp(0.0, 1.0);
+        let voice = &mut self.games[g].profile.voice;
+        if (voice.speed, voice.volume) == (speed, volume) {
+            return;
+        }
+        voice.speed = speed;
+        voice.volume = volume;
+        self.voice_dirty = true;
+        self.send_voice();
+        if self.test_running.is_some()
+            && w.get_test_in_settings()
+            && let Some(sp) = &self.voices.speech
+        {
+            sp.send(dr_runtime::speech::Cmd::SetTestVolume(volume));
+        }
+    }
+
+    /// Settings > Voices: a slider was let go. Saves the current profile when a slider moved.
+    pub fn game_voice_saved(&mut self) {
+        if std::mem::take(&mut self.voice_dirty) {
+            self.save_current();
+        }
+    }
+
+    /// Page 05: the Volume slider moved. A sample that plays follows it.
+    fn setup_volume_moved(&mut self) {
+        let Some(w) = self.win() else { return };
+        if self.test_running.is_some()
+            && !w.get_test_in_settings()
+            && let Some(sp) = &self.voices.speech
+        {
+            sp.send(dr_runtime::speech::Cmd::SetTestVolume(
+                w.get_voice_volume().clamp(0.0, 1.0),
+            ));
+        }
+    }
+
+    /// Any page change: a voice test stops, and slider moves not saved yet are saved.
+    fn page_changed(&mut self) {
+        if self.test_running.is_some() {
+            self.stop_test();
+        }
+        self.game_voice_saved();
+        self.check_kokoro();
+    }
+
+    /// When Kokoro's model failed to load (it loads on its own thread), the voice screens switch to the Windows
+    /// voices. Called at points that exist anyway: a page change, a voice test.
+    pub fn check_kokoro(&mut self) {
+        if !self.voices.check_kokoro() {
+            return;
+        }
+        let Some(w) = self.win() else { return };
+        push_voice_list(&w, &self.voices);
+        if usize::try_from(w.get_picked_voice()).map_or(true, |i| i >= self.voices.list.len()) {
+            w.set_picked_voice(0);
+        }
+        w.set_voice_label(self.voices.label("").into());
+        self.push_profile_settings();
+    }
+
+    /// Play sample (page 05, `setup`) or Test (Settings, the current game).
+    pub fn test_voice(&mut self, setup: bool) -> bool {
+        self.check_kokoro();
+        let Some(w) = self.win() else { return false };
+        if self.voices.list.is_empty() {
+            self.notice(&self.voices.problem_text());
+            return false;
+        }
+        let Some(sp) = &self.voices.speech else {
+            self.notice("Sample data: voices do not play here.");
+            return false;
+        };
+        let (voice, speed, volume) = if setup {
+            let i = usize::try_from(w.get_picked_voice()).unwrap_or(0);
+            let id = self
+                .voices
+                .list
+                .get(i)
+                .map(|v| v.id.clone())
+                .unwrap_or_default();
+            (
+                id,
+                voices::speed_of_slider(w.get_voice_speed()),
+                w.get_voice_volume(),
+            )
+        } else {
+            let Some(g) = self.current.and_then(|i| self.games.get(i)) else {
+                return false;
+            };
+            let v = &g.profile.voice;
+            (self.voices.effective(&v.id), v.speed, v.volume)
+        };
+        // events of an earlier sample are old news
+        let _ = sp.events();
+        self.test_id += 1;
+        sp.send(dr_runtime::speech::Cmd::Test {
+            id: self.test_id,
+            text: voices::SAMPLE.into(),
+            voice,
+            speed,
+            volume: volume.clamp(0.0, 1.0),
+        });
+        self.test_running = Some(self.test_id);
+        w.set_voice_testing(true);
+        w.set_test_in_settings(!setup);
+        w.set_test_played(0);
+        w.set_test_time("0:00".into());
+        true
+    }
+
+    /// Stop on the voice test.
+    pub fn stop_test(&mut self) {
+        if let Some(sp) = &self.voices.speech {
+            sp.send(dr_runtime::speech::Cmd::Stop);
+        }
+        self.test_running = None;
+        self.test_timer.stop();
+        if let Some(w) = self.win() {
+            w.set_voice_testing(false);
+            w.set_test_played(0);
+        }
+    }
+
+    /// Updates the voice test from the speech thread. Returns true while the sample still plays (or is still
+    /// being made). Only the events of the sample sent last count: an earlier sample's Cut does not end it.
+    pub fn poll_test(&mut self) -> bool {
+        use dr_runtime::speech::Ev;
+        let (Some(w), Some(sp), Some(id)) = (self.win(), &self.voices.speech, self.test_running)
+        else {
+            return false;
+        };
+        let mut ended = false;
+        for e in sp.events() {
+            if e.test() != Some(id) {
+                continue;
+            }
+            match e {
+                Ev::Finished { .. } | Ev::Cut { .. } => ended = true,
+                Ev::Error { kind, error, .. } => {
+                    ended = true;
+                    self.voices
+                        .write_log(&format!("voice test: {kind:?}: {error}"));
+                    w.set_notice(voices::error_text(kind).into());
+                }
+                _ => {}
+            }
+        }
+        if ended {
+            self.test_running = None;
+            w.set_voice_testing(false);
+            w.set_test_played(0);
+            w.set_test_time("0:00".into());
+            // a sample that did not play may mean that Kokoro failed to load
+            self.check_kokoro();
+            return false;
+        }
+        let st = sp.status();
+        if st.test == Some(id) && st.len_ms > 0.0 {
+            w.set_test_played(voices::bars_played(st.pos_ms, st.len_ms));
+            w.set_test_time(voices::time_text(st.pos_ms, st.len_ms).into());
+        }
+        true
     }
 
     /// The window picked on page 02 now, to find it again in a new list.
@@ -624,15 +1011,11 @@ impl Vm {
             self.notice("Pick a window first. Start your game, then press Refresh.");
             return false;
         };
-        // spec 2.8: the profile follows the game by its exe, so one game has one profile
-        if let Some(g) = self
-            .games
-            .iter()
-            .find(|g| profile_matches(&g.profile, &win))
-        {
+        // spec 2.8: several games can share an exe (told apart by the window title), but one window has one profile
+        if let Some(i) = same_game(self.profiles(), &win) {
             self.notice(&format!(
                 "{} already has a profile. Open it with the game switcher (Ctrl+K) to change its zones.",
-                g.profile.name
+                self.games[i].profile.name
             ));
             return false;
         }
@@ -681,8 +1064,14 @@ impl Vm {
         taken.extend(self.games.iter().map(|g| g.profile.id.clone()));
         let id = profile::new_id(&win.title, &taken);
         let mut p = Profile::new(&id, &win.title, &win.exe);
-        if win.exe.is_empty() {
-            // the game's process could not be read (it runs as administrator, or anti-cheat hides it)
+        let shared_exe = !win.exe.is_empty()
+            && self
+                .games
+                .iter()
+                .any(|g| g.profile.matches.exe.eq_ignore_ascii_case(&win.exe));
+        if win.exe.is_empty() || shared_exe {
+            // the game's process could not be read (it runs as administrator, or anti-cheat hides it), or another
+            // game uses the same exe (an emulator, javaw.exe): the window title tells them apart
             p.matches.title_contains = Some(win.title.clone());
         }
         p.mode = if w.get_automatic() {
@@ -692,8 +1081,15 @@ impl Vm {
         };
         p.keys.read = w.get_read_key().into();
         p.keys.quick_menu = w.get_menu_key().into();
-        // the voice list is sample data until M3a, so no voice id is saved yet; speed and volume are
-        p.voice.speed = (w.get_voice_speed() * 2.0).clamp(0.5, 2.0);
+        // the voice picked on page 05 (none when there is no voice at all), its speed and volume
+        if let Some(v) = usize::try_from(w.get_picked_voice())
+            .ok()
+            .and_then(|i| self.voices.list.get(i))
+        {
+            p.voice.engine = v.engine.to_string();
+            p.voice.id = v.id.clone();
+        }
+        p.voice.speed = voices::speed_of_slider(w.get_voice_speed());
         p.voice.volume = w.get_voice_volume().clamp(0.0, 1.0);
         p.zones = zone_cfgs(&self.setup);
         if let Err(e) = shot
@@ -702,6 +1098,24 @@ impl Vm {
         {
             self.notice(&format!("The game could not be saved: {e}"));
             return false;
+        }
+        let mut failed = None;
+        if shared_exe {
+            // The first game of this exe was saved with the exe only. It gets its title too (its name is the
+            // window title at its setup), or it would take every other game of this exe.
+            for g in &mut self.games {
+                let m = &mut g.profile.matches;
+                if m.exe.eq_ignore_ascii_case(&win.exe)
+                    && m.title_contains
+                        .as_deref()
+                        .is_none_or(|t| t.trim().is_empty())
+                {
+                    m.title_contains = Some(g.profile.name.clone());
+                    if let Err(e) = profile::save(&real.paths, &g.profile) {
+                        failed = Some(e);
+                    }
+                }
+            }
         }
         let shot = self.setup_shot.take().expect("checked above");
         self.games.insert(
@@ -718,6 +1132,11 @@ impl Vm {
         self.notice("");
         w.set_adding_game(false);
         self.open_game(0, Some(&shot));
+        if let Some(e) = failed {
+            self.notice(&format!(
+                "The other game of this program could not be saved: {e}"
+            ));
+        }
         true
     }
 
@@ -793,10 +1212,11 @@ impl Vm {
         }
         let Some(i) = self.current else { return };
         self.refresh_windows();
+        let profiles = self.profiles();
         let Some(win) = self
             .windows
             .iter()
-            .find(|w| profile_matches(&self.games[i].profile, w))
+            .find(|w| best_profile(profiles.iter().copied(), w) == Some(i))
             .cloned()
         else {
             let name = self.games[i].profile.name.clone();
@@ -1096,6 +1516,49 @@ fn wire(w: &MainWindow, vm: &Shared) {
     let v = vm.clone();
     w.on_setup_cancelled(move || v.borrow_mut().cancel_setup());
     let v = vm.clone();
+    w.on_voice_test(move |setup| {
+        if !v.borrow_mut().test_voice(setup) {
+            return;
+        }
+        // poll the speech thread while the sample plays (the timer runs only with an event loop)
+        let weak = Rc::downgrade(&v);
+        v.borrow().test_timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_millis(100),
+            move || {
+                if let Some(v) = weak.upgrade()
+                    && let Ok(mut vm) = v.try_borrow_mut()
+                    && !vm.poll_test()
+                {
+                    vm.test_timer.stop();
+                }
+            },
+        );
+    });
+    let v = vm.clone();
+    w.on_voice_stop(move || v.borrow_mut().stop_test());
+    let v = vm.clone();
+    w.on_voices_add(move || {
+        if let Some(real) = &v.borrow().real {
+            real.desktop.open_speech_settings();
+        }
+    });
+    let v = vm.clone();
+    w.on_game_voice_picked(move |i| v.borrow_mut().pick_game_voice(i));
+    let v = vm.clone();
+    w.on_game_voice_changed(move || v.borrow_mut().game_voice_changed());
+    let v = vm.clone();
+    w.on_game_voice_saved(move || v.borrow_mut().game_voice_saved());
+    let v = vm.clone();
+    w.on_voice_volume_moved(move || v.borrow_mut().setup_volume_moved());
+    let v = vm.clone();
+    w.on_page_changed(move |_| {
+        // a page change can come from inside another callback that holds the view model
+        if let Ok(mut vm) = v.try_borrow_mut() {
+            vm.page_changed();
+        }
+    });
+    let v = vm.clone();
     let weak = w.as_weak();
     w.on_add_game(move || {
         let Some(w) = weak.upgrade() else { return };
@@ -1171,6 +1634,91 @@ mod tests {
         r.matches.title_contains = Some("Main".into());
         assert!(profile_matches(&r, &win("Main window", "R.exe")));
         assert!(!profile_matches(&r, &win("Launcher", "R.exe")));
+    }
+
+    #[test]
+    fn games_that_share_an_exe_are_told_apart_by_the_title() {
+        // an emulator: one profile made first (exe only), then two games with their window titles
+        let first = Profile::new("a", "Emu - Game A", "emu.exe");
+        let mut b = Profile::new("b", "Emu - Game B", "emu.exe");
+        b.matches.title_contains = Some("Game B".into());
+        let mut b2 = Profile::new("b2", "Emu - Game B2", "emu.exe");
+        b2.matches.title_contains = Some("Game B2".into());
+        let other = Profile::new("o", "Other", "other.exe");
+        let all = [&first, &b, &b2, &other];
+        let best = |t: &str, e: &str| best_profile(all.iter().copied(), &win(t, e));
+        assert_eq!(best("Emu - Game B", "EMU.exe"), Some(1));
+        // the longer title wins ("Game B" is in "Game B2" too)
+        assert_eq!(best("Emu - Game B2 (60 fps)", "emu.exe"), Some(2));
+        // no title fits: the exe-only profile takes it
+        assert_eq!(best("Emu - Game C", "emu.exe"), Some(0));
+        assert_eq!(best("Other", "notepad.exe"), None);
+        // one window makes one profile "Running"
+        assert_eq!(
+            running(&all, &[win("Emu - Game B", "emu.exe")]),
+            [false, true, false, false]
+        );
+        assert_eq!(
+            running(
+                &all,
+                &[win("Emu - Game C", "emu.exe"), win("x", "other.exe")]
+            ),
+            [true, false, false, true]
+        );
+        // the duplicate check: the window's own profile only
+        let same = |t: &str| same_game(all.iter().copied(), &win(t, "emu.exe"));
+        assert_eq!(same("Emu - Game B"), Some(1), "by name");
+        assert_eq!(same("emu - game a"), Some(0), "by name, the title at setup");
+        assert_eq!(same("Emu - Game C"), None, "another game of the same exe");
+    }
+
+    #[test]
+    fn counters_in_a_title_are_left_out() {
+        assert_eq!(
+            stable_title("RPCS3 0.0.30 | FPS: 59.94 | Vulkan | Persona 5 [BLUS31604]"),
+            "rpcs3 | fps: | vulkan | persona 5 [blus31604]"
+        );
+        assert_eq!(
+            stable_title("Dolphin | JIT64 DC | FPS: 60 - VPS: 60 - 100%"),
+            "dolphin | jit64 dc | fps: - vps: -"
+        );
+        assert_eq!(stable_title("Game B2 (60 fps)  16.7ms"), "game b2 ( )");
+        assert_eq!(stable_title("Doom3 v1 - 12:34"), "doom3 v1 -");
+        // plain numbers stay: two games of one series stay apart
+        assert_eq!(stable_title("Persona 4"), "persona 4");
+        assert_ne!(stable_title("Persona 4"), stable_title("Persona 5"));
+        assert_eq!(stable_title("Ys 8 - 60 Hz"), "ys 8 -");
+        assert_ne!(
+            stable_title("Need for Speed 2"),
+            stable_title("Need for Speed 3")
+        );
+        assert_eq!(
+            stable_title("Warframe 2 - Speed: 100%"),
+            "warframe 2 - speed:"
+        );
+    }
+
+    #[test]
+    fn a_title_with_a_changing_counter_keeps_its_profile() {
+        // set up while the emulator showed 59.94 FPS; the counter changes every second
+        let mut a = Profile::new("a", "RPCS3 | FPS: 59.94 | Persona 5", "rpcs3.exe");
+        a.matches.title_contains = Some("RPCS3 | FPS: 59.94 | Persona 5".into());
+        let mut b = Profile::new("b", "RPCS3 | FPS: 60.00 | Persona 4", "rpcs3.exe");
+        b.matches.title_contains = Some("RPCS3 | FPS: 60.00 | Persona 4".into());
+        let all = [&a, &b];
+        let best = |t: &str| best_profile(all.iter().copied(), &win(t, "rpcs3.exe"));
+        assert_eq!(best("RPCS3 | FPS: 30.12 | Persona 5"), Some(0));
+        assert_eq!(best("RPCS3 | FPS: 57 | Persona 4"), Some(1));
+        assert_eq!(best("RPCS3 | FPS: 30.12 | Persona 3"), None);
+        // the duplicate check uses the same rule: no second profile after the counter changed
+        let same = |t: &str| same_game(all.iter().copied(), &win(t, "rpcs3.exe"));
+        assert_eq!(same("RPCS3 | FPS: 12.5 | Persona 5"), Some(0));
+        assert_eq!(same("RPCS3 | FPS: 12.5 | Persona 3"), None);
+        // an exe-only profile: its name is the title at setup, counters aside
+        let only = Profile::new("o", "Emu | 60 fps | Game A", "emu.exe");
+        let same_o = |t: &str| same_game([&only], &win(t, "emu.exe"));
+        assert_eq!(same_o("Emu | 30 fps | Game A"), Some(0));
+        assert_eq!(same_o("Emu | 30 fps | Game B"), None);
     }
 
     #[test]

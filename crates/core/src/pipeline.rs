@@ -191,12 +191,41 @@ pub struct Event {
     pub kind: Option<ZoneKind>,
 }
 
+/// Why a line that was read is not spoken.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkipReason {
+    /// The zone already spoke or shows this line.
+    AlreadyRead,
+    /// A prompt zone with `read_prompts` off: it is read for the log, never spoken.
+    PromptsOff,
+}
+
+/// A line that was read but not spoken (for the activity log).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Skipped {
+    pub line: Event,
+    pub reason: SkipReason,
+}
+
 /// What one call gives back. An OCR error in one zone does not drop the events of the others.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Output {
     pub events: Vec<Event>,
     /// OCR errors, one per failed zone read ("zone name: error").
     pub errors: Vec<String>,
+    /// Lines read but not spoken, and why.
+    pub skipped: Vec<Skipped>,
+}
+
+impl Output {
+    /// Adds the lines of zone `quiet` or not: a quiet zone's lines go to `skipped` (prompts off).
+    fn add(&mut self, events: Vec<Event>, quiet: bool) {
+        if quiet {
+            self.skipped.extend(events.into_iter().map(|line| Skipped { line, reason: SkipReason::PromptsOff }));
+        } else {
+            self.events.extend(events);
+        }
+    }
 }
 
 struct Snap {
@@ -237,6 +266,8 @@ struct ZoneState {
     settle: bool,
     /// Time of the last fresh OCR read.
     last_fresh: f64,
+    /// A prompt zone with `read_prompts` off: read, but its lines are skipped, not spoken.
+    quiet: bool,
 }
 
 /// Still time before the settle read. Busy and video backgrounds never stay still this long, so
@@ -258,6 +289,8 @@ pub struct Pipeline {
     /// OCR runs so far.
     pub ocr_runs: u64,
     pub trace: Vec<String>,
+    /// Lines skipped inside a call, given out with its [`Output`].
+    skips: Vec<Skipped>,
 }
 
 /// Groups OCR lines into rows (lines that share most of their height), top to bottom, each row
@@ -408,7 +441,7 @@ fn log(trace: &mut Vec<String>, on: bool, line: impl FnOnce() -> String) {
 
 impl Pipeline {
     pub fn new(cfg: Config, zones: &[Zone]) -> Pipeline {
-        let mut p = Pipeline { cfg: cfg.clone(), base: cfg, zones: Vec::new(), all_zones: Vec::new(), free: None, frame_size: None, empty: Vec::new(), ocr_runs: 0, trace: Vec::new() };
+        let mut p = Pipeline { cfg: cfg.clone(), base: cfg, zones: Vec::new(), all_zones: Vec::new(), free: None, frame_size: None, empty: Vec::new(), ocr_runs: 0, trace: Vec::new(), skips: Vec::new() };
         p.set_zones(zones);
         p
     }
@@ -430,7 +463,7 @@ impl Pipeline {
         let cfg = &self.base;
         self.zones = zones
             .iter()
-            .filter(|z| z.kind != ZoneKind::Ignore && (z.kind != ZoneKind::Prompt || cfg.read_prompts))
+            .filter(|z| z.kind != ZoneKind::Ignore)
             .map(|z| ZoneState {
                 zone: z.clone(),
                 px: None,
@@ -448,10 +481,12 @@ impl Pipeline {
                 todo: None,
                 settle: false,
                 last_fresh: f64::NEG_INFINITY,
+                quiet: z.kind == ZoneKind::Prompt && !cfg.read_prompts,
             })
             .collect();
-        // No zone to read (none drawn, or only "ignore" ones): watch the whole frame instead.
-        let no_read_zones = self.zones.is_empty();
+        // No zone to speak from (none drawn, only "ignore" ones, or only prompts with prompts off): watch the
+        // whole frame instead.
+        let no_read_zones = self.zones.iter().all(|z| z.quiet);
         self.free = (no_read_zones || cfg.free_outside).then(|| {
             let mut d = FreeDetector::new(cfg.free.clone(), cfg.track.clone());
             d.mask = zones.iter().map(|z| z.rect).collect();
@@ -499,6 +534,7 @@ impl Pipeline {
         let r = self.read(ocr, self.cfg.max_reads);
         out.events.extend(r.events);
         out.errors.extend(r.errors);
+        out.skipped.extend(r.skipped);
         out
     }
 
@@ -561,11 +597,12 @@ impl Pipeline {
             }
             let Some(todo) = self.zones[zi].todo.take() else { continue };
             let (ev, err) = self.read_one(zi, todo, ocr);
-            out.events.extend(ev);
+            out.add(ev, self.zones[zi].quiet);
             if let Some(e) = err {
                 out.errors.push(format!("{}: {e}", self.zones[zi].zone.name));
             }
         }
+        out.skipped.append(&mut self.skips);
         out
     }
 
@@ -761,6 +798,8 @@ impl Pipeline {
         let Some(text) = speak else { return Ok(None) };
         // Never repeat a line this zone already speaks or shows.
         if z.tracker.knows(&crate::text::normalize(&text)) {
+            let line = Event { t_ms: t, text, rect: best.rect, zone: Some(z.zone.name.clone()), kind: Some(z.zone.kind) };
+            self.skips.push(Skipped { line, reason: SkipReason::AlreadyRead });
             return Ok(None);
         }
         log(&mut self.trace, on, || format!("{t:.0} {} SPEAK-LOST ({why}) {text:?}", z.zone.name));
@@ -778,12 +817,13 @@ impl Pipeline {
             let lost = self.zones[zi].tracker.drain();
             for l in lost {
                 match self.recover(zi, t, l, ocr) {
-                    Ok(Some(e)) => out.events.push(e),
+                    Ok(Some(e)) => out.add(vec![e], self.zones[zi].quiet),
                     Ok(None) => {}
                     Err(e) => out.errors.push(format!("{}: {e}", self.zones[zi].zone.name)),
                 }
             }
         }
+        out.skipped.append(&mut self.skips);
         out
     }
 }

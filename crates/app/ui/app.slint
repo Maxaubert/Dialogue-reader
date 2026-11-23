@@ -55,6 +55,20 @@ export component MainWindow inherits Window {
     // page 05 sliders (0 to 1): kept here so they outlive the page and Finish can save them
     in-out property <float> voice-speed: 0.55;
     in-out property <float> voice-volume: 0.8;
+    // voices (M3a): why the list is empty, the Settings line, and the voice test
+    in property <string> voices-problem;
+    in property <string> voices-desc: "Built into Windows · 11 voices";
+    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
+    in property <bool> voice-testing: true;
+    in property <int> test-played: 20;
+    in property <string> test-time: "0:02 / 0:04";
+    // the playing sample was started in Settings (its button says Stop), not on page 05
+    in property <bool> test-in-settings: false;
+    // the current game's voice (Overview, Settings): index in `voices`, sliders 0 to 1 as on page 05
+    in-out property <int> game-voice: 0;
+    in-out property <float> game-speed: 0.55;
+    in-out property <float> game-volume: 0.8;
+    in property <string> voice-label: "Kokoro · Adam";
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
     in-out property <bool> adding-game: false;
     in property <string> version: "0.1.0";
@@ -120,15 +134,36 @@ export component MainWindow inherits Window {
     callback setup-cancelled();
     // the mode button on Overview (saved into the current profile)
     callback mode-changed(bool);
+    // voices (src/vm): Play sample / Stop on page 05 (setup voice) and in Settings (current game), Add voices
+    // opens the Windows speech settings, the Settings picker and sliders save the current profile
+    callback voice-test(bool);
+    callback voice-stop();
+    callback voices-add();
+    callback game-voice-picked(int);
+    callback game-voice-changed();
+    callback game-voice-saved();
+    // the page 05 Volume slider moved (a playing sample follows it)
+    callback voice-volume-moved();
+    // every page change (a playing voice test stops, unsaved slider moves are saved)
+    callback page-changed(Page);
+    // the page changed: the live view starts or stops (src/vm/live.rs)
+    callback page-shown(Page);
+    // one change callback per property in Slint: both callbacks run from here
+    changed page => {
+        root.page-changed(root.page);
+        root.page-shown(root.page);
+    }
+    // opens the Settings voice picker (render-screens)
+    public function settings-open-voice-list() {
+        settings.open-voice-list();
+    }
+    public function settings-close-voice-list() {
+        settings.close-voice-list();
+    }
     // asked before leaving a setup page forward: false stays (Continue on 02 takes the screenshot, Finish saves)
     callback leave(Page) -> bool;
     leave(p) => {
         return true;
-    }
-    // the page changed: the live view starts or stops (src/vm/live.rs)
-    callback page-shown(Page);
-    changed page => {
-        root.page-shown(self.page);
     }
 
     title: "DialogReader";
@@ -335,9 +370,26 @@ export component MainWindow inherits Window {
                 }
                 if root.page == Page.voice: VoicePage {
                     voices: root.voices;
+                    engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
                     selected <=> root.picked-voice;
                     speed <=> root.voice-speed;
                     volume <=> root.voice-volume;
+                    problem: root.voices-problem;
+                    testing: root.voice-testing && !root.test-in-settings;
+                    test-played: root.test-played;
+                    test-time: root.test-time;
+                    test => {
+                        root.voice-test(true);
+                    }
+                    stop-test => {
+                        root.voice-stop();
+                    }
+                    add-voices => {
+                        root.voices-add();
+                    }
+                    volume-moved => {
+                        root.voice-volume-moved();
+                    }
                 }
                 if root.page == Page.mode: ModePage {
                     automatic <=> root.automatic;
@@ -347,6 +399,9 @@ export component MainWindow inherits Window {
                     zone-count: root.setup-zones.length;
                     read-key: root.read-key;
                     menu-key: root.menu-key;
+                    voice: root.voices.length > 0 ? root.voices[root.picked-voice].engine + " · " + root.voices[root.picked-voice].name : "No voice";
+                    speed: root.voice-speed;
+                    has-voice: root.voices.length > 0;
                 }
                 if root.page == Page.overview: OverviewTab {
                     shot: root.shot;
@@ -361,6 +416,7 @@ export component MainWindow inherits Window {
                     recent: root.recent;
                     automatic <=> root.automatic;
                     read-key: root.read-key;
+                    voice: root.voice-label;
                     mode-changed(a) => {
                         root.mode-changed(a);
                     }
@@ -429,6 +485,33 @@ export component MainWindow inherits Window {
                     read-key: root.read-key;
                     menu-key: root.menu-key;
                     version: root.version;
+                    voices: root.voices;
+                    voices-desc: root.voices-desc;
+                    kokoro-desc: root.kokoro-desc;
+                    game: root.game-name;
+                    has-game: root.games.length > 0;
+                    game-voice <=> root.game-voice;
+                    game-speed <=> root.game-speed;
+                    game-volume <=> root.game-volume;
+                    testing: root.voice-testing && root.test-in-settings;
+                    add-voices => {
+                        root.voices-add();
+                    }
+                    voice-picked(i) => {
+                        root.game-voice-picked(i);
+                    }
+                    voice-changed => {
+                        root.game-voice-changed();
+                    }
+                    voice-saved => {
+                        root.game-voice-saved();
+                    }
+                    test => {
+                        root.voice-test(false);
+                    }
+                    stop-test => {
+                        root.voice-stop();
+                    }
                 }
             }
 

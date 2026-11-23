@@ -2,7 +2,7 @@
 name = "dr-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "DialogReader runtime without UI: profiles on disk, the window list, screenshots (M2)"
+description = "DialogReader runtime without UI: profiles on disk, the window list, screenshots, speech"
 
 [lib]
 name = "dr_runtime"
@@ -10,6 +10,9 @@ path = "src/lib.rs"
 
 [dependencies]
 dr-core = { path = "../core" }
+dr-tts = { path = "../tts" }
+# Audio out for speech (speech.rs). Playback only: no decoders, the PCM comes from dr-tts.
+rodio = { version = "=0.21.1", default-features = false, features = ["playback"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
 image = { version = "=0.25.10", default-features = false, features = ["png"] }

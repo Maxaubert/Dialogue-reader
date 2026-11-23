@@ -105,6 +105,10 @@ export component ModePage inherits Rectangle {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     in property <string> voice: "Kokoro · Adam";
+    // false: no voice at all (no Kokoro files and no Windows voice)
+    in property <bool> has-voice: true;
+    // page 05 slider, 0 to 1 for 0x to 2x (the profile keeps 0.5x to 2x)
+    in property <float> speed: 0.55;
     VerticalLayout {
         x: (parent.width - Size.col) / 2;
         width: Size.col;
@@ -234,7 +238,7 @@ export component ModePage inherits Rectangle {
                     }
 
                     Text {
-                        text: "1.1× speed";
+                        text: root.has-voice ? Math.round(Math.max(0.25, root.speed) * 20) / 10 + "× speed" : "Nothing is spoken until you add a voice.";
                         color: Palette.text-2;
                         vertical-alignment: center;
                     }
