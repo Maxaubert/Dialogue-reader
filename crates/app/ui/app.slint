@@ -20,8 +20,9 @@ import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
 import { ZoneEdit } from "overlays/zone_edit.slint";
 import { LiveView } from "components/stage.slint";
+import { PillWindow, QuickMenuWindow, ZoneEditWindow } from "overlays/windows.slint";
 
-export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView }
+export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView, PillWindow, QuickMenuWindow, ZoneEditWindow }
 
 export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
@@ -103,6 +104,10 @@ export component MainWindow inherits Window {
     in property <string> now-line: "We need to get these horses moving before the snow buries us.";
     // the key row waiting for a key: 0 the read key, 1 the quick menu key, -1 none
     in property <int> capturing-key: -1;
+    // Settings > In-game overlay (M4 uses them for this session; saving them is M5): 0 top right, 1 bottom
+    // center, 2 off; and whether the pill shows the speaker
+    in-out property <int> pill-position: 0;
+    in-out property <bool> show-speaker: true;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
@@ -539,6 +544,8 @@ export component MainWindow inherits Window {
                     change-key(i) => {
                         root.key-change(i);
                     }
+                    pill-position <=> root.pill-position;
+                    show-speaker <=> root.show-speaker;
                     version: root.version;
                     voices: root.voices;
                     voices-desc: root.voices-desc;

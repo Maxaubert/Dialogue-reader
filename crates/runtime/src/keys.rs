@@ -19,6 +19,13 @@
 //!   while Win is held (Win+key is a Windows shortcut).
 //! - Key capture never takes Alt+Tab, Alt+Esc, Ctrl+Esc, Win or Win+anything: they go on to Windows, and capture
 //!   keeps waiting. The app ends capture when its window loses the focus (`dr_app::focus_lost`).
+//! - In-game overlays (M4, spec 2.7): the quick menu key opens the quick menu only while the game window is in
+//!   front, and goes through to the game then. While the menu is open the hook takes the arrows, Enter, Space,
+//!   Esc and the quick menu key itself (it closes the menu); while zone edit is open it takes Delete, Backspace,
+//!   Esc and the quick menu key (back to the menu). Taken keys come out as [`Action::Nav`]. The open overlay
+//!   ([`Overlay`]) changes on the hook thread at once (the quick menu key, Esc), so the next key is already judged
+//!   by it; the app reads it back and makes its windows match. Only arrows and Delete repeat while held; a held
+//!   Enter, Space or Esc acts once.
 
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -302,13 +309,118 @@ pub fn decode_mouse(msg: u32, mouse_data: u32) -> Option<Raw> {
     Some(Raw::Button { b, down })
 }
 
+/// The in-game overlay that is open: it decides which keys DialogReader takes from the game.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Overlay {
+    #[default]
+    None,
+    /// The quick menu: arrows, Enter, Space, Esc.
+    Menu,
+    /// Zone edit: Delete, Backspace, Esc.
+    Zones,
+}
+
+impl Overlay {
+    /// The overlay after the quick menu key: closed opens the menu, the menu closes, zone edit goes back to the
+    /// menu.
+    pub fn after_menu_key(self) -> Overlay {
+        match self {
+            Overlay::None | Overlay::Zones => Overlay::Menu,
+            Overlay::Menu => Overlay::None,
+        }
+    }
+}
+
+/// A key the quick menu or zone edit takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Nav {
+    Up,
+    Down,
+    Left,
+    Right,
+    Enter,
+    Space,
+    Esc,
+    /// Delete or Backspace.
+    Delete,
+}
+
+impl Nav {
+    /// The key this overlay takes for `vk`, if any.
+    pub fn of(vk: u16, o: Overlay) -> Option<Nav> {
+        let n = match vk {
+            0x26 => Nav::Up,
+            0x28 => Nav::Down,
+            0x25 => Nav::Left,
+            0x27 => Nav::Right,
+            0x0D => Nav::Enter,
+            0x20 => Nav::Space,
+            0x1B => Nav::Esc,
+            0x2E | 0x08 => Nav::Delete,
+            _ => return None,
+        };
+        let taken = match o {
+            Overlay::None => false,
+            Overlay::Menu => n != Nav::Delete,
+            Overlay::Zones => matches!(n, Nav::Delete | Nav::Esc),
+        };
+        taken.then_some(n)
+    }
+
+    /// Held down, the key acts again (arrows move on, Delete removes the next zone); Enter, Space and Esc act once.
+    fn repeats(self) -> bool {
+        matches!(
+            self,
+            Nav::Up | Nav::Down | Nav::Left | Nav::Right | Nav::Delete
+        )
+    }
+}
+
 /// The keys the hook looks for now.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bindings {
     pub read: Option<Key>,
     pub menu: Option<Key>,
     /// Key capture is on: the next key or button (not left or right click) is taken.
     pub capture: bool,
+    /// The overlay that is open.
+    pub overlay: Overlay,
+    /// Esc closes the open overlay (false while the quick menu's voice list or a new zone's kind picker is open:
+    /// Esc goes back there).
+    pub esc_closes: bool,
+    /// The game window (`HWND` as a number): the quick menu opens only while it is in front.
+    pub game: Option<isize>,
+    /// The game window is not in front now (the hook sets it from the foreground window before a key-down): the
+    /// quick menu key does not open the menu, and an open overlay takes no keys.
+    pub game_away: bool,
+}
+
+impl Bindings {
+    /// What an action changes at once, on the hook thread, so the next event is judged by it: capture ends with
+    /// the key it took (the next key is the game's again), the quick menu key opens or closes the menu, and Esc
+    /// closes the open overlay (when it is not going back to the menu).
+    pub fn after(&mut self, action: Action) {
+        match action {
+            Action::Captured(_) | Action::Cancelled => self.capture = false,
+            Action::Menu => self.overlay = self.overlay.after_menu_key(),
+            Action::Nav(Nav::Esc) if self.esc_closes => self.overlay = Overlay::None,
+            _ => {}
+        }
+    }
+}
+
+impl Default for Bindings {
+    fn default() -> Self {
+        Bindings {
+            read: None,
+            menu: None,
+            capture: false,
+            overlay: Overlay::None,
+            esc_closes: true,
+            game: None,
+            game_away: false,
+        }
+    }
 }
 
 /// What an event means.
@@ -325,6 +437,8 @@ pub enum Action {
     Refused(Btn),
     /// Esc during key capture.
     Cancelled,
+    /// A key the open quick menu or zone edit takes (also an auto-repeat of an arrow or Delete).
+    Nav(Nav),
 }
 
 /// Which keys and buttons are down, which of those were swallowed, and the modifiers held. Pure.
@@ -366,8 +480,13 @@ impl State {
                     *m(&mut self.mods) = true;
                 }
                 if bit(&self.held, vk) {
-                    // auto-repeat: as its first key-down
-                    return (Action::None, bit(&self.swallowed, vk));
+                    // auto-repeat: as its first key-down; a held arrow or Delete keeps acting in an overlay
+                    let swallowed = bit(&self.swallowed, vk);
+                    let again = self
+                        .nav(vk, b)
+                        .filter(|n| swallowed && !b.capture && n.repeats())
+                        .map_or(Action::None, Action::Nav);
+                    return (again, swallowed);
                 }
                 let (action, swallow) = if is_modifier(vk) {
                     (Action::None, false)
@@ -391,7 +510,14 @@ impl State {
                         vk,
                         mods: self.mods,
                     };
-                    (Self::bound(b, k), false)
+                    let bound = Self::bound(b, k);
+                    match Self::overlay_key(b, bound) {
+                        Some(r) => r,
+                        None => match self.nav(vk, b) {
+                            Some(n) => (Action::Nav(n), true),
+                            None => (bound, false),
+                        },
+                    }
                 };
                 put(&mut self.held, vk, true);
                 put(&mut self.swallowed, vk, swallow);
@@ -417,7 +543,10 @@ impl State {
                     // a game needs left and right click: they are never taken
                     (true, None) => (Action::Refused(btn), false),
                     (true, Some(n)) => (Action::Captured(Key::Mouse(n)), true),
-                    (false, Some(n)) => (Self::bound(b, Key::Mouse(n)), false),
+                    (false, Some(n)) => {
+                        let bound = Self::bound(b, Key::Mouse(n));
+                        Self::overlay_key(b, bound).unwrap_or((bound, false))
+                    }
                     (false, None) => (Action::None, false),
                 };
                 self.btn_held[i] = true;
@@ -434,6 +563,30 @@ impl State {
                 self.btn_swallowed[i] = false;
                 (Action::None, swallow)
             }
+        }
+    }
+
+    /// The key the open overlay takes for `vk`, if any. Never with Win, Ctrl or Alt held (Ctrl+Esc, Alt+Esc,
+    /// Ctrl+Shift+Esc, Win+arrows and Alt+Enter stay Windows' and the game's), and never while the game is not in
+    /// front (the UI closes the overlay on its next tick; until then the keys go where the user is).
+    fn nav(&self, vk: u16, b: &Bindings) -> Option<Nav> {
+        if self.mods.win || self.mods.ctrl || self.mods.alt || b.game_away {
+            return None;
+        }
+        Nav::of(vk, b.overlay)
+    }
+
+    /// What the read key and the quick menu key do with the overlays (None: nothing special). The quick menu key
+    /// opens the menu only while the game is in front (and goes through to the game then); while an overlay is
+    /// open it is taken (it closes the menu, or goes from zone edit back to the menu). The read key does nothing
+    /// while an overlay is open (reading waits then) and goes through to the game.
+    fn overlay_key(b: &Bindings, bound: Action) -> Option<(Action, bool)> {
+        match (bound, b.overlay) {
+            (Action::Menu, Overlay::None) if b.game_away => Some((Action::None, false)),
+            (Action::Menu, Overlay::None) => None,
+            (Action::Menu, _) => Some((Action::Menu, true)),
+            (Action::Read, Overlay::Menu | Overlay::Zones) => Some((Action::None, false)),
+            _ => None,
         }
     }
 
@@ -482,7 +635,16 @@ fn shared() -> Option<Arc<Shared>> {
 /// Runs one event through the installed hooks' state. True: swallow it.
 fn handle(raw: Raw) -> bool {
     let Some(s) = shared() else { return false };
-    let b = s.bindings.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    #[allow(unused_mut)]
+    let mut b = s.bindings.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    // the quick menu opens only over the game in front, and an open overlay takes keys only while it is in front
+    // (after Alt+Tab or a click on another monitor the keys go there at once, not after the UI's next tick)
+    #[cfg(windows)]
+    if (b.overlay != Overlay::None || b.menu.is_some())
+        && matches!(raw, Raw::KeyDown(_) | Raw::Button { down: true, .. })
+    {
+        b.game_away = !b.game.is_some_and(win::is_front);
+    }
     let (action, swallow) = {
         let mut st = s.state.lock().unwrap_or_else(|e| e.into_inner());
         #[cfg(windows)]
@@ -490,10 +652,10 @@ fn handle(raw: Raw) -> bool {
         st.feed(raw, &b)
     };
     if action != Action::None {
-        if matches!(action, Action::Captured(_) | Action::Cancelled) {
-            // the next key is the game's again
-            s.bindings.lock().unwrap_or_else(|e| e.into_inner()).capture = false;
-        }
+        s.bindings
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .after(action);
         // a panic must not cross the hook's extern "system" function
         let f = s.on_action.clone();
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(action)));
@@ -529,6 +691,19 @@ mod win {
             alt: down(VK_MENU),
             win: down(VK_LWIN) || down(VK_RWIN),
         }
+    }
+
+    /// `game` (an `HWND` as a number) is the window in front, or owns the window in front.
+    pub fn is_front(game: isize) -> bool {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GA_ROOTOWNER, GetAncestor, GetForegroundWindow,
+        };
+        let fg = unsafe { GetForegroundWindow() };
+        if fg.is_invalid() {
+            return false;
+        }
+        fg.0 as isize == game || unsafe { GetAncestor(fg, GA_ROOTOWNER) } == HWND(game as *mut _)
     }
 
     pub unsafe extern "system" fn keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -746,6 +921,7 @@ mod tests {
             read: Some(Key::Mouse(4)),
             menu: Key::parse("F7"),
             capture: false,
+            ..Bindings::default()
         };
         let mut s = State::default();
         let x1 = |down| Raw::Button { b: Btn::X1, down };
@@ -798,6 +974,7 @@ mod tests {
             read: Key::parse("Mouse 4"),
             menu: Key::parse("F7"),
             capture: false,
+            ..Bindings::default()
         };
         let x1 = |down| Raw::Button { b: Btn::X1, down };
         for m in [0xA0u16, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x10, 0x11, 0x12] {
@@ -836,6 +1013,7 @@ mod tests {
             read: Key::parse("F7"),
             menu: Key::parse("Ctrl+F7"),
             capture: false,
+            ..Bindings::default()
         };
         let mut s = State::default();
         assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Read);
@@ -854,6 +1032,7 @@ mod tests {
             read: Key::parse("Shift+F7"),
             menu: Key::parse("F7"),
             capture: false,
+            ..Bindings::default()
         };
         let mut s = State::default();
         assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Menu);
@@ -1058,6 +1237,265 @@ mod tests {
         assert_eq!(
             s.feed(Raw::KeyDown(0x41), &on),
             (Action::Captured(kb(0x41)), true)
+        );
+    }
+
+    fn with(o: Overlay) -> Bindings {
+        Bindings {
+            read: Some(Key::Mouse(4)),
+            menu: Key::parse("F7"),
+            overlay: o,
+            ..Bindings::default()
+        }
+    }
+
+    const UP: u16 = 0x26;
+    const DOWN: u16 = 0x28;
+    const ENTER: u16 = 0x0D;
+    const ESC: u16 = 0x1B;
+    const DEL: u16 = 0x2E;
+    const F7: u16 = 0x76;
+
+    #[test]
+    fn the_open_menu_takes_its_keys_and_the_game_gets_the_rest() {
+        let mut s = State::default();
+        let m = with(Overlay::Menu);
+        for (vk, n) in [
+            (UP, Nav::Up),
+            (DOWN, Nav::Down),
+            (0x25, Nav::Left),
+            (0x27, Nav::Right),
+            (ENTER, Nav::Enter),
+            (0x20, Nav::Space),
+            (ESC, Nav::Esc),
+        ] {
+            assert_eq!(s.feed(Raw::KeyDown(vk), &m), (Action::Nav(n), true));
+            assert_eq!(s.feed(Raw::KeyUp(vk), &m), (Action::None, true));
+        }
+        // W, Delete and the read key go to the game; the read key does nothing while the menu is open
+        assert_eq!(s.feed(Raw::KeyDown(0x57), &m), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyDown(DEL), &m), (Action::None, false));
+        let x1 = Raw::Button {
+            b: Btn::X1,
+            down: true,
+        };
+        assert_eq!(s.feed(x1, &m), (Action::None, false));
+        // the quick menu key closes it, and is taken
+        assert_eq!(s.feed(Raw::KeyDown(F7), &m), (Action::Menu, true));
+        assert_eq!(s.feed(Raw::KeyUp(F7), &m), (Action::None, true));
+        // closed: every key goes to the game; the quick menu key opens the menu and goes through too
+        let none = with(Overlay::None);
+        assert_eq!(s.feed(Raw::KeyDown(UP), &none), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyDown(F7), &none), (Action::Menu, false));
+    }
+
+    #[test]
+    fn zone_edit_takes_delete_backspace_and_esc_only() {
+        let mut s = State::default();
+        let z = with(Overlay::Zones);
+        assert_eq!(
+            s.feed(Raw::KeyDown(DEL), &z),
+            (Action::Nav(Nav::Delete), true)
+        );
+        assert_eq!(
+            s.feed(Raw::KeyDown(0x08), &z),
+            (Action::Nav(Nav::Delete), true)
+        );
+        assert_eq!(s.feed(Raw::KeyDown(ESC), &z), (Action::Nav(Nav::Esc), true));
+        assert_eq!(s.feed(Raw::KeyDown(UP), &z), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyDown(ENTER), &z), (Action::None, false));
+        // the quick menu key goes back to the menu
+        assert_eq!(s.feed(Raw::KeyDown(F7), &z), (Action::Menu, true));
+        assert_eq!(Overlay::Zones.after_menu_key(), Overlay::Menu);
+        assert_eq!(Overlay::Menu.after_menu_key(), Overlay::None);
+        assert_eq!(Overlay::None.after_menu_key(), Overlay::Menu);
+    }
+
+    #[test]
+    fn held_arrows_repeat_but_a_held_enter_or_esc_acts_once() {
+        let mut s = State::default();
+        let m = with(Overlay::Menu);
+        assert_eq!(
+            s.feed(Raw::KeyDown(DOWN), &m),
+            (Action::Nav(Nav::Down), true)
+        );
+        assert_eq!(
+            s.feed(Raw::KeyDown(DOWN), &m),
+            (Action::Nav(Nav::Down), true)
+        );
+        assert_eq!(s.feed(Raw::KeyUp(DOWN), &m), (Action::None, true));
+        assert_eq!(
+            s.feed(Raw::KeyDown(ENTER), &m),
+            (Action::Nav(Nav::Enter), true)
+        );
+        // Enter held on Quit must not press it twice
+        assert_eq!(s.feed(Raw::KeyDown(ENTER), &m), (Action::None, true));
+        assert_eq!(s.feed(Raw::KeyUp(ENTER), &m), (Action::None, true));
+        // Esc closed the menu on its key-down: its repeats and key-up stay with DialogReader, and do nothing
+        assert_eq!(s.feed(Raw::KeyDown(ESC), &m), (Action::Nav(Nav::Esc), true));
+        let none = with(Overlay::None);
+        assert_eq!(s.feed(Raw::KeyDown(ESC), &none), (Action::None, true));
+        assert_eq!(s.feed(Raw::KeyUp(ESC), &none), (Action::None, true));
+        // the next Esc is the game's
+        assert_eq!(s.feed(Raw::KeyDown(ESC), &none), (Action::None, false));
+    }
+
+    #[test]
+    fn a_key_held_before_the_menu_opened_stays_with_the_game() {
+        let mut s = State::default();
+        assert_eq!(
+            s.feed(Raw::KeyDown(UP), &with(Overlay::None)),
+            (Action::None, false)
+        );
+        let m = with(Overlay::Menu);
+        assert_eq!(s.feed(Raw::KeyDown(UP), &m), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyUp(UP), &m), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyDown(UP), &m), (Action::Nav(Nav::Up), true));
+    }
+
+    #[test]
+    fn the_menu_opens_only_over_the_game_in_front() {
+        let mut s = State::default();
+        let away = Bindings {
+            game_away: true,
+            ..with(Overlay::None)
+        };
+        assert_eq!(s.feed(Raw::KeyDown(F7), &away), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyUp(F7), &away), (Action::None, false));
+        // a side button as the quick menu key: the same rules
+        let mouse = Bindings {
+            menu: Some(Key::Mouse(5)),
+            ..Bindings::default()
+        };
+        let x2 = |down| Raw::Button { b: Btn::X2, down };
+        assert_eq!(s.feed(x2(true), &mouse), (Action::Menu, false));
+        assert_eq!(s.feed(x2(false), &mouse), (Action::None, false));
+        let open = Bindings {
+            overlay: Overlay::Menu,
+            ..mouse.clone()
+        };
+        assert_eq!(s.feed(x2(true), &open), (Action::Menu, true));
+        assert_eq!(s.feed(x2(false), &open), (Action::None, true));
+        let away = Bindings {
+            game_away: true,
+            ..mouse
+        };
+        assert_eq!(s.feed(x2(true), &away), (Action::None, false));
+    }
+
+    #[test]
+    fn the_hook_changes_the_overlay_at_once() {
+        let mut b = with(Overlay::None);
+        b.after(Action::Menu);
+        assert_eq!(b.overlay, Overlay::Menu);
+        // Esc in the voice list goes back to the menu
+        b.esc_closes = false;
+        b.after(Action::Nav(Nav::Esc));
+        assert_eq!(b.overlay, Overlay::Menu);
+        b.esc_closes = true;
+        b.after(Action::Nav(Nav::Esc));
+        assert_eq!(b.overlay, Overlay::None);
+        b.overlay = Overlay::Zones;
+        b.after(Action::Menu);
+        assert_eq!(b.overlay, Overlay::Menu);
+        b.after(Action::Menu);
+        assert_eq!(b.overlay, Overlay::None);
+        b.capture = true;
+        b.after(Action::Cancelled);
+        assert!(!b.capture);
+    }
+
+    #[test]
+    fn the_open_menu_lets_windows_shortcuts_through() {
+        const CTRL: u16 = 0xA2;
+        const SHIFT: u16 = 0xA0;
+        const ALT: u16 = 0xA4;
+        const WIN: u16 = 0x5B;
+        const LEFT: u16 = 0x25;
+        const SPACE: u16 = 0x20;
+        let m = with(Overlay::Menu);
+        for (held, vk) in [
+            (&[CTRL][..], ESC),
+            (&[CTRL, SHIFT][..], ESC),
+            (&[ALT][..], ESC),
+            (&[WIN][..], UP),
+            (&[WIN, SHIFT][..], LEFT),
+            (&[ALT][..], ENTER),
+            (&[ALT][..], SPACE),
+            (&[CTRL][..], DOWN),
+        ] {
+            let mut s = State::default();
+            for &k in held {
+                assert_eq!(s.feed(Raw::KeyDown(k), &m), (Action::None, false));
+            }
+            assert_eq!(
+                s.feed(Raw::KeyDown(vk), &m),
+                (Action::None, false),
+                "{held:?} + {vk:#x}"
+            );
+            // its repeats and key-up go through too
+            assert_eq!(s.feed(Raw::KeyDown(vk), &m), (Action::None, false));
+            assert_eq!(s.feed(Raw::KeyUp(vk), &m), (Action::None, false));
+            for &k in held {
+                assert_eq!(s.feed(Raw::KeyUp(k), &m), (Action::None, false));
+            }
+            // with the modifiers let go, the key is the menu's again
+            let n = Nav::of(vk, Overlay::Menu).unwrap();
+            assert_eq!(s.feed(Raw::KeyDown(vk), &m), (Action::Nav(n), true));
+        }
+        // Shift alone does not stop a key
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(SHIFT), &m);
+        assert_eq!(s.feed(Raw::KeyDown(UP), &m), (Action::Nav(Nav::Up), true));
+        // an arrow held before Win went down: still DialogReader's, but its repeats no longer move the menu
+        let mut s = State::default();
+        assert_eq!(
+            s.feed(Raw::KeyDown(DOWN), &m),
+            (Action::Nav(Nav::Down), true)
+        );
+        s.feed(Raw::KeyDown(WIN), &m);
+        assert_eq!(s.feed(Raw::KeyDown(DOWN), &m), (Action::None, true));
+        assert_eq!(s.feed(Raw::KeyUp(DOWN), &m), (Action::None, true));
+        // zone edit: Ctrl+Backspace and Alt+Esc are not its keys either
+        let z = with(Overlay::Zones);
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(CTRL), &z);
+        assert_eq!(s.feed(Raw::KeyDown(0x08), &z), (Action::None, false));
+        s.feed(Raw::KeyUp(CTRL), &z);
+        s.feed(Raw::KeyDown(ALT), &z);
+        assert_eq!(s.feed(Raw::KeyDown(ESC), &z), (Action::None, false));
+    }
+
+    #[test]
+    fn an_open_overlay_takes_no_keys_while_the_game_is_away() {
+        let mut s = State::default();
+        let away = Bindings {
+            game_away: true,
+            ..with(Overlay::Menu)
+        };
+        for vk in [UP, DOWN, ENTER, ESC] {
+            assert_eq!(s.feed(Raw::KeyDown(vk), &away), (Action::None, false));
+            assert_eq!(s.feed(Raw::KeyUp(vk), &away), (Action::None, false));
+        }
+        let z = Bindings {
+            game_away: true,
+            ..with(Overlay::Zones)
+        };
+        assert_eq!(s.feed(Raw::KeyDown(DEL), &z), (Action::None, false));
+        // the quick menu key still closes the menu (the UI closes it anyway)
+        assert_eq!(s.feed(Raw::KeyDown(F7), &away), (Action::Menu, true));
+    }
+
+    #[test]
+    fn capture_wins_over_an_open_overlay() {
+        let mut s = State::default();
+        let b = Bindings {
+            capture: true,
+            ..with(Overlay::Menu)
+        };
+        assert_eq!(
+            s.feed(Raw::KeyDown(UP), &b),
+            (Action::Captured(kb(UP)), true)
         );
     }
 }

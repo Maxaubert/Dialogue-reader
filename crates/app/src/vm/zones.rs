@@ -306,6 +306,29 @@ impl Editor {
             .expect("a free name")
     }
 
+    /// Adds a zone of `kind` (image pixels, clamped to the picture) and selects it: in-game zone edit draws the
+    /// box itself and adds it when its kind is picked. None when it is empty after clamping.
+    pub fn add(&mut self, r: Rect, kind: Kind) -> Option<usize> {
+        let b = self.bounds();
+        let (x0, y0) = (r.x.clamp(0.0, b.w), r.y.clamp(0.0, b.h));
+        let (x1, y1) = ((r.x + r.w).clamp(0.0, b.w), (r.y + r.h).clamp(0.0, b.h));
+        if x1 - x0 < 1.0 || y1 - y0 < 1.0 {
+            return None;
+        }
+        self.cancel_drag();
+        self.undo = Some(self.snapshot());
+        let name = self.new_name(kind);
+        self.zones.push(EdZone {
+            name,
+            kind,
+            on: true,
+            rect: Rect::new(x0, y0, x1 - x0, y1 - y0),
+        });
+        self.kind = kind;
+        self.selected = Some(self.zones.len() - 1);
+        self.selected
+    }
+
     pub fn select(&mut self, i: Option<usize>) {
         self.selected = i.filter(|&i| i < self.zones.len());
         if let Some(i) = self.selected {

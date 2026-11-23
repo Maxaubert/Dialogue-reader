@@ -1,0 +1,188 @@
+// The in-game overlay windows (M4, spec 2.7): the pill (13), the quick menu (15-quick-menu-a, 15-quick-menu-voice)
+// and zone edit (16-zone-edit). Rust (src/overlay) creates them as overlay windows: topmost, never active, the
+// pill click-through. All state comes from Rust; mouse input goes back through the callbacks.
+// No PopupWindow here: popups would not get the overlay styles (docs/overlay-spike.md).
+import { Palette, Shadow } from "../theme.slint";
+import { VoiceData, EditZone } from "../data.slint";
+import { Kind } from "../theme.slint";
+import { OverlayPill } from "pill.slint";
+import { QuickMenu, QmHints, QmVoices } from "quick_menu.slint";
+import { ZoneEdit } from "zone_edit.slint";
+
+// 13: the status pill. The window is wider than the pill (a long speaker name fits); the pill sits at its right
+// edge (top right of the game) or in its middle (bottom center). The margin holds the shadow.
+export component PillWindow inherits Window {
+    in property <string> speaker;
+    in property <bool> ok;
+    in property <bool> speaking;
+    // 0: right edge (top right), 1: middle (bottom center)
+    in property <int> align: 0;
+    // the margin around the pill, in logical px (place.rs uses the same numbers)
+    out property <length> pad: 8px;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "DialogReader status";
+    width: 320px;
+    height: 48px;
+    pill := OverlayPill {
+        x: root.align == 0 ? root.width - root.pad - self.width : (root.width - self.width) / 2;
+        y: root.pad;
+        speaker: root.speaker;
+        ok: root.ok;
+        speaking: root.speaking;
+    }
+}
+
+// 15: the quick menu, with room on both sides for the voice list (so the card stays in the middle of the window)
+// and a margin of at least the shadow blur (40 px).
+export component QuickMenuWindow inherits Window {
+    in property <string> game;
+    in property <int> highlight;
+    in property <bool> stopped;
+    in property <bool> muted;
+    in property <string> voice;
+    in property <float> speed: 1.0;
+    // in-out and bound both ways: a drag on the slider or a click on Mode sets them inside the menu, and a
+    // one-way binding would then stop following Rust (the windows live for the whole session)
+    in-out property <float> volume: 0.8;
+    in-out property <bool> automatic: true;
+    in property <bool> quit-armed;
+    in property <bool> voice-open;
+    // the rows of the voice list on screen (a slice that follows the highlight), and their highlight and check
+    in property <[VoiceData]> voices;
+    in property <int> voice-hi;
+    in property <int> voice-chosen: -1;
+    callback activate(int);
+    callback volume-moved(float);
+    callback volume-let-go(float);
+    callback mode-picked(bool);
+    callback choose-voice(int);
+    callback preview-voice(int);
+    // a click outside the menu
+    callback outside();
+    out property <length> margin: Shadow.pop-blur;
+    // the middle of the card and its key hints, in window px (the window is placed so it is the game's middle)
+    out property <length> group-cy: root.margin + (menu.height + 14px + 38px) / 2;
+    property <length> side: 278px;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "DialogReader quick menu";
+    width: root.margin * 2 + root.side * 2 + menu.width;
+    height: root.margin * 2 + max(menu.height + 14px + 38px, 208px + 7px * 2 + 36px * 8);
+    TouchArea {
+        clicked => {
+            root.outside();
+        }
+    }
+
+    menu := QuickMenu {
+        x: root.margin + root.side;
+        y: root.margin;
+        game: root.game;
+        highlight: root.highlight;
+        stopped: root.stopped;
+        muted: root.muted;
+        voice: root.voice;
+        speed: root.speed;
+        volume <=> root.volume;
+        automatic <=> root.automatic;
+        quit-armed: root.quit-armed;
+        voice-open: root.voice-open;
+        activate(i) => {
+            root.activate(i);
+        }
+        volume-moved(v) => {
+            root.volume-moved(v);
+        }
+        volume-let-go(v) => {
+            root.volume-let-go(v);
+        }
+        mode-picked(a) => {
+            root.mode-picked(a);
+        }
+    }
+
+    if root.voice-open: QmVoices {
+        x: menu.x + menu.width + 8px;
+        y: menu.y + 208px;
+        voices: root.voices;
+        chosen: root.voice-chosen;
+        highlight: root.voice-hi;
+        choose(i) => {
+            root.choose-voice(i);
+        }
+        preview(i) => {
+            root.preview-voice(i);
+        }
+    }
+
+    HorizontalLayout {
+        x: menu.x;
+        y: menu.y + menu.height + 14px;
+        width: menu.width;
+        height: 38px;
+        alignment: center;
+        QmHints {
+            hints: root.voice-open ? [
+                { key: "↑↓", text: "Move" },
+                { key: "Space", text: "Preview" },
+                { key: "Enter", text: "Choose" },
+                { key: "←", text: "Back" },
+            ] : [
+                { key: "↑↓", text: "Move" },
+                { key: "←→", text: "Change" },
+                { key: "Enter", text: "Select" },
+                { key: "Esc", text: "Close" },
+            ];
+        }
+    }
+}
+
+// 16: zone edit over a frozen screenshot of the game, the size of what the capture covers.
+export component ZoneEditWindow inherits Window {
+    in property <image> shot;
+    in property <[EditZone]> zones;
+    in-out property <int> selected: -1;
+    in property <string> dim-commands;
+    in-out property <bool> draft: false;
+    in-out property <length> draft-x;
+    in-out property <length> draft-y;
+    in-out property <length> draft-w;
+    in-out property <length> draft-h;
+    callback done();
+    callback remove(int);
+    callback commit(Kind, length, length, length, length);
+    callback pick(length, length) -> int;
+    no-frame: true;
+    always-on-top: true;
+    background: Palette.bg;
+    title: "DialogReader zone edit";
+    ze := ZoneEdit {
+        width: 100%;
+        height: 100%;
+        real-shot: true;
+        shot: root.shot;
+        zones: root.zones;
+        selected <=> root.selected;
+        dim-commands: root.dim-commands;
+        draft <=> root.draft;
+        draft-x <=> root.draft-x;
+        draft-y <=> root.draft-y;
+        draft-w <=> root.draft-w;
+        draft-h <=> root.draft-h;
+        done => {
+            root.done();
+        }
+        remove(i) => {
+            root.remove(i);
+        }
+        commit(k) => {
+            root.commit(k, root.draft-x, root.draft-y, root.draft-w, root.draft-h);
+        }
+        pick(x, y) => {
+            return root.pick(x, y);
+        }
+    }
+}

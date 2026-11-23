@@ -1256,6 +1256,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tempfile",
+ "windows 0.62.2",
 ]
 
 [[package]]

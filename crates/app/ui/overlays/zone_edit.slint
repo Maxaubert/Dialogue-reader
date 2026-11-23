@@ -36,6 +36,9 @@ export component ZoneEdit inherits Rectangle {
     property <length> press-x;
     property <length> press-y;
     property <bool> dragging: false;
+    // the overlay window (M4): the frozen screenshot of the game, stretched over the window
+    in property <bool> real-shot: false;
+    in property <image> shot;
     callback done();
     callback remove(int);
     callback commit(Kind);
@@ -60,8 +63,8 @@ export component ZoneEdit inherits Rectangle {
     Image {
         width: 100%;
         height: 100%;
-        source: Render.software ? Art.scene-full : Art.scene;
-        image-fit: cover;
+        source: root.real-shot ? root.shot : Render.software ? Art.scene-full : Art.scene;
+        image-fit: root.real-shot ? fill : cover;
     }
 
     Path {

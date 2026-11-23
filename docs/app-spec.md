@@ -58,7 +58,8 @@ view models and wiring. That keeps the reading path testable without a UI, and t
  [keys thread]     low-level keyboard + mouse hooks (WH_KEYBOARD_LL, WH_MOUSE_LL) with its own message loop
                    read key  -> ReadNow straight to the reader thread (both modes)
                    quick menu key -> UI opens the quick menu; while it is open, arrow/Enter/Esc/Space are
-                   taken by the hook and sent to the menu (the game does not see them)
+                   taken by the hook and sent to the menu (the game does not see them); not with Win, Ctrl
+                   or Alt held (Ctrl+Esc, Alt+Esc, Win+arrows stay Windows'), and not while the game is away
 
  [UI thread]       Slint event loop (winit backend): main window, overlay windows, tray icon
 ```
@@ -214,6 +215,14 @@ pub trait Tts: Send {
   are never taken: Windows gets them and capture keeps waiting. Capture ends as Cancel when the main window loses
   the focus.
 - Elevated games: see Risks.
+- Overlays (M4): the quick menu key opens the quick menu only while the game window is in front (and still goes
+  through to the game). While the menu is open the hook takes the arrows, Enter, Space, Esc and the quick menu key
+  (it closes the menu); in zone edit it takes Delete, Backspace, Esc and the quick menu key (back to the menu). The
+  hook changes the open overlay itself for the quick menu key and Esc, so the next key is judged right before the
+  UI thread has shown anything. Held arrows and Delete repeat; a held Enter, Space or Esc acts once. The read key
+  does nothing while an overlay is open.
+- Injected keys (`LLKHF_INJECTED`: Steam Input, pad mappers, AutoHotkey, game streaming) count as real keys
+  (M4 default, as in the spike; Max may still flip it).
 
 ### 2.7 Windows and overlays
 
@@ -227,11 +236,16 @@ in [overlay-spike.md](overlay-spike.md).
 | Main window | 01 to 06, 10-main-b, 11, 12, 14 | frameless (own title bar as in the mockups), normal taskbar window | normal |
 | Status pill | 13 | `WS_EX_LAYERED`, `WS_EX_TRANSPARENT`, `WS_EX_TOPMOST`, `WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW` | none, click-through |
 | Quick menu | 15-quick-menu-a, 15-quick-menu-voice | `WS_EX_TOPMOST`, `WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`, transparent background | keyboard through the hook; mouse clicks work but never activate it |
-| Zone edit | 16-zone-edit | as the quick menu, covers the game's client area | mouse on the window (no activation); Delete, Backspace, Esc through the hook |
+| Zone edit | 16-zone-edit | as the quick menu, covers what the capture covers (the client area of a borderless game) | mouse on the window (no activation); Delete, Backspace, Esc through the hook |
 
 - Placement: overlays follow the game's client rect (`GetClientRect` + `ClientToScreen`, physical pixels) and its
   monitor's scale. The pill sits at the position set in Settings (top right, bottom center, off).
-- While the quick menu or zone edit is open, reading pauses and the pill hides.
+- While the quick menu or zone edit is open, reading pauses and the pill hides. The pause is a hold apart from the
+  user's Pause (closing the menu does not undo a Pause). The menu and zone edit open only over the game in front and
+  close when it is no longer in front. The pill shows only while the game is in front and being read (M4).
+- Zone edit covers what the capture covers (the DWM frame bounds: for a game with a title bar that is more than the
+  client area), so its frozen screenshot lines up with the game and its zones are in the capture pixels the reader
+  uses (M4).
 - The quick menu is centered on the game (design rule). Order: Manage zones, Stop (play/pause), Mute, Voice,
   Speed, Volume, Mode, Settings, Quit (press twice). Arrows move and change, Enter selects, Esc closes.
 - Zone edit: drag on empty space adds a zone, click selects, Delete/Backspace or the small x removes, Esc or Done

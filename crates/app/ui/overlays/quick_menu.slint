@@ -177,6 +177,10 @@ export component QuickMenu inherits Rectangle {
     in-out property <bool> quit-armed: false;
     in property <bool> voice-open: false;
     callback activate(int);
+    // mouse on the volume slider and the mode buttons (the overlay window saves them)
+    callback volume-moved(float);
+    callback volume-let-go(float);
+    callback mode-picked(bool);
     width: 440px;
     height: col.preferred-height;
     border-radius: 14px;
@@ -258,7 +262,7 @@ export component QuickMenu inherits Rectangle {
                         on: root.muted;
                         label: "Mute";
                         toggled(v) => {
-                            root.muted = v;
+                            root.activate(2);
                         }
                     }
                 }
@@ -334,6 +338,12 @@ export component QuickMenu inherits Rectangle {
                         Slider {
                             knob: 14px;
                             value <=> root.volume;
+                            changed(v) => {
+                                root.volume-moved(v);
+                            }
+                            released(v) => {
+                                root.volume-let-go(v);
+                            }
                         }
                     }
 
@@ -364,6 +374,7 @@ export component QuickMenu inherits Rectangle {
                         font-size: 13px;
                         select(i) => {
                             root.automatic = i == 0;
+                            root.mode-picked(i == 0);
                         }
                     }
                 }
