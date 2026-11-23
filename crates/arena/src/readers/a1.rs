@@ -24,7 +24,7 @@ pub const OPTIONS: &[&str] = &[
     "change_share", "same_px", "static_ms", "refresh_ms", "idle_ms", "ring_ms", "rescue", "emit_lost", "prompts", "gap_dialogue", "gap_speaker", "gap_notif", "gap_prompt",
     "stable_dialogue", "stable_speaker", "stable_notif", "stable_prompt", "confirm", "gone_reads", "jitter",
     "min_letters", "consensus", "typing_ms", "grow_ms", "change_ms", "lost_letters", "second_ms", "max_reads", "loose", "ref_h", "free_diff", "gone_dialogue", "gone_speaker", "gone_notif", "gone_prompt", "free_cell", "free_edge", "free_change", "free_recent", "free_gap", "free_max", "free_min_cells",
-    "free_expire", "free_stable", "free_move", "trace", "mode", "press_every_ms", "look_ms", "repeats",
+    "free_expire", "free_stable", "free_move", "trace", "mode", "press_every_ms", "look_ms", "repeats", "prompt_zones",
 ];
 
 /// The arena OCR engine behind the dr-core trait.
@@ -55,6 +55,9 @@ pub struct A1 {
     manual: Option<ManualRun>,
     ocr: EngineOcr,
     use_zones: bool,
+    /// `prompt_zones=off`: prompt zones are not given to dr-core at all (the app's M3b CPU check: what a press
+    /// costs without them).
+    drop_prompts: bool,
     trace: Option<PathBuf>,
     warned: bool,
 }
@@ -208,7 +211,11 @@ pub fn create(ctx: &ReaderContext) -> Result<Box<dyn Reader>> {
     let engine = ocr::create_engine(&o.get("engine", "winocr".to_string())?, &eo)?;
     let use_zones = o.flag("zones", true)?;
     let trace = ctx.options.get("trace").map(|d| PathBuf::from(d).join(format!("{}.txt", ctx.scenario_id)));
-    let zones = if use_zones { map_zones(&ctx.layout) } else { Vec::new() };
+    let drop_prompts = !o.flag("prompt_zones", true)?;
+    let mut zones = if use_zones { map_zones(&ctx.layout) } else { Vec::new() };
+    if drop_prompts {
+        zones.retain(|z| z.kind != ZoneKind::Prompt);
+    }
     let manual = match o.get("mode", "auto".to_string())?.as_str() {
         "auto" => None,
         "manual" => {
@@ -221,7 +228,7 @@ pub fn create(ctx: &ReaderContext) -> Result<Box<dyn Reader>> {
         }
         v => bail!("a1: mode must be auto or manual, not {v:?}"),
     };
-    Ok(Box::new(A1 { pipe: Pipeline::new(cfg, &zones), manual, ocr: EngineOcr(engine), use_zones, trace, warned: false }))
+    Ok(Box::new(A1 { pipe: Pipeline::new(cfg, &zones), manual, ocr: EngineOcr(engine), use_zones, drop_prompts, trace, warned: false }))
 }
 
 fn to_event(e: dr_core::Event) -> ReadEvent {
@@ -234,7 +241,10 @@ impl Reader for A1 {
     }
 
     fn setup(&mut self, layout: &Layout) {
-        let zones = if self.use_zones { map_zones(layout) } else { Vec::new() };
+        let mut zones = if self.use_zones { map_zones(layout) } else { Vec::new() };
+        if self.drop_prompts {
+            zones.retain(|z| z.kind != ZoneKind::Prompt);
+        }
         self.pipe.set_zones(&zones);
         if let Some(mr) = &mut self.manual {
             mr.m.set_zones(&zones);

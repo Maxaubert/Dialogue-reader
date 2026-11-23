@@ -458,10 +458,12 @@ export component Dot inherits Rectangle {
 
 export component StatusChip inherits Rectangle {
     in property <string> text: "Reading";
+    // green while reading; grey otherwise (paused, game not running)
+    in property <bool> ok: true;
     height: 28px;
     horizontal-stretch: 0;
     border-radius: 14px;
-    background: Palette.ok-soft;
+    background: root.ok ? Palette.ok-soft : Palette.surface-3;
     HorizontalLayout {
         padding-left: Space.s3;
         padding-right: Space.s3;
@@ -469,14 +471,16 @@ export component StatusChip inherits Rectangle {
         alignment: center;
         VerticalLayout {
             alignment: center;
-            Dot { }
+            Dot {
+                tint: root.ok ? Palette.ok : Palette.text-3;
+            }
         }
 
         Text {
             text: root.text;
             font-size: Type.fs1;
             font-weight: Type.w-medium;
-            color: Palette.ok;
+            color: root.ok ? Palette.ok : Palette.text-2;
             vertical-alignment: center;
         }
     }

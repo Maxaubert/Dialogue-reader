@@ -1275,7 +1275,9 @@ dependencies = [
 name = "dr-runtime"
 version = "0.1.0"
 dependencies = [
+ "arena",
  "dr-core",
+ "dr-ocr",
  "dr-tts",
  "image",
  "rodio",

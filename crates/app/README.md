@@ -2,15 +2,17 @@
 
 The Slint UI of DialogReader. It builds `DialogReader.exe`.
 
-**Status: M3a.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
+**Status: M3b.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
 are saved as JSON in `%APPDATA%\DialogReader\profiles`, page 02 lists the running windows (games first), Continue
 takes one screenshot with Windows Graphics Capture, and pages 03 and 11 draw, select, move, resize, rename,
 re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). The stages of 03, 10 and 11 show the
 game live while it runs (see "Live view"). Onboarding runs only when there is no profile yet. Since M3a, page 05
 and Settings > Voices list the Windows voices; "Play sample" and "Test" speak on the speakers (only in the app,
 never in a test); voice, speed and volume are saved in the profile. Games that share an exe get one profile each,
-told apart by the window title. The activity log, reading, keys and the overlays still show fake data (M3b and
-M4). The plan
+told apart by the window title. Since M3b the app reads the current game: it finds its window, captures it,
+reads it automatically or on the read key, speaks the lines, and shows the status, the line being spoken and Recent
+from the activity log (`log\<id>.jsonl`). Pause, Read now, Replay, Stop and key capture ("Change") work. The
+overlays still show fake data (M4). The plan
 is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
 
 ## Run, test, render
@@ -56,6 +58,7 @@ src/vm/mod.rs            view-model layer: profiles, windows, screenshots, Slint
 src/vm/zones.rs          zone drawing state: draw, select, move, resize, rename, kind, on/off, delete, undo
 src/vm/voices.rs         voices for the UI: the installed list, labels ("Windows · David"), the voice test thread
 src/vm/live.rs           live view of the game on the stages of 03, 10 and 11: start, stop, frames, fallback
+src/vm/reading.rs        reading: the runtime, status, now speaking, activity log, window search, key capture
 src/crash.rs             panic hook: crash log in %LOCALAPPDATA%\DialogReader\logs
 src/fake.rs              fake data of the mockups (behind vm::Source::Fake) and the zone edit callbacks
 src/geom.rs              stage mapping, drag to zone, hit tests, dim path (unit-tested)
@@ -70,7 +73,7 @@ ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout, w
                          quick_menu_preview (review only: menu over the game and its two other states), zone_edit
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
 ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
-tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs, voices.rs (testing
+tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs, voices.rs, reading.rs (testing
                          backend), screens.rs (renders, compares with the mockups), common/ (fake desktop with a
                          fake live view, fake voices, temp data folder, pointer input)
 examples/snapshot.rs     one page in a real window with a chosen renderer, saved as PNG (run on a hidden desktop)
@@ -308,11 +311,22 @@ page) and page 11 (Zones) at 225 % and 150 %.
 - `cargo test -p dr-tts` shows "3 ignored" on a PC with no Windows voice. On a PC with one, run
   `cargo test -p dr-tts --test voices -- --ignored`.
 
-## Known gaps (M3a)
+## Reading (M3b)
 
-- Key capture ("Change"), Import settings and the other Settings buttons do nothing yet (M3b, M5).
-- The Recent and activity lists, the status chip and "Read now" are fake or empty (M3b). The Overview voice
-  button shows the game's voice but opens nothing; the quick menu voice list is still sample data (M4).
+- `main.rs` builds the runtime (`dr_runtime::runtime::Parts::real`) and hands it to the view model
+  (`vm::attach_runtime`). Tests pass a runtime on fake parts (`tests/reading.rs`) or none; no test installs a key
+  hook or captures a game.
+- A 100 ms UI timer (`Vm::reading_tick`) runs the runtime's tick, its events and the speech events, and looks for
+  the current game's window once a second while it is not read.
+- The live view attaches to the reader's capture session when both want the same window (one WGC session).
+- Raw errors (capture, OCR, hooks) go to `%LOCALAPPDATA%\DialogReader\logs\reading.log`.
+
+## Known gaps (M3b)
+
+- Import settings and the other Settings buttons (Startup, overlay, updates) do nothing yet (M5). The quick menu
+  key does nothing until the quick menu is a real overlay (M4); the quick menu voice list is still sample data.
+- The reader follows the game picked in the app; it does not switch by itself when another profile's game starts.
+- No button restarts DialogReader as administrator for an elevated game (the notice says why; open question).
 - Overlays are previews inside the main window. Real overlay windows come in M4.
 - The zone strip on Overview shows every zone in one row; many zones run past the edge (no "+N" chip with real
   data yet).

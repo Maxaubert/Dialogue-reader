@@ -80,6 +80,7 @@ export component SettingsTab inherits Rectangle {
     in-out property <bool> auto-update: true;
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
+    in property <int> capturing: -1;
     in property <string> version: "0.1.0";
     // Voices: Kokoro (first, as in mockup 12) and the Windows voices, and the current game's voice, speed and
     // volume (saved in its profile)
@@ -231,6 +232,7 @@ export component SettingsTab inherits Rectangle {
                     KeysCard {
                         read-key: root.read-key;
                         menu-key: root.menu-key;
+                        capturing: root.capturing;
                         change(i) => {
                             root.change-key(i);
                         }

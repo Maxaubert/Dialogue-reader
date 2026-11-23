@@ -41,11 +41,12 @@ slint = { version = "=1.18.1", default-features = false, features = [
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 dr-runtime = { path = "../runtime" }
 dr-tts = { path = "../tts" }
+# Line kinds and skip reasons of the activity log (src/vm/reading.rs).
+dr-core = { path = "../core" }
 
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"
 tempfile = "=3.27.0"
-dr-core = { path = "../core" }
 
 [build-dependencies]
 slint-build = "=1.18.1"

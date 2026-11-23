@@ -43,6 +43,11 @@ impl Paths {
     pub fn settings(&self) -> PathBuf {
         self.root.join("settings.json")
     }
+
+    /// `log\<id>.jsonl`: the lines read for that game (spec 2.8).
+    pub fn activity_log(&self, id: &str) -> PathBuf {
+        self.root.join("log").join(format!("{id}.jsonl"))
+    }
 }
 
 /// Crash logs: `%LOCALAPPDATA%\DialogReader\logs`. `None` when `LOCALAPPDATA` is not set.
@@ -86,6 +91,10 @@ mod tests {
             Path::new("C:/x/DialogReader/profiles/rdr2.png")
         );
         assert_eq!(p.settings(), Path::new("C:/x/DialogReader/settings.json"));
+        assert_eq!(
+            p.activity_log("rdr2"),
+            Path::new("C:/x/DialogReader/log/rdr2.jsonl")
+        );
     }
 
     #[test]

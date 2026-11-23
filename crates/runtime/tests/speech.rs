@@ -351,3 +351,63 @@ fn a_device_error_while_idle_does_not_lose_the_next_line() {
     );
     assert_eq!(sink.resets(), 1);
 }
+
+/// Lines thrown out of the queue (a press, Stop, a voice test) are said, so the activity log can show them; a
+/// mark comes back after them.
+#[test]
+fn cleared_lines_are_said_and_a_mark_follows() {
+    let (sp, _, _) = start(1.0);
+    sp.send(Cmd::Say(vec![
+        line("a long first line that plays"),
+        line("waits one"),
+        line("waits two"),
+    ]));
+    until(
+        &sp,
+        |e| matches!(e, Ev::Started { item, .. } if item.text == "a long first line that plays"),
+    );
+    // a press: the waiting lines are replaced
+    sp.send(Cmd::Replace(vec![line("pressed")]));
+    sp.send(Cmd::Stop);
+    sp.send(Cmd::Mark(7));
+    let evs = until(&sp, |e| matches!(e, Ev::Mark(7)));
+    let cleared: Vec<&str> = evs
+        .iter()
+        .filter_map(|e| match e {
+            Ev::Cleared(i) => Some(i.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(cleared, ["waits one", "waits two", "pressed"], "{evs:?}");
+    assert!(evs.iter().all(|e| e.test().is_none()));
+}
+
+/// A replay is marked, so it is not logged as a new line: Replay of the last line, and a row of the log.
+#[test]
+fn replays_are_marked() {
+    let (sp, _, _) = start(0.0);
+    sp.send(Cmd::Say(vec![line("first")]));
+    let evs = until(&sp, |e| is_finished(e, "first"));
+    assert!(evs.iter().all(|e| match e {
+        Ev::Started { item, .. } => !item.replay,
+        _ => true,
+    }));
+    sp.send(Cmd::Replay);
+    let evs = until(&sp, |e| is_finished(e, "first"));
+    assert!(
+        evs.iter()
+            .any(|e| matches!(e, Ev::Started { item, .. } if item.replay)),
+        "{evs:?}"
+    );
+    sp.send(Cmd::ReplayLines(vec![
+        Line::new("Arthur:", "", Some(ZoneKind::Speaker)),
+        line("We need to go."),
+    ]));
+    let evs = until(&sp, |e| is_finished(e, "Arthur: We need to go."));
+    let Some(Ev::Started { item, .. }) = evs.iter().find(|e| matches!(e, Ev::Started { .. }))
+    else {
+        panic!("{evs:?}")
+    };
+    assert!(item.replay);
+    assert_eq!(item.lines[1].kind, Some(ZoneKind::Dialogue));
+}

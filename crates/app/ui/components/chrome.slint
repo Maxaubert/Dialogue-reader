@@ -408,6 +408,7 @@ export component MainBar inherits Bar {
     in property <string> art: "rdr2";
     in property <image> cover;
     in property <string> status: "Reading";
+    in property <bool> status-ok: true;
     callback tab-clicked(int);
     callback game-clicked();
     HorizontalLayout {
@@ -470,6 +471,7 @@ export component MainBar inherits Bar {
             alignment: center;
             StatusChip {
                 text: root.status;
+                ok: root.status-ok;
             }
         }
 

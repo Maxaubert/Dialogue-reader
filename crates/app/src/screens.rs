@@ -172,6 +172,26 @@ pub fn all() -> Vec<Screen> {
                 w.invoke_settings_jump(3);
             },
         },
+        // M3b: key capture waits for the new read key; Overview of a game that is not running, nothing read yet
+        Screen {
+            name: "19-keys-capture",
+            setup: |w| {
+                page(w, Page::Keys);
+                w.set_capturing_key(0);
+            },
+        },
+        Screen {
+            name: "19-overview-not-running",
+            setup: |w| {
+                w.set_capturing_key(-1);
+                w.set_status_text(crate::vm::reading::STATUS_NO_WINDOW.into());
+                w.set_status_ok(false);
+                w.set_now_who("".into());
+                w.set_now_line("".into());
+                w.set_recent(slint::ModelRc::default());
+                page(w, Page::Overview);
+            },
+        },
     ]
 }
 

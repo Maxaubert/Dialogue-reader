@@ -44,17 +44,19 @@ view models and wiring. That keeps the reading path testable without a UI, and t
  [capture thread]  BGRA frame with row padding -> tight RGBA copy -> "latest frame" slot (drops old frames)
      |
      v
- [reader thread]   auto:   dr_core::Pipeline::on_frame(frame, &mut ocr)     -> Output { events, errors }
-                   manual: dr_core::Manual::on_frame(frame, &mut ocr)       -> Option<Press>
+ [reader thread]   auto:   dr_core::Pipeline::on_frame(frame, &mut ocr)     -> Output { events, skipped, errors }
+                   manual: dr_core::Manual::observe(frame) on every frame (no OCR)
+                   press:  dr_core::Manual::read_now(frame, &mut ocr)       -> lines that replace the queue
                    OCR: dr_ocr::WinOcr (runs on this thread, MTA)
-     |  Line { text, zone, kind, t } (and errors)
+     |  speech Cmd::Say / Cmd::Replace (Line { text, zone, kind }); skipped lines and errors as ReaderEv
      v
  [speech thread]   queue -> dr_tts engine -> PCM -> audio out (volume, stop, mute)
      |
-     +--> events to the UI thread (slint::invoke_from_event_loop): status, spoken line, error
+     +--> speech events (Started, Finished, Cut, Cleared, Dropped, Error), drained by the UI timer
+          (crates/app/src/vm/reading.rs, every 100 ms) into the "now speaking" card and the activity log
 
  [keys thread]     low-level keyboard + mouse hooks (WH_KEYBOARD_LL, WH_MOUSE_LL) with its own message loop
-                   read key  -> Manual::press() flag, or "read now" in auto mode
+                   read key  -> ReadNow straight to the reader thread (both modes)
                    quick menu key -> UI opens the quick menu; while it is open, arrow/Enter/Esc/Space are
                    taken by the hook and sent to the menu (the game does not see them)
 
@@ -64,17 +66,25 @@ view models and wiring. That keeps the reading path testable without a UI, and t
 - Capture rate: `MinimumUpdateIntervalSettings` set to 40 ms (25 fps). This matches the `Manual` ring step
   (`step_ms: 40`) and keeps a 4K copy (33 MB) to about 0.8 GB/s at most. The reader takes the newest frame and
   skips the rest, so a slow OCR call never builds a backlog.
+- One session per window (M3b): the live view of the stages attaches to the reader's capture session when the
+  reader captures that window (small frames made on the GPU from the same captured frames, about 12 a second),
+  and starts its own session only when the reader does not run on it. Pause stops OCR, not the capture.
+- Still screens (M3b): WGC sends a frame only when the window changes, so the reader keeps the newest frame and
+  feeds it again every 40 ms with the time now. A line on a screen that stays still is still confirmed, and a
+  press reads the screen as it is.
 - `dr_core::Frame` needs tight RGBA. The capture thread converts BGRA with padding to tight RGBA once per frame
   (as arena `live.rs` does). A later speed-up: copy only the zone rectangles. This needs a change in `dr-core`,
   so it is not in v1.
 - Auto mode "Read now" (main page button, read key in auto mode): reads all zones once through `Manual::read_now`
   on the same frame, then auto mode goes on. One read key means the same thing in both modes: "read my zones now".
-- Commands in (`Runtime::send(Cmd)`): `Start(profile)`, `Stop`, `Pause`, `Resume`, `ReadNow`, `StopSpeaking`,
-  `Mute(bool)`, `SetVoice`, `SetSpeed`, `SetVolume`, `SetMode`, `SetZones`, `SetKeys`, `CaptureKey`,
-  `Screenshot`, `Quit`.
-- Events out (`Runtime::events() -> Receiver<Ev>`): `Status(Reading | Paused | Stopped | NoWindow | Error)`,
-  `Spoken(Line)`, `Skipped(Line, reason)`, `Speaking { line, progress }`, `KeyCaptured(Key)`, `Screenshot(png)`,
-  `Error(String)`, `WindowGone`, `ElevatedGame`.
+- Commands in (`Runtime::send(Cmd)`, crates/runtime/src/runtime.rs): `Start(RunCfg)`, `Window(Option<Target>)`
+  (the app finds the game window and says when it comes or goes), `Stop`, `Pause(bool)`, `ReadNow`, `SetMode`,
+  `SetZones`, `SetPrompts`, `SetKeys`, `CaptureKey(bool)`. Voice, speed, volume, mute, Stop and Replay go to the
+  speech thread directly (`speech::Cmd`), which the app owns and shares with the voice test.
+- Events out (`Runtime::events()`, drained by the app's timer): `Status(Stopped | NoWindow | Reading | Paused |
+  Error)`, `Reader(ReaderEv)` (skipped lines, a press, OCR errors, capture ended, no OCR), `Key(Action)` (quick
+  menu key, key capture), `Elevated`, `Fullscreen`, `HooksFailed`, `CaptureFailed`. Spoken lines come from the
+  speech thread's events, not from the runtime.
 
 ### 2.3 Capture
 
@@ -95,8 +105,8 @@ view models and wiring. That keeps the reading path testable without a UI, and t
   be larger than the client size page 02 shows. Zones are stored in these capture pixels. M4 places overlays by
   the client rect, so it must add the offset of the client area inside the captured window.
 - A minimized window gives no picture. Page 02 and Retake refuse it at once with a plain message instead of
-  waiting for the 3 s capture timeout. In M2 the capture still runs on the UI thread (up to 3 s, plus PNG
-  encoding at Finish). Proposal, not yet planned: move capture to its own thread in M3b.
+  waiting for the 3 s capture timeout. The screenshot (Continue, Retake) still runs on the UI thread (up to 3 s,
+  plus PNG encoding at Finish); M3b moved only the reader's capture to its own thread. Still open.
 - The window is found again by exe name when the game restarts. `Status(NoWindow)` while it is gone. When the
   game's process cannot be read (it runs as administrator, or anti-cheat protects it), the exe is empty. Such a
   profile is saved with `title_contains` set to the window title and matches by title only. An empty exe never
@@ -167,6 +177,11 @@ pub trait Tts: Send {
   SetSpeed, SetVolume. Events (Started, Finished, Cut, Dropped, Error) carry the `Item` (its lines and zones) and
   the test id, so a poll ends only on its own sample. Error has a kind (engine, no device, device lost); the UI
   shows a plain line for the kind and writes the raw text to `speech.log`.
+- Added in M3b: `ReplayLines` (a row of the activity log, spoken next; the queue and the line that plays go on),
+  `Mark(id)` (answered with `Ev::Mark` after every earlier command, so the app knows when a game it left has no
+  events to come), and `Ev::Cleared` (a line that waited in the queue and was thrown out by a press, Stop or a
+  voice test). An `Item` spoken again (Replay, ReplayLines) has `replay` set, so the activity log does not show it
+  twice.
 - Speech thread rules added after the M3a review (2026-11-23): commands sent while a line is being made are read
   before it plays, and a Stop, Skip, Replay or Test among them drops the sound (no short blip). A device that
   reports an error, or a sound that runs past 1.5 times its length plus 1.5 s, ends the line with an error, lets
@@ -185,8 +200,9 @@ pub trait Tts: Send {
 
 - One `Key` type, saved as text: `"Mouse 4"`, `"Mouse 5"`, `"Mouse 3"`, `"F7"`, `"Ctrl+Shift+R"`.
 - Low-level hooks on the keys thread catch both keyboard keys and mouse side buttons (`WH_MOUSE_LL`,
-  `XBUTTON1`/`XBUTTON2`). One code path for both. The hook callback only posts a message and returns at once
-  (Windows drops hooks that take longer than `LowLevelHooksTimeout`).
+  `XBUTTON1`/`XBUTTON2`). One code path for both. The hook callback does no slow work: it takes a few short
+  locks, reads the modifier keys and sends one message on a channel, then returns (Windows drops hooks that take
+  longer than `LowLevelHooksTimeout`).
 - The read key and quick menu key are passed through to the game (not swallowed), except keys that are only used
   by DialogReader while the quick menu or zone edit is open.
 - Key capture ("Change" on the keys page): the next key or mouse button press is taken as the new key. Esc cancels.

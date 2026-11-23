@@ -10,10 +10,12 @@
 //! keep a small cover, made the first time the game switcher opens, and the screenshot size from the PNG header.
 
 mod live;
+pub mod reading;
 pub mod voices;
 pub mod zones;
 
 pub use live::{LiveRun, NOTE_CLOSED, NOTE_FAILED, NOTE_LIVE, NOTE_MINIMIZED};
+pub use reading::attach_runtime;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -453,6 +455,8 @@ pub struct Vm {
     rename: Option<PendingRename>,
     /// The live view on the stages (live.rs).
     live: live::LiveState,
+    /// Reading: the runtime, the activity log, key capture (reading.rs).
+    reading: reading::ReadState,
     setup_zones: Rc<VecModel<ZoneData>>,
     zones: Rc<VecModel<ZoneData>>,
     games_running: Rc<VecModel<WindowData>>,
@@ -489,6 +493,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         main: Editor::new(crate::fake::ed_zones(false), 1600.0, 900.0),
         rename: None,
         live: live::LiveState::default(),
+        reading: reading::ReadState::default(),
         setup_zones: Rc::new(VecModel::default()),
         zones: Rc::new(VecModel::default()),
         games_running: Rc::new(VecModel::default()),
@@ -523,7 +528,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             desktop,
             voices,
         } => {
-            // the activity log and zone edit stay fake until M3b and M4
+            // zone edit and the quick menu stay fake until M4
             crate::fake::fill(w);
             vm.voices = *voices;
             vm.voices.check_kokoro();
@@ -536,8 +541,12 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             w.set_voice_label(vm.voices.label("").into());
             w.set_real_shots(true);
             w.set_extra_zones(ModelRc::default());
-            w.set_recent(ModelRc::default());
-            w.set_log(ModelRc::default());
+            vm.reading_models(w);
+            w.set_now_who("".into());
+            w.set_now_line("".into());
+            // nothing reads until main.rs attaches the runtime
+            w.set_status_text(reading::STATUS_STOPPED.into());
+            w.set_status_ok(false);
             vm.real = Some(Real { paths, desktop });
             vm.setup = Editor::new(Vec::new(), 1600.0, 900.0);
             vm.main = Editor::new(Vec::new(), 1600.0, 900.0);
@@ -695,6 +704,7 @@ impl Vm {
         self.push_profile_settings();
         self.push_games();
         self.push_main();
+        self.reading_start();
     }
 
     /// The current game's mode and keys (Overview and Settings show them; setup pages share them).
@@ -794,6 +804,7 @@ impl Vm {
         if self.test_running.is_some() {
             self.stop_test();
         }
+        self.end_capture();
         self.game_voice_saved();
         self.check_kokoro();
     }
@@ -821,10 +832,12 @@ impl Vm {
             self.notice(&self.voices.problem_text());
             return false;
         }
-        let Some(sp) = &self.voices.speech else {
+        if self.voices.speech.is_none() {
             self.notice("Sample data: voices do not play here.");
             return false;
-        };
+        }
+        // events of an earlier sample are old news; line events still go to the log
+        let _ = self.drain_speech();
         let (voice, speed, volume) = if setup {
             let i = usize::try_from(w.get_picked_voice()).unwrap_or(0);
             let id = self
@@ -845,8 +858,9 @@ impl Vm {
             let v = &g.profile.voice;
             (self.voices.effective(&v.id), v.speed, v.volume)
         };
-        // events of an earlier sample are old news
-        let _ = sp.events();
+        let Some(sp) = &self.voices.speech else {
+            return false;
+        };
         self.test_id += 1;
         sp.send(dr_runtime::speech::Cmd::Test {
             id: self.test_id,
@@ -879,13 +893,19 @@ impl Vm {
     /// Updates the voice test from the speech thread. Returns true while the sample still plays (or is still
     /// being made). Only the events of the sample sent last count: an earlier sample's Cut does not end it.
     pub fn poll_test(&mut self) -> bool {
+        let events = self.drain_speech();
+        self.test_events(events)
+    }
+
+    /// The voice test's part of the speech events ([`Vm::drain_speech`] takes them all). Returns true while the
+    /// sample still plays.
+    fn test_events(&mut self, events: Vec<dr_runtime::speech::Ev>) -> bool {
         use dr_runtime::speech::Ev;
-        let (Some(w), Some(sp), Some(id)) = (self.win(), &self.voices.speech, self.test_running)
-        else {
+        let (Some(w), Some(id)) = (self.win(), self.test_running) else {
             return false;
         };
         let mut ended = false;
-        for e in sp.events() {
+        for e in events {
             if e.test() != Some(id) {
                 continue;
             }
@@ -909,6 +929,9 @@ impl Vm {
             self.check_kokoro();
             return false;
         }
+        let Some(sp) = &self.voices.speech else {
+            return false;
+        };
         let st = sp.status();
         if st.test == Some(id) && st.len_ms > 0.0 {
             w.set_test_played(voices::bars_played(st.pos_ms, st.len_ms));
@@ -1168,6 +1191,7 @@ impl Vm {
         self.games[i].profile.zones = zone_cfgs(&self.main);
         self.save_current();
         self.push_games();
+        self.reading_update();
     }
 
     /// The mode button on Overview.
@@ -1181,6 +1205,7 @@ impl Vm {
         if self.games[i].profile.mode != mode {
             self.games[i].profile.mode = mode;
             self.save_current();
+            self.reading_update();
         }
     }
 
@@ -1551,6 +1576,23 @@ fn wire(w: &MainWindow, vm: &Shared) {
     w.on_game_voice_saved(move || v.borrow_mut().game_voice_saved());
     let v = vm.clone();
     w.on_voice_volume_moved(move || v.borrow_mut().setup_volume_moved());
+    // reading (reading.rs)
+    let v = vm.clone();
+    w.on_read_now(move || v.borrow_mut().read_now());
+    let v = vm.clone();
+    w.on_pause_clicked(move || v.borrow_mut().toggle_pause());
+    let v = vm.clone();
+    w.on_now_replay(move || v.borrow().speech_cmd(dr_runtime::speech::Cmd::Replay));
+    let v = vm.clone();
+    w.on_now_stop(move || v.borrow().speech_cmd(dr_runtime::speech::Cmd::Stop));
+    let v = vm.clone();
+    w.on_recent_replay(move |i| {
+        if let Ok(i) = usize::try_from(i) {
+            v.borrow().replay_row(i);
+        }
+    });
+    let v = vm.clone();
+    w.on_key_change(move |i| v.borrow_mut().key_change(i));
     let v = vm.clone();
     w.on_page_changed(move |_| {
         // a page change can come from inside another callback that holds the view model
