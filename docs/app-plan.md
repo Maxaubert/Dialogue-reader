@@ -398,7 +398,7 @@ noted in `docs/`, and all headless tests pass.
   Recent row's replay) is not logged again; a row replay is spoken next and keeps the waiting lines.
 - **Game switch.** Opening another game stops the old reader (joined, so its last skipped lines go to its log),
   then stops speech; the events of that Stop go to the old game's log until a speech mark comes back. Pause is not
-  reset (open question).
+  reset: the next game opens "Paused" (decided by Max, 2026-11-23, spec section 6).
 - **Window.** The app finds the current game's window with its profile rules (`best_profile`, once a second on
   another thread while it is not read) and gives it to the runtime (`Cmd::Window`). A closed window ends the reader;
   a capture that fails on an open window is tried again after 3 s. The reader follows the current game; switching
@@ -407,8 +407,10 @@ noted in `docs/`, and all headless tests pass.
   key comes out as an event (nothing uses it before M4). Hooks exist only while a profile is active or a key capture
   is open. Mouse moves and the wheel leave the mouse hook before any lock. Key capture swallows the key it takes
   (down and up); left and right click pass through and are refused with a plain line; a modifier alone is not a
-  key; Esc or "Cancel" ends it; a page change ends it. A key that is already the other key is refused. Injected
-  input counts as real input (as in the spike).
+  key; Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are not taken (Windows gets them); Esc, "Cancel", a page change
+  or the main window losing the focus ends it. A key saved without Ctrl, Shift or Alt fires while they are held;
+  one saved with modifiers needs exactly those; the more specific key wins (decided by Max, 2026-11-23). A key
+  that is already the other key is refused. Injected input counts as real input (as in the spike).
 - **Elevated and exclusive fullscreen.** Checked by the runtime when it starts on a window (token elevation; a
   process that cannot be opened counts as elevated) and on its tick (the game window is in front and
   `SHQueryUserNotificationState` says D3D fullscreen). Black frames alone are not used: loading screens are black
@@ -496,12 +498,7 @@ frame is what the reader spends on a frame (crops, signatures, OCR). A press is 
   - A game switch now stops speech. This also cuts a voice test that plays at that moment.
   - A voice test still clears the game lines that wait in the queue; they now show in the log as "Stopped". Keep
     that, or let the test wait or play over them?
-  - Pause carries over to the next game (it opens "Paused"). Reset it on a game switch?
   - "Cannot read" (no OCR language) stays until the game is reopened or the app restarts; there is no retry.
-  - Modifiers must match exactly: F7 does not fire while Shift, Ctrl or Alt is held (sprint, crouch). Mouse 4 is
-    not affected. Should a key saved without modifiers fire with any modifier held?
-  - Key capture is global: while "Press a key" is open, Alt+Tab is taken as a key, and a key pressed in the game is
-    taken too. End capture when the main window loses focus, and refuse Alt+Tab and Win combos?
   - The chip says "Reading" also when nothing can be spoken (no spoken zone, or On key press mode).
   - The exclusive fullscreen notice may be a false alarm on DX12 flip-model games where capture still works
     (not checked; step 1 of the manual check).

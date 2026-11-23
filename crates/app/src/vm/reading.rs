@@ -14,7 +14,8 @@
 //! - A game change stops the reader and the speech of the game before; what it read or queued is logged under it
 //!   (a speech mark tells when its last events came).
 //! - Key capture ("Change" on the keys page and in Settings): the runtime installs the hooks while it is open; the
-//!   next key or mouse button (not left or right click) becomes the key. Esc or "Cancel" ends it.
+//!   next key or mouse button (not left or right click) becomes the key. Esc, "Cancel" or the app window losing
+//!   the focus ends it. Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are never taken (`dr_runtime::keys`).
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -710,11 +711,17 @@ impl Vm {
                 }
             }
             Action::Refused(Btn::Left | Btn::Right) => self.notice(NOTE_CLICK),
-            Action::Cancelled => {
-                self.notice("");
-                self.end_capture();
-            }
+            Action::Cancelled => self.cancel_capture(),
             _ => {}
+        }
+    }
+
+    /// Ends key capture as Esc or "Cancel" does: the key stays as it was. Also when the app window loses the
+    /// focus (`crate::focus_lost`): Alt+Tab, Win or a click in the game must not leave capture open.
+    pub fn cancel_capture(&mut self) {
+        if self.reading.capture.is_some() {
+            self.notice("");
+            self.end_capture();
         }
     }
 

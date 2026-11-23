@@ -68,12 +68,14 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
 /// The app window lost the focus (Alt+Tab, a UAC prompt): the left release of a zone drag may never come. The
 /// stage lets go of the mouse (a pointer exit) and the drag is cancelled, as a right click does: the zone goes
 /// back, a zone being drawn is dropped. Overview pauses its live view (the game is in front, src/vm/live.rs).
+/// Key capture ends as Cancel does (Max, 2026-11-23): a key pressed in the game is not taken.
 /// Public for the tests (the testing backend has no winit events).
 pub fn focus_lost(w: &MainWindow, vm: &vm::Shared) {
     use slint::platform::WindowEvent;
     w.window().dispatch_event(WindowEvent::PointerExited);
     if let Ok(mut vm) = vm.try_borrow_mut() {
         vm.cancel_zone_drag();
+        vm.cancel_capture();
         vm.live_focus(false);
     }
 }

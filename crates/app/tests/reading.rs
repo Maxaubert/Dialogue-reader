@@ -231,6 +231,37 @@ fn key_capture_takes_a_key_refuses_clicks_and_saves_in_settings() {
 }
 
 #[test]
+fn key_capture_ends_as_cancel_when_the_window_loses_the_focus() {
+    let a = app();
+    for page in [Page::Keys, Page::Settings] {
+        a.w.set_page(page);
+        let before = a.w.get_read_key();
+        a.vm.borrow_mut().key_change(0);
+        assert_eq!(a.w.get_capturing_key(), 0);
+        // a refused click put a notice up; it goes with the capture
+        a.vm.borrow_mut().key_event(Action::Refused(Btn::Right));
+        assert_eq!(a.w.get_notice().as_str(), NOTE_CLICK);
+        // Alt+Tab, Win, a click in the game: the window loses the focus
+        dr_app::focus_lost(&a.w, &a.vm);
+        assert_eq!(a.w.get_capturing_key(), -1, "{page:?}");
+        assert_eq!(a.w.get_read_key(), before, "the key stays as it was");
+        assert_eq!(a.w.get_notice().as_str(), "");
+        // a key the hook hands on after that is not taken
+        a.vm.borrow_mut()
+            .key_event(Action::Captured(Key::parse("F9").unwrap()));
+        assert_eq!(a.w.get_read_key(), before);
+    }
+    // focus loss without a capture changes nothing; a new capture works as before
+    dr_app::focus_lost(&a.w, &a.vm);
+    a.vm.borrow_mut().key_change(1);
+    assert_eq!(a.w.get_capturing_key(), 1);
+    a.vm.borrow_mut()
+        .key_event(Action::Captured(Key::parse("F9").unwrap()));
+    assert_eq!(a.w.get_menu_key().as_str(), "F9");
+    assert_eq!(a.w.get_capturing_key(), -1);
+}
+
+#[test]
 fn elevated_and_fullscreen_games_are_explained() {
     let a = app();
     a.vm.borrow_mut().runtime_event(Ev::Elevated);
