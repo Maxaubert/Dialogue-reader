@@ -95,7 +95,7 @@ impl Default for Keys {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VoiceCfg {
-    /// `windows` (v1); `kokoro` later.
+    /// The engine of `id`: `kokoro` or `windows` (the id prefix, `kokoro:` or `win:`, decides when they differ).
     pub engine: String,
     pub id: String,
     pub speed: f32,

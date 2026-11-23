@@ -58,6 +58,7 @@ export component MainWindow inherits Window {
     // voices (M3a): why the list is empty, the Settings line, and the voice test
     in property <string> voices-problem;
     in property <string> voices-desc: "Built into Windows · 11 voices";
+    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
     in property <bool> voice-testing: true;
     in property <int> test-played: 20;
     in property <string> test-time: "0:02 / 0:04";
@@ -67,7 +68,7 @@ export component MainWindow inherits Window {
     in-out property <int> game-voice: 0;
     in-out property <float> game-speed: 0.55;
     in-out property <float> game-volume: 0.8;
-    in property <string> voice-label: "Windows · David";
+    in property <string> voice-label: "Kokoro · Adam";
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
     in-out property <bool> adding-game: false;
     in property <string> version: "0.1.0";
@@ -369,6 +370,7 @@ export component MainWindow inherits Window {
                 }
                 if root.page == Page.voice: VoicePage {
                     voices: root.voices;
+                    engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
                     selected <=> root.picked-voice;
                     speed <=> root.voice-speed;
                     volume <=> root.voice-volume;
@@ -397,7 +399,7 @@ export component MainWindow inherits Window {
                     zone-count: root.setup-zones.length;
                     read-key: root.read-key;
                     menu-key: root.menu-key;
-                    voice: root.voices.length > 0 ? "Windows · " + root.voices[root.picked-voice].name : "No voice";
+                    voice: root.voices.length > 0 ? root.voices[root.picked-voice].engine + " · " + root.voices[root.picked-voice].name : "No voice";
                     speed: root.voice-speed;
                     has-voice: root.voices.length > 0;
                 }
@@ -485,6 +487,7 @@ export component MainWindow inherits Window {
                     version: root.version;
                     voices: root.voices;
                     voices-desc: root.voices-desc;
+                    kokoro-desc: root.kokoro-desc;
                     game: root.game-name;
                     has-game: root.games.length > 0;
                     game-voice <=> root.game-voice;

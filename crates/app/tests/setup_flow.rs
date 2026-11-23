@@ -389,7 +389,7 @@ fn voice_speed_and_volume_are_saved() {
     assert!((p.voice.volume - 0.5).abs() < 1e-4);
     assert_eq!(
         (p.voice.engine.as_str(), p.voice.id.as_str()),
-        ("windows", "fake-zira")
+        ("windows", "win:fake-zira")
     );
 }
 

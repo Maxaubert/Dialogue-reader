@@ -258,6 +258,69 @@ winocr-naive, and standard and hard a1 with prompts off, every scene's events id
 40 differ in each). Simulated clock against `docs/baselines/` (soft): all three exit 0 with "no regressions";
 standard a1 0.788, dup 83, halluc 118; hard a1 0.390 (278/712), halluc 131; standard winocr-naive unchanged.
 
+### Kokoro engine (built 2026-11-23)
+
+Kokoro is the main engine when its files are on the PC; the Windows voices are the backup when Kokoro's files are
+missing or its model does not load. DialogReader does not depend on an installed Sonara. Kokoro ships with the app
+(Max, 2026-11-23: "kokoro voices should be bundled"). Why Sonara's code is copied and not used as a whole crate: spec
+section 6, "Kokoro engine (built 2026-11-23)". Built on `feat/app-m3a`:
+
+- `crates/tts/src/kokoro/`: `KokoroTts` (voices without a model, one load shared by clones, `preload` on its own
+  thread, synth to PCM with 250 ms between sentences, `game_text` so capital lines and "O'" names are read as
+  words, not spelled), `KokoroFiles` (looks in the app folder, then
+  `%LOCALAPPDATA%\DialogReader\models\kokoro\v1.0`, then Sonara's folders in a debug build or with
+  `DIALOGREADER_SONARA_KOKORO=1`; files count only at their known size; nothing is downloaded), and the modules
+  copied from Sonara with attribution (`LICENSE-Sonara`).
+- `crates/tts/src/engines.rs`: `Engines`, one `Tts` over Kokoro and Windows. Profile ids `kokoro:af_heart` and
+  `win:<id>`; an id without a prefix is an old Windows id. A new game gets Heart (`af_heart`).
+- `crates/app/src/vm/voices.rs`: `Voices::real()` (was `windows()`) builds both engines; the list is Kokoro's 28
+  voices, or the Windows voices when Kokoro is missing. `VoiceData.engine` gives each row its engine name.
+- Tests: unit tests on a fake model and fake engines; `cargo test -p dr-tts --test kokoro -- --ignored` runs the
+  real model to PCM in memory (ignored by default, fails when the files are missing). Run on this PC: passed (load
+  1681 ms and synth 427 ms in a debug build, 3840 ms of sound for the sample line). render-screens adds
+  `18-voice-windows.png` and `18-settings-voices-windows.png` (Kokoro missing).
+  `cargo run -p dr-tts --example kokoro_text` prints what game lines become (no model).
+- Not tested yet: the app speaking through Kokoro end to end (`Engines`, the speech thread, the speakers): Max is
+  the first to hear it. The files were found in Sonara's folders; the app-folder paths ran only in unit tests on
+  temp folders.
+- Measured on this PC (release build, `cargo run --release -p dr-tts --example kokoro_bench`, files from Sonara's
+  folders, ONNX Runtime 1.28.2): first load 835 to 889 ms; one dialogue line (the 05 sample, 3.8 s of sound)
+  389 to 430 ms; memory 7 MB before load, 507 MB after load, 605 MB after three lines.
+- `DialogReader.exe` (`cargo build --profile ship`): 29,021,184 bytes, was 23,644,160 (+5.4 MB: the misaki
+  lexicons and tagger are compiled in). Build 3 min 26 s. After the Kokoro review fixes: 29,032,960 bytes (build 3 min 7 s). The model (about 354 MB) and `onnxruntime.dll` are
+  separate files.
+
+**After the Kokoro review (2026-11-23).** A model that does not load (for example an `onnxruntime.dll` older than
+API 24) no longer leaves Kokoro listed with every line failing: `Engines` speaks with the Windows default voice and
+notes it once in `speech.log`, and the app reads `KokoroTts::watch` at each page change and voice test and then
+lists the Windows voices. When Windows has no voice either, the error is Kokoro's. `Engines::synth` no longer lists
+the Windows voices for every line. Sonara's folders are searched only in debug builds or with
+`DIALOGREADER_SONARA_KOKORO=1`. A capital speaker name before a colon ("ZOE: Go.") is read as a name, not spelled.
+`THIRD_PARTY_NOTICES.md` added (the misaki lexicons are in the exe). `vm::Source` holds `Box<Voices>` (no clippy
+allow). The Settings Kokoro row says "Installed" (the approved mockup's word), not "Included".
+
+**Text changes for Max to approve** (wait for question 13; old > new; old is the M3a text):
+
+| Where | Old | New |
+|---|---|---|
+| 05 list header | Windows voices | Kokoro voices (as in the mockup); Windows voices when Kokoro is missing |
+| 05 list count | number of Windows voices | 28 (Kokoro's English voices) |
+| 05 voice rows | David, Zira, ... (Windows names) | Heart, Bella, Emma, Nicole, ... (Kokoro names, Kokoro's own order); sample data back to the mockup's Adam, Bella, Michael ... |
+| 05 test card label | Windows · David | Kokoro · Heart (engine of the picked voice) |
+| 05 header button | Add voices (opens Windows Settings > Speech) | unchanged (still adds Windows voices only; mockup said "Get more voices", open question) |
+| 05 empty list | No Windows voice is installed. Press Add voices to get one. | The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice. |
+| 06 summary voice | Windows · David | Kokoro · Heart (engine of the picked voice) |
+| 10 voice button, 01 preview card, quick menu (sample data) | Windows · David / Read just now · Windows · David / David | Kokoro · Adam / Read just now · Kokoro · Adam / Adam (back to the mockups) |
+| 12 Voices row 1 | Windows voices · Built into Windows · N voices · Add voices | Kokoro · Installed · 28 voices · 354 MB (no button; mockup: "Installed · 11 voices · 312 MB" with "Manage") |
+| 12 Voices row 2 | Kokoro · Coming later · more natural voices that run on your PC | Windows voices · Built into Windows · N voices · Add voices (moved down, unchanged) |
+| 12 Kokoro row when Kokoro's files are missing (new) | none | Kokoro · Not found · Windows voices speak instead |
+| 12 voice picker | Windows · David | Kokoro · Heart (engine of the voice) |
+| notice, test failed: engine | The Windows voice could not speak the sample. | The voice could not speak the sample. |
+
+Layout change (also for Max): Settings > Voices shows the Kokoro row first and the Windows row second, as mockup 12
+(which had Kokoro, then Piper). Page 05 keeps its layout; with Kokoro the Windows voices are not listed (they
+are the backup only).
+
 ## M3b: capture, keys and live reading
 
 **Scope.** The real loop (spec 2.2): capture thread, reader thread with `Pipeline` (auto) or `Manual` (read key),
@@ -371,6 +434,25 @@ installer/                         installer script (per-user install, no admin)
 CLAUDE.md                          build, test and release block (shipping skill)
 ```
 
+**Kokoro in the installer (added 2026-11-23, Max: Kokoro is bundled).** The installer ships next to
+`DialogReader.exe`: `onnxruntime.dll` (Microsoft's official CPU build, 1.28.2 or newer that has API 24, from the
+`onnxruntime-win-x64` zip; with `onnxruntime-LICENSE.txt` and `onnxruntime-ThirdPartyNotices.txt`), the four
+Visual C++ DLLs it imports (`msvcp140.dll`, `msvcp140_1.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`, 14.40 or
+newer, app-local; Sonara's `packaging/runtime_dlls.py` shows how), and `kokoro\kokoro-v1.0.onnx` plus
+`kokoro\voices-v1.0.bin` (from the kokoro-onnx release `model-files-v1.0`, SHA-256 checked at build time, about
+354 MB). Plus `THIRD_PARTY_NOTICES` with: Sonara (MIT, the copied Kokoro code), misaki-rs (MIT) and its lexicons
+(Apache-2.0), Kokoro-82M (Apache-2.0), kokoro-onnx (MIT), ONNX Runtime (MIT), the VC++ runtime terms (Sonara's
+`packaging/notices/models-and-data.md` has the texts). Test: a clean install on a PC without Sonara speaks with
+Kokoro, and DialogReader finds the files in its own folder (not the Sonara fallback, which a ship build does not
+search).
+
+**Licence gates (added 2026-11-23, apply whether Kokoro is bundled or not).**
+- `THIRD_PARTY_NOTICES.md` ships with every `DialogReader.exe` given to anyone, from the first one (the misaki
+  lexicons are compiled in). Before that first copy: add each Rust crate's own copyright line (a tool such as
+  `cargo about` can list them; Sonara's own notices lack these lines, so its texts cannot simply be copied).
+- Before any paid release: the provenance check of the misaki lexicons (some entries came from espeak-ng output,
+  GPL-3.0; spec section 6). Without a clean result, a paid release does not ship them.
+
 **Tests.** Settings round trip. Autostart writes and removes the Run value (on a test value name, cleaned up).
 Single instance: a second process started by the test exits and the first gets the "show" message (no visible
 window: the first instance runs with `--minimized` on a hidden desktop). Version string equals the workspace
@@ -381,7 +463,6 @@ Windows works after a sign-out, and all headless tests pass. Merge only after Ma
 
 ## After v1
 
-- Kokoro voices behind the `Tts` trait (needs the ort + Kokoro spike, plan.md spike 3).
 - Zone-only frame copies in `dr-core` to cut CPU on 4K.
 - Per-speaker voices, OCR languages beyond en-US.
 - Media pause while speaking. The old app had it. Max to confirm that v1 may ship without it (spec section 6).

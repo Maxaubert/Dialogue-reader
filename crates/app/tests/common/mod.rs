@@ -225,19 +225,15 @@ pub fn temp_paths() -> (tempfile::TempDir, Paths) {
 
 /// Two fake voices ("David", "Zira") and a speech thread with a fake engine and a null sink: nothing plays.
 pub fn fake_voices() -> Voices {
-    let tts = dr_tts::FakeTts::new();
-    let list = dr_tts::Tts::voices(&tts);
-    let speech = Speech::start(
-        Box::new(tts),
+    // Windows voices only (no Kokoro), through the same engine router as the app
+    let engines = || dr_tts::Engines::new(None, Some(Box::new(dr_tts::FakeTts::new())));
+    let mut v = Voices::of(&engines(), 2, None);
+    v.speech = Some(Speech::start(
+        Box::new(engines()),
         || Box::new(NullSink::timed(1.0)),
         VoiceSettings::default(),
-    );
-    Voices {
-        list,
-        problem: None,
-        speech: Some(speech),
-        log: None,
-    }
+    ));
+    v
 }
 
 /// A window on a temp data folder and a fake desktop, at 1440 x 900, with no event loop.
@@ -259,7 +255,7 @@ pub fn real_window_with(
     let (w, vm) = dr_app::build_window(Source::Real {
         paths: paths.clone(),
         desktop: Box::new(desktop),
-        voices,
+        voices: Box::new(voices),
     })
     .expect("window");
     w.window().set_size(slint::LogicalSize::new(1440.0, 900.0));

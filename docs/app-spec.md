@@ -26,7 +26,7 @@ Inputs: [PRODUCT.md](../PRODUCT.md), [plan.md](plan.md), [reader-a1.md](reader-a
 |---|---|---|---|
 | `crates/core` | `dr-core` | Engine, as today: zones, change checks, OCR scheduling, dedup. `Pipeline` (auto) and `Manual` (read key). | nothing |
 | `crates/ocr` (new) | `dr-ocr` | WinRT OCR engine (`Windows.Media.Ocr`), moved out of `crates/arena/src/ocr/winrt.rs`. Implements `dr_core::Ocr`. | `dr-core`, `windows` |
-| `crates/tts` (new) | `dr-tts` | `Tts` trait. First engine: Windows voices (`Windows.Media.SpeechSynthesis.SpeechSynthesizer`). Kokoro later behind the same trait. | `windows` |
+| `crates/tts` (new) | `dr-tts` | `Tts` trait. Kokoro (the main engine since 2026-11-23 when its files are on the PC; whether they ship with the app is open, section 6 question 13) and the Windows voices (`Windows.Media.SpeechSynthesis.SpeechSynthesizer`, the backup) behind it, joined by `Engines`. | `windows`, `ort`, `misaki` (Sonara) |
 | `crates/runtime` (new) | `dr-runtime` | No UI. Capture, reader thread, speech queue, audio out, global keys, profiles on disk. One `Runtime` handle with commands in and events out. | `dr-core`, `dr-ocr`, `dr-tts`, `windows`, `windows-capture` |
 | `crates/app` (new) | `dr-app`, binary `DialogReader.exe` | Slint UI: main window, onboarding, overlays (pill, quick menu, zone edit), tray, single instance, start with Windows. | `dr-runtime`, `slint` |
 | `crates/arena` | `arena` | Test harness, as today. Uses `dr-ocr` instead of its own WinRT copy. Keeps PP-OCR (`ppocr` feature). | `dr-core`, `dr-ocr` |
@@ -130,8 +130,32 @@ pub trait Tts: Send {
 
 - First engine `WinTts`: `SpeechSynthesizer`, `AllVoices()` for the list, `Options().SetSpeakingRate(speed)`,
   `SynthesizeTextToStreamAsync` gives a WAV stream that is parsed to PCM.
-- Kokoro later: a second `impl Tts` (ONNX through `ort`), chosen per profile. The UI shows the engine name before
-  the voice ("Windows · David", later "Kokoro · Adam").
+- Kokoro (built 2026-11-23; ships inside the app, Max): `KokoroTts`, a second
+  `impl Tts` (`crates/tts/src/kokoro`).
+  Kokoro-82M v1.0 on Microsoft's CPU ONNX Runtime (`ort` 2.0.0-rc.15, `load-dynamic`), phonemes from Sonara's
+  misaki (no espeak). 28 English voices (US and UK, female and male), 24 kHz mono. The voice list needs no model;
+  the model loads once on its own thread at app start (`preload`) and a `synth` meanwhile waits for it. Each
+  sentence is made on its own, its silent edges cut, its loudness set, and 250 ms of silence put between sentences
+  (DialogReader's own choice, not Sonara's). Game text first goes through `game_text`: a line with no lower-case
+  letter ("WE NEED TO GO") is lower-cased, else Sonara's rules spell each word as letters; "O'Driscoll" becomes
+  "O Driscoll", else the name is spelled; a capital speaker name before a colon ("CIRI: Go.") is written as a name
+  ("Ciri: Go."), else a short name the lexicon does not know is spelled (a word under 3 letters or with no vowel,
+  "AI:", "NPC:", stays an acronym).
+  Files, in order: model and voice styles in `<exe dir>\kokoro\`, then
+  `%LOCALAPPDATA%\DialogReader\models\kokoro\v1.0\`, then Sonara's `%LOCALAPPDATA%\Sonara\models\kokoro\v1.0\` and
+  `%USERPROFILE%\.sonara\kokoro\`; `onnxruntime.dll` in `<exe dir>`, then
+  `%LOCALAPPDATA%\Sonara\runtime\<newest version>\`. Sonara's folders are a developer fallback: searched only in a
+  debug build or with `DIALOGREADER_SONARA_KOKORO=1` (a shipped build must not load another app's DLL and model).
+  A file counts only at its known size. Nothing is downloaded yet. Missing files: Kokoro is off, the reason goes to
+  `speech.log`, Windows voices speak. Files present but a model that does not load (for example an old
+  `onnxruntime.dll`): `Engines` speaks each line with the Windows default voice and notes it once in `speech.log`;
+  the app reads the load state (`KokoroTts::watch`, never waits for the load) at each page change and voice test
+  and then lists the Windows voices. Measured on this PC: see app-plan.md, "Kokoro engine (built 2026-11-23)".
+- `Engines` joins both: the app shows Kokoro's voices when Kokoro is there, else the Windows voices. Voice ids in
+  the profile say the engine: `kokoro:af_heart`, `win:<Windows id>`; an id without a prefix (saved before
+  2026-11-23) is a Windows id. A Kokoro id without Kokoro, or when Kokoro fails, speaks with the Windows default
+  voice and the other way round (when both fail, the error of the picked engine is kept). A new game gets the first voice of the list: Kokoro's Heart (`af_heart`, Kokoro's best rated). The UI
+  shows the engine name before the voice ("Kokoro · Heart", "Windows · David").
 - Audio out: one output stream through `rodio` (pinned exact version). Volume, stop and mute act on the sink.
   Speed is passed to the engine (better quality than resampling).
 - Queue: lines are spoken in order. A new manual press replaces the queue. Stop clears it. Lines older than 10 s
@@ -212,7 +236,7 @@ Profile JSON (version field so later changes can migrate):
   "match": { "exe": "RDR2.exe", "title_contains": null },
   "mode": "auto",
   "keys": { "read": "Mouse 4", "quick_menu": "F7" },
-  "voice": { "engine": "windows", "id": "...", "speed": 1.1, "volume": 0.8 },
+  "voice": { "engine": "kokoro", "id": "kokoro:af_heart", "speed": 1.1, "volume": 0.8 },
   "read_prompts": false,
   "ocr_lang": "en-US",
   "zones": [
@@ -243,7 +267,8 @@ Profile JSON (version field so later changes can migrate):
   file wins. So one window makes one profile "Running", and Retake uses that same window. Page 02 refuses a window
   when its best profile matched it by title (the same rule), or, for a profile with the exe only, when its name is
   this window's title apart from counters, and points to the game switcher.
-- `voice.id` is the Windows voice picked on page 05 or in Settings > Voices (empty when none is installed);
+- `voice.id` is the voice picked on page 05 or in Settings > Voices, with its engine prefix (`kokoro:af_heart`,
+  `win:<id>`; empty when there is no voice); `voice.engine` is `kokoro` or `windows`;
   `speed` (0.5 to 2.0) and `volume` come from page 05 and Settings > Voices.
 - The active profile follows the game: when a window that matches a profile appears, the profile it fits best
   starts.
@@ -421,14 +446,15 @@ Navigation is one Slint enum property on the main window:
 | Frameless main window | Own title bar loses some native behaviour (snap layouts, resize borders). | winit `drag_window` and `drag_resize_window` from the title bar and edges. If snap layouts matter, keep the native frame and theme it dark later. |
 | Speed of 4K frames | Copying 33 MB per frame costs CPU next to a game. | 25 fps cap, newest-frame slot, later zone-only copies. Measure CPU in M3b with Satisfactory. |
 | Slint limits | No line height on `StyledText`, no outline-offset, no blur, no rounded clip and no shadows in the software renderer. Overlay transparency depends on the winit backend. | `line-height-factor` on `Text`. Rings as extra rectangles. Corner masks in software renders only. Check transparent, frameless, topmost windows in a spike right after M1 (app-plan.md); fallback: draw overlays with the software renderer into a Win32 layered window (`UpdateLayeredWindow`). |
-| Windows voices quality | Built-in voices sound flat next to Kokoro. | Tts trait from day one. Kokoro comes after v1 behind it. |
+| Windows voices quality | Built-in voices sound flat next to Kokoro. | Kokoro is the main engine when its files are on the PC (2026-11-23); Windows voices are only the backup. How the files reach a user's PC is open (section 6, question 13). |
+| Kokoro under `panic = "abort"` | The ship profile aborts on a panic, so the `catch_unwind` guards around ONNX Runtime do nothing there: a bad `onnxruntime.dll` or model ends the app instead of falling back to Windows voices. | `KokoroFiles` checks the sizes, and a ship build never searches Sonara's folders. Errors that ONNX Runtime returns (not panics) fall back to the Windows voices; a too-old `onnxruntime.dll` is such an error (`ort` rc.15 returns `LoadError::BadVersion`, checked in the Kokoro review). |
 | Log shows skipped lines | 10-main-b and 14 show "Prompts off" and "Already read" rows. `dr-core` does not report skipped lines today. | M1 shows them from fake data. M3a adds a small `dr-core` change: a `skipped` list in `Output` and `Press` (line, zone, reason: already read, prompts off). With prompts off, prompt zones are still read but not spoken, so the log can show them; if that OCR cost shows up in the M3b CPU check, prompt zones are dropped and the log shows nothing for them. Cost seen in the M3a review (simulated clock, soft): standard a1 with prompts off, CPU per frame p50 0.65 to 2.35 ms, p95 14.6 to 17.9 ms, same score. In manual mode a press also waits for the OCR of every prompt zone before any line is spoken. On the M3b checklist. |
 
 ## 6. Open questions for Max
 
-1. Voice labels in the approved mockups say "Kokoro · Adam". v1 ships Windows voices first. From M3a the labels
-   show the real engine ("Windows · David"). Built in M3a and waiting for Max's yes: the text changes are listed
-   in app-plan.md, M3a result.
+1. Voice labels in the approved mockups say "Kokoro · Adam". Since 2026-11-23 the labels say "Kokoro · Heart"
+   again (the engine of the picked voice), "Windows · David" only when Kokoro is missing. The text changes are
+   listed in app-plan.md, "Kokoro engine (built 2026-11-23)", and wait for Max's approval with question 13.
 2. Settings > Updates: v1 shows the version and a "Check now" link to GitHub Releases. Automatic install of updates
    is later.
 3. "Import settings" on the welcome page: v1 imports a profile JSON exported from DialogReader (Export is in the
@@ -441,8 +467,10 @@ Navigation is one Slint enum property on the main window:
 5. Settings > Keys: settled. Max picked "D everywhere" (2026-11-22), so Settings shows the same two 04-read-key-d
    cards as setup.
 6. Media pause while speaking. The old app had it; this plan puts it after v1. Is v1 without it acceptable?
-7. Kokoro wording. M3a changed the voice page header, "Get more voices" and Settings > Voices to what v1 ships
-   (Windows voices), as a proposal. Max approves it or names other words (list in app-plan.md, M3a result).
+7. Kokoro wording. M3a changed the voice page header, "Get more voices" and Settings > Voices to Windows voices.
+   Since 2026-11-23 the page 05 header says "Kokoro voices" again and Settings > Voices has a real Kokoro row
+   (app-plan.md, "Kokoro engine (built 2026-11-23)"). Open: the page 05 header button still says "Add voices" and opens the Windows
+   speech settings (it adds Windows voices only); the mockup said "Get more voices".
 8. Renderer: settled. Max (2026-11-22): Skia with `panic = "abort"` in a ship-only profile. Measured before
    (`crates/app/README.md`, "Renderer"): Skia text has 100 to 101% of the mockup shots' ink at 100% and 225%
    scale, femtovg 79 to 89%. The workspace `Cargo.toml` has `[profile.ship]` (inherits release, fat LTO, one
@@ -461,15 +489,47 @@ Navigation is one Slint enum property on the main window:
 10. Game check on page 02 (M2): any app that draws with Direct3D counts as a game by the library check (on this
    PC, Flare). Browsers and Electron are left out by window class. Is that good enough, or should the library
    check go (games would then need a full-monitor window or a profile)?
-11. No Windows voice on Max's PC (M3a review, 2026-11-23). Max adds an English voice in Windows Settings > Time &
-    language > Speech once, then runs `cargo test -p dr-tts --test voices -- --ignored`. If WinRT still lists no
-    voice, v1 needs a SAPI 5 engine (Zira is registered there) before M3b, or Max cannot hear his own app.
+11. No Windows voice on Max's PC (M3a review, 2026-11-23). Less urgent while Kokoro's files are on his PC (Max
+    hears the app through Kokoro). The Windows voices stay the backup; a SAPI 5 engine is only needed if Max wants a backup on a
+    PC like his.
 12. Games that share an exe (M3a review): the first profile of an exe gets its title when a second game of that exe
     is set up, and titles are compared without counters (FPS, frame times, percent, versions). Open: let Max edit
     the saved title on page 02 (new UI, needs a mockup). The reviewer advised doing it.
+13. Kokoro details (2026-11-23): is 500 to 600 MB of memory next to a game fine, and should the model load at app
+    start (now) or at the first game or sample? Should Windows voices stay pickable on page 05 when Kokoro is
+    there (today an old Windows pick shows and speaks as "Kokoro · Heart")? What should the page 05 button say and
+    do? Is the 250 ms gap between sentences right (heard by Max)?
 
 ### Decisions after M2 (Max, 2026-11-22)
 - Games that share one exe (emulators, javaw.exe, Game.exe): allow several profiles per exe and tell them apart by
   exe plus window title. Replaces the "one profile per exe" refusal from M2. Built in M3a (section 2.8).
 - UI bits added in M2 without a mockup (rename field, notice strip, exe icons on page 02, scrolling lists, the blue
   box while drawing) are accepted as built. Max flags anything he dislikes when he sees it.
+
+### Kokoro engine (built 2026-11-23)
+- **Kokoro is bundled (Max, 2026-11-23).** His words: "kokoro voices should be bundled, if sonara fits or would be
+  helpful it can be considered". So the installer ships the model, `onnxruntime.dll` and its DLLs next to
+  `DialogReader.exe` (M5), and DialogReader never needs an installed Sonara. Sonara's model folders are searched
+  only in debug builds or with `DIALOGREADER_SONARA_KOKORO=1`, as a developer shortcut.
+- Kokoro is the main engine when its files are on the PC, the Windows voices are the backup when Kokoro's files
+  are missing or its model does not load (section 2.5). DialogReader does not depend on an installed Sonara
+  (Sonara's folders are a developer fallback only).
+- How Sonara is reused: Sonara's `sonara-engine` as a git dependency was tried first (pinned rev, `kokoro` feature,
+  no default features). It does not resolve here: it pins `ort =2.0.0-rc.13` and the arena pins
+  `ort =2.0.0-rc.15`, and cargo stops with "failed to select a version for `ort`" (both are 2.0.0 pre-releases, so
+  they cannot sit side by side). Changing the arena's PP-OCR setup or Sonara's pin was out of scope. Checked: the
+  arena still builds with `--features ppocr`, and a normal build keeps the two `ort` feature sets apart (the arena's
+  `download-binaries`, dr-tts's `load-dynamic`); only a `--all-features` workspace build would join them. Its high-level engine is also not wanted: its model manager hashes the
+  300 MB model, writes `verified.json` into the model folder, and deletes and downloads a file whose hash differs.
+  So: Sonara's `misaki` crate (the G2P, no `ort`) is a git dependency pinned to commit
+  `8fd2af726869e1dfe49814ea21eb4aa7bd335c99`, and Sonara's Kokoro modules (model, voices, phonemes, text rules,
+  vocab, lead-in, word fallback, trim, loudness) are copied into `crates/tts/src/kokoro` with attribution and
+  Sonara's MIT licence (`LICENSE-Sonara`), moved to `ort` rc.15. The download, hashing and fallback-wait code is
+  not copied. No HTTP code is linked (`cargo tree -p dr-tts` has no `ureq`, `rustls` or `ring`).
+- Licences of what ships (all permissive, from Sonara's `packaging/notices/models-and-data.md`, checked
+  2026-10-02): Kokoro-82M weights Apache-2.0, the ONNX export and `voices-v1.0.bin` from kokoro-onnx MIT, misaki-rs
+  MIT, misaki lexicons Apache-2.0, ONNX Runtime MIT, the Visual C++ runtime DLLs under Microsoft's redistributable
+  terms. Sonara notes a provenance check of the misaki lexicons (some entries came from espeak-ng output) before a
+  commercial bundle; that applies to DialogReader too (a gate in app-plan.md, M5).
+- The misaki lexicons and tagger (about 3.6 MB) are compiled into `DialogReader.exe`, so the notice duty starts with
+  the first exe given to anyone, not with the installer: `THIRD_PARTY_NOTICES.md` (repo root) lists them now.

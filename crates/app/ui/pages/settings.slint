@@ -81,9 +81,11 @@ export component SettingsTab inherits Rectangle {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     in property <string> version: "0.1.0";
-    // Voices (M3a): the Windows voices, and the current game's voice, speed and volume (saved in its profile)
+    // Voices: Kokoro (first, as in mockup 12) and the Windows voices, and the current game's voice, speed and
+    // volume (saved in its profile)
     in property <[VoiceData]> voices;
     in property <string> voices-desc: "Built into Windows · 11 voices";
+    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
     in property <string> game: "Red Dead Redemption 2";
     in property <bool> has-game: true;
     in-out property <int> game-voice: 0;
@@ -242,6 +244,11 @@ export component SettingsTab inherits Rectangle {
                             padding: 1px;
                             SetRow {
                                 first: true;
+                                title: "Kokoro";
+                                desc: root.kokoro-desc;
+                            }
+
+                            SetRow {
                                 title: "Windows voices";
                                 desc: root.voices-desc;
                                 VerticalLayout {
@@ -254,11 +261,6 @@ export component SettingsTab inherits Rectangle {
                                         }
                                     }
                                 }
-                            }
-
-                            SetRow {
-                                title: "Kokoro";
-                                desc: "Coming later · more natural voices that run on your PC";
                             }
 
                             SetRow {
@@ -288,7 +290,7 @@ export component SettingsTab inherits Rectangle {
                                                 padding-left: Space.s3 + 1px;
                                                 padding-right: Space.s3 + 1px;
                                                 Text {
-                                                    text: root.voices.length > 0 ? "Windows · " + root.voices[root.game-voice].name : "No voice";
+                                                    text: root.voices.length > 0 ? root.voices[root.game-voice].engine + " · " + root.voices[root.game-voice].name : "No voice";
                                                     color: Palette.text;
                                                     vertical-alignment: center;
                                                     horizontal-stretch: 1;

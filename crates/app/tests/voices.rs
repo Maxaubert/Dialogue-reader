@@ -10,7 +10,7 @@ use dr_app::Page;
 use dr_app::vm::voices::Voices;
 use dr_runtime::profile;
 use dr_runtime::speech::{NullSink, Speech, VoiceSettings};
-use dr_tts::{FakeTts, Tts};
+use dr_tts::{Engines, FakeTts};
 use i_slint_backend_testing::{AccessibleRole, ElementHandle};
 use slint::Model;
 
@@ -19,17 +19,15 @@ fn voices(scale: f64) -> (Voices, FakeTts, NullSink) {
     let tts = FakeTts::new();
     let sink = NullSink::timed(scale);
     let (t, s) = (tts.clone(), sink.clone());
-    let speech = Speech::start(Box::new(t), move || Box::new(s), VoiceSettings::default());
-    (
-        Voices {
-            list: tts.voices(),
-            problem: None,
-            speech: Some(speech),
-            log: None,
-        },
-        tts,
-        sink,
-    )
+    // Windows voices only (no Kokoro), through the same engine router as the app
+    let speech = Speech::start(
+        Box::new(Engines::new(None, Some(Box::new(t)))),
+        move || Box::new(s),
+        VoiceSettings::default(),
+    );
+    let mut v = Voices::of(&Engines::new(None, Some(Box::new(tts.clone()))), 2, None);
+    v.speech = Some(speech);
+    (v, tts, sink)
 }
 
 /// The button labelled `label` can be pressed.
@@ -117,7 +115,7 @@ fn with_no_voice_installed_the_pages_say_so_and_finish_still_saves() {
     assert_eq!(w.get_voices_desc(), "Built into Windows · none installed");
     assert_eq!(
         w.get_voices_problem(),
-        "No Windows voice is installed. Press Add voices to get one."
+        "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice."
     );
     assert_eq!(w.get_voice_label(), "No voice");
     w.set_page(Page::Voice);
@@ -171,7 +169,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
     assert!((p.voice.volume - 0.8).abs() < 1e-4, "{}", p.voice.volume);
     w.invoke_game_voice_saved();
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
-    assert_eq!(p.voice.id, "fake-zira");
+    assert_eq!(p.voice.id, "win:fake-zira");
     assert!((p.voice.speed - 1.5).abs() < 1e-4, "{}", p.voice.speed);
     assert!((p.voice.volume - 0.3).abs() < 1e-4);
 
@@ -203,6 +201,19 @@ fn a_saved_voice_that_is_gone_falls_back_to_the_first() {
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_game_voice(), 0);
     assert_eq!(w.get_voice_label(), "Windows · David");
+}
+
+#[test]
+fn an_old_windows_id_without_a_prefix_still_picks_its_voice() {
+    // profiles saved before Kokoro (M3a) hold the bare Windows id
+    let (_dir, paths) = temp_paths();
+    let mut p = dr_runtime::Profile::new("g", "Game", "TestGame.exe");
+    p.voice.id = "fake-zira".into();
+    profile::save(&paths, &p).unwrap();
+    let (vs, _, _) = voices(0.0);
+    let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    assert_eq!(w.get_game_voice(), 1);
+    assert_eq!(w.get_voice_label(), "Windows · Zira");
 }
 
 /// A finished game, its window and view model, on fake voices whose engine takes `delay` to make a sound.
@@ -279,10 +290,7 @@ fn a_failed_test_says_why_in_plain_words() {
     press(&w, "Play sample", AccessibleRole::Button);
     wait_test_end(&vm);
     assert!(!w.get_voice_testing());
-    assert_eq!(
-        w.get_notice(),
-        "The Windows voice could not speak the sample."
-    );
+    assert_eq!(w.get_notice(), "The voice could not speak the sample.");
 }
 
 #[test]
@@ -303,4 +311,38 @@ fn the_page_05_volume_slider_changes_a_playing_sample() {
     std::thread::sleep(Duration::from_millis(100));
     assert!((sink.volume() - 0.7).abs() < 1e-4, "{}", sink.volume());
     vm.borrow_mut().stop_test();
+}
+
+#[test]
+fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices() {
+    use dr_tts::kokoro::{LoadState, LoadWatch};
+    let (_dir, paths) = temp_paths();
+    let kokoro = FakeTts::with_voices(vec![
+        dr_tts::kokoro::voice_of("af_heart"),
+        dr_tts::kokoro::voice_of("am_adam"),
+    ]);
+    let engines = Engines::new(Some(Box::new(kokoro)), Some(Box::new(FakeTts::new())));
+    let watch = LoadWatch::default();
+    let vs = Voices {
+        kokoro_load: Some(watch.clone()),
+        ..Voices::of(&engines, 2, None)
+    };
+    let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    let names = |w: &dr_app::MainWindow| -> Vec<String> {
+        w.get_voices().iter().map(|v| v.name.to_string()).collect()
+    };
+    assert_eq!(names(&w), ["Heart", "Adam"]);
+    assert!(w.get_kokoro_desc().starts_with("Installed · 2 voices"));
+    assert_eq!(w.get_voice_label(), "Kokoro · Heart");
+
+    // the model fails on its own thread; the next page change shows the Windows voices
+    watch.set(LoadState::Failed("onnxruntime.dll is too old".into()));
+    w.set_page(Page::Voice);
+    settle();
+    assert_eq!(names(&w), ["David", "Zira"]);
+    assert_eq!(
+        w.get_kokoro_desc(),
+        "Not found · Windows voices speak instead"
+    );
+    assert_eq!(w.get_voice_label(), "Windows · David");
 }

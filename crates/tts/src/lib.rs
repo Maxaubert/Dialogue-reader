@@ -2,18 +2,23 @@
 //!
 //! - [`Tts`]: the engine interface. An engine lists its voices and turns text into PCM. It never plays sound:
 //!   playback, volume, stop and mute belong to the audio sink in `dr-runtime` (`speech.rs`).
-//! - [`WinTts`]: the voices built into Windows (`Windows.Media.SpeechSynthesis.SpeechSynthesizer`), the v1 engine.
+//! - [`KokoroTts`]: Kokoro voices, the main engine when its files are on the PC (ships with the app: docs/app-spec.md section 6). See [`kokoro`].
+//! - [`WinTts`]: the voices built into Windows (`Windows.Media.SpeechSynthesis.SpeechSynthesizer`), the backup
+//!   when Kokoro's files are missing.
+//! - [`Engines`]: one engine over both; profile voice ids carry the engine (`kokoro:af_heart`, `win:<id>`).
 //! - [`FakeTts`]: a test engine that makes silent PCM whose length follows the text and the speed.
 //! - [`wav::parse`]: WAV bytes to [`Pcm`].
-//!
-//! Kokoro comes later as a second `impl Tts`.
 
+pub mod engines;
 pub mod fake;
+pub mod kokoro;
 pub mod wav;
 #[cfg(windows)]
 mod win;
 
+pub use engines::Engines;
 pub use fake::FakeTts;
+pub use kokoro::{KokoroFiles, KokoroTts};
 #[cfg(windows)]
 pub use win::WinTts;
 
@@ -34,7 +39,7 @@ pub struct Voice {
     /// BCP 47 language tag, for example "en-US".
     pub lang: String,
     pub gender: Option<Gender>,
-    /// Engine name as saved in the profile (`voice.engine`): "windows" for [`WinTts`].
+    /// Engine name as saved in the profile (`voice.engine`): "kokoro" for [`KokoroTts`], "windows" for [`WinTts`].
     pub engine: &'static str,
 }
 

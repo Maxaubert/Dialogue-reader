@@ -1,5 +1,4 @@
-//! Fake data from the approved mockups (Red Dead Redemption 2, five zones, Mouse 4 and F7). The voices are
-//! Windows voices since M3a (the mockups showed Kokoro · Adam).
+//! Fake data from the approved mockups (Red Dead Redemption 2, five zones, Kokoro · Adam, Mouse 4 and F7).
 //! It sits behind the view-model layer (`vm::Source::Fake`): render-screens and the tests use it. With real data
 //! (M2), profiles and the window list replace the zones, windows and games; voices (M3a), the activity log
 //! (M3b) and zone edit (M4) are still filled from here.
@@ -143,41 +142,43 @@ pub fn windows() -> (Vec<WindowData>, Vec<WindowData>) {
 
 fn voices() -> Vec<VoiceData> {
     [
-        ("David", "American English · Male", "US · Male"),
-        ("Zira", "American English · Female", "US · Female"),
-        ("Mark", "American English · Male", "US · Male"),
-        ("Hazel", "British English · Female", "UK · Female"),
+        ("Adam", "American English · Male", "US · Male"),
+        ("Bella", "American English · Female", "US · Female"),
+        ("Michael", "American English · Male", "US · Male"),
+        ("Emma", "British English · Female", "UK · Female"),
         ("George", "British English · Male", "UK · Male"),
-        ("Susan", "British English · Female", "UK · Female"),
+        ("Sky", "American English · Female", "US · Female"),
         // below the fold of the list (the header count says 11)
-        ("Catherine", "Australian English · Female", "AU · Female"),
-        ("James", "Australian English · Male", "AU · Male"),
-        ("Linda", "Canadian English · Female", "CA · Female"),
-        ("Richard", "Canadian English · Male", "CA · Male"),
-        ("Heera", "Indian English · Female", "IN · Female"),
+        ("Sarah", "American English · Female", "US · Female"),
+        ("Nicole", "American English · Female", "US · Female"),
+        ("Eric", "American English · Male", "US · Male"),
+        ("Alice", "British English · Female", "UK · Female"),
+        ("Lewis", "British English · Male", "UK · Male"),
     ]
     .iter()
     .map(|&(n, d, sh)| VoiceData {
         name: s(n),
         desc: s(d),
         short: s(sh),
+        engine: s("Kokoro"),
     })
     .collect()
 }
 
 fn menu_voices() -> Vec<VoiceData> {
     [
-        ("David", "US · Male"),
-        ("Zira", "US · Female"),
-        ("Mark", "US · Male"),
-        ("Hazel", "UK · Female"),
-        ("George", "UK · Male"),
+        ("Adam", "US · Male"),
+        ("Bella", "US · Female"),
+        ("Michael", "US · Male"),
+        ("Sarah", "US · Female"),
+        ("Emma", "UK · Female"),
     ]
     .iter()
     .map(|&(n, sh)| VoiceData {
         name: s(n),
         desc: s(sh),
         short: s(sh),
+        engine: s("Kokoro"),
     })
     .collect()
 }

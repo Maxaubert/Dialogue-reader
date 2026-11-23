@@ -139,9 +139,17 @@ pub enum Source {
     Real {
         paths: Paths,
         desktop: Box<dyn Desktop>,
-        /// The installed voices and the speech thread for the voice test (M3a).
-        voices: Voices,
+        /// The voices (Kokoro, or the Windows voices) and the speech thread for the voice test.
+        voices: Box<Voices>,
     },
+}
+
+/// The voice list and the voice texts of `v` to the window (page 05 and Settings > Voices).
+fn push_voice_list(w: &MainWindow, v: &Voices) {
+    w.set_voices(ModelRc::new(VecModel::from(v.rows())));
+    w.set_voices_problem(v.problem_text().into());
+    w.set_voices_desc(v.desc().into());
+    w.set_kokoro_desc(v.kokoro_desc().into());
 }
 
 /// Slint kind from a profile kind, and back.
@@ -517,10 +525,9 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         } => {
             // the activity log and zone edit stay fake until M3b and M4
             crate::fake::fill(w);
-            vm.voices = voices;
-            w.set_voices(ModelRc::new(VecModel::from(vm.voices.rows())));
-            w.set_voices_problem(vm.voices.problem_text().into());
-            w.set_voices_desc(vm.voices.desc().into());
+            vm.voices = *voices;
+            vm.voices.check_kokoro();
+            push_voice_list(w, &vm.voices);
             w.set_voice_testing(false);
             w.set_test_played(0);
             w.set_test_time("0:00".into());
@@ -788,10 +795,27 @@ impl Vm {
             self.stop_test();
         }
         self.game_voice_saved();
+        self.check_kokoro();
+    }
+
+    /// When Kokoro's model failed to load (it loads on its own thread), the voice screens switch to the Windows
+    /// voices. Called at points that exist anyway: a page change, a voice test.
+    pub fn check_kokoro(&mut self) {
+        if !self.voices.check_kokoro() {
+            return;
+        }
+        let Some(w) = self.win() else { return };
+        push_voice_list(&w, &self.voices);
+        if usize::try_from(w.get_picked_voice()).map_or(true, |i| i >= self.voices.list.len()) {
+            w.set_picked_voice(0);
+        }
+        w.set_voice_label(self.voices.label("").into());
+        self.push_profile_settings();
     }
 
     /// Play sample (page 05, `setup`) or Test (Settings, the current game).
     pub fn test_voice(&mut self, setup: bool) -> bool {
+        self.check_kokoro();
         let Some(w) = self.win() else { return false };
         if self.voices.list.is_empty() {
             self.notice(&self.voices.problem_text());
@@ -881,6 +905,8 @@ impl Vm {
             w.set_voice_testing(false);
             w.set_test_played(0);
             w.set_test_time("0:00".into());
+            // a sample that did not play may mean that Kokoro failed to load
+            self.check_kokoro();
             return false;
         }
         let st = sp.status();
@@ -1055,7 +1081,7 @@ impl Vm {
         };
         p.keys.read = w.get_read_key().into();
         p.keys.quick_menu = w.get_menu_key().into();
-        // the voice picked on page 05 (none when no Windows voice is installed), its speed and volume
+        // the voice picked on page 05 (none when there is no voice at all), its speed and volume
         if let Some(v) = usize::try_from(w.get_picked_voice())
             .ok()
             .and_then(|i| self.voices.list.get(i))

@@ -1,4 +1,4 @@
-// 05 voice. M3a: real Windows voices (the mockup said Kokoro; v1 ships the voices built into Windows).
+// 05 voice. Kokoro voices (as in the approved mockup); the Windows voices when Kokoro's files are missing.
 import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
 import { VoiceData } from "../data.slint";
 import { Icon, CIcon, Button, BtnKind, Card, CardHead, ITile, Chip, Slider, Wave, SmallLabel } from "../components/base.slint";
@@ -9,9 +9,9 @@ export component VoicePage inherits Rectangle {
     in-out property <int> selected: 0;
     in-out property <float> speed: 0.55;
     in-out property <float> volume: 0.8;
-    // engine name in front of the voice name ("Windows · David")
-    in property <string> engine: "Windows";
-    // why the list is empty (no Windows voice installed)
+    // engine of the list, for its header ("Kokoro voices", "Windows voices")
+    in property <string> engine: "Kokoro";
+    // why the list is empty (no Kokoro files and no Windows voice installed)
     in property <string> problem;
     // a sample is playing: the button says Stop, the wave shows how far it got
     in property <bool> testing;
@@ -154,7 +154,7 @@ export component VoicePage inherits Rectangle {
                     CardHead {
                         title: "Test it";
                         Text {
-                            text: root.voices.length > 0 ? root.engine + " · " + root.voices[root.selected].name : "No voice";
+                            text: root.voices.length > 0 ? root.voices[root.selected].engine + " · " + root.voices[root.selected].name : "No voice";
                             font-size: Type.fs1;
                             color: Palette.text-3;
                             vertical-alignment: center;

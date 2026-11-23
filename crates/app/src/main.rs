@@ -1,5 +1,6 @@
 //! DialogReader.exe. M2: profiles in `%APPDATA%\DialogReader`, the real window list, a screenshot, and zones.
-//! M3a: the Windows voices, with a voice test that plays on the speakers.
+//! M3a: voices, with a voice test that plays on the speakers: Kokoro first when its files are on the PC, the Windows
+//! voices when they are missing or its model does not load.
 //!
 //! `--fake` shows the mockup data instead of real profiles. `--preview-overlay <pill|quick-menu|quick-menu-voice|
 //! zone-edit>` shows an in-game overlay inside the main window (debug: the real overlay windows come in M4).
@@ -40,7 +41,7 @@ fn run(args: &[String]) -> Result<(), slint::PlatformError> {
             paths,
             desktop: Box::new(dr_app::vm::RealDesktop),
             // the only place that can reach the speakers (the voice test)
-            voices: dr_app::vm::voices::Voices::windows(),
+            voices: Box::new(dr_app::vm::voices::Voices::real()),
         },
         _ => dr_app::vm::Source::Fake,
     };
