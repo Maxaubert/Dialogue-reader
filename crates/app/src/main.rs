@@ -71,9 +71,8 @@ fn run(
     let source = match paths {
         Some(paths) if !fake => {
             // Start with Windows follows this exe (a moved folder, a portable copy replaced by the installed one).
-            // Only here: tests and tools never write the app's Run value. An elevated app uses a task instead.
-            if !dr_runtime::elevation::self_elevated()
-                && let Ok(exe) = std::env::current_exe()
+            // Only here: tests and tools never write the app's Run value.
+            if let Ok(exe) = std::env::current_exe()
                 && let Err(e) = dr_runtime::autostart::Autostart::app().follow(&exe)
             {
                 log("autostart.log", &format!("Start with Windows: {e}\n"));

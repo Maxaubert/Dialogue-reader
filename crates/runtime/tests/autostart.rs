@@ -26,7 +26,7 @@ fn run_value_is_written_and_removed() {
 
     assert_eq!(a.run_value(), None);
     let exe = Path::new(r"C:\Program Files\Test Folder\DialogReader.exe");
-    a.enable(exe, false).unwrap();
+    a.enable(exe).unwrap();
     assert_eq!(
         a.run_value().as_deref(),
         Some(r#""C:\Program Files\Test Folder\DialogReader.exe" --minimized"#)
@@ -68,43 +68,4 @@ fn the_run_value_follows_the_exe() {
     a.disable().unwrap();
     assert_eq!(a.run_value(), None);
     assert_eq!(Autostart::app().run_value(), app_before);
-}
-
-/// Makes a real sign-in task (normal rights, a test name, a path that does not exist) and removes it. Ignored in
-/// the gate because it changes Task Scheduler; run it by hand: `cargo test -p dr-runtime --test autostart --
-/// --ignored`.
-#[test]
-#[ignore]
-fn a_sign_in_task_is_made_and_removed() {
-    let name = format!("DialogReader.test-task-{}", std::process::id());
-    let a = Autostart::named(&name);
-    struct Gone(String);
-    impl Drop for Gone {
-        fn drop(&mut self) {
-            let _ = std::process::Command::new("schtasks.exe")
-                .args(["/Delete", "/F", "/TN", &self.0])
-                .output();
-        }
-    }
-    let _gone = Gone(name.clone());
-    let exe = Path::new(r"C:\Does Not Exist\Test Folder\DialogReader.exe");
-    a.make_task(exe, false).unwrap();
-    assert!(a.has_task());
-    assert!(a.is_on());
-    let out = std::process::Command::new("schtasks.exe")
-        .args(["/Query", "/TN", &name, "/XML"])
-        .output()
-        .unwrap();
-    let xml = String::from_utf8_lossy(&out.stdout).into_owned();
-    assert!(
-        xml.contains(r"<Command>C:\Does Not Exist\Test Folder\DialogReader.exe</Command>"),
-        "{xml}"
-    );
-    assert!(xml.contains("<Arguments>--minimized</Arguments>"), "{xml}");
-    assert!(
-        xml.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"),
-        "{xml}"
-    );
-    a.disable().unwrap();
-    assert!(!a.has_task());
 }

@@ -558,6 +558,16 @@ Navigation is one Slint enum property on the main window:
 - The quick menu key also reaches the game when it opens the menu (not swallowed).
 - Until the tray in M5, closing the main window quits DialogReader. (Since M5 it hides to the tray.)
 
+### Decisions after M5 (Max, 2026-11-23, PR #17 merged)
+- Slint licence: Royalty-free 2.0. Before any copy goes to anyone, show the AboutSlint widget (for example in
+  Settings > Updates) or the "Made with Slint" badge on the download page.
+- "Show in the taskbar" defaults to on (the mockup showed off).
+- After a silent update, a DialogReader that was running starts again with `--minimized`.
+- Security fix (follow-up PR): Start with Windows always uses the HKCU Run value, also when DialogReader runs as
+  administrator. A highest-privilege sign-in task pointing at the per-user install (a folder the user can write)
+  would let any program of that user get admin rights at the next sign-in. Starting with Windows as
+  administrator for elevated games is an open question.
+
 ### Kokoro engine (built 2026-11-23)
 - **Kokoro is bundled (Max, 2026-11-23).** His words: "kokoro voices should be bundled, if sonara fits or would be
   helpful it can be considered". So the installer ships the model, `onnxruntime.dll` and its DLLs next to

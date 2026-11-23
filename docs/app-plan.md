@@ -688,7 +688,7 @@ skill.
 ```
 crates/app/src/tray.rs             tray-icon on the UI thread
 crates/app/src/single.rs           named mutex + hidden listener window: show, quit, end of session, TaskbarCreated
-crates/runtime/src/autostart.rs    HKCU Run key, or a scheduled task when run as admin
+crates/runtime/src/autostart.rs    HKCU Run key (never an elevated task, see its module docs)
 crates/runtime/src/settings.rs     settings.json load/save
 crates/app/app.manifest            per-monitor DPI v2, common controls, asInvoker
 installer/                         installer script (per-user install, no admin), version from Cargo
