@@ -19,6 +19,9 @@
 //! - The start returns at once (`dr_runtime::live` builds the session on a helper thread). A start Windows
 //!   refuses comes back as the end of the session: "no live picture" while the window is open, "closed" if not.
 //! - "Retake screenshot" still updates the saved still.
+//! - While the reader captures the same window (M3b), the live view attaches to the reader's capture session
+//!   instead of starting a second one on that window (`dr_runtime::live::Attacher`). When the reader starts or
+//!   stops, the live view moves to or from it on the next check, and the last frame stays on the stage meanwhile.
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -42,8 +45,16 @@ impl LiveRun for dr_runtime::live::Live {
     }
 }
 
+impl LiveRun for dr_runtime::live::Attached {
+    fn set_target(&self, w: u32, h: u32) {
+        dr_runtime::live::Attached::set_target(self, w, h);
+    }
+}
+
 /// How often the UI checks whether the live view should run.
 pub const TICK: Duration = Duration::from_millis(500);
+/// Frames of the live view at most this often (also when attached to the reader's session).
+const INTERVAL: Duration = Duration::from_millis(66);
 /// A failed start is tried again after this long.
 const RETRY: Duration = Duration::from_secs(3);
 /// No frame for this long: check whether the game was minimized. A game that does not change sends no frames,
@@ -134,6 +145,8 @@ enum For {
 
 pub struct LiveState {
     run: Option<Box<dyn LiveRun>>,
+    /// `run` is attached to the reader's capture session (not a session of its own).
+    attached: bool,
     slot: Arc<Slot>,
     session: u64,
     of: Option<For>,
@@ -169,6 +182,7 @@ impl Default for LiveState {
     fn default() -> Self {
         LiveState {
             run: None,
+            attached: false,
             slot: Arc::new(Slot::default()),
             session: 0,
             of: None,
@@ -331,6 +345,17 @@ impl Vm {
             self.live_start(&w, of);
             return;
         }
+        // the reader started or stopped capturing this window: move to its session, or to one of our own
+        let shared = self
+            .live
+            .win
+            .as_ref()
+            .is_some_and(|win| self.reading_attacher(win.hwnd).is_some());
+        if shared != self.live.attached {
+            self.live_pause();
+            self.live_start(&w, of);
+            return;
+        }
         // running: a quiet game is fine, a minimized or closed one shows the saved screenshot
         let quiet_since = self.live.last_frame.or(self.live.started);
         if quiet_since.is_some_and(|t| t.elapsed() >= QUIET) {
@@ -380,15 +405,26 @@ impl Vm {
                 ..SlotData::default()
             };
         }
-        let sink = Sink {
+        let sink = || Sink {
             slot: self.live.slot.clone(),
             session,
             w: w.as_weak(),
         };
         let (tw, th) = self.live.target;
-        match real.desktop.live(&win, tw, th, Box::new(sink)) {
+        // the reader captures this window already: one session serves both
+        let attached = self
+            .reading_attacher(win.hwnd)
+            .and_then(|a| a.attach(tw, th, INTERVAL, Box::new(sink())))
+            .map(|a| Box::new(a) as Box<dyn LiveRun>);
+        let is_attached = attached.is_some();
+        let run = match attached {
+            Some(a) => Ok(a),
+            None => real.desktop.live(&win, tw, th, Box::new(sink())),
+        };
+        match run {
             Ok(run) => {
                 self.live.run = Some(run);
+                self.live.attached = is_attached;
                 self.live.of = Some(of);
                 self.live.win = Some(win);
                 self.live.started = Some(Instant::now());
@@ -539,6 +575,12 @@ impl Vm {
         let Some(of) = self.live.of.filter(|_| self.live.run.is_some()) else {
             return;
         };
+        if ended.as_deref() == Some(dr_runtime::live::STOPPED) {
+            // the reader's session it was attached to stopped: a session of its own starts at the next check,
+            // and the last frame stays meanwhile
+            self.live_pause();
+            return;
+        }
         if ended.is_some() {
             self.live.run = None;
             self.live.pending = None;

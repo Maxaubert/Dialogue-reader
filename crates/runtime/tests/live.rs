@@ -492,3 +492,61 @@ fn live_cost_4k() {
         times[19].as_secs_f64() * 1000.0
     );
 }
+
+#[test]
+fn one_session_serves_the_reader_and_an_attached_live_view() {
+    use dr_runtime::capture::{FrameSource, Next, WgcSource};
+    let win = moving(640, 360);
+    let mut src = WgcSource::start(win.hwnd).unwrap();
+    let got = Arc::new(Mutex::new(Got::default()));
+    let attached = src
+        .attacher()
+        .attach(160, 160, INTERVAL, Box::new(Sink(got.clone())))
+        .expect("the reader's session runs");
+    // full-size frames for the reader, and small ones for the live view, from the same captured frames
+    let end = Instant::now() + Duration::from_secs(2);
+    let mut full = 0;
+    while Instant::now() < end {
+        if let Next::Frame(f) = src.next(Duration::from_millis(100)) {
+            assert_eq!((f.w, f.h), (640, 360));
+            assert_eq!(f.rgba.len(), 640 * 360 * 4);
+            full += 1;
+            src.recycle(f.rgba);
+        }
+    }
+    assert!(full >= 15, "only {full} full frames in 2 s");
+    let n = got.lock().unwrap().frames.len();
+    assert!(n >= 8, "only {n} live view frames in 2 s");
+    assert!(
+        got.lock()
+            .unwrap()
+            .frames
+            .iter()
+            .all(|f| (f.0, f.1, f.2, f.3, f.4) == (640, 360, 160, 90, true))
+    );
+    // detached: no frame reaches it after the drop, while the reader goes on
+    drop(attached);
+    let n = got.lock().unwrap().frames.len();
+    let end = Instant::now() + Duration::from_millis(600);
+    let mut more = 0;
+    while Instant::now() < end {
+        if let Next::Frame(f) = src.next(Duration::from_millis(100)) {
+            more += 1;
+            src.recycle(f.rgba);
+        }
+    }
+    assert!(more > 0);
+    assert_eq!(got.lock().unwrap().frames.len(), n);
+    // a live view attached when the reader stops gets the end
+    let got2 = Arc::new(Mutex::new(Got::default()));
+    let a2 = src
+        .attacher()
+        .attach(160, 160, INTERVAL, Box::new(Sink(got2.clone())))
+        .unwrap();
+    drop(src);
+    assert_eq!(
+        got2.lock().unwrap().ended.as_deref(),
+        Some(dr_runtime::live::STOPPED)
+    );
+    assert!(!a2.is_attached());
+}

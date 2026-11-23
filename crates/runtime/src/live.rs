@@ -14,6 +14,13 @@
 //! - The capture size (`src_w` x `src_h`) comes with every frame: zones stay in capture pixels.
 //! - [`Live::stop`] (or drop) ends the session at once for the sink: no frame is handed over after it returns.
 //!   The capture thread itself is stopped and joined on a helper thread, so the caller never waits for it.
+//!
+//! One session serves both the reader and the live view (M3b). The reader's session ([`Live::start_full`]) hands
+//! full-size frames to a [`FullSink`] every 40 ms. While it runs, the live view of the same window does not start
+//! a second session: it attaches to the reader's ([`Attacher::attach`]) and gets small frames made on the GPU
+//! from the same captured frame. Its own interval check then runs on the reader's 40 ms frames, so it gets about
+//! every second frame (12.5 a second instead of 15). When the reader is not running, the live view starts its own
+//! session as before ([`Live::start`]).
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
@@ -62,6 +69,44 @@ pub trait LiveSink: Send + 'static {
     fn ended(&mut self, why: &str);
 }
 
+/// Where full-size frames go (the reader, [`Live::start_full`]). Runs on the capture thread.
+pub trait FullSink: Send + 'static {
+    /// A buffer for the next frame: it is resized to `w * h * 4` and filled. Give back a spare one, so a 4K
+    /// frame (33 MB) is not allocated each time.
+    fn buffer(&mut self) -> Vec<u8>;
+    /// One frame of the capture size, tight RGBA rows, alpha 255.
+    fn frame(&mut self, w: u32, h: u32, rgba: Vec<u8>);
+    /// The window closed or the capture failed (also a start Windows refused). No frame follows.
+    fn ended(&mut self, why: &str);
+}
+
+/// The consumer a session was started for.
+enum Primary {
+    /// The live view: frames made small to fit `max_w` x `max_h`.
+    Small(Box<dyn LiveSink>),
+    /// The reader: frames of the capture size.
+    Full(Box<dyn FullSink>),
+}
+
+impl Primary {
+    fn ended(&mut self, why: &str) {
+        match self {
+            Primary::Small(s) => s.ended(why),
+            Primary::Full(s) => s.ended(why),
+        }
+    }
+}
+
+/// A live view attached to another session (the reader's).
+struct Attach {
+    id: u64,
+    sink: Box<dyn LiveSink>,
+    max_w: u32,
+    max_h: u32,
+    interval: Duration,
+    last: Option<Instant>,
+}
+
 /// What the session cost so far (for the CPU budget in crates/app/README.md).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LiveStats {
@@ -83,6 +128,8 @@ pub struct LiveStats {
 struct Shared {
     /// Cleared by `stop`. Checked early in each frame to skip work; the gate below is what makes it final.
     alive: AtomicBool,
+    /// Set when Windows ended the session (the window closed, the capture failed or the start was refused).
+    ended: AtomicBool,
     /// Held around the last open check and the sink call, and while `stop` clears it: after `stop` returns, no
     /// frame or end reaches the sink. Only the sink call runs under it, not the frame's work.
     gate: Mutex<bool>,
@@ -98,37 +145,137 @@ struct Shared {
     readback_ns: AtomicU64,
     scale_ns: AtomicU64,
     sink_ns: AtomicU64,
+    /// The window (`HWND.0`), for [`Attacher::hwnd`].
+    hwnd: isize,
+    /// A live view attached to this session. Its sink is called with this lock held, so after
+    /// [`Attached`] is dropped no frame reaches it.
+    attached: Mutex<Option<Attach>>,
+    next_attach: AtomicU64,
 }
 
 impl Shared {
     fn gate(&self) -> MutexGuard<'_, bool> {
         self.gate.lock().unwrap_or_else(|e| e.into_inner())
     }
+
+    fn attached(&self) -> MutexGuard<'_, Option<Attach>> {
+        self.attached.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The attached live view (if any) gets `why` as its end and is let go.
+    fn end_attached(&self, why: &str) {
+        if let Some(mut a) = self.attached().take() {
+            a.sink.ended(why);
+        }
+    }
 }
 
 struct Flags {
     shared: Arc<Shared>,
-    sink: Box<dyn LiveSink>,
+    primary: SinkBack,
     interval: Duration,
 }
 
 struct Handler {
     shared: Arc<Shared>,
-    sink: Box<dyn LiveSink>,
+    primary: SinkBack,
     interval: Duration,
     last: Option<Instant>,
     out: Vec<u8>,
     ended: bool,
     gpu: Gpu,
     taps: Option<Taps>,
+    /// The attached live view's own GPU objects and buffers (its size differs from the primary's).
+    view_gpu: Gpu,
+    view_out: Vec<u8>,
+    view_taps: Option<Taps>,
 }
 
 impl Handler {
     fn end(&mut self, why: &str) {
+        // before the attached view is let go: no attach lands on the dead session after it
+        self.shared.ended.store(true, Ordering::Release);
         let open = self.shared.gate();
         if !self.ended && *open {
             self.ended = true;
-            self.sink.ended(why);
+            if let Some(p) = self.primary.inner.as_mut() {
+                p.ended(why);
+            }
+        }
+        drop(open);
+        self.shared.end_attached(why);
+    }
+
+    /// Makes `frame` `tw` x `th` into `out`: on the GPU, or (when D3D fails) from a full readback, box-filtered on
+    /// the CPU. Gives the time the readback ended. Err: the frame could not be read.
+    fn make(
+        gpu: &mut Gpu,
+        taps: &mut Option<Taps>,
+        cpu_only: bool,
+        frame: &mut Frame,
+        tw: u32,
+        th: u32,
+        out: &mut Vec<u8>,
+    ) -> Result<(Instant, bool), String> {
+        if !cpu_only && let Ok(t1) = gpu.read(frame, tw, th, out) {
+            return Ok((t1, true));
+        }
+        let (src_w, src_h) = (frame.width(), frame.height());
+        let mut fb = frame
+            .buffer()
+            .map_err(|e| format!("could not read the captured frame: {e}"))?;
+        let t1 = Instant::now();
+        let pitch = fb.row_pitch() as usize;
+        let raw = fb.as_raw_buffer();
+        out.resize((tw * th * 4) as usize, 0);
+        let t = match taps.take() {
+            Some(t) if t.is_for(src_w, src_h, tw, th) => t,
+            _ => Taps::new(src_w, src_h, tw, th),
+        };
+        downscale_with(&t, raw, pitch, out);
+        *taps = Some(t);
+        Ok((t1, false))
+    }
+
+    /// The attached live view, when one is there and due: its small frame of `frame`.
+    fn feed_attached(&mut self, frame: &mut Frame, now: Instant) {
+        let s = self.shared.clone();
+        let (id, max_w, max_h) = {
+            let mut a = s.attached();
+            let Some(a) = a.as_mut() else { return };
+            if a.last
+                .is_some_and(|t| now.duration_since(t) + Duration::from_millis(8) < a.interval)
+            {
+                return;
+            }
+            a.last = Some(now);
+            (a.id, a.max_w, a.max_h)
+        };
+        let (src_w, src_h) = (frame.width(), frame.height());
+        let (tw, th) = fit(src_w, src_h, max_w, max_h);
+        let cpu_only = s.cpu_only.load(Ordering::Relaxed);
+        if Self::make(
+            &mut self.view_gpu,
+            &mut self.view_taps,
+            cpu_only,
+            frame,
+            tw,
+            th,
+            &mut self.view_out,
+        )
+        .is_err()
+        {
+            return;
+        }
+        let mut a = s.attached();
+        if let Some(a) = a.as_mut().filter(|a| a.id == id) {
+            a.sink.frame(&LiveFrame {
+                src_w,
+                src_h,
+                w: tw,
+                h: th,
+                rgba: &self.view_out,
+            });
         }
     }
 }
@@ -141,13 +288,16 @@ impl GraphicsCaptureApiHandler for Handler {
         let f = ctx.flags;
         Ok(Handler {
             shared: f.shared,
-            sink: f.sink,
+            primary: f.primary,
             interval: f.interval,
             last: None,
             out: Vec::new(),
             ended: false,
             gpu: Gpu::default(),
             taps: None,
+            view_gpu: Gpu::default(),
+            view_out: Vec::new(),
+            view_taps: None,
         })
     }
 
@@ -162,6 +312,8 @@ impl GraphicsCaptureApiHandler for Handler {
             return Ok(());
         }
         let now = Instant::now();
+        // a live view attached to this session (the reader's) has its own interval
+        self.feed_attached(frame, now);
         // a little early is fine: WGC's own interval already spaces the frames
         if self
             .last
@@ -172,44 +324,46 @@ impl GraphicsCaptureApiHandler for Handler {
         }
         self.last = Some(now);
         let (src_w, src_h) = (frame.width(), frame.height());
-        let (max_w, max_h) = (
-            s.max_w.load(Ordering::Relaxed),
-            s.max_h.load(Ordering::Relaxed),
-        );
-        let (tw, th) = fit(src_w, src_h, max_w, max_h);
-        // the GPU makes the picture the target size; any D3D error falls back to the full readback
-        let gpu = if s.cpu_only.load(Ordering::Relaxed) {
-            None
+        let full = matches!(self.primary.inner, Some(Primary::Full(_)));
+        let (tw, th) = if full {
+            (src_w, src_h)
         } else {
-            self.gpu.read(frame, tw, th, &mut self.out).ok()
+            fit(
+                src_w,
+                src_h,
+                s.max_w.load(Ordering::Relaxed),
+                s.max_h.load(Ordering::Relaxed),
+            )
         };
-        let (t1, t2) = match gpu {
-            Some(t1) => {
-                s.gpu_frames.fetch_add(1, Ordering::Relaxed);
-                (t1, Instant::now())
+        // a full frame goes straight into the reader's buffer (no second copy of 33 MB at 4K)
+        let mut buf = match self.primary.inner.as_mut() {
+            Some(Primary::Full(f)) => f.buffer(),
+            _ => std::mem::take(&mut self.out),
+        };
+        // the GPU makes the picture the target size; any D3D error falls back to the full readback
+        let made = Self::make(
+            &mut self.gpu,
+            &mut self.taps,
+            s.cpu_only.load(Ordering::Relaxed),
+            frame,
+            tw,
+            th,
+            &mut buf,
+        );
+        let t1 = match made {
+            Ok((t1, on_gpu)) => {
+                if on_gpu {
+                    s.gpu_frames.fetch_add(1, Ordering::Relaxed);
+                }
+                t1
             }
-            None => {
-                let mut fb = match frame.buffer() {
-                    Ok(fb) => fb,
-                    Err(e) => {
-                        self.end(&format!("could not read the captured frame: {e}"));
-                        control.stop();
-                        return Ok(());
-                    }
-                };
-                let t1 = Instant::now();
-                let pitch = fb.row_pitch() as usize;
-                let raw = fb.as_raw_buffer();
-                self.out.resize((tw * th * 4) as usize, 0);
-                let taps = match self.taps.take() {
-                    Some(t) if t.is_for(src_w, src_h, tw, th) => t,
-                    _ => Taps::new(src_w, src_h, tw, th),
-                };
-                downscale_with(&taps, raw, pitch, &mut self.out);
-                self.taps = Some(taps);
-                (t1, Instant::now())
+            Err(e) => {
+                self.end(&e);
+                control.stop();
+                return Ok(());
             }
         };
+        let t2 = Instant::now();
         // stop() may have come while this frame was made: it must not reach the sink then
         let open = s.gate();
         if !*open {
@@ -217,13 +371,20 @@ impl GraphicsCaptureApiHandler for Handler {
             control.stop();
             return Ok(());
         }
-        self.sink.frame(&LiveFrame {
-            src_w,
-            src_h,
-            w: tw,
-            h: th,
-            rgba: &self.out,
-        });
+        match self.primary.inner.as_mut() {
+            Some(Primary::Full(f)) => f.frame(tw, th, buf),
+            Some(Primary::Small(sink)) => {
+                sink.frame(&LiveFrame {
+                    src_w,
+                    src_h,
+                    w: tw,
+                    h: th,
+                    rgba: &buf,
+                });
+                self.out = buf;
+            }
+            None => self.out = buf,
+        }
         drop(open);
         let t3 = Instant::now();
         s.frames.fetch_add(1, Ordering::Relaxed);
@@ -274,11 +435,40 @@ impl Live {
         cpu_only: bool,
         sink: Box<dyn LiveSink>,
     ) -> Result<Live, String> {
+        Self::launch(hwnd, max_w, max_h, interval, cpu_only, Primary::Small(sink))
+    }
+
+    /// The reader's session: frames of the capture size go to `sink`, at most every `interval`. A live view can
+    /// attach to it ([`Live::attacher`]). Returns at once, as [`Live::start`].
+    pub fn start_full(
+        hwnd: isize,
+        interval: Duration,
+        sink: Box<dyn FullSink>,
+    ) -> Result<Live, String> {
+        Self::launch(hwnd, 1, 1, interval, false, Primary::Full(sink))
+    }
+
+    /// A handle that attaches live views to this session, from any thread.
+    pub fn attacher(&self) -> Attacher {
+        Attacher {
+            shared: self.shared.clone(),
+        }
+    }
+
+    fn launch(
+        hwnd: isize,
+        max_w: u32,
+        max_h: u32,
+        interval: Duration,
+        cpu_only: bool,
+        sink: Primary,
+    ) -> Result<Live, String> {
         if !crate::windows_list::is_open(hwnd) {
             return Err("the window is gone".into());
         }
         let shared = Arc::new(Shared {
             alive: AtomicBool::new(true),
+            ended: AtomicBool::new(false),
             gate: Mutex::new(true),
             starting: AtomicBool::new(true),
             cpu_only: AtomicBool::new(cpu_only),
@@ -290,6 +480,9 @@ impl Live {
             readback_ns: AtomicU64::new(0),
             scale_ns: AtomicU64::new(0),
             sink_ns: AtomicU64::new(0),
+            hwnd,
+            attached: Mutex::new(None),
+            next_attach: AtomicU64::new(1),
         });
         let control = Arc::new(Mutex::new(None));
         let (sh, ctl) = (shared.clone(), control.clone());
@@ -310,11 +503,14 @@ impl Live {
                         }
                     }
                     Err(e) => {
+                        sh.ended.store(true, Ordering::Release);
                         let sink = slot.lock().ok().and_then(|mut s| s.take());
                         let open = sh.gate();
                         if let (Some(mut sink), true) = (sink, *open) {
                             sink.ended(&e);
                         }
+                        drop(open);
+                        sh.end_attached(&e);
                     }
                 }
                 sh.starting.store(false, Ordering::Release);
@@ -363,6 +559,8 @@ impl Live {
     fn halt(&mut self) {
         *self.shared.gate() = false;
         self.shared.alive.store(false, Ordering::Release);
+        // a live view attached to this session ends with it (it starts its own session then)
+        self.shared.end_attached(STOPPED);
         let c = self
             .control
             .lock()
@@ -388,7 +586,7 @@ fn build(
     hwnd: isize,
     interval: Duration,
     shared: &Arc<Shared>,
-    slot: &Arc<Mutex<Option<Box<dyn LiveSink>>>>,
+    slot: &Arc<Mutex<Option<Primary>>>,
 ) -> Result<Control, String> {
     let mut cursor = CursorCaptureSettings::WithoutCursor;
     let mut border = DrawBorderSettings::WithoutBorder;
@@ -402,7 +600,7 @@ fn build(
         };
         let back = SinkBack {
             slot: slot.clone(),
-            sink: Some(sink),
+            inner: Some(sink),
         };
         let settings = Settings::new(
             Window::from_raw_hwnd(hwnd as *mut std::ffi::c_void),
@@ -414,7 +612,7 @@ fn build(
             ColorFormat::Rgba8,
             Flags {
                 shared: shared.clone(),
-                sink: Box::new(back),
+                primary: back,
                 interval,
             },
         );
@@ -430,32 +628,117 @@ fn build(
     }
 }
 
-/// Forwards to the sink, and gives it back to the start when an attempt fails.
+/// Holds the session's sink, and gives it back to the start when an attempt fails.
 struct SinkBack {
-    slot: Arc<Mutex<Option<Box<dyn LiveSink>>>>,
-    sink: Option<Box<dyn LiveSink>>,
-}
-
-impl LiveSink for SinkBack {
-    fn frame(&mut self, f: &LiveFrame) {
-        if let Some(s) = &mut self.sink {
-            s.frame(f);
-        }
-    }
-    fn ended(&mut self, why: &str) {
-        if let Some(s) = &mut self.sink {
-            s.ended(why);
-        }
-    }
+    slot: Arc<Mutex<Option<Primary>>>,
+    inner: Option<Primary>,
 }
 
 impl Drop for SinkBack {
     fn drop(&mut self) {
-        if let (Some(s), Ok(mut slot)) = (self.sink.take(), self.slot.lock())
+        if let (Some(s), Ok(mut slot)) = (self.inner.take(), self.slot.lock())
             && slot.is_none()
         {
             *slot = Some(s);
         }
+    }
+}
+
+/// The end a live view gets when the session it was attached to stops (the reader stopped).
+pub const STOPPED: &str = "the session it was attached to stopped";
+
+/// Attaches live views to a running session (the reader's). Cheap to clone; usable from any thread.
+#[derive(Clone)]
+pub struct Attacher {
+    shared: Arc<Shared>,
+}
+
+impl Attacher {
+    /// The window the session captures (`HWND.0`).
+    pub fn hwnd(&self) -> isize {
+        self.shared.hwnd
+    }
+
+    /// The session still runs (not stopped, and not ended by Windows).
+    pub fn is_running(&self) -> bool {
+        self.live() && *self.shared.gate()
+    }
+
+    /// Not stopped and not ended (no lock).
+    fn live(&self) -> bool {
+        self.shared.alive.load(Ordering::Acquire) && !self.shared.ended.load(Ordering::Acquire)
+    }
+
+    /// A live view of this session's window: frames fit inside `max_w` x `max_h`, at most every `interval` (on
+    /// top of the session's own interval), go to `sink` until the returned handle is dropped. A live view attached
+    /// before is let go (it gets no end). None when the session has stopped.
+    pub fn attach(
+        &self,
+        max_w: u32,
+        max_h: u32,
+        interval: Duration,
+        sink: Box<dyn LiveSink>,
+    ) -> Option<Attached> {
+        if !self.is_running() {
+            return None;
+        }
+        let id = self.shared.next_attach.fetch_add(1, Ordering::Relaxed);
+        let mut slot = self.shared.attached();
+        // an end or a stop that came since: it let go of the attached view already, so this one would get nothing
+        if !self.live() {
+            return None;
+        }
+        *slot = Some(Attach {
+            id,
+            sink,
+            max_w: max_w.max(1),
+            max_h: max_h.max(1),
+            interval,
+            last: None,
+        });
+        Some(Attached {
+            shared: self.shared.clone(),
+            id,
+        })
+    }
+}
+
+/// A live view attached to another session. Dropping it detaches it: no frame reaches its sink after the drop.
+pub struct Attached {
+    shared: Arc<Shared>,
+    id: u64,
+}
+
+impl Attached {
+    /// A new target size (the stage changed size).
+    pub fn set_target(&self, max_w: u32, max_h: u32) {
+        if let Some(a) = self.shared.attached().as_mut().filter(|a| a.id == self.id) {
+            a.max_w = max_w.max(1);
+            a.max_h = max_h.max(1);
+        }
+    }
+
+    /// The session it is attached to still runs, and this view is still attached.
+    pub fn is_attached(&self) -> bool {
+        self.shared
+            .attached()
+            .as_ref()
+            .is_some_and(|a| a.id == self.id)
+    }
+}
+
+impl Drop for Attached {
+    fn drop(&mut self) {
+        let gone = {
+            let mut a = self.shared.attached();
+            if a.as_ref().is_some_and(|a| a.id == self.id) {
+                a.take()
+            } else {
+                None
+            }
+        };
+        // the sink is dropped outside the lock
+        drop(gone);
     }
 }
 

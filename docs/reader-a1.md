@@ -244,6 +244,7 @@ Defaults are the tuned settings. Unknown keys are an error.
 | `rescue`, `emit_lost`, `lost_letters`, `second_ms` | on, on, 3, 60 | ring rescue; speak ended lines whose reads agree; letters an ended line needs; still time before a second opinion (negative: off) |
 | `free_cell`, `free_edge`, `free_change`, `free_recent`, `free_gap`, `free_max`, `free_min_cells`, `free_expire`, `free_stable`, `free_move`, `free_diff` | 8, 14, 12, 600, 60, 4, 3, 400, 120, 1000, 30 | no-zone mode |
 | `mode`, `press_every_ms`, `look_ms`, `repeats` | auto, 3000, 500, on | manual mode (see [Manual mode](#manual-mode)) |
+| `prompt_zones` | on | off: prompt zones are not given to dr-core at all (added for the app's M3b CPU check, app-plan.md) |
 | `trace` | - | folder: write one text trace per scene (every read with row heights, every speak) |
 
 `regrow` is gone: a spoken dialogue line that gains words is now always a new event.

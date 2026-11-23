@@ -54,12 +54,17 @@ component BarOption inherits Rectangle {
 
 export component ControlBar inherits Card {
     in property <bool> paused: false;
+    // what reading does now ("Reading", "Paused", "Not running"); green only while reading
+    in property <string> status: root.paused ? "Paused" : "Reading";
+    in property <bool> status-ok: !root.paused;
     in property <bool> automatic: true;
     in property <string> voice: "Kokoro · Adam";
     in property <string> read-key: "Mouse 4";
     callback read-now();
     callback pause();
     callback mode();
+    callback voice-clicked();
+    callback key-clicked();
     height: 48px;
     HorizontalLayout {
         padding-left: Space.s5 + 1px;
@@ -71,12 +76,12 @@ export component ControlBar inherits Card {
             VerticalLayout {
                 alignment: center;
                 Dot {
-                    tint: root.paused ? Palette.text-3 : Palette.ok;
+                    tint: root.status-ok ? Palette.ok : Palette.text-3;
                 }
             }
 
             Text {
-                text: root.paused ? "Paused" : "Reading";
+                text: root.status;
                 font-weight: Type.w-medium;
                 color: Palette.text;
                 vertical-alignment: center;
@@ -136,6 +141,9 @@ export component ControlBar inherits Card {
                 icon: Icons.volume;
                 text: root.voice;
                 label: "Voice";
+                clicked => {
+                    root.voice-clicked();
+                }
             }
         }
 
@@ -145,6 +153,9 @@ export component ControlBar inherits Card {
                 icon: Icons.mouse;
                 kbd: root.read-key;
                 label: "Read key";
+                clicked => {
+                    root.key-clicked();
+                }
             }
         }
     }
@@ -313,6 +324,7 @@ component ZoneStrip inherits Rectangle {
 export component RecentRow inherits Rectangle {
     in property <LineData> item;
     in property <bool> first;
+    callback replay();
     height: 52px;
     if !root.first: Rectangle {
         y: 0;
@@ -369,6 +381,9 @@ export component RecentRow inherits Rectangle {
                 icon: Icons.replay;
                 kind: BtnKind.ghost;
                 label: "Replay";
+                clicked => {
+                    root.replay();
+                }
             }
         }
     }
@@ -378,12 +393,21 @@ export component OverviewTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
     in-out property <[ZoneData]> extra-zones;
     in property <[LineData]> recent;
-    in-out property <bool> paused: false;
+    in property <bool> paused: false;
+    in property <string> status: root.paused ? "Paused" : "Reading";
+    in property <bool> status-ok: !root.paused;
     in-out property <bool> automatic: true;
     in property <string> voice: "Kokoro · Adam";
     in property <string> read-key: "Mouse 4";
     in property <string> now-who: "Arthur:";
     in property <string> now-line: "We need to get these horses moving before the snow buries us.";
+    callback read-now();
+    callback pause();
+    callback replay();
+    callback stop();
+    callback recent-replay(int);
+    callback voice-clicked();
+    callback key-clicked();
     callback edit-zones();
     callback show-all();
     callback mode-changed(bool);
@@ -398,11 +422,22 @@ export component OverviewTab inherits Rectangle {
         alignment: start;
         ControlBar {
             paused: root.paused;
+            status: root.status;
+            status-ok: root.status-ok;
             automatic: root.automatic;
             voice: root.voice;
             read-key: root.read-key;
+            read-now => {
+                root.read-now();
+            }
             pause => {
-                root.paused = !root.paused;
+                root.pause();
+            }
+            voice-clicked => {
+                root.voice-clicked();
+            }
+            key-clicked => {
+                root.key-clicked();
             }
             mode => {
                 root.automatic = !root.automatic;
@@ -473,14 +508,15 @@ export component OverviewTab inherits Rectangle {
                                 x: 0;
                                 y: 0;
                                 width: parent.width;
-                                text: root.now-who == "" ? root.now-line : root.now-who + " " + root.now-line;
+                                // nothing spoken yet (a game just opened): a grey hint in its place
+                                text: root.now-line == "" ? "Nothing read yet. Lines show here as they are spoken." : root.now-who == "" ? root.now-line : root.now-who + " " + root.now-line;
                                 font-size: Type.fs3;
                                 line-height-factor: Type.lhf-140;
                                 wrap: word-wrap;
-                                color: Palette.text;
+                                color: root.now-line == "" ? Palette.text-3 : Palette.text;
                             }
 
-                            if root.now-who != "": Rectangle {
+                            if root.now-who != "" && root.now-line != "": Rectangle {
                                 x: 0;
                                 y: 0;
                                 width: who-text.preferred-width;
@@ -516,6 +552,9 @@ export component OverviewTab inherits Rectangle {
                                 icon: Icons.replay;
                                 kind: BtnKind.ghost;
                                 label: "Replay";
+                                clicked => {
+                                    root.replay();
+                                }
                             }
 
                             Button {
@@ -523,6 +562,9 @@ export component OverviewTab inherits Rectangle {
                                 icon: Icons.stop;
                                 kind: BtnKind.ghost;
                                 label: "Stop";
+                                clicked => {
+                                    root.stop();
+                                }
                             }
                         }
                     }
@@ -541,6 +583,9 @@ export component OverviewTab inherits Rectangle {
                         for r[i] in root.recent: RecentRow {
                             item: r;
                             first: i == 0;
+                            replay => {
+                                root.recent-replay(i);
+                            }
                         }
                         Rectangle {
                             height: 40px;

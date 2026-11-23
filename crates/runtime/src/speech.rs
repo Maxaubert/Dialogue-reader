@@ -49,6 +49,8 @@ pub struct Item {
     pub lines: Vec<Line>,
     /// When it was queued (ms on the queue's clock).
     pub queued_ms: f64,
+    /// Spoken again (Replay): it is in the activity log already.
+    pub replay: bool,
 }
 
 /// "Arthur" or "Arthur:" plus a line gives "Arthur: line".
@@ -72,12 +74,14 @@ pub fn items_of(lines: Vec<Line>, now_ms: f64) -> Vec<Item> {
                 text: joined(&l.text, &next.text),
                 lines: vec![l, next],
                 queued_ms: now_ms,
+                replay: false,
             });
         } else {
             out.push(Item {
                 text: l.text.trim().to_string(),
                 lines: vec![l],
                 queued_ms: now_ms,
+                replay: false,
             });
         }
     }
@@ -96,20 +100,23 @@ impl Queue {
         self.items.extend(items_of(lines, now_ms));
     }
 
-    /// A new manual press: its lines replace everything waiting.
-    pub fn replace(&mut self, lines: Vec<Line>, now_ms: f64) {
-        self.items.clear();
+    /// A new manual press: its lines replace everything waiting. Returns the items that waited.
+    pub fn replace(&mut self, lines: Vec<Line>, now_ms: f64) -> Vec<Item> {
+        let gone = self.clear();
         self.push(lines, now_ms);
+        gone
     }
 
-    /// Puts one item first (Replay).
+    /// Puts one item first, marked as a replay (Replay).
     pub fn push_front(&mut self, mut item: Item, now_ms: f64) {
         item.queued_ms = now_ms;
+        item.replay = true;
         self.items.push_front(item);
     }
 
-    pub fn clear(&mut self) {
-        self.items.clear();
+    /// Empties the queue. Returns the items that waited.
+    pub fn clear(&mut self) -> Vec<Item> {
+        self.items.drain(..).collect()
     }
 
     /// The next item to speak. Items that waited longer than [`MAX_AGE_MS`] are dropped first and returned in
@@ -426,6 +433,11 @@ pub enum Cmd {
     Skip,
     /// Speaks the last item again, first.
     Replay,
+    /// Speaks these lines (a row of the activity log) next, as a replay: what plays now and the queue go on.
+    ReplayLines(Vec<Line>),
+    /// Answered with [`Ev::Mark`] once every command sent before it is done (the app then knows which events
+    /// belong to the game before).
+    Mark(u64),
     Mute(bool),
     SetVoice(String),
     SetSpeed(f32),
@@ -465,6 +477,8 @@ pub enum Ev {
     Cut { item: Item, test: Option<u64> },
     /// `item` waited too long and was dropped.
     Dropped(Item),
+    /// `item` waited in the queue and was thrown out by a press, Stop or a voice test. It was never spoken.
+    Cleared(Item),
     /// `item` was not spoken, or stopped, because of an error. `error` is the raw text, for the log.
     Error {
         item: Item,
@@ -472,17 +486,21 @@ pub enum Ev {
         kind: ErrorKind,
         error: String,
     },
+    /// The answer to [`Cmd::Mark`].
+    Mark(u64),
 }
 
 impl Ev {
-    /// The text of the event's item.
+    /// The text of the event's item ("" for a mark).
     pub fn text(&self) -> &str {
         match self {
             Ev::Started { item, .. }
             | Ev::Finished { item, .. }
             | Ev::Cut { item, .. }
             | Ev::Dropped(item)
+            | Ev::Cleared(item)
             | Ev::Error { item, .. } => &item.text,
+            Ev::Mark(_) => "",
         }
     }
 
@@ -493,7 +511,7 @@ impl Ev {
             | Ev::Finished { test, .. }
             | Ev::Cut { test, .. }
             | Ev::Error { test, .. } => *test,
-            Ev::Dropped(_) => None,
+            Ev::Dropped(_) | Ev::Cleared(_) | Ev::Mark(_) => None,
         }
     }
 }
@@ -575,6 +593,11 @@ impl Speech {
         let _ = self.tx.send(Msg::Cmd(cmd));
     }
 
+    /// A handle that sends commands from another thread (the reader thread).
+    pub fn sender(&self) -> SpeechTx {
+        SpeechTx(self.tx.clone())
+    }
+
     pub fn status(&self) -> Status {
         self.status.lock().map(|s| s.clone()).unwrap_or_default()
     }
@@ -590,6 +613,16 @@ impl Speech {
     }
 }
 
+/// Sends commands to the speech thread from any thread. Sending to a thread that ended does nothing.
+#[derive(Clone)]
+pub struct SpeechTx(Sender<Msg>);
+
+impl SpeechTx {
+    pub fn send(&self, cmd: Cmd) {
+        let _ = self.0.send(Msg::Cmd(cmd));
+    }
+}
+
 impl Drop for Speech {
     fn drop(&mut self) {
         let _ = self.tx.send(Msg::Quit);
@@ -599,8 +632,8 @@ impl Drop for Speech {
     }
 }
 
-/// COM on the speech thread.
-mod com {
+/// COM on the speech thread (and the reader thread, which waits on WinRT OCR calls).
+pub(crate) mod com {
     /// The thread is in the multithreaded apartment while this lives (Windows only).
     pub struct Mta {
         #[cfg(windows)]
@@ -724,11 +757,21 @@ impl Worker {
         }
     }
 
+    /// Items thrown out of the queue are said, so none goes missing from the activity log.
+    fn cleared(&self, items: Vec<Item>) {
+        for item in items {
+            self.emit(Ev::Cleared(item));
+        }
+    }
+
     fn handle(&mut self, c: Cmd) {
         let now = self.now();
         match c {
             Cmd::Say(lines) => self.queue.push(lines, now),
-            Cmd::Replace(lines) => self.queue.replace(lines, now),
+            Cmd::Replace(lines) => {
+                let gone = self.queue.replace(lines, now);
+                self.cleared(gone);
+            }
             Cmd::Test {
                 id,
                 text,
@@ -737,11 +780,13 @@ impl Worker {
                 volume,
             } => {
                 self.cut();
-                self.queue.clear();
+                let gone = self.queue.clear();
+                self.cleared(gone);
                 let item = Item {
                     text,
                     lines: Vec::new(),
                     queued_ms: now,
+                    replay: false,
                 };
                 self.speak(item, &voice, speed, Some((id, volume)));
             }
@@ -754,7 +799,8 @@ impl Worker {
             }
             Cmd::Stop => {
                 self.cut();
-                self.queue.clear();
+                let gone = self.queue.clear();
+                self.cleared(gone);
             }
             Cmd::Skip => self.cut(),
             Cmd::Replay => {
@@ -767,6 +813,12 @@ impl Worker {
                     self.queue.push_front(i, now);
                 }
             }
+            Cmd::ReplayLines(lines) => {
+                for i in items_of(lines, now).into_iter().rev() {
+                    self.queue.push_front(i, now);
+                }
+            }
+            Cmd::Mark(id) => self.emit(Ev::Mark(id)),
             Cmd::Mute(m) => {
                 self.muted = m;
                 let v = self.volume();

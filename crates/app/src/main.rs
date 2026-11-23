@@ -1,6 +1,7 @@
 //! DialogReader.exe. M2: profiles in `%APPDATA%\DialogReader`, the real window list, a screenshot, and zones.
 //! M3a: voices, with a voice test that plays on the speakers: Kokoro first when its files are on the PC, the Windows
-//! voices when they are missing or its model does not load.
+//! voices when they are missing or its model does not load. M3b: reading (capture, OCR, speech) and the two
+//! global keys, through `dr_runtime::runtime`.
 //!
 //! `--fake` shows the mockup data instead of real profiles. `--preview-overlay <pill|quick-menu|quick-menu-voice|
 //! zone-edit>` shows an in-game overlay inside the main window (debug: the real overlay windows come in M4).
@@ -36,16 +37,28 @@ fn run(args: &[String]) -> Result<(), slint::PlatformError> {
     let fake = args.iter().any(|a| a == "--fake");
     let paths = dr_runtime::Paths::from_env();
     let no_folder = paths.is_none() && !fake;
+    // the speech thread reads the lines the reader finds (M3b); the runtime sends them there
+    let mut speech = None;
     let source = match paths {
-        Some(paths) if !fake => dr_app::vm::Source::Real {
-            paths,
-            desktop: Box::new(dr_app::vm::RealDesktop),
-            // the only place that can reach the speakers (the voice test)
-            voices: Box::new(dr_app::vm::voices::Voices::real()),
-        },
+        Some(paths) if !fake => {
+            // the only place that can reach the speakers (the voice test and reading)
+            let voices = Box::new(dr_app::vm::voices::Voices::real());
+            speech = voices.speech.as_ref().map(|s| s.sender());
+            dr_app::vm::Source::Real {
+                paths,
+                desktop: Box::new(dr_app::vm::RealDesktop),
+                voices,
+            }
+        }
         _ => dr_app::vm::Source::Fake,
     };
-    let (w, _vm) = dr_app::build_window(source)?;
+    let (w, vm) = dr_app::build_window(source)?;
+    // the only place that captures the game, reads it and installs the global key hooks
+    if let Some(tx) = speech {
+        let rt = dr_runtime::runtime::Runtime::new(dr_runtime::runtime::Parts::real(tx));
+        let log = dr_runtime::paths::crash_logs().map(|d| d.join("reading.log"));
+        dr_app::vm::attach_runtime(&vm, rt, log);
+    }
     if no_folder {
         w.set_notice(
             "Windows did not say where app data goes (APPDATA is not set), so nothing can be saved. \

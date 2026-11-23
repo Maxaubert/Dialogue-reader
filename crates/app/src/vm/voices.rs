@@ -220,7 +220,7 @@ pub fn error_text(kind: ErrorKind) -> &'static str {
 }
 
 /// Adds a line to the log at `path`, with the time in seconds.
-fn append_log(path: &std::path::Path, text: &str) {
+pub(crate) fn append_log(path: &std::path::Path, text: &str) {
     use std::io::Write;
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);

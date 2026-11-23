@@ -10,6 +10,9 @@ component KeyRow inherits Card {
     in property <image> icon;
     in property <image> key-icon;
     in property <bool> main: false;
+    // waiting for the new key (key capture): the keycap asks for it, the button cancels
+    in property <bool> capturing: false;
+    property <image> no-icon;
     callback change();
     height: 92px;
     border-color: root.main ? Palette.accent : Palette.line;
@@ -68,8 +71,8 @@ component KeyRow inherits Card {
         VerticalLayout {
             alignment: center;
             KeyCap {
-                text: root.key;
-                icon: root.key-icon;
+                text: root.capturing ? "Press a key" : root.key;
+                icon: root.capturing ? root.no-icon : root.key-icon;
             }
         }
 
@@ -77,8 +80,8 @@ component KeyRow inherits Card {
             alignment: center;
             Button {
                 width: 84px;
-                text: "Change";
-                label: "Change " + root.name;
+                text: root.capturing ? "Cancel" : "Change";
+                label: (root.capturing ? "Cancel " : "Change ") + root.name;
                 kind: BtnKind.ghost;
                 fg: Palette.text-3;
                 clicked => {
@@ -92,6 +95,8 @@ component KeyRow inherits Card {
 export component KeysCard inherits VerticalLayout {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
+    // the row waiting for a key: 0 read, 1 quick menu, -1 none
+    in property <int> capturing: -1;
     callback change(int);
     spacing: Space.s3;
     KeyRow {
@@ -101,6 +106,7 @@ export component KeysCard inherits VerticalLayout {
         icon: Icons.volume-lg;
         key-icon: Icons.mouse;
         main: true;
+        capturing: root.capturing == 0;
         change => {
             root.change(0);
         }
@@ -111,6 +117,7 @@ export component KeysCard inherits VerticalLayout {
         desc: "Opens the quick menu over your game";
         key: root.menu-key;
         icon: Icons.panel-lg;
+        capturing: root.capturing == 1;
         change => {
             root.change(1);
         }
@@ -120,6 +127,7 @@ export component KeysCard inherits VerticalLayout {
 export component KeysPage inherits Rectangle {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
+    in property <int> capturing: -1;
     callback change(int);
     VerticalLayout {
         alignment: center;
@@ -142,6 +150,7 @@ export component KeysPage inherits Rectangle {
                 width: 720px;
                 read-key: root.read-key;
                 menu-key: root.menu-key;
+                capturing: root.capturing;
                 change(i) => {
                     root.change(i);
                 }

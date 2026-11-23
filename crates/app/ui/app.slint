@@ -95,6 +95,14 @@ export component MainWindow inherits Window {
     in property <ZoneData> draft;
     // a problem said in plain words: in the onboarding footer, or under the title bar. A tab change clears it.
     in-out property <string> notice;
+    // reading (M3b, src/vm/reading.rs): the status, the line being spoken, Pause, key capture
+    in property <string> status-text: "Reading";
+    in property <bool> status-ok: true;
+    in property <bool> paused: false;
+    in property <string> now-who: "Arthur:";
+    in property <string> now-line: "We need to get these horses moving before the snow buries us.";
+    // the key row waiting for a key: 0 the read key, 1 the quick menu key, -1 none
+    in property <int> capturing-key: -1;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
@@ -134,6 +142,14 @@ export component MainWindow inherits Window {
     callback setup-cancelled();
     // the mode button on Overview (saved into the current profile)
     callback mode-changed(bool);
+    // Overview: Read now, Pause / Resume, Replay and Stop of the line being spoken, Replay of a Recent row
+    callback read-now();
+    callback pause-clicked();
+    callback now-replay();
+    callback now-stop();
+    callback recent-replay(int);
+    // "Change" on a key row (keys page, Settings): 0 the read key, 1 the quick menu key
+    callback key-change(int);
     // voices (src/vm): Play sample / Stop on page 05 (setup voice) and in Settings (current game), Add voices
     // opens the Windows speech settings, the Settings picker and sliders save the current profile
     callback voice-test(bool);
@@ -283,6 +299,8 @@ export component MainWindow inherits Window {
                 game: root.game-name;
                 art: root.game-art;
                 cover: root.game-cover;
+                status: root.status-text;
+                status-ok: root.status-ok;
                 tab-clicked(i) => {
                     // a zone name still being typed is saved before its page goes
                     root.zone-rename-done();
@@ -367,6 +385,10 @@ export component MainWindow inherits Window {
                 if root.page == Page.keys: KeysPage {
                     read-key: root.read-key;
                     menu-key: root.menu-key;
+                    capturing: root.capturing-key;
+                    change(i) => {
+                        root.key-change(i);
+                    }
                 }
                 if root.page == Page.voice: VoicePage {
                     voices: root.voices;
@@ -417,8 +439,37 @@ export component MainWindow inherits Window {
                     automatic <=> root.automatic;
                     read-key: root.read-key;
                     voice: root.voice-label;
+                    status: root.status-text;
+                    status-ok: root.status-ok;
+                    paused: root.paused;
+                    now-who: root.now-who;
+                    now-line: root.now-line;
                     mode-changed(a) => {
                         root.mode-changed(a);
+                    }
+                    read-now => {
+                        root.read-now();
+                    }
+                    pause => {
+                        root.pause-clicked();
+                    }
+                    replay => {
+                        root.now-replay();
+                    }
+                    stop => {
+                        root.now-stop();
+                    }
+                    recent-replay(i) => {
+                        root.recent-replay(i);
+                    }
+                    // the voice and key buttons open their part of Settings
+                    voice-clicked => {
+                        root.page = Page.settings;
+                        settings.jump(3);
+                    }
+                    key-clicked => {
+                        root.page = Page.settings;
+                        settings.jump(2);
                     }
                     edit-zones => {
                         root.page = Page.zones;
@@ -484,6 +535,10 @@ export component MainWindow inherits Window {
                     visible: root.page == Page.settings;
                     read-key: root.read-key;
                     menu-key: root.menu-key;
+                    capturing: root.capturing-key;
+                    change-key(i) => {
+                        root.key-change(i);
+                    }
                     version: root.version;
                     voices: root.voices;
                     voices-desc: root.voices-desc;

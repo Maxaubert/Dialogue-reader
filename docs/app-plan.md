@@ -363,6 +363,151 @@ noted in `docs/`, and all headless tests pass.
   or when a sound runs well past its length. Read from the rodio 0.21.1 and cpal 0.16 source; not tried with a
   real device (no test may play sound). Try once by hand with headphones.
 
+**Result (2026-11-23, branch `feat/app-m3b`, not merged).** Built as planned, with these notes:
+- `crates/runtime`: `capture.rs` (`FrameSource`; `WgcSource`, 40 ms, newest-frame slot with a spare buffer, so a
+  4K frame is not allocated or copied twice; `ScriptSource` with a `Gate` for tests), `reader.rs` (reader thread),
+  `keys.rs` (`Key` and its text form, `decode_key` / `decode_mouse`, the pure `State::feed`, `Hooks` with
+  `WH_KEYBOARD_LL` and `WH_MOUSE_LL` on their own thread), `elevation.rs`, `runtime.rs` (`Runtime`, `Cmd`, `Ev`,
+  `Parts`), and `activity.rs` (the activity log `log\<id>.jsonl`, capped at 5 MB, spec 2.8). `speech.rs` gained
+  `SpeechTx` (the reader sends `Say` and `Replace` from its thread).
+- The headless runtime test is `crates/runtime/tests/reading.rs` (the plan said `tests/live.rs`, which the live view
+  already uses): an arena scene (speaker, two dialogue lines, a prompt) drawn frame by frame, real WinRT OCR, the
+  speech thread with `FakeTts` and `NullSink`. Auto speaks the lines in order and logs the prompt as "prompts off";
+  a line that shows on one frame of a still screen is spoken; manual reads nothing (and runs no OCR) until a press;
+  Stop clears the queue; Pause keeps the OCR count flat. `crates/app/tests/reading.rs` covers the app side on fake
+  parts. `tests/live.rs` gained `one_session_serves_the_reader_and_an_attached_live_view`.
+- **One capture session per window.** The reader's session (`Live::start_full`) hands full-size frames to the
+  reader; the live view of the same window attaches to it (`Attacher::attach`) and gets small GPU-scaled frames of
+  the same captured frames, so there are never two WGC sessions on one window while reading runs. When the reader
+  does not capture that window (no profile, game not found yet, setup page 03), the live view starts its own
+  session as before. Cost: an attached live view gets about every second frame of the 40 ms session (12.5 frames a
+  second instead of 15). When the reader starts or stops, the live view moves on its next check; the last frame
+  stays on the stage meanwhile.
+- **Pause** stops OCR only. Frames are still taken and the newest kept (a still window sends no new frame), so a
+  press while paused, and Resume, read the screen at once. Cost while paused: the frame copy (25 a second).
+- **Still screens.** WGC sends a frame only when the window changes. The reader keeps the newest frame and feeds it
+  again every 40 ms with the time now, so a line on a screen that stays still is confirmed, and a press reads the
+  screen as it is without waiting for a new frame.
+- **Prompts off and the press.** A press reads the spoken zones first, hands their lines to speech (`Replace`), and
+  only then reads the prompt zones for the log: two `dr_core::Manual`s on disjoint zones give the same lines as
+  one. `dr-core` is not changed.
+- **Speech events have one reader.** `Vm::drain_speech` (on a 100 ms UI timer, and in the voice test poll) gives the
+  voice test its own events and turns the others into log lines and the "now speaking" card. A line is logged when
+  it starts to be spoken, or as skipped: prompts off, already read, waited too long (Dropped), voice error, stopped
+  before it was heard (Cut, or Cleared for a line that still waited in the queue). A replay (the card's Replay, a
+  Recent row's replay) is not logged again; a row replay is spoken next and keeps the waiting lines.
+- **Game switch.** Opening another game stops the old reader (joined, so its last skipped lines go to its log),
+  then stops speech; the events of that Stop go to the old game's log until a speech mark comes back. Pause is not
+  reset (open question).
+- **Window.** The app finds the current game's window with its profile rules (`best_profile`, once a second on
+  another thread while it is not read) and gives it to the runtime (`Cmd::Window`). A closed window ends the reader;
+  a capture that fails on an open window is tried again after 3 s. The reader follows the current game; switching
+  games by itself when another profile's game starts (spec 2.8) is not built.
+- **Keys.** The read key goes from the hook thread straight to the reader (`ReadNow`), in both modes. The quick menu
+  key comes out as an event (nothing uses it before M4). Hooks exist only while a profile is active or a key capture
+  is open. Mouse moves and the wheel leave the mouse hook before any lock. Key capture swallows the key it takes
+  (down and up); left and right click pass through and are refused with a plain line; a modifier alone is not a
+  key; Esc or "Cancel" ends it; a page change ends it. A key that is already the other key is refused. Injected
+  input counts as real input (as in the spike).
+- **Elevated and exclusive fullscreen.** Checked by the runtime when it starts on a window (token elevation; a
+  process that cannot be opened counts as elevated) and on its tick (the game window is in front and
+  `SHQueryUserNotificationState` says D3D fullscreen). Black frames alone are not used: loading screens are black
+  too. The plain lines show in the notice strip. `elevation::restart_as_admin` exists, but no button calls it
+  (open question).
+- `main.rs` is the only place that builds the real runtime (`Parts::real`: WinRT OCR, WGC, hooks, window checks).
+  Raw runtime errors go to `%LOCALAPPDATA%\DialogReader\logs\reading.log`. No test installs a hook, starts the real
+  runtime parts in the app, or sends input.
+- Arena: `crates/arena/src/readers/a1.rs` gained the option `prompt_zones=off` (prompt zones are not given to
+  dr-core), only for the CPU check below. Ideal clock, standard seed 59, a1 default, `prompts=false`, and
+  `mode=manual prompts=false`: every scene's events identical before and after (0 of 40 differ in each).
+
+**CPU check: prompts off (2026-11-23, simulated clock, standard seed 59, release; no build of this session ran
+meanwhile, other programs may have, so the numbers are soft).** CPU per
+frame is what the reader spends on a frame (crops, signatures, OCR). A press is a frame of manual mode that ran OCR
+(at least 2 ms; the arena presses every 3 s).
+
+| Run | Score | CPU per frame: mean / p50 / p95 / p99 | Per press: p50 / p95 / max |
+|---|---|---|---|
+| auto, prompts on (the arena default) | 0.788 (412/523) | 4.40 / 1.22 / 17.1 / 29.6 ms | |
+| auto, prompts off (read for the log) | 0.826 (432/523) | 5.03 / 2.34 / 18.9 / 32.4 ms | |
+| auto, prompt zones left out | 0.834 (436/523) | 4.05 / 0.72 / 14.4 / 27.5 ms | |
+| manual, prompts on | 0.522 | 0.12 / 0.00 / 0.07 ms | 9.3 / 27.4 / 52.6 ms |
+| manual, prompts off | 0.518 | 0.13 / 0.00 / 0.07 ms | 10.1 / 32.3 / 57.5 ms |
+| manual, prompt zones left out | 0.518 | 0.11 / 0.00 / 0.07 ms | 9.9 / 32.1 / 57.6 ms |
+
+- Auto: reading prompt zones for the log costs about 1 ms per frame on average (5.03 against 4.05 ms), about 2.5 %
+  of one core at 25 frames a second. Kept: the log shows the "Prompts off" rows of the mockups.
+- Manual: the prompt zones add about 1 ms to a press on average and almost nothing at p95 on this suite. The M3b
+  reader reads them after the spoken lines are handed to speech, so they never delay a press.
+- These are arena frames (1280 x 720 and similar). A 4K game adds the copy of each frame (about 33 MB at 25 a second);
+  Max's manual check measures that.
+
+**Manual check for Max (not run; needs his yes for windows and sound).**
+1. Satisfactory, borderless, 4K: start DialogReader, pick Satisfactory (or open its profile). The status chip says
+   "Reading".
+2. Automatic: talk to a character or trigger a dialogue; the line is spoken with Kokoro, shows in "now speaking" and
+   in Recent. A prompt shows in the log as "Prompts off".
+3. On key press: switch the mode on Overview, press Mouse 4 in the game: the zones are read, the game keeps focus
+   and still gets Mouse 4.
+4. Pause: nothing is read; Resume reads again. Read now on Overview reads once.
+5. Settings > Keys > Change: press F8; the key shows and is saved. Left click is refused with a line. Esc cancels.
+6. CPU: note DialogReader's CPU in Task Manager while reading (auto) and idle in the game, and with Overview open
+   (live view attached).
+7. An elevated program (any app started with "Run as administrator", picked on page 02): the notice says it runs as
+   administrator. Also check whether the read key works in it (spec Risks: `RegisterHotKey` as a fallback).
+8. Headphones: plug them in while a line plays; the next line moves to them (M3a checklist).
+9. Replay: press replay on a Recent row and Replay in the "now speaking" card. The line is spoken again, and no new
+   row shows in Recent or in the activity list.
+10. Game switch while a line plays (two profiles): speech stops at once; the new game's Recent is empty, and the old
+    game's activity list shows the line once (not again as "Stopped").
+
+**Text changes for Max to approve (M3b)** (old > new):
+
+| Where | Old | New |
+|---|---|---|
+| title bar status chip, 10 control bar status | Reading (always green) | Reading (green), or Paused, Not running, Stopped, Cannot read (grey) |
+| 10 "now speaking" card, nothing spoken yet (new) | none | Nothing read yet. Lines show here as they are spoken. (grey) |
+| 04 and Settings key row while waiting for a key (new) | keycap with the key; Change | keycap "Press a key"; Cancel |
+| notice, key capture got left or right click (new) | none | Left and right click are for your game. Press another key or mouse button. |
+| notice, key capture got the other key (new) | none | That key is already the quick menu key. Press another one. / That key is already the read key. Press another one. |
+| notice, Read now while the game is not running (new) | none | (game) is not running. Start it, then press Read now. |
+| notice, game runs as administrator (new, spec Risks) | none | This game runs as administrator. DialogReader needs to run as administrator too. |
+| notice, exclusive fullscreen (new, spec Risks) | none | This game runs in exclusive fullscreen. Switch it to borderless or windowed in the game's settings. |
+| notice, no OCR language (new) | none | Windows has no English text recognition. Add the English language in Windows Settings > Time & language > Language. |
+| notice, the key hooks failed (new) | none | The keys could not be set up, so the read key does nothing. Restart DialogReader to try again. |
+| activity list skip reasons (new, next to Prompts off and Already read) | none | Waited too long, Voice error, Stopped |
+| 10 voice button and read key button (behaviour) | open nothing | open Settings at Voices, and at Keys |
+
+`render-screens` adds `19-keys-capture.png` and `19-overview-not-running.png` for the new states.
+
+**Open questions for Max (M3b).**
+- No zone to speak from (every zone switched off, none drawn, or only prompt zones with prompts off): dr-core
+  would then read the whole screen aloud (its no-zone mode). The reader does not read automatically in that case
+  (`reader::speaks`, tested). Should the app say so on Overview, or should whole-screen reading be an option?
+- Elevated games: a "Restart as administrator" button (`elevation::restart_as_admin` exists; needs a mockup).
+- The Overview voice and read key buttons open Settings (Voices, Keys); the mockup draws them as dropdowns.
+- Switch the current game by itself when another profile's game starts (spec 2.8)? Not built.
+- Not built from spec Risks: a hook watchdog (re-install hooks that stop firing), the `RegisterHotKey` fallback
+  for elevated games (not checked), and the black-frames check for exclusive fullscreen (left out: loading screens
+  are black too).
+- After the M3b review fixes (2026-11-23):
+  - A replay from a Recent row is spoken next. It no longer throws out the waiting lines, and it does not cut the
+    line that plays. Is that right, or should it cut in at once, like Replay in the card?
+  - A game switch now stops speech. This also cuts a voice test that plays at that moment.
+  - A voice test still clears the game lines that wait in the queue; they now show in the log as "Stopped". Keep
+    that, or let the test wait or play over them?
+  - Pause carries over to the next game (it opens "Paused"). Reset it on a game switch?
+  - "Cannot read" (no OCR language) stays until the game is reopened or the app restarts; there is no retry.
+  - Modifiers must match exactly: F7 does not fire while Shift, Ctrl or Alt is held (sprint, crouch). Mouse 4 is
+    not affected. Should a key saved without modifiers fire with any modifier held?
+  - Key capture is global: while "Press a key" is open, Alt+Tab is taken as a key, and a key pressed in the game is
+    taken too. End capture when the main window loses focus, and refuse Alt+Tab and Win combos?
+  - The chip says "Reading" also when nothing can be spoken (no spoken zone, or On key press mode).
+  - The exclusive fullscreen notice may be a false alarm on DX12 flip-model games where capture still works
+    (not checked; step 1 of the manual check).
+- An attached live view gets about 12 frames a second (15 before). `Drop for Speech` still waits for one synth call
+  at exit, and the screenshot (Continue, Retake) still runs on the UI thread.
+
 ## M4: overlays
 
 **Scope.** The pill, the quick menu (with voice list) and zone edit become real overlay windows (spec 2.7):
