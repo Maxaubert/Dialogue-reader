@@ -550,6 +550,11 @@ Navigation is one Slint enum property on the main window:
   are ignored and capture keeps waiting unless the focus is lost. No new UI text.
 - Pause stays on across a game switch: the next game opens "Paused" (Max: keep it paused). No code change.
 
+### Decisions after M4 (Max, 2026-11-23, PR #16 merged)
+- Injected keys (Steam Input, pad mappers, `LLKHF_INJECTED`) count as real key presses.
+- The quick menu key also reaches the game when it opens the menu (not swallowed).
+- Until the tray in M5, closing the main window quits DialogReader.
+
 ### Kokoro engine (built 2026-11-23)
 - **Kokoro is bundled (Max, 2026-11-23).** His words: "kokoro voices should be bundled, if sonara fits or would be
   helpful it can be considered". So the installer ships the model, `onnxruntime.dll` and its DLLs next to
