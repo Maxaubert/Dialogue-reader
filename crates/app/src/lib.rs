@@ -51,11 +51,85 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
         v.borrow_mut().commit_rename();
         let _ = slint::quit_event_loop();
     });
+    // the left button is down while a mouse button is held on the app (see keep_left_drags)
+    let left = std::rc::Rc::new(std::cell::Cell::new(false));
     let weak = w.as_weak();
+    let l = left.clone();
     chrome.on_drag(move || {
         if let Some(w) = weak.upgrade() {
             drag_window(&w);
         }
+        // the native move loop of a title bar drag eats the left release
+        l.set(false);
+    });
+    keep_left_drags(w, vm, left);
+}
+
+/// The app window lost the focus (Alt+Tab, a UAC prompt): the left release of a zone drag may never come. The
+/// stage lets go of the mouse (a pointer exit) and the drag is cancelled, as a right click does: the zone goes
+/// back, a zone being drawn is dropped. Overview pauses its live view (the game is in front, src/vm/live.rs).
+/// Public for the tests (the testing backend has no winit events).
+pub fn focus_lost(w: &MainWindow, vm: &vm::Shared) {
+    use slint::platform::WindowEvent;
+    w.window().dispatch_event(WindowEvent::PointerExited);
+    if let Ok(mut vm) = vm.try_borrow_mut() {
+        vm.cancel_zone_drag();
+        vm.live_focus(false);
+    }
+}
+
+/// The app window got the focus back: Overview starts its live view again. Public for the tests.
+pub fn focus_gained(vm: &vm::Shared) {
+    if let Ok(mut vm) = vm.try_borrow_mut() {
+        vm.live_focus(true);
+    }
+}
+
+/// While the left button is down, the middle, back and forward buttons never reach Slint. Their release would
+/// end the mouse grab of a zone drag on the stage, which then could not follow the mouse outside the stage. The
+/// right button still goes through: on the stage it cancels the drag (ui/components/stage.slint).
+/// Focus loss cancels a drag (`focus_lost`). Focus changes also go to the live view (`focus_gained`).
+fn keep_left_drags(w: &MainWindow, vm: &vm::Shared, left: std::rc::Rc<std::cell::Cell<bool>>) {
+    use slint::winit_030::winit::event::{ElementState, MouseButton, WindowEvent};
+    use slint::winit_030::{EventResult, WinitWindowAccessor};
+    // Only the winit backend has winit events. Tests and screens have none.
+    let weak = w.as_weak();
+    let v = std::rc::Rc::downgrade(vm);
+    w.window().on_winit_window_event(move |_, e| match e {
+        WindowEvent::MouseInput {
+            state,
+            button: MouseButton::Left,
+            ..
+        } => {
+            left.set(*state == ElementState::Pressed);
+            EventResult::Propagate
+        }
+        WindowEvent::MouseInput {
+            button: MouseButton::Right,
+            ..
+        } => EventResult::Propagate,
+        WindowEvent::MouseInput { .. } if left.get() => EventResult::PreventDefault,
+        WindowEvent::Focused(false) => {
+            left.set(false);
+            // after this event is handled, not inside the winit hook
+            let (weak, v) = (weak.clone(), v.clone());
+            slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                if let (Some(w), Some(vm)) = (weak.upgrade(), v.upgrade()) {
+                    focus_lost(&w, &vm);
+                }
+            });
+            EventResult::Propagate
+        }
+        WindowEvent::Focused(true) => {
+            let v = v.clone();
+            slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                if let Some(vm) = v.upgrade() {
+                    focus_gained(&vm);
+                }
+            });
+            EventResult::Propagate
+        }
+        _ => EventResult::Propagate,
     });
 }
 

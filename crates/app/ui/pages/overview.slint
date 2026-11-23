@@ -2,7 +2,7 @@
 import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData, LineData } from "../data.slint";
 import { Icon, CIcon, Button, BtnKind, Card, CardHead, Toggle, Dot, Kbd, PillWave, VSep } from "../components/base.slint";
-import { Stage } from "../components/stage.slint";
+import { Stage, LiveNote, LiveView } from "../components/stage.slint";
 
 // Mode / voice / key pick in the control bar (.sbar .opt).
 component BarOption inherits Rectangle {
@@ -413,34 +413,47 @@ export component OverviewTab inherits Rectangle {
         HorizontalLayout {
             spacing: Space.s3;
             alignment: start;
-            Card {
+            // the game picture card, and the live view note in a small line under it
+            VerticalLayout {
                 width: 1120px;
-                height: 1px + 629px + 52px + 1px;
-                VerticalLayout {
-                    padding: 1px;
-                    Stage {
-                        height: 629px;
-                        source: root.shot;
-                        src-w: root.shot-w;
-                        src-h: root.shot-h;
-                        contain: root.contain;
-                        zones: root.zones;
-                        labels: false;
-                        radius: Radius.lg;
-                        round-bottom: false;
-                        behind: Palette.bg;
-                    }
+                alignment: start;
+                Card {
+                    height: 1px + 629px + 52px + 1px;
+                    VerticalLayout {
+                        padding: 1px;
+                        Stage {
+                            height: 629px;
+                            source: root.shot;
+                            src-w: root.shot-w;
+                            src-h: root.shot-h;
+                            contain: root.contain;
+                            zones: root.zones;
+                            labels: false;
+                            radius: Radius.lg;
+                            round-bottom: false;
+                            behind: Palette.bg;
+                        }
 
-                    ZoneStrip {
-                        zones <=> root.zones;
-                        extra <=> root.extra-zones;
-                        edit => {
-                            root.edit-zones();
-                        }
-                        toggle(i, v) => {
-                            root.toggle(i, v);
+                        ZoneStrip {
+                            zones <=> root.zones;
+                            extra <=> root.extra-zones;
+                            edit => {
+                                root.edit-zones();
+                            }
+                            toggle(i, v) => {
+                                root.toggle(i, v);
+                            }
                         }
                     }
+                }
+
+                // "Live", or why the saved screenshot shows: under the picture, never on it. Not in the zone strip:
+                // a long note there pushed the zone toggles out.
+                if root.contain && LiveView.note != "": HorizontalLayout {
+                    alignment: start;
+                    padding-top: Space.s2;
+                    padding-left: Space.s4;
+                    LiveNote { }
                 }
             }
 

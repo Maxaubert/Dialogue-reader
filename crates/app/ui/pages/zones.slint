@@ -1,8 +1,8 @@
 // 11 zone editor tab.
 import { Palette, Space, Radius, Size, Type, Icons, Art, Kind } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, CardHead } from "../components/base.slint";
-import { Stage, ZoneRow, ZoneTools } from "../components/stage.slint";
+import { Icon, CIcon, Button, BtnKind, CardHead, Dot } from "../components/base.slint";
+import { Stage, ZoneRow, ZoneTools, LiveView } from "../components/stage.slint";
 
 export component ZonesTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
@@ -103,6 +103,16 @@ export component ZonesTab inherits Rectangle {
                             horizontal-stretch: 1;
                         }
 
+                        // the live view note is part of this line (src/vm/live.rs `push_shot_info`): a green dot
+                        // while it is live, never a chip on the game picture
+                        if root.contain && LiveView.note-live: VerticalLayout {
+                            alignment: center;
+                            padding-right: 6px;
+                            Dot {
+                                size: 6px;
+                                tint: Palette.ok;
+                            }
+                        }
                         Text {
                             text: root.shot-info;
                             font-size: Type.fs1;

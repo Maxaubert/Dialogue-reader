@@ -8,7 +8,8 @@ use std::rc::Rc;
 
 use dr_app::MainWindow;
 use dr_app::vm::voices::Voices;
-use dr_app::vm::{Desktop, Source};
+use dr_app::vm::{Desktop, LiveRun, Source};
+use dr_runtime::live::{LiveFrame, LiveSink};
 use dr_runtime::speech::{NullSink, Speech, VoiceSettings};
 use dr_runtime::windows_list::{WinInfo, WinMode};
 use dr_runtime::{Paths, Shot};
@@ -20,13 +21,84 @@ pub const SHOT_W: u32 = 1920;
 pub const SHOT_H: u32 = 1080;
 
 /// Windows and screenshots from memory. `fail` makes the next screenshots fail. `front` holds windows that
-/// open later: the next list shows them first (a test fills it after the window is built).
+/// open later: the next list shows them first (a test fills it after the window is built). `live` is the live
+/// view: the test pushes frames into its sink.
 pub struct FakeDesktop {
     pub windows: Vec<WinInfo>,
     pub fail: Rc<Cell<bool>>,
     pub front: Rc<RefCell<Vec<WinInfo>>>,
     /// How often "Add voices" asked to open the Windows speech settings.
     pub opened_settings: Rc<Cell<u32>>,
+    pub live: FakeLive,
+}
+
+/// The live view of the fake desktop: what was started and stopped, and the sink of the newest session.
+#[derive(Clone, Default)]
+pub struct FakeLive {
+    pub sink: Rc<RefCell<Option<Box<dyn LiveSink>>>>,
+    pub starts: Rc<Cell<u32>>,
+    pub stops: Rc<Cell<u32>>,
+    /// Target size of the newest session (physical px).
+    pub target: Rc<Cell<(u32, u32)>>,
+    /// The title of the window of the newest session.
+    pub title: Rc<RefCell<String>>,
+    /// The next starts fail.
+    pub fail: Rc<Cell<bool>>,
+    /// The windows are minimized, or closed.
+    pub minimized: Rc<Cell<bool>>,
+    pub closed: Rc<Cell<bool>>,
+    /// The window searches wait here until the test answers them (`answer`), as the real one runs on another
+    /// thread. Off: they answer at once.
+    pub defer: Rc<Cell<bool>>,
+    pub searches: Rc<RefCell<Vec<Search>>>,
+}
+
+/// A window search the test answers later: the list it will get, and where the answer goes.
+pub type Search = (Vec<WinInfo>, Box<dyn FnOnce(Vec<WinInfo>) + Send>);
+
+impl FakeLive {
+    /// One frame of a `src_w` x `src_h` capture, made `w` x `h`, as the capture thread hands it over.
+    pub fn frame(&self, src_w: u32, src_h: u32, w: u32, h: u32) {
+        let rgba = [90u8, 120, 160, 255].repeat((w * h) as usize);
+        if let Some(s) = self.sink.borrow_mut().as_mut() {
+            s.frame(&LiveFrame {
+                src_w,
+                src_h,
+                w,
+                h,
+                rgba: &rgba,
+            });
+        }
+    }
+
+    /// Answers the oldest waiting window search.
+    pub fn answer(&self) {
+        let s = self.searches.borrow_mut().remove(0);
+        (s.1)(s.0);
+    }
+
+    pub fn end(&self, why: &str) {
+        if let Some(s) = self.sink.borrow_mut().as_mut() {
+            s.ended(why);
+        }
+    }
+}
+
+struct FakeRun {
+    stops: Rc<Cell<u32>>,
+    target: Rc<Cell<(u32, u32)>>,
+}
+
+impl LiveRun for FakeRun {
+    fn set_target(&self, w: u32, h: u32) {
+        self.target.set((w, h));
+    }
+}
+
+impl Drop for FakeRun {
+    fn drop(&mut self) {
+        self.stops.set(self.stops.get() + 1);
+    }
 }
 
 pub fn win(title: &str, exe: &str, game: bool) -> WinInfo {
@@ -59,6 +131,7 @@ impl FakeDesktop {
             fail: Rc::new(Cell::new(false)),
             front: Rc::new(RefCell::new(Vec::new())),
             opened_settings: Rc::new(Cell::new(0)),
+            live: FakeLive::default(),
         }
     }
 }
@@ -77,6 +150,54 @@ impl Desktop for FakeDesktop {
 
     fn open_speech_settings(&self) {
         self.opened_settings.set(self.opened_settings.get() + 1);
+    }
+
+    fn is_minimized(&self, w: &WinInfo) -> bool {
+        w.minimized || self.live.minimized.get()
+    }
+
+    fn is_open(&self, _w: &WinInfo) -> bool {
+        !self.live.closed.get()
+    }
+
+    fn windows_quick(&self, profile_exes: &[String]) -> Vec<WinInfo> {
+        if self.live.closed.get() {
+            return Vec::new();
+        }
+        self.windows(profile_exes)
+    }
+
+    fn windows_quick_then(
+        &self,
+        profile_exes: Vec<String>,
+        done: Box<dyn FnOnce(Vec<WinInfo>) + Send>,
+    ) {
+        let list = self.windows_quick(&profile_exes);
+        if self.live.defer.get() {
+            self.live.searches.borrow_mut().push((list, done));
+        } else {
+            done(list);
+        }
+    }
+
+    fn live(
+        &self,
+        w: &WinInfo,
+        max_w: u32,
+        max_h: u32,
+        sink: Box<dyn LiveSink>,
+    ) -> Result<Box<dyn LiveRun>, String> {
+        if self.live.fail.get() {
+            return Err("Windows could not capture this window".into());
+        }
+        self.live.starts.set(self.live.starts.get() + 1);
+        self.live.target.set((max_w, max_h));
+        *self.live.title.borrow_mut() = w.title.clone();
+        *self.live.sink.borrow_mut() = Some(sink);
+        Ok(Box::new(FakeRun {
+            stops: self.live.stops.clone(),
+            target: self.live.target.clone(),
+        }))
     }
 
     fn screenshot(&self, w: &WinInfo) -> Result<Shot, String> {

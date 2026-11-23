@@ -1,7 +1,23 @@
 // The game picture with zones on top (.stage, .zone, .ztag, .handle), the zone list row and the zone tools.
 import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, Toggle, CornerMask } from "base.slint";
+import { Icon, CIcon, Button, Toggle, CornerMask, Dot } from "base.slint";
+
+// The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
+// Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
+export global LiveView {
+    in-out property <bool> on: false;
+    in-out property <image> frame;
+    in-out property <float> w: 1600;
+    in-out property <float> h: 900;
+    // "Live", or why the saved screenshot shows (plain words); empty: no chip
+    in-out property <string> note;
+    in-out property <bool> note-live: false;
+    // a real stage was shown or changed size (logical px): the frames are made this size
+    callback stage-size(length, length);
+    // a frame or the end of the session waits (called on the UI thread)
+    callback arrived();
+}
 
 // Maps image pixels (src-w x src-h, shown with "cover", or "contain" for real screenshots) to view pixels.
 // Rust has the same math in geom.rs. With `interactive`, presses, drags and releases go to `pointer` in image
@@ -23,9 +39,13 @@ export component Stage inherits Rectangle {
     in property <bool> round-top: true;
     in property <bool> round-bottom: true;
     in property <color> behind: Palette.bg;
-    out property <float> scale: root.contain ? min(root.width / 1px / root.src-w, root.height / 1px / root.src-h) : max(root.width / 1px / root.src-w, root.height / 1px / root.src-h);
-    out property <length> off-x: (root.width - root.src-w * root.scale * 1px) / 2;
-    out property <length> off-y: (root.height - root.src-h * root.scale * 1px) / 2;
+    // real screenshots (contain) follow the live view when there is one
+    property <bool> live: root.contain && LiveView.on;
+    property <float> pw: root.live ? LiveView.w : root.src-w;
+    property <float> ph: root.live ? LiveView.h : root.src-h;
+    out property <float> scale: root.contain ? min(root.width / 1px / root.pw, root.height / 1px / root.ph) : max(root.width / 1px / root.pw, root.height / 1px / root.ph);
+    out property <length> off-x: (root.width - root.pw * root.scale * 1px) / 2;
+    out property <length> off-y: (root.height - root.ph * root.scale * 1px) / 2;
     callback zone-clicked(int);
     // 0 press, 1 move, 2 release; x and y in image px; scale = view px per image px
     callback pointer(int, float, float, float);
@@ -36,13 +56,31 @@ export component Stage inherits Rectangle {
     border-bottom-left-radius: root.round-bottom ? root.radius : 0px;
     border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
     clip: true;
+    init => {
+        if root.contain {
+            LiveView.stage-size(root.width, root.height);
+        }
+    }
+    changed width => {
+        if root.contain {
+            LiveView.stage-size(root.width, root.height);
+        }
+    }
+    changed height => {
+        if root.contain {
+            LiveView.stage-size(root.width, root.height);
+        }
+    }
     Image {
         x: root.off-x;
         y: root.off-y;
-        width: root.src-w * root.scale * 1px;
-        height: root.src-h * root.scale * 1px;
-        source: root.source;
+        width: root.pw * root.scale * 1px;
+        height: root.ph * root.scale * 1px;
+        source: root.live ? LiveView.frame : root.source;
         image-fit: fill;
+        // the game picture itself (the tests check that the live view note is never on it)
+        accessible-role: image;
+        accessible-label: "Game picture";
     }
 
     for z[i] in root.zones: Rectangle {
@@ -87,20 +125,45 @@ export component Stage inherits Rectangle {
         border-color: Palette.edit-draft-line;
         background: Palette.edit-draft-fill;
     }
+    // A left drag draws, moves or resizes. The release of ANY button ends a TouchArea's mouse grab, and its
+    // `moved` then stops while `pressed` stays true (Max, 2026-11-22: a right click froze the box, and the left
+    // release put it at the cursor). So the drag is tracked here and moves come from `pointer-event`, which
+    // fires with or without the grab. A right press cancels the drag (3), as does a lost pointer; other buttons
+    // are ignored. Esc cancels in app.slint.
     if root.interactive: TouchArea {
+        property <bool> dragging: false;
         mouse-cursor: crosshair;
         accessible-role: image;
         accessible-label: "Screenshot";
+        function send(kind: int) {
+            root.pointer(kind, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+        }
         pointer-event(e) => {
-            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
-                root.pointer(0, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
-            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
-                root.pointer(2, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+            if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                self.dragging = true;
+                self.send(0);
+            } else if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                if self.dragging {
+                    self.dragging = false;
+                    self.send(2);
+                }
+            } else if e.kind == PointerEventKind.move {
+                if self.dragging {
+                    self.send(1);
+                }
+            } else if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) || e.kind == PointerEventKind.cancel {
+                if self.dragging {
+                    self.dragging = false;
+                    self.send(3);
+                }
             }
         }
-        moved => {
-            if self.pressed {
-                root.pointer(1, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+        // the grab was lost (another button's release) and the mouse left the stage: the left release may
+        // never come here, so the drag is cancelled
+        changed has-hover => {
+            if !self.has-hover && self.dragging {
+                self.dragging = false;
+                self.send(3);
             }
         }
     }
@@ -142,6 +205,35 @@ export component Stage inherits Rectangle {
         color: root.behind;
         top: root.round-top;
         bottom: root.round-bottom;
+    }
+}
+
+// "Live" (with a green dot), or why the saved screenshot shows (LiveView.note). It sits in the line under a stage,
+// never on the game picture (Max, 2026-11-23: the chip covered the top right corner, where a zone may be).
+// Empty note: nothing.
+export component LiveNote inherits Rectangle {
+    width: row.preferred-width;
+    height: 22px;
+    horizontal-stretch: 0;
+    accessible-role: text;
+    accessible-label: "Live view";
+    accessible-value: LiveView.note;
+    row := HorizontalLayout {
+        spacing: 6px;
+        if LiveView.note-live: VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+                tint: Palette.ok;
+            }
+        }
+        Text {
+            text: LiveView.note;
+            font-size: Type.fs1;
+            font-weight: LiveView.note-live ? Type.w-medium : Type.w-regular;
+            color: LiveView.note-live ? Palette.ok : Palette.text-3;
+            vertical-alignment: center;
+        }
     }
 }
 

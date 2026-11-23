@@ -41,6 +41,15 @@ pub fn all() -> Vec<Screen> {
             setup: |w| page(w, Page::PickWindow),
         },
         Screen {
+            // No mockup: page 02 with an "Other windows" row picked (selection must be as clear as a card).
+            name: "02-pick-window-other",
+            setup: |w| {
+                page(w, Page::PickWindow);
+                use slint::Model;
+                w.set_picked_window(w.get_games_running().row_count() as i32);
+            },
+        },
+        Screen {
             name: "03-draw-zones",
             setup: |w| page(w, Page::DrawZones),
         },

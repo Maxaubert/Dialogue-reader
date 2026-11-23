@@ -9,8 +9,11 @@
 //! Memory: only the current game's screenshot is decoded at full size (for pages 10 and 11). The other games
 //! keep a small cover, made the first time the game switcher opens, and the screenshot size from the PNG header.
 
+mod live;
 pub mod voices;
 pub mod zones;
+
+pub use live::{LiveRun, NOTE_CLOSED, NOTE_FAILED, NOTE_LIVE, NOTE_MINIMIZED};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -39,6 +42,33 @@ pub trait Desktop {
     }
     /// Opens the Windows speech settings, where voices are added ("Add voices"). Nothing by default.
     fn open_speech_settings(&self) {}
+    /// The window still exists.
+    fn is_open(&self, _win: &WinInfo) -> bool {
+        true
+    }
+    /// The windows without their icons (cheaper), to find a running game for the live view.
+    fn windows_quick(&self, profile_exes: &[String]) -> Vec<WinInfo> {
+        self.windows(profile_exes)
+    }
+    /// `windows_quick`, handed to `done` (from another thread when the list is slow to read: the real desktop).
+    fn windows_quick_then(
+        &self,
+        profile_exes: Vec<String>,
+        done: Box<dyn FnOnce(Vec<WinInfo>) + Send>,
+    ) {
+        done(self.windows_quick(&profile_exes));
+    }
+    /// A live view of the window: frames fit inside `max_w` x `max_h` and go to `sink` on another thread until
+    /// the returned handle is dropped (src/vm/live.rs).
+    fn live(
+        &self,
+        _win: &WinInfo,
+        _max_w: u32,
+        _max_h: u32,
+        _sink: Box<dyn dr_runtime::live::LiveSink>,
+    ) -> Result<Box<dyn LiveRun>, String> {
+        Err("no live view here".into())
+    }
 }
 
 /// The real desktop: `EnumWindows` and Windows Graphics Capture.
@@ -64,6 +94,43 @@ impl Desktop for RealDesktop {
         let _ = std::process::Command::new("explorer.exe")
             .arg("ms-settings:speech")
             .spawn();
+    }
+
+    fn is_open(&self, win: &WinInfo) -> bool {
+        dr_runtime::windows_list::is_open(win.hwnd)
+    }
+
+    fn windows_quick(&self, profile_exes: &[String]) -> Vec<WinInfo> {
+        let mut o = dr_runtime::windows_list::ListOpts::for_app(profile_exes.to_vec());
+        o.icons = false;
+        dr_runtime::windows_list::list(&o)
+    }
+
+    fn windows_quick_then(
+        &self,
+        profile_exes: Vec<String>,
+        done: Box<dyn FnOnce(Vec<WinInfo>) + Send>,
+    ) {
+        // about 10 ms: not on the UI thread. A thread that cannot start (out of resources) never answers; the
+        // next page change starts a new search.
+        let _ = std::thread::Builder::new()
+            .name("window-list".into())
+            .spawn(move || {
+                let mut o = dr_runtime::windows_list::ListOpts::for_app(profile_exes);
+                o.icons = false;
+                done(dr_runtime::windows_list::list(&o));
+            });
+    }
+
+    fn live(
+        &self,
+        win: &WinInfo,
+        max_w: u32,
+        max_h: u32,
+        sink: Box<dyn dr_runtime::live::LiveSink>,
+    ) -> Result<Box<dyn LiveRun>, String> {
+        dr_runtime::live::Live::start(win.hwnd, max_w, max_h, dr_runtime::live::INTERVAL, sink)
+            .map(|l| Box::new(l) as Box<dyn LiveRun>)
     }
 }
 
@@ -376,6 +443,8 @@ pub struct Vm {
     /// Pages 10 and 11: the current profile's zones.
     main: Editor,
     rename: Option<PendingRename>,
+    /// The live view on the stages (live.rs).
+    live: live::LiveState,
     setup_zones: Rc<VecModel<ZoneData>>,
     zones: Rc<VecModel<ZoneData>>,
     games_running: Rc<VecModel<WindowData>>,
@@ -411,6 +480,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         setup: fake_setup(),
         main: Editor::new(crate::fake::ed_zones(false), 1600.0, 900.0),
         rename: None,
+        live: live::LiveState::default(),
         setup_zones: Rc::new(VecModel::default()),
         zones: Rc::new(VecModel::default()),
         games_running: Rc::new(VecModel::default()),
@@ -479,6 +549,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
     vm.push_main();
     let vm = Rc::new(RefCell::new(vm));
     wire(w, &vm);
+    live::wire(w, &vm);
     vm
 }
 
@@ -601,6 +672,8 @@ impl Vm {
         };
         let mut e = Editor::new(ed_zones(&g.profile, sw, sh), sw as f32, sh as f32);
         e.draw = false;
+        // the live view of the game before is for its zones: stop it before they go (the tick starts the new one)
+        self.live_stop();
         self.main = e;
         if let Some(w) = self.win() {
             w.set_current_game(i as i32);
@@ -1139,22 +1212,31 @@ impl Vm {
                     w.set_shot(image_of(shot.width, shot.height, &shot.rgba));
                     w.set_shot_w(shot.width as f32);
                     w.set_shot_h(shot.height as f32);
-                    w.set_shot_info(
-                        format!(
-                            "Screenshot · {} × {} · Fit to window",
-                            shot.width, shot.height
-                        )
-                        .into(),
-                    );
                 }
                 self.games[i].cover = Some(cover_of(&shot));
                 self.games[i].shot_size = Some((shot.width, shot.height));
+                // the line under the stage on 11 keeps the live view note ("Live", or why the saved
+                // screenshot shows)
+                self.push_shot_info();
                 self.notice("");
                 self.save_main();
                 self.push_main();
             }
             Err(e) => self.notice(&format!("No new screenshot: {e}.")),
         }
+    }
+
+    /// Esc on 03 or 11: cancels a drag on the stage (the zone goes back, a new one is dropped). False when no
+    /// drag was going on.
+    pub fn cancel_zone_drag(&mut self) -> bool {
+        let Some(w) = self.win() else { return false };
+        let page = w.get_page();
+        let cancelled = self.editor(page).cancel_drag();
+        if cancelled {
+            self.after(page, false);
+            self.live_flush();
+        }
+        cancelled
     }
 
     /// Stores the text typed into a zone name; [`Vm::commit_rename`] saves it.
@@ -1297,10 +1379,20 @@ fn wire(w: &MainWindow, vm: &Shared) {
         let c = match kind {
             0 => e.pointer_down(x, y, scale),
             1 => e.pointer_move(x, y, scale),
-            _ => e.pointer_up(x, y, scale),
+            2 => e.pointer_up(x, y, scale),
+            _ => {
+                e.cancel_drag();
+                zones::Changed::default()
+            }
         };
         vm.after(page, c.zones);
+        if kind >= 2 {
+            // the drag ended: a live frame of a new size that waited for it shows now
+            vm.live_flush();
+        }
     });
+    let v = vm.clone();
+    w.on_zone_cancel(move || v.borrow_mut().cancel_zone_drag());
     let v = vm.clone();
     let weak = w.as_weak();
     w.on_zone_select(move |i| {

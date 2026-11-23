@@ -19,8 +19,9 @@ import { PillPreview } from "overlays/pill.slint";
 import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
 import { ZoneEdit } from "overlays/zone_edit.slint";
+import { LiveView } from "components/stage.slint";
 
-export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome }
+export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView }
 
 export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
@@ -109,7 +110,10 @@ export component MainWindow inherits Window {
         settings.jump(i);
     }
     // zone editing (Rust: src/vm). The page says which list: draw-zones = setup, zones and overview = profile.
+    // 0 press, 1 move, 2 release, 3 cancel (right click or a lost pointer during a drag)
     callback zone-pointer(int, float, float, float);
+    // Esc: cancels a drag on the stage; false when no drag was going on (the key is then not used)
+    callback zone-cancel() -> bool;
     callback zone-select(int);
     callback zone-toggle(int, bool);
     callback zone-rename(int, string);
@@ -141,8 +145,12 @@ export component MainWindow inherits Window {
     callback voice-volume-moved();
     // every page change (a playing voice test stops, unsaved slider moves are saved)
     callback page-changed(Page);
+    // the page changed: the live view starts or stops (src/vm/live.rs)
+    callback page-shown(Page);
+    // one change callback per property in Slint: both callbacks run from here
     changed page => {
         root.page-changed(root.page);
+        root.page-shown(root.page);
     }
     // opens the Settings voice picker (render-screens)
     public function settings-open-voice-list() {
@@ -257,6 +265,9 @@ export component MainWindow inherits Window {
                 }
                 if e.modifiers.control && (e.text == "z" || e.text == "Z" || e.text == "\u{1a}") {
                     root.zone-undo();
+                    return accept;
+                }
+                if e.text == Key.Escape && root.zone-cancel() {
                     return accept;
                 }
             }

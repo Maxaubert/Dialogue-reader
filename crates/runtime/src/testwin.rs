@@ -27,9 +27,10 @@ use windows::Win32::UI::HiDpi::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
     GetSystemMetrics, MA_NOACTIVATE, MSG, PostThreadMessageW, RegisterClassW, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, ShowWindow, TranslateMessage, ULW_ALPHA,
-    UpdateLayeredWindow, WINDOW_EX_STYLE, WINDOW_STYLE, WM_MOUSEACTIVATE, WM_QUIT, WNDCLASSW,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_OVERLAPPEDWINDOW, WS_POPUP,
+    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, SetTimer, ShowWindow, TranslateMessage, ULW_ALPHA,
+    UpdateLayeredWindow, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_MOUSEACTIVATE, WM_QUIT,
+    WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_OVERLAPPEDWINDOW,
+    WS_POPUP,
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
@@ -108,19 +109,25 @@ pub enum Kind {
     },
     /// A layered tool window left of every monitor showing `rgba` (`w` x `h`, straight alpha 255).
     Offscreen { w: u32, h: u32, rgba: Vec<u8> },
+    /// As `Offscreen`, but it repaints every `every_ms` (a bright band moves down a dark picture), so Windows
+    /// Graphics Capture keeps sending frames (it sends one only when the window changed). Live view tests.
+    OffscreenMoving { w: u32, h: u32, every_ms: u32 },
 }
 
 /// A window on its own thread, which pumps its messages until the window is dropped.
 pub struct TestWindow {
     pub hwnd: isize,
-    thread_id: u32,
+    /// The thread that owns the window and paints it.
+    pub thread_id: u32,
     join: Option<JoinHandle<()>>,
 }
 
 impl TestWindow {
     /// Makes the window on a new thread, on `desktop` when given (else the normal desktop).
     pub fn spawn(kind: Kind, desktop: Option<&HiddenDesktop>) -> Result<TestWindow, String> {
-        if desktop.is_none() && !matches!(kind, Kind::Offscreen { .. }) {
+        if desktop.is_none()
+            && !matches!(kind, Kind::Offscreen { .. } | Kind::OffscreenMoving { .. })
+        {
             return Err("only off-screen windows may be made on the normal desktop".into());
         }
         let desk = desktop.map(|d| d.desk);
@@ -147,6 +154,16 @@ impl TestWindow {
             let mut msg = MSG::default();
             unsafe {
                 while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                    if msg.hwnd.is_invalid() && msg.message == WM_RESIZE_TO {
+                        let (w, h) = (msg.wParam.0 as u32, msg.lParam.0 as u32);
+                        MOVING.with(|m| {
+                            if let Some(m) = m.borrow_mut().as_mut() {
+                                *m = Moving::new(m.hwnd, w, h);
+                                m.step();
+                            }
+                        });
+                        continue;
+                    }
                     let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
@@ -195,9 +212,78 @@ impl Drop for TestWindow {
     }
 }
 
+impl TestWindow {
+    /// A moving off-screen window (`Kind::OffscreenMoving`) changes to `w` x `h` (a game that changed size).
+    pub fn resize(&self, w: u32, h: u32) {
+        unsafe {
+            let _ = PostThreadMessageW(
+                self.thread_id,
+                WM_RESIZE_TO,
+                WPARAM(w as usize),
+                LPARAM(h as isize),
+            );
+        }
+    }
+}
+
+/// Thread message of [`TestWindow::resize`].
+const WM_RESIZE_TO: u32 = WM_APP + 1;
+
+/// The picture of a moving window, on its thread.
+struct Moving {
+    hwnd: HWND,
+    w: u32,
+    h: u32,
+    tick: u32,
+    rgba: Vec<u8>,
+}
+
+thread_local! {
+    static MOVING: std::cell::RefCell<Option<Moving>> = const { std::cell::RefCell::new(None) };
+}
+
+impl Moving {
+    fn new(hwnd: HWND, w: u32, h: u32) -> Moving {
+        Moving {
+            hwnd,
+            w,
+            h,
+            tick: 0,
+            rgba: [24u8, 28, 36, 255].repeat((w * h) as usize),
+        }
+    }
+
+    /// Moves the band one step and shows the picture.
+    fn step(&mut self) {
+        let band = (self.h / 16).max(1);
+        let rows = |n: u32| (n * band * 7) % self.h.max(1);
+        let dark = [24u8, 28, 36, 255];
+        let light = [230u8, 220, 120, 255];
+        let row_bytes = (self.w * 4) as usize;
+        for (y0, px) in [(rows(self.tick), dark), (rows(self.tick + 1), light)] {
+            for y in y0..(y0 + band).min(self.h) {
+                let r = &mut self.rgba[y as usize * row_bytes..(y as usize + 1) * row_bytes];
+                for c in r.as_chunks_mut::<4>().0 {
+                    *c = px;
+                }
+            }
+        }
+        self.tick += 1;
+        let _ = paint_layered(self.hwnd, self.w, self.h, &self.rgba);
+    }
+}
+
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     match msg {
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
+        WM_TIMER => {
+            MOVING.with(|m| {
+                if let Some(m) = m.borrow_mut().as_mut() {
+                    m.step();
+                }
+            });
+            LRESULT(0)
+        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wp, lp) },
     }
 }
@@ -285,6 +371,25 @@ fn make(kind: &Kind) -> Result<HWND, String> {
                     let _ = DestroyWindow(hwnd);
                     return Err(e);
                 }
+                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                Ok(hwnd)
+            }
+            Kind::OffscreenMoving { w, h, every_ms } => {
+                let x = GetSystemMetrics(SM_XVIRTUALSCREEN) - *w as i32 - 200;
+                let y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+                let hwnd = create(
+                    WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+                    "dr-runtime offscreen moving",
+                    WS_POPUP,
+                    x,
+                    y,
+                    *w as i32,
+                    *h as i32,
+                )?;
+                let mut m = Moving::new(hwnd, *w, *h);
+                m.step();
+                MOVING.with(|s| *s.borrow_mut() = Some(m));
+                SetTimer(Some(hwnd), 1, *every_ms, None);
                 let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                 Ok(hwnd)
             }
