@@ -687,7 +687,7 @@ skill.
 **Files.**
 ```
 crates/app/src/tray.rs             tray-icon on the UI thread
-crates/app/src/single.rs           named mutex + message-only window, "show" from a second start
+crates/app/src/single.rs           named mutex + hidden listener window: show, quit, end of session, TaskbarCreated
 crates/runtime/src/autostart.rs    HKCU Run key, or a scheduled task when run as admin
 crates/runtime/src/settings.rs     settings.json load/save
 crates/app/app.manifest            per-monitor DPI v2, common controls, asInvoker
@@ -722,6 +722,102 @@ version. Installer builds in CI.
 
 **Done when.** Install from the installer on this PC, the version shows in Settings and in `--version`, start with
 Windows works after a sign-out, and all headless tests pass. Merge only after Max's yes (global rules).
+
+### Status (built 2026-11-23, branch feat/app-m5)
+
+Built, not merged. Version 0.2.0 (`[workspace.package]` in the root `Cargo.toml`; every crate takes it).
+
+- `crates/runtime/src/settings.rs`: `settings.json` (Startup, In-game overlay). Defaults from spec 2.9: Start with
+  Windows off, Open minimized on, Show in the taskbar on (the mockup shows it off), pill top right, speaker on. A
+  broken file is kept as `settings.json.bad`, a newer file is not touched.
+- `crates/runtime/src/autostart.rs`: the HKCU Run value `DialogReader` = `"<exe>" --minimized`; an elevated
+  DialogReader makes a Task Scheduler task with the highest privileges instead. The registry is the truth: the
+  toggle shows what Windows will do.
+- `crates/app/src/single.rs`: mutex `Local\DialogReader.SingleInstance` and a hidden top-level listener window,
+  made right after the mutex. A second start posts "show" and exits (140 ms on this PC). Review fixes (2026-11-23):
+  the window is top-level, not message-only, because only top-level windows get Explorer's `TaskbarCreated` (the
+  tray icon is made again after Explorer restarts) and the end-of-session messages (`WM_ENDSESSION` quits, so
+  sign-out, shutdown and Restart Manager do not have to kill the app); the installer posts its quit message
+  (`WM_QUIT_APP`, 32850); a mutex that cannot be opened (access denied: the first runs as administrator) counts
+  as a second start, and the window lets show and quit through the UIPI filter. `DIALOGREADER_INSTANCE` renames it
+  for tests.
+- `crates/app/src/tray.rs`, `ui/tray.slint`: Slint's own `SystemTrayIcon` (the `system-tray` feature was already
+  on), not the `tray-icon` crate: no new dependency. Open, Pause/Resume (follows the app), Quit; left click opens.
+- `crates/app/src/shell.rs`: close (button or Alt+F4) hides the window while the tray icon is up, and quits when
+  there is none. `--minimized` (Start with Windows) starts in the tray when Open minimized is on; a start by hand
+  always shows the window. The app runs `run_event_loop_until_quit`.
+- `crates/app/src/vm/prefs.rs`: Settings rows saved; Check now opens the releases page; Export and Import of a game
+  (one profile JSON, the file dialogs run on their own thread, `crates/app/src/dialogs.rs`). "Import settings" on
+  the welcome page imports a game. An imported game gets a new id, so nothing on disk is overwritten.
+- `crates/app/app.manifest`, `app.rc`, `app.ico`, `build.rs`: asInvoker, per-monitor DPI v2, common controls v6,
+  the icon and a version block (`embed-resource`, needs rc.exe from the Windows SDK).
+- `installer/DialogReader.iss` (Inno Setup 6), `installer/build.ps1`: per-user install to
+  `%LOCALAPPDATA%\Programs\DialogReader`, no admin; `DialogReader-Setup-x64-<version>.exe` (336 MB). Ships the exe,
+  ONNX Runtime 1.28.2 with its licence and notices, the four VC++ DLLs (14.40 or newer), the Kokoro model and voices
+  (SHA-256 pinned, checked at build time) and `THIRD_PARTY_NOTICES.md`. `-Fetch` downloads ONNX Runtime and the
+  Kokoro files from their official releases (CI); without it the files next to `target\ship\DialogReader.exe`
+  are used. The uninstaller removes the Run value and keeps `%APPDATA%\DialogReader`.
+- `installer/notices.py`: the Rust crate table of `THIRD_PARTY_NOTICES.md` (each crate linked into the exe, its
+  licence and the copyright lines of its licence files). CI runs it with `--check`.
+- `.github/workflows/ci.yml`, `release.yml`, `CLAUDE.md` (shipping skill). Neither workflow has run yet.
+- Tests: `crates/runtime/tests/{settings,autostart}.rs`, `crates/app/tests/{settings,single,version}.rs`. The
+  single-instance test runs DialogReader.exe twice on a hidden desktop with a temp APPDATA and `--no-tray`.
+- `speech.log` names the Kokoro files a start uses (the installed app logs its own folder, not Sonara's).
+
+### Text changes for Max to approve (M5)
+
+Old (mockup) > new (app):
+
+1. Settings section list: Startup, In-game overlay, Keys, Voices, Updates > the same plus **Games** (no mockup).
+   Its rows: "Export this game" (the game's name under it, button "Export") and "Import a game" ("Adds a game from
+   an exported file.", button "Import").
+2. Updates: "You have the latest version." > "Check now opens the releases page in your browser." The app cannot
+   know whether it is the latest version without an update check.
+3. Updates: the row "Install updates automatically / Only when no game is running." > not shown (nothing installs
+   updates yet, spec 6 item 2).
+4. "Version 0.4.0" > the real version (0.2.0).
+5. Tray icon (no mockup): tooltip "DialogReader"; menu "Open", "Pause" / "Resume", "Quit".
+6. Welcome "Import settings" keeps its text; it imports one exported game file (spec 6 item 3).
+7. New notices: "<game> was exported to <path>.", "This file is not a DialogReader game (<reason>), so nothing was
+   imported.", "The file could not be read: <reason>", "The game could not be saved: <reason>", "Start with Windows
+   could not be changed: <reason>", "The settings could not be saved: <reason>", and the three settings file
+   notices in `settings.rs` (`Problem::text`). The export notice uses the red notice strip, which is meant for
+   problems; a quieter style for a success needs a design.
+8. File dialogs: titles "Export this game" and "Import a game", file type "DialogReader game (*.json)".
+9. Installer (Inno Setup's English texts) plus "Create a desktop shortcut", its group title "Additional
+   shortcuts:", and "Start DialogReader".
+10. Settings > Games with no game set up: "Set up a game first." (`ui/pages/settings.slint`, no mockup).
+11. More new notices (`src/vm/prefs.rs`): "The game could not be exported: <reason>", "Nothing can be saved here."
+    (Import with no data folder), and "This file is too big to be a DialogReader game, so nothing was imported."
+12. A Startup or In-game overlay change while settings.json cannot be written (from a newer DialogReader, or it
+    could not be read or moved aside): before, nothing was said and the change was lost at the next start; now
+    "This change is not saved: DialogReader does not write over a settings file it could not use. It lasts until
+    DialogReader closes."
+13. Start with Windows off, when a DialogReader running as administrator turned it on (a sign-in task): "Start
+    with Windows could not be changed: it was turned on by DialogReader running as administrator, so it can only
+    be turned off that way (<schtasks error>)".
+
+### Open questions (M5)
+
+1. Installer tool: Inno Setup 6 was used (on this PC already, RCMM uses it). The shipping skill says the tool is
+   Max's choice: keep Inno, or NSIS (Glint, Thrasher), WiX, Velopack?
+2. Where releases live: the repo is private, so "Check now" opens a page only Max can see, and an in-app update
+   check (GitHub API without a token) cannot work. A public releases repo, or another host?
+3. Code signing (SignPath or other): releases are unsigned until then.
+4. Slint licence: GPL-3.0, Royalty-free 2.0 (needs the AboutSlint widget in an About screen, or the "Made with
+   Slint" badge on the download page) or a paid licence. Not chosen.
+5. Skia's bundled libraries (FreeType, HarfBuzz, libpng, zlib, ICU and so on) are not listed one by one in the
+   notices yet.
+6. Show in the taskbar: on by default here (the mockup shows it off).
+7. CI is unproven: the capture and hidden-desktop tests may not run on a GitHub runner, and `release.yml` publishes
+   a release on every push to main once merged.
+8. ONNX Runtime download: on 2026-11-23 `github.com/microsoft/onnxruntime` (repo, API and the 1.28.2 release zip)
+   answered 404 from this PC, and NuGet has no 1.28.2 (1.28.0, then 1.29.0). So `build.ps1 -Fetch` (CI) stops at
+   that download; the local build uses the copy next to `target\ship` (SHA-256 pinned). Retry later, or pick another
+   ONNX Runtime version and source (the DLL pin changes with it). The Kokoro URLs answer. The review (2026-11-23)
+   confirmed it: the `installer` job of `ci.yml` and all of `release.yml` fail until this is chosen.
+9. A silent update over a running DialogReader now starts it again (with `--minimized`) after the install. A
+   normal install still asks with its "Start DialogReader" box. Keep this?
 
 ## After v1
 

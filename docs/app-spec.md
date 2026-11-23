@@ -314,13 +314,16 @@ Profile JSON (version field so later changes can migrate):
 ### 2.9 App shell
 
 - Single instance: a named mutex `Local\DialogReader.SingleInstance`. A second start finds the first instance's
-  message-only window and asks it to show the main window, then exits.
-- Tray icon (`tray-icon` crate, on the UI thread): left click opens the main window; menu: Open, Pause/Resume,
-  Quit.
+  hidden listener window and asks it to show the main window, then exits. The same window ends the app for the
+  installer and uninstaller and at the end of the Windows session, and makes the tray icon again after Explorer
+  restarts.
+- Tray icon (Slint's `SystemTrayIcon`, `ui/tray.slint`, on the UI thread; M5 used it instead of the `tray-icon`
+  crate): left click opens the main window; menu: Open, Pause/Resume, Quit.
 - Start with Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\DialogReader` =
   `"<path>\DialogReader.exe" --minimized`. Off by default, set in Settings.
-- Closing the main window keeps the app in the tray while a profile is active. Quit is in the tray, the quick
-  menu, and the main window menu.
+- Closing the main window keeps the app in the tray (M5: always while the tray icon is up; with no tray icon
+  closing quits). Quit is in the tray and the quick menu. `--minimized` (the Run value) starts in the tray when
+  "Open minimized" is on; a start by hand always shows the window.
 - `#![windows_subsystem = "windows"]`, per-monitor DPI aware v2 (app manifest), `--version` prints the version.
 - Version: the workspace version (`CARGO_PKG_VERSION`), shown in Settings > Updates and in the installer name.
 
@@ -553,7 +556,7 @@ Navigation is one Slint enum property on the main window:
 ### Decisions after M4 (Max, 2026-11-23, PR #16 merged)
 - Injected keys (Steam Input, pad mappers, `LLKHF_INJECTED`) count as real key presses.
 - The quick menu key also reaches the game when it opens the menu (not swallowed).
-- Until the tray in M5, closing the main window quits DialogReader.
+- Until the tray in M5, closing the main window quits DialogReader. (Since M5 it hides to the tray.)
 
 ### Kokoro engine (built 2026-11-23)
 - **Kokoro is bundled (Max, 2026-11-23).** His words: "kokoro voices should be bundled, if sonara fits or would be

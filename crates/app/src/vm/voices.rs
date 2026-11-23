@@ -86,7 +86,9 @@ impl Voices {
             Err(why) => (Vec::new(), Some(why)),
         };
         let log = dr_runtime::paths::crash_logs().map(|d| d.join("speech.log"));
-        let (kokoro, watch, missing) = match dr_tts::KokoroFiles::locate() {
+        let located = dr_tts::KokoroFiles::locate();
+        let found = located.as_ref().ok().cloned();
+        let (kokoro, watch, missing) = match located {
             Ok(files) => {
                 let k = dr_tts::KokoroTts::new(files);
                 k.preload();
@@ -112,6 +114,15 @@ impl Voices {
         v.log = log;
         if let Some(m) = &missing {
             v.write_log(m);
+        }
+        if let Some(f) = &found {
+            // which files this start uses: an installed app must name its own folder, not Sonara's (M5 check)
+            v.write_log(&format!(
+                "Kokoro files: model {}, voices {}, runtime {}",
+                f.model.display(),
+                f.voices.display(),
+                f.runtime.display()
+            ));
         }
         if let Some(p) = &v.problem {
             v.write_log(&format!("listing the Windows voices: {p}"));

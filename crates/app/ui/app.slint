@@ -21,8 +21,9 @@ import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
 import { ZoneEdit } from "overlays/zone_edit.slint";
 import { LiveView } from "components/stage.slint";
 import { PillWindow, QuickMenuWindow, ZoneEditWindow } from "overlays/windows.slint";
+import { Tray } from "tray.slint";
 
-export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView, PillWindow, QuickMenuWindow, ZoneEditWindow }
+export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView, PillWindow, QuickMenuWindow, ZoneEditWindow, Tray }
 
 export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
@@ -72,7 +73,7 @@ export component MainWindow inherits Window {
     in property <string> voice-label: "Kokoro · Adam";
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
     in-out property <bool> adding-game: false;
-    in property <string> version: "0.1.0";
+    in property <string> version: "";
     // the game being set up (page 06 summary)
     in property <string> setup-game: "Red Dead Redemption 2";
     in property <string> setup-art: "rdr2";
@@ -104,10 +105,17 @@ export component MainWindow inherits Window {
     in property <string> now-line: "We need to get these horses moving before the snow buries us.";
     // the key row waiting for a key: 0 the read key, 1 the quick menu key, -1 none
     in property <int> capturing-key: -1;
-    // Settings > In-game overlay (M4 uses them for this session; saving them is M5): 0 top right, 1 bottom
+    // Settings > In-game overlay (saved in settings.json since M5, src/vm/prefs.rs): 0 top right, 1 bottom
     // center, 2 off; and whether the pill shows the speaker
     in-out property <int> pill-position: 0;
     in-out property <bool> show-speaker: true;
+    // Settings > Startup (M5). The defaults are the mockup's; the app sets the saved values.
+    in-out property <bool> start-with-windows: true;
+    in-out property <bool> open-minimized: true;
+    in-out property <bool> show-in-taskbar: false;
+    // Settings > Updates (M5): the line under the version, and whether the automatic install row shows
+    in property <string> update-note: "You have the latest version.";
+    in property <bool> show-auto-update: true;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
@@ -120,6 +128,14 @@ export component MainWindow inherits Window {
     callback edit-remove(int);
     callback edit-pick(length, length) -> int;
     callback settings-jump(int);
+    // Settings (M5, src/vm/prefs.rs): a Startup or In-game overlay row changed, Check now, Export and Import of a
+    // game ("Import settings" on the welcome page imports a game too)
+    callback settings-changed();
+    callback check-updates();
+    callback export-game();
+    callback import-game();
+    // the file dialog of Export (true) or Import (false) answered with this path (src/vm/prefs.rs)
+    callback file-picked(bool, string);
     settings-jump(i) => {
         settings.jump(i);
     }
@@ -173,6 +189,11 @@ export component MainWindow inherits Window {
     changed page => {
         root.page-changed(root.page);
         root.page-shown(root.page);
+    }
+    // Pause or Resume changed: the tray menu follows (src/tray.rs)
+    callback paused-changed(bool);
+    changed paused => {
+        root.paused-changed(root.paused);
     }
     // opens the Settings voice picker (render-screens)
     public function settings-open-voice-list() {
@@ -337,6 +358,9 @@ export component MainWindow inherits Window {
                     zones: root.setup-zones;
                     get-started => {
                         root.next();
+                    }
+                    import-settings => {
+                        root.import-game();
                     }
                 }
                 if root.page == Page.pick-window: PickWindowPage {
@@ -546,7 +570,24 @@ export component MainWindow inherits Window {
                     }
                     pill-position <=> root.pill-position;
                     show-speaker <=> root.show-speaker;
+                    start-with-windows <=> root.start-with-windows;
+                    open-minimized <=> root.open-minimized;
+                    show-in-taskbar <=> root.show-in-taskbar;
                     version: root.version;
+                    update-note: root.update-note;
+                    show-auto-update: root.show-auto-update;
+                    changed => {
+                        root.settings-changed();
+                    }
+                    check-updates => {
+                        root.check-updates();
+                    }
+                    export-game => {
+                        root.export-game();
+                    }
+                    import-game => {
+                        root.import-game();
+                    }
                     voices: root.voices;
                     voices-desc: root.voices-desc;
                     kokoro-desc: root.kokoro-desc;

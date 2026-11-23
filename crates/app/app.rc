@@ -1,0 +1,31 @@
+// Resources of DialogReader.exe (M5): the app manifest, the icon (tools/make_icons.py) and the version block.
+// build.rs compiles it with the version numbers of the workspace version as macros.
+#include <winver.h>
+
+1 24 "app.manifest"
+1 ICON "app.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION DR_V1, DR_V2, DR_V3, 0
+PRODUCTVERSION DR_V1, DR_V2, DR_V3, 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "DialogReader"
+      VALUE "FileDescription", "DialogReader"
+      VALUE "FileVersion", DR_VERSION
+      VALUE "InternalName", "DialogReader"
+      VALUE "OriginalFilename", "DialogReader.exe"
+      VALUE "ProductName", "DialogReader"
+      VALUE "ProductVersion", DR_VERSION
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

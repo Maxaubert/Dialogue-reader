@@ -1,5 +1,8 @@
 // 12 settings. The Shortcuts section of the mockup becomes "Keys": the same two 04-read-key-d cards as onboarding
 // (read key and quick menu key). Max picked "D everywhere", 2026-11-22.
+// M5: the Startup and In-game overlay rows are saved (src/vm/prefs.rs), Updates shows the real version, and a
+// "Games" section (no mockup; listed in docs/app-plan.md, "Text changes for Max to approve (M5)") exports and
+// imports a game.
 import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
 import { Icon, CIcon, Button, BtnKind, Card, Toggle, Segmented, Kbd, Slider } from "../components/base.slint";
 import { VoiceData } from "../data.slint";
@@ -61,12 +64,14 @@ component Section inherits VerticalLayout {
 component RowToggle inherits VerticalLayout {
     in-out property <bool> on;
     in property <string> label;
+    callback toggled(bool);
     alignment: center;
     Toggle {
         on: root.on;
         label: root.label;
         toggled(v) => {
             root.on = v;
+            root.toggled(v);
         }
     }
 }
@@ -81,7 +86,16 @@ export component SettingsTab inherits Rectangle {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     in property <int> capturing: -1;
-    in property <string> version: "0.1.0";
+    in property <string> version: "";
+    // under the version (the mockup text with the fake data; the app says what Check now does)
+    in property <string> update-note: "You have the latest version.";
+    // the automatic install row (the mockup shows it; the app hides it until updates can install, spec 6 item 2)
+    in property <bool> show-auto-update: true;
+    // a Startup or In-game overlay row changed (saved by src/vm/prefs.rs)
+    callback changed();
+    callback check-updates();
+    callback export-game();
+    callback import-game();
     // Voices: Kokoro (first, as in mockup 12) and the Windows voices, and the current game's voice, speed and
     // volume (saved in its profile)
     in property <[VoiceData]> voices;
@@ -112,7 +126,7 @@ export component SettingsTab inherits Rectangle {
     public function jump(i: int) {
         root.section = i;
         flick.content-y = -max(0px, min(
-            i == 0 ? startup.y : i == 1 ? overlay.y : i == 2 ? keys.y : i == 3 ? voices.y : updates.y,
+            i == 0 ? startup.y : i == 1 ? overlay.y : i == 2 ? keys.y : i == 3 ? voices.y : i == 4 ? updates.y : games.y,
             col.preferred-height + 2 * Size.page-x - flick.height));
     }
     HorizontalLayout {
@@ -123,7 +137,7 @@ export component SettingsTab inherits Rectangle {
             width: 200px;
             spacing: 2px;
             alignment: start;
-            for s[i] in ["Startup", "In-game overlay", "Keys", "Voices", "Updates"]: Rectangle {
+            for s[i] in ["Startup", "In-game overlay", "Keys", "Voices", "Updates", "Games"]: Rectangle {
                 height: Size.ctl;
                 border-radius: Radius.md;
                 background: i == root.section ? Palette.surface-2 : (nav-touch.has-hover ? Palette.surface : transparent);
@@ -170,6 +184,9 @@ export component SettingsTab inherits Rectangle {
                                 RowToggle {
                                     on <=> root.start-with-windows;
                                     label: "Start with Windows";
+                                    toggled => {
+                                        root.changed();
+                                    }
                                 }
                             }
 
@@ -179,6 +196,9 @@ export component SettingsTab inherits Rectangle {
                                 RowToggle {
                                     on <=> root.open-minimized;
                                     label: "Open minimized";
+                                    toggled => {
+                                        root.changed();
+                                    }
                                 }
                             }
 
@@ -188,6 +208,9 @@ export component SettingsTab inherits Rectangle {
                                 RowToggle {
                                     on <=> root.show-in-taskbar;
                                     label: "Show in the taskbar";
+                                    toggled => {
+                                        root.changed();
+                                    }
                                 }
                             }
                         }
@@ -210,6 +233,7 @@ export component SettingsTab inherits Rectangle {
                                         selected: root.pill-position;
                                         select(i) => {
                                             root.pill-position = i;
+                                            root.changed();
                                         }
                                     }
                                 }
@@ -221,6 +245,9 @@ export component SettingsTab inherits Rectangle {
                                 RowToggle {
                                     on <=> root.show-speaker;
                                     label: "Show the speaker";
+                                    toggled => {
+                                        root.changed();
+                                    }
                                 }
                             }
                         }
@@ -452,22 +479,65 @@ export component SettingsTab inherits Rectangle {
                             SetRow {
                                 first: true;
                                 title: "Version " + root.version;
-                                desc: "You have the latest version.";
+                                desc: root.update-note;
                                 VerticalLayout {
                                     alignment: center;
                                     Button {
                                         text: "Check now";
                                         icon: Icons.refresh;
+                                        clicked => {
+                                            root.check-updates();
+                                        }
                                     }
                                 }
                             }
 
-                            SetRow {
+                            if root.show-auto-update: SetRow {
                                 title: "Install updates automatically";
                                 desc: "Only when no game is running.";
                                 RowToggle {
                                     on <=> root.auto-update;
                                     label: "Install updates automatically";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                games := Section {
+                    title: "Games";
+                    Card {
+                        VerticalLayout {
+                            padding: 1px;
+                            SetRow {
+                                first: true;
+                                title: "Export this game";
+                                desc: root.has-game ? root.game : "Set up a game first.";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Button {
+                                        text: "Export";
+                                        icon: Icons.download;
+                                        enabled: root.has-game;
+                                        clicked => {
+                                            root.export-game();
+                                        }
+                                    }
+                                }
+                            }
+
+                            SetRow {
+                                title: "Import a game";
+                                desc: "Adds a game from an exported file.";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Button {
+                                        text: "Import";
+                                        icon: Icons.upload;
+                                        clicked => {
+                                            root.import-game();
+                                        }
+                                    }
                                 }
                             }
                         }

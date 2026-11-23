@@ -11,6 +11,7 @@
 
 mod live;
 pub mod overlays;
+pub mod prefs;
 pub mod reading;
 pub mod voices;
 pub mod zones;
@@ -46,6 +47,27 @@ pub trait Desktop {
     }
     /// Opens the Windows speech settings, where voices are added ("Add voices"). Nothing by default.
     fn open_speech_settings(&self) {}
+    /// Start with Windows is on (the Run value or the task, src/autostart.rs). `None`: not known here.
+    fn autostart(&self) -> Option<bool> {
+        None
+    }
+    /// Turns Start with Windows on or off.
+    fn set_autostart(&self, _on: bool) -> Result<(), String> {
+        Err("Start with Windows cannot be changed here.".into())
+    }
+    /// Opens a web page in the browser (Settings > Updates > Check now).
+    fn open_url(&self, _url: &str) {}
+    /// Asks for a file and hands it to `done` (`None`: cancelled). `save`: the suggested name of a file to save
+    /// (Export), or `None` to open one (Import). `owner` is the main window's HWND. The real desktop shows the dialog
+    /// on another thread, so the UI thread is never inside a modal loop; `done` may run on that thread.
+    fn pick_file_then(
+        &self,
+        _owner: Option<isize>,
+        _save: Option<String>,
+        done: Box<dyn FnOnce(Option<std::path::PathBuf>) + Send>,
+    ) {
+        done(None);
+    }
     /// The window still exists.
     fn is_open(&self, _win: &WinInfo) -> bool {
         true
@@ -98,6 +120,52 @@ impl Desktop for RealDesktop {
         let _ = std::process::Command::new("explorer.exe")
             .arg("ms-settings:speech")
             .spawn();
+    }
+
+    fn autostart(&self) -> Option<bool> {
+        Some(dr_runtime::autostart::Autostart::app().is_on())
+    }
+
+    fn set_autostart(&self, on: bool) -> Result<(), String> {
+        let a = dr_runtime::autostart::Autostart::app();
+        if on {
+            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            a.enable(&exe, dr_runtime::elevation::self_elevated())
+        } else {
+            a.disable()
+        }
+    }
+
+    fn open_url(&self, url: &str) {
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        use windows::core::{HSTRING, w};
+        unsafe {
+            ShellExecuteW(
+                None,
+                w!("open"),
+                &HSTRING::from(url),
+                None,
+                None,
+                SW_SHOWNORMAL,
+            );
+        }
+    }
+
+    fn pick_file_then(
+        &self,
+        owner: Option<isize>,
+        save: Option<String>,
+        done: Box<dyn FnOnce(Option<std::path::PathBuf>) + Send>,
+    ) {
+        let _ = std::thread::Builder::new()
+            .name("file-dialog".into())
+            .spawn(move || {
+                done(match save {
+                    Some(name) => crate::dialogs::save_path(owner, &name),
+                    None => crate::dialogs::open_path(owner),
+                })
+            });
     }
 
     fn is_open(&self, win: &WinInfo) -> bool {
@@ -477,6 +545,10 @@ pub struct Vm {
     overlays: Option<crate::overlay::Overlays>,
     /// Mute from the quick menu (for this session; not saved).
     muted: bool,
+    /// settings.json (M5, prefs.rs): the defaults with the fake source.
+    prefs: dr_runtime::settings::Settings,
+    /// settings.json must not be written (newer format, or a broken file that could not be moved aside).
+    prefs_read_only: bool,
 }
 
 pub type Shared = Rc<RefCell<Vm>>;
@@ -512,6 +584,8 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         voice_dirty: false,
         overlays: None,
         muted: false,
+        prefs: dr_runtime::settings::Settings::default(),
+        prefs_read_only: false,
     };
     w.set_setup_zones(ModelRc::from(vm.setup_zones.clone()));
     w.set_zones(ModelRc::from(vm.zones.clone()));
@@ -556,6 +630,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             w.set_status_text(reading::STATUS_STOPPED.into());
             w.set_status_ok(false);
             vm.real = Some(Real { paths, desktop });
+            vm.load_prefs();
             vm.setup = Editor::new(Vec::new(), 1600.0, 900.0);
             vm.main = Editor::new(Vec::new(), 1600.0, 900.0);
             vm.main.draw = false;
@@ -1430,6 +1505,17 @@ fn problems_text(problems: &[Problem]) -> Option<String> {
 }
 
 fn wire(w: &MainWindow, vm: &Shared) {
+    // Settings (M5, prefs.rs)
+    let v = vm.clone();
+    w.on_settings_changed(move || v.borrow_mut().settings_changed());
+    let v = vm.clone();
+    w.on_check_updates(move || v.borrow().check_updates());
+    let v = vm.clone();
+    w.on_export_game(move || v.borrow().pick_file(true));
+    let v = vm.clone();
+    w.on_import_game(move || v.borrow().pick_file(false));
+    let v = vm.clone();
+    w.on_file_picked(move |save, path| v.borrow_mut().file_picked(save, path.as_str()));
     let v = vm.clone();
     let weak = w.as_weak();
     w.on_zone_pointer(move |kind, x, y, scale| {

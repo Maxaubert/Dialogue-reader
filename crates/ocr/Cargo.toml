@@ -1,6 +1,6 @@
 [package]
 name = "dr-ocr"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "DialogReader OCR: the Windows built-in OCR engine (Windows.Media.Ocr) behind dr_core::Ocr"
 

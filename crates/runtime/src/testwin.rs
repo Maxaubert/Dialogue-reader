@@ -37,6 +37,7 @@ use windows::core::{HSTRING, PCWSTR, w};
 /// A desktop that is never shown. Closed on drop (after its windows are gone).
 pub struct HiddenDesktop {
     desk: isize,
+    name: String,
 }
 
 impl HiddenDesktop {
@@ -45,7 +46,7 @@ impl HiddenDesktop {
         // GENERIC_ALL, as tools/hidden-run.ps1 asks for.
         let desk = unsafe {
             CreateDesktopW(
-                &HSTRING::from(name),
+                &HSTRING::from(name.as_str()),
                 PCWSTR::null(),
                 None,
                 DESKTOP_CONTROL_FLAGS(0),
@@ -56,7 +57,18 @@ impl HiddenDesktop {
         .map_err(|e| format!("CreateDesktop: {e}"))?;
         Ok(HiddenDesktop {
             desk: desk.0 as isize,
+            name,
         })
+    }
+
+    /// The desktop's name: a process started with `STARTUPINFO.lpDesktop` = `WinSta0\<name>` runs on it.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The desktop handle (`HDESK`), for `EnumDesktopWindows`.
+    pub fn handle(&self) -> isize {
+        self.desk
     }
 
     /// Runs `f` on a new thread that belongs to this desktop and waits for it.
