@@ -130,7 +130,7 @@ impl Desktop for RealDesktop {
         let a = dr_runtime::autostart::Autostart::app();
         if on {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-            a.enable(&exe, dr_runtime::elevation::self_elevated())
+            a.enable(&exe)
         } else {
             a.disable()
         }
