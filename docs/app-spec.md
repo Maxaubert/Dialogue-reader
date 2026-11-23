@@ -133,6 +133,25 @@ pub trait Tts: Send {
 - Queue: lines are spoken in order. A new manual press replaces the queue. Stop clears it. Lines older than 10 s
   in the queue are dropped (they no longer match the screen). A speaker line and the dialogue line after it are
   spoken as one ("Arthur: We need to ...") when they come in the same read.
+- Built in M3a: `dr-tts` holds the trait, `WinTts`, WAV parsing and `FakeTts`. The queue, the speech thread and
+  the sinks (`RodioOut`, `NullSink`) are in `dr-runtime` (`speech.rs`), as section 2.1 says. Commands: Say,
+  Replace (manual press), Test (voice test, with an id), SetTestVolume, Stop, Skip, Replay, Mute, SetVoice,
+  SetSpeed, SetVolume. Events (Started, Finished, Cut, Dropped, Error) carry the `Item` (its lines and zones) and
+  the test id, so a poll ends only on its own sample. Error has a kind (engine, no device, device lost); the UI
+  shows a plain line for the kind and writes the raw text to `speech.log`.
+- Speech thread rules added after the M3a review (2026-11-23): commands sent while a line is being made are read
+  before it plays, and a Stop, Skip, Replay or Test among them drops the sound (no short blip). A device that
+  reports an error, or a sound that runs past 1.5 times its length plus 1.5 s, ends the line with an error, lets
+  go of the device and opens the default device again at the next line; the next line also moves to a new default
+  device. The thread joins the multithreaded COM apartment first (cpal would make it a single-threaded one with no
+  message loop). `WinTts` keeps the picked voice until the id changes.
+- An empty or unknown voice id means the Windows default voice in `WinTts`; the app shows and uses the first
+  installed voice in that case. On Max's PC (2026-11-22, checked again 2026-11-23 with `probe_voices`) WinRT
+  lists no voice: `AllVoices` returns an empty list, and `DefaultVoice` and `SpeechSynthesizer::new` fail with
+  0x80070002. The registry key `HKLM\SOFTWARE\Microsoft\Speech_OneCore\Voices\Tokens` is missing, although
+  `C:\Windows\Speech_OneCore\Engines\TTS\en-US` exists; only the old SAPI 5 voice Zira is registered. The app
+  shows the "no voice" state there. Adding a voice in Windows Settings > Time & language > Speech may not fix it
+  (the files are there but not registered); if it does not, v1 needs a SAPI 5 engine (open question 11).
 
 ### 2.6 Global keys
 
@@ -208,9 +227,22 @@ Profile JSON (version field so later changes can migrate):
 - The file name is the id: on load, `id` is set from the file name, so a copied or hand-edited file always saves
   back to itself. A new profile takes an id that no file in `profiles\` uses yet (`.json`, `.json.bad`, `.png`;
   case does not matter), so a file that was not loaded (newer format, damaged) is never overwritten.
-- One profile per game: page 02 refuses a window that already has a profile and points to the game switcher.
-- `voice.id` stays empty until real voices exist (M3a); `speed` (0.5 to 2.0) and `volume` come from page 05.
-- The active profile follows the game: when a window whose exe matches a profile appears, that profile starts.
+- Several profiles can share an exe (emulators, `javaw.exe`, `Game.exe`; Max, 2026-11-22), told apart by the
+  window title. The first profile of an exe matches by exe only. A new profile for an exe that already has one
+  saves the window title as `title_contains`, and the profiles of that exe with no title get their name (the window
+  title at their setup) as `title_contains` too, so the first game no longer takes every window of the exe
+  (M3a review, 2026-11-23). Titles are compared without counters (`vm::stable_title`): numbers with a point,
+  comma or colon, numbers with a unit (fps, ms, Hz, %) and numbers after "FPS" or "VPS" are left out, other
+  numbers stay ("Persona 4" and "Persona 5" stay apart; "HD 1.5" and "HD 2.5" do not). A title that changes its
+  shape (for example when paused) still loses its match. A window belongs to the profile that fits it best: a
+  profile with a title beats one with the exe only, a longer title beats a shorter one, and on a tie the newest
+  file wins. So one window makes one profile "Running", and Retake uses that same window. Page 02 refuses a window
+  when its best profile matched it by title (the same rule), or, for a profile with the exe only, when its name is
+  this window's title apart from counters, and points to the game switcher.
+- `voice.id` is the Windows voice picked on page 05 or in Settings > Voices (empty when none is installed);
+  `speed` (0.5 to 2.0) and `volume` come from page 05 and Settings > Voices.
+- The active profile follows the game: when a window that matches a profile appears, the profile it fits best
+  starts.
 - Writes are atomic (write to `.tmp`, then rename). A broken file is kept as `.bad` and the app starts with
   defaults and says so.
 
@@ -386,13 +418,13 @@ Navigation is one Slint enum property on the main window:
 | Speed of 4K frames | Copying 33 MB per frame costs CPU next to a game. | 25 fps cap, newest-frame slot, later zone-only copies. Measure CPU in M3b with Satisfactory. |
 | Slint limits | No line height on `StyledText`, no outline-offset, no blur, no rounded clip and no shadows in the software renderer. Overlay transparency depends on the winit backend. | `line-height-factor` on `Text`. Rings as extra rectangles. Corner masks in software renders only. Check transparent, frameless, topmost windows in a spike right after M1 (app-plan.md); fallback: draw overlays with the software renderer into a Win32 layered window (`UpdateLayeredWindow`). |
 | Windows voices quality | Built-in voices sound flat next to Kokoro. | Tts trait from day one. Kokoro comes after v1 behind it. |
-| Log shows skipped lines | 10-main-b and 14 show "Prompts off" and "Already read" rows. `dr-core` does not report skipped lines today. | M1 shows them from fake data. M3a adds a small `dr-core` change: a `skipped` list in `Output` and `Press` (line, zone, reason: already read, prompts off). With prompts off, prompt zones are still read but not spoken, so the log can show them; if that OCR cost shows up in the M3b CPU check, prompt zones are dropped and the log shows nothing for them. |
+| Log shows skipped lines | 10-main-b and 14 show "Prompts off" and "Already read" rows. `dr-core` does not report skipped lines today. | M1 shows them from fake data. M3a adds a small `dr-core` change: a `skipped` list in `Output` and `Press` (line, zone, reason: already read, prompts off). With prompts off, prompt zones are still read but not spoken, so the log can show them; if that OCR cost shows up in the M3b CPU check, prompt zones are dropped and the log shows nothing for them. Cost seen in the M3a review (simulated clock, soft): standard a1 with prompts off, CPU per frame p50 0.65 to 2.35 ms, p95 14.6 to 17.9 ms, same score. In manual mode a press also waits for the OCR of every prompt zone before any line is spoken. On the M3b checklist. |
 
 ## 6. Open questions for Max
 
-1. Voice labels in the approved mockups say "Kokoro · Adam". v1 ships Windows voices first. M1 keeps the mockup
-   text; from M3a the labels show the real engine ("Windows · David"). The Settings > Voices card then lists
-   "Windows voices" and "Kokoro (coming later)" instead of Kokoro and Piper.
+1. Voice labels in the approved mockups say "Kokoro · Adam". v1 ships Windows voices first. From M3a the labels
+   show the real engine ("Windows · David"). Built in M3a and waiting for Max's yes: the text changes are listed
+   in app-plan.md, M3a result.
 2. Settings > Updates: v1 shows the version and a "Check now" link to GitHub Releases. Automatic install of updates
    is later.
 3. "Import settings" on the welcome page: v1 imports a profile JSON exported from DialogReader (Export is in the
@@ -405,8 +437,8 @@ Navigation is one Slint enum property on the main window:
 5. Settings > Keys: settled. Max picked "D everywhere" (2026-11-22), so Settings shows the same two 04-read-key-d
    cards as setup.
 6. Media pause while speaking. The old app had it; this plan puts it after v1. Is v1 without it acceptable?
-7. Kokoro wording. M3a changes the voice page header, "Get more voices" and Settings > Voices to what v1 ships
-   (Windows voices). Max approves the new wording first.
+7. Kokoro wording. M3a changed the voice page header, "Get more voices" and Settings > Voices to what v1 ships
+   (Windows voices), as a proposal. Max approves it or names other words (list in app-plan.md, M3a result).
 8. Renderer: settled. Max (2026-11-22): Skia with `panic = "abort"` in a ship-only profile. Measured before
    (`crates/app/README.md`, "Renderer"): Skia text has 100 to 101% of the mockup shots' ink at 100% and 225%
    scale, femtovg 79 to 89%. The workspace `Cargo.toml` has `[profile.ship]` (inherits release, fat LTO, one
@@ -425,8 +457,15 @@ Navigation is one Slint enum property on the main window:
 10. Game check on page 02 (M2): any app that draws with Direct3D counts as a game by the library check (on this
    PC, Flare). Browsers and Electron are left out by window class. Is that good enough, or should the library
    check go (games would then need a full-monitor window or a profile)?
+11. No Windows voice on Max's PC (M3a review, 2026-11-23). Max adds an English voice in Windows Settings > Time &
+    language > Speech once, then runs `cargo test -p dr-tts --test voices -- --ignored`. If WinRT still lists no
+    voice, v1 needs a SAPI 5 engine (Zira is registered there) before M3b, or Max cannot hear his own app.
+12. Games that share an exe (M3a review): the first profile of an exe gets its title when a second game of that exe
+    is set up, and titles are compared without counters (FPS, frame times, percent, versions). Open: let Max edit
+    the saved title on page 02 (new UI, needs a mockup). The reviewer advised doing it.
+
 ### Decisions after M2 (Max, 2026-11-22)
 - Games that share one exe (emulators, javaw.exe, Game.exe): allow several profiles per exe and tell them apart by
-  exe plus window title. Replaces the "one profile per exe" refusal from M2.
+  exe plus window title. Replaces the "one profile per exe" refusal from M2. Built in M3a (section 2.8).
 - UI bits added in M2 without a mockup (rename field, notice strip, exe icons on page 02, scrolling lists, the blue
   box while drawing) are accepted as built. Max flags anything he dislikes when he sees it.

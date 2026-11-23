@@ -40,6 +40,7 @@ slint = { version = "=1.18.1", default-features = false, features = [
 ] }
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 dr-runtime = { path = "../runtime" }
+dr-tts = { path = "../tts" }
 
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"

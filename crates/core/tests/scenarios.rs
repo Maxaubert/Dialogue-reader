@@ -355,3 +355,38 @@ fn a_still_line_the_first_clean_up_misses_is_read_by_the_second() {
     }
     assert_eq!(said, vec!["Hold the line!"]);
 }
+
+#[test]
+fn with_prompts_off_prompt_lines_are_skipped_not_spoken() {
+    let texts = Rc::new(RefCell::new(vec![String::new(), "Press E to open".to_string()]));
+    let mut ocr = Coded { texts: texts.clone() };
+    let cfg = Config { read_prompts: false, ..Config::default() };
+    let mut p = Pipeline::new(cfg, &[zone(ZoneKind::Prompt)]);
+    let (mut spoken, mut skipped) = (Vec::new(), Vec::new());
+    let mut last = 0.0;
+    for i in 0..60 {
+        let t = i as f64 * 33.3;
+        last = t;
+        let px = frame_with(60, if i < 40 { 1 } else { 0 });
+        let o = p.on_frame(&Frame::new(t, FW, FH, &px), &mut ocr);
+        spoken.extend(o.events);
+        skipped.extend(o.skipped);
+    }
+    let o = p.finish(last, &mut ocr);
+    spoken.extend(o.events);
+    skipped.extend(o.skipped);
+    assert!(spoken.is_empty(), "{spoken:?}");
+    assert_eq!(skipped.len(), 1, "{skipped:?}");
+    assert_eq!(skipped[0].line.text, "Press E to open");
+    assert_eq!(skipped[0].reason, dr_core::SkipReason::PromptsOff);
+    // with prompts on, the same prompt is spoken
+    let mut p = Pipeline::new(Config::default(), &[zone(ZoneKind::Prompt)]);
+    let mut n = 0;
+    for i in 0..60 {
+        let px = frame_with(60, if i < 40 { 1 } else { 0 });
+        let o = p.on_frame(&Frame::new(i as f64 * 33.3, FW, FH, &px), &mut ocr);
+        n += o.events.len();
+        assert!(o.skipped.is_empty());
+    }
+    assert_eq!(n, 1);
+}

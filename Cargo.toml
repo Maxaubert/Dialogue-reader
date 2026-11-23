@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["spikes/recorder", "spikes/overlay", "crates/core", "crates/arena", "crates/runtime", "crates/app"]
+members = ["spikes/recorder", "spikes/overlay", "crates/core", "crates/ocr", "crates/tts", "crates/arena", "crates/runtime", "crates/app"]
 
 # The shipped DialogReader.exe (Max, 2026-11-22): Skia with fat LTO and panic = "abort", about 22 MB.
 # `cargo build --profile ship -p dr-app --bin DialogReader` writes target\ship\DialogReader.exe.

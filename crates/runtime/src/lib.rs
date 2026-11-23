@@ -1,12 +1,13 @@
 //! DialogReader runtime: everything the app needs that is not UI. No Slint here (docs/app-spec.md 2.1).
 //!
 //! M2: profiles on disk ([`profile`], [`paths`]), the list of windows to read ([`windows_list`]) and one
-//! screenshot of a window with Windows Graphics Capture ([`screenshot`]). Capture, the reader thread, speech and
-//! keys come in M3.
+//! screenshot of a window with Windows Graphics Capture ([`screenshot`]). M3a: the speech queue, the speech thread
+//! and audio out ([`speech`]). Capture, the reader thread and keys come in M3b.
 
 pub mod paths;
 pub mod profile;
 pub mod shot;
+pub mod speech;
 
 #[cfg(windows)]
 pub mod screenshot;

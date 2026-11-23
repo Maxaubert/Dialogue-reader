@@ -1,0 +1,20 @@
+[package]
+name = "dr-tts"
+version = "0.1.0"
+edition = "2024"
+description = "DialogReader speech: the Tts trait, the Windows built-in voices engine, WAV parsing and a fake engine for tests"
+
+[lib]
+name = "dr_tts"
+path = "src/lib.rs"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Media_Core",
+    "Media_SpeechSynthesis",
+    "Storage_Streams",
+] }

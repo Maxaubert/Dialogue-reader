@@ -24,10 +24,12 @@ pub struct Screen {
 fn page(w: &MainWindow, p: Page) {
     w.set_overlay(OverlayPreview::None);
     w.set_switcher_open(false);
+    w.invoke_settings_close_voice_list();
     w.set_page(p);
 }
 
-/// Every approved mockup, plus the activity list ("Show all") and Settings scrolled to the keys.
+/// Every approved mockup, plus the activity list ("Show all"), Settings scrolled to the keys, the Settings voice
+/// picker open, and the voice screens with no Windows voice installed.
 pub fn all() -> Vec<Screen> {
     vec![
         Screen {
@@ -112,7 +114,50 @@ pub fn all() -> Vec<Screen> {
             name: "17-activity",
             setup: |w| page(w, Page::Activity),
         },
+        // review aids (M3a, no mockup): the Settings voice picker open (sample voices, the list scrolls), and what
+        // pages 05, 06 and Settings > Voices show with no Windows voice installed
+        Screen {
+            name: "18-settings-voice-list",
+            setup: |w| {
+                page(w, Page::Settings);
+                w.invoke_settings_jump(3);
+                w.invoke_settings_open_voice_list();
+            },
+        },
+        Screen {
+            name: "18-voice-none",
+            setup: |w| {
+                no_voices(w);
+                page(w, Page::Voice);
+            },
+        },
+        Screen {
+            name: "18-mode-voice-none",
+            setup: |w| {
+                no_voices(w);
+                page(w, Page::Mode);
+            },
+        },
+        Screen {
+            name: "18-settings-voices-none",
+            setup: |w| {
+                no_voices(w);
+                page(w, Page::Settings);
+                w.invoke_settings_jump(3);
+            },
+        },
     ]
+}
+
+/// The state of a PC with no Windows voice (the last screens, so the others keep the sample voices).
+fn no_voices(w: &MainWindow) {
+    let none = crate::vm::voices::Voices::none();
+    w.set_voices(slint::ModelRc::default());
+    w.set_voices_problem(none.problem_text().into());
+    w.set_voices_desc(none.desc().into());
+    w.set_voice_label(none.label("").into());
+    w.set_voice_testing(false);
+    w.set_test_time("0:00".into());
 }
 
 struct Headless {

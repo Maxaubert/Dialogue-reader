@@ -177,7 +177,7 @@ fn a_file_that_was_not_loaded_is_never_overwritten() {
 }
 
 #[test]
-fn add_game_can_go_back_and_refuses_a_second_profile_for_the_same_exe() {
+fn add_game_can_go_back_and_refuses_a_second_profile_for_the_same_window() {
     let (_dir, paths) = temp_paths();
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     finish_onboarding(&w);
@@ -204,6 +204,66 @@ fn add_game_can_go_back_and_refuses_a_second_profile_for_the_same_exe() {
     press(&w, "Continue", AccessibleRole::Button);
     assert_eq!(w.get_page(), Page::DrawZones);
     assert_eq!(w.get_zone_kind(), dr_app::Kind::Dialogue);
+}
+
+#[test]
+fn games_that_share_an_exe_get_one_profile_each() {
+    let (_dir, paths) = temp_paths();
+    let mut d = FakeDesktop::new();
+    d.windows = vec![win("Emu - Game A", "emu.exe", true)];
+    let front = d.front.clone();
+    let (w, _vm) = real_window(&paths, d);
+    finish_onboarding(&w);
+    let a = profile::load(&paths.profile_json("emu-game-a")).unwrap();
+    assert_eq!(
+        a.matches.title_contains, None,
+        "the first game of an exe matches by exe"
+    );
+
+    // a second game in the same emulator: allowed, and saved with its window title
+    front
+        .borrow_mut()
+        .push(win("Emu - Game B", "emu.exe", true));
+    w.invoke_add_game();
+    press(&w, "Emu - Game B", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::DrawZones, "{}", w.get_notice());
+    for _ in 0..3 {
+        press(&w, "Continue", AccessibleRole::Button);
+    }
+    press(&w, "Finish", AccessibleRole::Button);
+    let b = profile::load(&paths.profile_json("emu-game-b")).unwrap();
+    assert_eq!(b.matches.exe, "emu.exe");
+    assert_eq!(b.matches.title_contains.as_deref(), Some("Emu - Game B"));
+    // the first game gets its title too (its name, the title at its setup): it no longer takes every window
+    let a = profile::load(&paths.profile_json("emu-game-a")).unwrap();
+    assert_eq!(a.matches.title_contains.as_deref(), Some("Emu - Game A"));
+    let running = |w: &dr_app::MainWindow, name: &str| {
+        w.get_games()
+            .iter()
+            .find(|g| g.name == name)
+            .unwrap_or_else(|| panic!("no game {name}"))
+            .running
+    };
+    // both windows run: each game is running
+    assert!(running(&w, "Emu - Game A") && running(&w, "Emu - Game B"));
+
+    // only game B runs: game A is not running, although its exe-only match fits that window
+    drop(w);
+    let mut d = FakeDesktop::new();
+    d.windows = vec![win("Emu - Game B", "emu.exe", true)];
+    let (w, _vm) = real_window(&paths, d);
+    assert!(running(&w, "Emu - Game B"));
+    assert!(!running(&w, "Emu - Game A"));
+    // game B's window is refused as a duplicate
+    w.invoke_add_game();
+    press(&w, "Continue", AccessibleRole::Button);
+    assert!(
+        w.get_notice()
+            .contains("Emu - Game B already has a profile"),
+        "{}",
+        w.get_notice()
+    );
 }
 
 #[test]
@@ -322,11 +382,15 @@ fn voice_speed_and_volume_are_saved() {
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     w.set_voice_speed(0.6);
     w.set_voice_volume(0.5);
+    w.set_picked_voice(1);
     finish_onboarding(&w);
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
     assert!((p.voice.speed - 1.2).abs() < 1e-4, "{}", p.voice.speed);
     assert!((p.voice.volume - 0.5).abs() < 1e-4);
-    assert_eq!(p.voice.id, "", "no voice id until real voices (M3a)");
+    assert_eq!(
+        (p.voice.engine.as_str(), p.voice.id.as_str()),
+        ("windows", "fake-zira")
+    );
 }
 
 #[test]

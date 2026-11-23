@@ -2,11 +2,14 @@
 
 The Slint UI of DialogReader. It builds `DialogReader.exe`.
 
-**Status: M2.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
+**Status: M3a.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
 are saved as JSON in `%APPDATA%\DialogReader\profiles`, page 02 lists the running windows (games first), Continue
 takes one screenshot with Windows Graphics Capture, and pages 03 and 11 draw, select, move, resize, rename,
 re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). Onboarding runs only when there is no
-profile yet. Voices, the activity log, reading, keys and the overlays still show fake data (M3 and M4). The plan
+profile yet. Since M3a, page 05 and Settings > Voices list the Windows voices; "Play sample" and "Test" speak on
+the speakers (only in the app, never in a test); voice, speed and volume are saved in the profile. Games that
+share an exe get one profile each, told apart by the window title. The activity log, reading, keys and the
+overlays still show fake data (M3b and M4). The plan
 is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
 
 ## Run, test, render
@@ -50,6 +53,7 @@ src/main.rs              DialogReader.exe: renderer (skia-opengl), crash hook, r
 src/lib.rs               build_window(source) and build_main_window() (fake): window + view model + window buttons
 src/vm/mod.rs            view-model layer: profiles, windows, screenshots, Slint models, callbacks; Desktop trait
 src/vm/zones.rs          zone drawing state: draw, select, move, resize, rename, kind, on/off, delete, undo
+src/vm/voices.rs         voices for the UI: the installed list, labels ("Windows · David"), the voice test thread
 src/crash.rs             panic hook: crash log in %LOCALAPPDATA%\DialogReader\logs
 src/fake.rs              fake data of the mockups (behind vm::Source::Fake) and the zone edit callbacks
 src/geom.rs              stage mapping, drag to zone, hit tests, dim path (unit-tested)
@@ -64,8 +68,8 @@ ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout, w
                          quick_menu_preview (review only: menu over the game and its two other states), zone_edit
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
 ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
-tests/                   nav.rs, zones.rs, setup_flow.rs (testing backend), screens.rs (renders, compares with
-                         the mockups), common/ (fake desktop, temp data folder, pointer input)
+tests/                   nav.rs, zones.rs, setup_flow.rs, voices.rs (testing backend), screens.rs (renders,
+                         compares with the mockups), common/ (fake desktop, fake voices, temp data folder, input)
 examples/snapshot.rs     one page in a real window with a chosen renderer, saved as PNG (run on a hidden desktop)
 tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits for it
 ```
@@ -163,7 +167,9 @@ panic = "abort"
 
 The workspace `Cargo.toml` now has this profile. `cargo build --profile ship -p dr-app --bin DialogReader` writes
 `target\ship\DialogReader.exe` (spike, Skia default surface: 22,085,632 bytes, 2 min 49 s; with `skia-opengl` and
-M2, measured 2026-11-22: 22,675,456 bytes, 2 min 36 s; it ran 8 s on a hidden desktop with no crash). Tests, the arena and normal release builds keep unwinding. The cost is in the
+M2, measured 2026-11-22: 22,675,456 bytes, 2 min 36 s; it ran 8 s on a hidden desktop with no crash; with M3a,
+measured 2026-11-23: 23,644,160 bytes (22.5 MiB, 0.9 MiB more than M2), 3 min 35 s, built only, not run. M3a
+adds speech (dr-tts, rodio, cpal); cpal brings a second `windows` crate, 0.54.0, next to 0.62.2). Tests, the arena and normal release builds keep unwinding. The cost is in the
 shipped exe only: a panic in any thread ends the app at once, with no `Drop` cleanup. The panic hook in
 `src/crash.rs` writes the crash log first.
 
@@ -174,10 +180,27 @@ first build needs the internet (or `SKIA_BINARIES_URL` pointing at a local copy)
 included); a release rebuild of dr-app alone takes about 51 s. The fat LTO build took 4 min 20 s. No build errors.
 Skia's window surface on Windows is wgpu (GPU), with a CPU surface (softbuffer) as its fallback.
 
-## Known gaps (M2)
+## Voices (M3a)
 
-- Key capture ("Change"), voice test, Import settings and the Settings buttons do nothing yet (M3, M5).
-- Voices, the Recent and activity lists, the status chip and "Read now" are fake or empty (M3a, M3b).
+- `main.rs` is the only place that builds `Voices::windows()`: the Windows voices (`dr_tts::WinTts`) and a speech
+  thread with the speakers (`dr_runtime::speech::RodioOut`, opened at the first sound). Tests pass fake voices
+  (`dr_tts::FakeTts`) and a `NullSink`; render-screens uses the fake source. No test plays sound.
+- A saved voice that is not installed (or an empty id) uses the first installed voice, and the screens show it.
+- With no Windows voice installed, page 05 says so, "Play sample" and the Settings "Test" are off, page 06 says
+  nothing is spoken, and Finish saves an empty voice id. "Add voices" opens `ms-settings:speech` through the
+  `Desktop` trait (a test counts the call).
+- The Settings Speed and Volume sliders reach the speech thread on every move and save the current profile when
+  let go (or on a page change). Leaving page 05 or Settings stops a sample that plays.
+- A failed voice test shows a plain line; the raw error goes to `%LOCALAPPDATA%\DialogReader\logs\speech.log`
+  (only the app binary has a log path, so tests write nothing there).
+- `cargo test -p dr-tts` shows "3 ignored" on a PC with no Windows voice. On a PC with one, run
+  `cargo test -p dr-tts --test voices -- --ignored`.
+
+## Known gaps (M3a)
+
+- Key capture ("Change"), Import settings and the other Settings buttons do nothing yet (M3b, M5).
+- The Recent and activity lists, the status chip and "Read now" are fake or empty (M3b). The Overview voice
+  button shows the game's voice but opens nothing; the quick menu voice list is still sample data (M4).
 - Overlays are previews inside the main window. Real overlay windows come in M4.
 - The zone strip on Overview shows every zone in one row; many zones run past the edge (no "+N" chip with real
   data yet).

@@ -5,8 +5,9 @@
 //! recent zone crops used to pick the clearest frame at a press (`look_ms`, 0 turns it off).
 //!
 //! A press ([`Manual::read_now`], or [`Manual::press`] and the next [`Manual::on_frame`]):
-//! 1. Takes the zones that can be read (not Ignore; prompts only with `read_prompts`), top to
-//!    bottom, then left to right. A speaker zone comes before the first dialogue zone.
+//! 1. Takes the zones that can be read (not Ignore), top to bottom, then left to right. A speaker
+//!    zone comes before the first dialogue zone. Prompt zones without `read_prompts` are read too,
+//!    but their lines go to `skipped` (prompts off), never to `events`.
 //! 2. Reads each zone of the current frame with the A1 clean-up (`read_zone`: two-pass rows for
 //!    tall zones, the 2x small-zone path with its second try), and with the black and white
 //!    clean-up when that reads nothing.
@@ -23,7 +24,7 @@ use crate::frame::Frame;
 use crate::geom::PxBox;
 use crate::image::Gray;
 use crate::ocr::Ocr;
-use crate::pipeline::{Config, Event, read_alt, read_zone, small_path, units_of};
+use crate::pipeline::{Config, Event, SkipReason, Skipped, read_alt, read_zone, small_path, units_of};
 use crate::ring::Ring;
 use crate::text::{Relation, is_junk, relate};
 use crate::track::Unit;
@@ -56,6 +57,8 @@ pub struct Press {
     pub errors: Vec<String>,
     /// The zones were empty, and `events` are the lines of the last press that found text.
     pub repeat: bool,
+    /// Lines read but not spoken (prompt zones with prompts off).
+    pub skipped: Vec<Skipped>,
 }
 
 struct MZone {
@@ -63,6 +66,8 @@ struct MZone {
     px: Option<PxBox>,
     ring: Ring<Gray>,
     last_push: f64,
+    /// A prompt zone with `read_prompts` off: read for the log only.
+    quiet: bool,
 }
 
 pub struct Manual {
@@ -85,15 +90,21 @@ impl Manual {
         m
     }
 
-    /// Replaces the zones. Ignore zones (and prompt zones without `read_prompts`) are dropped:
-    /// they are never read. The press history is kept.
+    /// Replaces the zones. Ignore zones are dropped: they are never read. Prompt zones without
+    /// `read_prompts` are read for the log only. The press history is kept.
     pub fn set_zones(&mut self, zones: &[Zone]) {
         let (look, step) = (self.mcfg.look_ms.max(0.0), self.mcfg.step_ms.max(1.0));
         let cap = (look / step).ceil() as usize + 2;
         self.zones = zones
             .iter()
-            .filter(|z| z.kind != ZoneKind::Ignore && (z.kind != ZoneKind::Prompt || self.base.read_prompts))
-            .map(|z| MZone { zone: z.clone(), px: None, ring: Ring::new(look + step, cap), last_push: f64::NEG_INFINITY })
+            .filter(|z| z.kind != ZoneKind::Ignore)
+            .map(|z| MZone {
+                zone: z.clone(),
+                px: None,
+                ring: Ring::new(look + step, cap),
+                last_push: f64::NEG_INFINITY,
+                quiet: z.kind == ZoneKind::Prompt && !self.base.read_prompts,
+            })
             .collect();
         self.frame_size = None;
     }
@@ -233,7 +244,14 @@ impl Manual {
             let g = Gray::crop(f.rgba, f.w, px, self.cfg.channel);
             match self.read_zone_now(zi, &g, t, ocr) {
                 Ok(units) => {
-                    let z = &self.zones[zi].zone;
+                    let (z, quiet) = (&self.zones[zi].zone, self.zones[zi].quiet);
+                    if quiet {
+                        out.skipped.extend(units.into_iter().map(|u| Skipped {
+                            line: Event { t_ms: t, text: u.raw, rect: u.rect, zone: Some(z.name.clone()), kind: Some(z.kind) },
+                            reason: SkipReason::PromptsOff,
+                        }));
+                        continue;
+                    }
                     for u in units {
                         // Once per press (overlapping zones, or a row read twice).
                         if said.iter().any(|s| relate(&u.norm, s, jit) == Relation::Same) {

@@ -1,4 +1,5 @@
 //! DialogReader.exe. M2: profiles in `%APPDATA%\DialogReader`, the real window list, a screenshot, and zones.
+//! M3a: the Windows voices, with a voice test that plays on the speakers.
 //!
 //! `--fake` shows the mockup data instead of real profiles. `--preview-overlay <pill|quick-menu|quick-menu-voice|
 //! zone-edit>` shows an in-game overlay inside the main window (debug: the real overlay windows come in M4).
@@ -38,6 +39,8 @@ fn run(args: &[String]) -> Result<(), slint::PlatformError> {
         Some(paths) if !fake => dr_app::vm::Source::Real {
             paths,
             desktop: Box::new(dr_app::vm::RealDesktop),
+            // the only place that can reach the speakers (the voice test)
+            voices: dr_app::vm::voices::Voices::windows(),
         },
         _ => dr_app::vm::Source::Fake,
     };

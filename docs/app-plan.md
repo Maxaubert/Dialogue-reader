@@ -166,6 +166,98 @@ test plays sound.
 **Done when.** The arena numbers are unchanged, the Windows voices synthesize headless, the voice screens show
 the wording Max approved, and all headless tests pass.
 
+**Result (2026-11-22, branch `feat/app-m3a`).**
+- `crates/ocr` (dr-ocr): `WinOcr` implements `dr_core::Ocr`; the reading code is the arena's, unchanged. The arena
+  keeps `ocr::winrt::WinOcr` as an adapter (same name `winocr(<lang>)`, same `max_dim`). Fixture PNGs in
+  `crates/ocr/tests/fixtures/` (Segoe UI 30 px, made with Pillow).
+- Arena, before and after the move and the `dr-core` change, ideal clock (deterministic): every event of smoke,
+  standard seed 59 and hard seed 59 (a1 and winocr-naive) and every crop of the OCR bench on standard are
+  identical, timing fields left out. Same recall, CER, dup, noise, halluc and latency.
+- Simulated clock, seed 59, against `docs/baselines/` (before and after run in turn, nothing else running). Every
+  run exits 0 with "no regressions". Recall is the same; a1 moves by a few dup, noise or halluc, the run-to-run
+  noise of a clock that charges real OCR time. That noise is about 4 duplicates on standard a1 (runs of the same
+  code gave dup 79, 80, 81 and 83), not 1.
+
+  | Run | Before | After |
+  |---|---|---|
+  | standard a1 | 0.788 (412/523), dup 80, noise 20, halluc 118 | 0.788 (412/523), dup 81, noise 20, halluc 118 |
+  | standard winocr-naive | 0.558 (292/523), dup 309, noise 60, halluc 348 | same |
+  | hard a1 | 0.392 (279/712), dup 28, noise 19, halluc 129 | 0.392 (279/712), dup 29, noise 20, halluc 128 |
+  | hard winocr-naive | 0.320 (228/712), dup 134, noise 2, halluc 244 | same |
+
+  Prompts off (`--reader-opt prompts=false`, the profile default), seed 59, from the M3a review (2026-11-23).
+  Ideal clock, every scene's events identical before and after: standard a1 0.826 (432/523), dup 83, noise 37,
+  halluc 117; hard a1 0.397 (283/712), dup 26, noise 23, halluc 132. Simulated clock (soft, another session was
+  running): the same score before and after, 0.826 (432/523) on standard, but CPU per frame rose from p50 0.65 ms
+  to 2.35 ms and p95 14.6 ms to 17.9 ms, because prompt zones are now read for the log (see M3b checklist).
+- `crates/tts` (dr-tts): `Tts`, `Voice`, `Pcm`, `WinTts`, `wav::parse`, `FakeTts`, and `examples/probe_voices.rs`
+  (prints what WinRT says about its voices). The queue, the speech thread, `RodioOut` and `NullSink` are in
+  `crates/runtime/src/speech.rs` (rodio =0.21.1, playback only).
+- `dr-core`: `Output::skipped` and `Press::skipped` (`Skipped { line, reason }`). Prompt zones with `read_prompts`
+  off are read and go to `skipped` (prompts off). "Already read" is reported where the pipeline drops a line it
+  already speaks (a line rescued after it ended). Nothing changes with `read_prompts` on (the arena default).
+- Not met on this PC: Windows lists no WinRT voice here (`AllVoices` returns an empty list; `DefaultVoice` and
+  `new` fail with 0x80070002; no OneCore voice is registered, only SAPI 5 Zira), so `WinTts::synth` has never run
+  on a real voice. The three `dr-tts` tests that need a voice are `#[ignore]`d, so the gate shows them as
+  "3 ignored" instead of passing them. Max adds an English voice in Windows Settings > Time & language > Speech
+  once, then runs `cargo test -p dr-tts --test voices -- --ignored` (they fail when no voice is found). If that
+  does not work, v1 needs a SAPI 5 engine before M3b (spec section 6, question 11).
+- Games that share an exe: several profiles per exe (spec 2.8), `vm::best_profile`, `vm::running`, `vm::same_game`.
+
+**Text changes for Max to approve** (old > new):
+
+| Where | Old | New |
+|---|---|---|
+| 05 list header | Kokoro voices | Windows voices |
+| 05 header button | Get more voices | Add voices (opens Windows Settings > Speech) |
+| 05 test card label | Kokoro · Adam | Windows · David (the picked voice) |
+| 05 button | Stop (always) | Play sample, and Stop while it plays |
+| 05 empty list (new, review) | none | "No Windows voice is installed. Press Add voices to get one." |
+| 05 list when Windows cannot list its voices (new, review) | none | "Windows could not list its voices. Press Add voices to check the speech settings." |
+| 05 Play sample and 12 Test with no voice (review) | none | dimmed, cannot be pressed |
+| 06 summary voice with no voice (new, review) | none | No voice · "Nothing is spoken until you add a voice." |
+| 05 voice rows (sample data) | Adam, Bella, Michael ... | David, Zira, Mark, Hazel, George, Susan, ... |
+| 12 Voices row 1 | Kokoro · Installed · 11 voices · 312 MB · Manage | Windows voices · Built into Windows · N voices · Add voices |
+| 12 Voices row 2 | Piper · Not installed · 48 voices · about 60 MB each · Download | Kokoro · Coming later · more natural voices that run on your PC (no button) |
+| 12 Voices row 3 | Default voice for new games: Kokoro · Adam | Voice for this game (game name below): Windows · David, with a Test button |
+| 12 Voices rows 4 and 5 (new) | none | Speed (slider, 1.1×) and Volume (slider, 80%) |
+| 06 summary voice | Kokoro · Adam, 1.1× speed | Windows · David, and the speed from page 05 |
+| 10 voice button | Kokoro · Adam | Windows · David (the game's voice) |
+| 01 preview card | Read just now · Kokoro · Adam | Read just now · Windows · David |
+| quick menu voice (sample data) | Adam | David |
+| 05 card label, 06, 10, 12 picker with no voice (new) | none | No voice |
+| 05 list with no voice and no reason (new) | none | No voice found. |
+| 12 row 1 with 0 or 1 voice (new) | none | Built into Windows · none installed / · 1 voice |
+| 12 row 3 with no game (new) | none | Set up a game first. |
+| 12 row 3 button (new) | none | Test, and Stop while it plays |
+| 12 picker list rows (new) | none | David · US · Male |
+| notice, test without speech, only with `--fake` (new, review) | none | Sample data: voices do not play here. |
+| notice, test failed: engine (new, review) | none | The Windows voice could not speak the sample. |
+| notice, test failed: no device (new, review) | none | No sound device was found. |
+| notice, test failed: device lost (new, review) | none | The sound device stopped working. Try again. |
+| notice, the first game of a shared exe could not be saved (new, review) | none | The other game of this program could not be saved: (error) |
+| new game default speed | 1.1× (mockup slider) | 1× (the profile default) |
+
+Layout change, not only wording (also for Max): Settings > Voices gained a Test button in the voice row and two
+rows (Speed, Volume), and the Kokoro row has no button. Without them the game's voice could not be changed after
+setup until the quick menu (M4). Page 05 keeps its layout; with no voice the list shows the message instead.
+`render-screens` writes `18-voice-none.png`, `18-mode-voice-none.png` and `18-settings-voices-none.png` for that
+state, and `18-settings-voice-list.png` with the Settings voice picker open (six rows show, the rest scroll).
+
+**After the M3a review (2026-11-23).** Fixed: the voice tests that need a voice are ignored, not passed; the speech
+thread recovers from a lost or stuck device and moves to a new default device; it joins the multithreaded COM
+apartment; events carry the item and the test id, and status is written while a line is made, so a quick
+Play, Stop, Play keeps the Stop button; a Stop during synth drops the sound; `WinTts` keeps the picked voice; the
+first profile of a shared exe gets its title, titles are compared without counters, and the duplicate check uses
+the same rule; the Settings sliders save when let go (and on a page change), not on every move; leaving page 05 or
+Settings stops the sample; the page 05 Volume slider changes a sample that plays; with no voice the test buttons
+are off and page 06 says nothing will be spoken; raw Windows and audio errors go to `speech.log`, the notice shows
+a plain line; the Settings voice picker scrolls. Rows marked "(review)" in the table above are new or changed.
+Arena after these fixes (none touch `dr-core` or `dr-ocr`): ideal clock, seed 59, standard a1, hard a1, standard
+winocr-naive, and standard and hard a1 with prompts off, every scene's events identical to the review's runs (0 of
+40 differ in each). Simulated clock against `docs/baselines/` (soft): all three exit 0 with "no regressions";
+standard a1 0.788, dup 83, halluc 118; hard a1 0.390 (278/712), halluc 131; standard winocr-naive unchanged.
+
 ## M3b: capture, keys and live reading
 
 **Scope.** The real loop (spec 2.2): capture thread, reader thread with `Pipeline` (auto) or `Manual` (read key),
@@ -192,6 +284,21 @@ zones, auto mode reads dialogue, CPU use of DialogReader noted. One elevated pro
 
 **Done when.** A profile reads a live game in both modes with Windows voices, keys work in the game, CPU use is
 noted in `docs/`, and all headless tests pass.
+
+**Checklist from the M3a review (2026-11-23).**
+- A Windows voice speaks on Max's PC, or a SAPI 5 engine is in (spec section 6, question 11). Before M3b starts.
+- Prompts off costs OCR time: prompt zones are read for the log. Standard a1 (simulated clock, soft): CPU per frame
+  p50 0.65 to 2.35 ms, p95 14.6 to 17.9 ms, same score. In manual mode a press waits for the OCR of every prompt
+  zone before any line is spoken. Measure in the CPU check; if it shows, leave quiet zones out of a press (manual),
+  or drop prompt zones and their log rows (spec Risks, "Log shows skipped lines").
+- Drain the speech events on a timer (`Speech::events`): nothing reads them outside a voice test, so the channel
+  grows once `Say` is used. The events carry the `Item` for the activity log. `Vm::test_voice` still throws away
+  waiting events; with a reader running it must hand them to the log instead.
+- The reader thread joins the multithreaded COM apartment first, as the speech thread does (WinRT OCR waits).
+- `Drop for Speech` waits for a sound being made, so closing the app waits for one synth call (about a second).
+- A new default device is checked by name at each line (`RodioOut::play`); a lost device is let go on its error
+  or when a sound runs well past its length. Read from the rodio 0.21.1 and cpal 0.16 source; not tried with a
+  real device (no test may play sound). Try once by hand with headphones.
 
 ## M4: overlays
 
