@@ -13,6 +13,12 @@
 //!   in Settings) swallows the key it takes, down and up, so the app page does not react to it too. A key belongs
 //!   to whoever got its first key-down until it is released (the spike's rule).
 //! - Injected input (`LLKHF_INJECTED`, pad mappers) counts as real input, as in the spike.
+//! - Matching (Max, 2026-11-23): a key saved with modifiers (Ctrl+F7) needs exactly those modifiers. A key saved
+//!   without Ctrl, Shift or Alt fires while any of them is held (Mouse 4 or F7 while sprinting with Shift). When both
+//!   keys could match, the exact one wins. Not part of that decision, kept as before: a keyboard key does not fire
+//!   while Win is held (Win+key is a Windows shortcut).
+//! - Key capture never takes Alt+Tab, Alt+Esc, Ctrl+Esc, Win or Win+anything: they go on to Windows, and capture
+//!   keeps waiting. The app ends capture when its window loses the focus (`dr_app::focus_lost`).
 
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -110,6 +116,13 @@ const NAMES: &[(u16, &str)] = &[
 
 /// Esc: cancels key capture.
 pub const VK_ESCAPE: u16 = 0x1B;
+/// Tab (Alt+Tab is never taken by key capture).
+const VK_TAB: u16 = 0x09;
+
+/// A Windows shortcut that key capture never takes: Win+anything, Alt+Tab, Alt+Esc, Ctrl+Esc.
+fn system_combo(vk: u16, mods: Mods) -> bool {
+    mods.win || (mods.alt && (vk == VK_TAB || vk == VK_ESCAPE)) || (mods.ctrl && vk == VK_ESCAPE)
+}
 
 /// The name of a virtual key ("F7", "R", "Num 5", "Page Up"); "Key 123" for one without a name.
 pub fn vk_name(vk: u16) -> String {
@@ -359,7 +372,10 @@ impl State {
                 let (action, swallow) = if is_modifier(vk) {
                     (Action::None, false)
                 } else if b.capture {
-                    if vk == VK_ESCAPE {
+                    if system_combo(vk, self.mods) {
+                        // Windows gets it (the task switcher, Start); the app ends capture when it loses the focus
+                        (Action::None, false)
+                    } else if vk == VK_ESCAPE {
                         (Action::Cancelled, true)
                     } else {
                         (
@@ -396,6 +412,8 @@ impl State {
                     return (Action::None, self.btn_swallowed[i]);
                 }
                 let (action, swallow) = match (b.capture, btn.number()) {
+                    // Win+anything is never taken
+                    (true, _) if self.mods.win => (Action::None, false),
                     // a game needs left and right click: they are never taken
                     (true, None) => (Action::Refused(btn), false),
                     (true, Some(n)) => (Action::Captured(Key::Mouse(n)), true),
@@ -419,13 +437,27 @@ impl State {
         }
     }
 
+    /// The binding a key press fires. An exact match first (the more specific key wins), then, for a keyboard
+    /// key pressed with Ctrl, Shift or Alt but not Win, the key saved without modifiers. Mouse buttons take no
+    /// modifiers, so they fire whatever is held.
     fn bound(b: &Bindings, k: Key) -> Action {
-        if b.read == Some(k) {
-            Action::Read
-        } else if b.menu == Some(k) {
-            Action::Menu
-        } else {
-            Action::None
+        let hit = |k: Key| {
+            if b.read == Some(k) {
+                Action::Read
+            } else if b.menu == Some(k) {
+                Action::Menu
+            } else {
+                Action::None
+            }
+        };
+        match (hit(k), k) {
+            (Action::None, Key::Keyboard { vk, mods }) if mods != Mods::default() && !mods.win => {
+                hit(Key::Keyboard {
+                    vk,
+                    mods: Mods::default(),
+                })
+            }
+            (a, _) => a,
         }
     }
 }
@@ -733,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    fn modifiers_must_match_exactly() {
+    fn a_key_with_modifiers_needs_exactly_those() {
         let b = Bindings {
             read: Key::parse("Ctrl+R"),
             ..Bindings::default()
@@ -751,8 +783,153 @@ mod tests {
         assert_eq!(s.feed(Raw::KeyDown(0x52), &b).0, Action::None);
         s.feed(Raw::KeyUp(0x52), &b);
         s.feed(Raw::KeyUp(0xA0), &b);
+        // Shift+R is not Ctrl+R either
         s.feed(Raw::KeyUp(0xA2), &b);
+        s.feed(Raw::KeyDown(0xA1), &b);
         assert_eq!(s.feed(Raw::KeyDown(0x52), &b).0, Action::None);
+        s.feed(Raw::KeyUp(0x52), &b);
+        s.feed(Raw::KeyUp(0xA1), &b);
+        assert_eq!(s.feed(Raw::KeyDown(0x52), &b).0, Action::None);
+    }
+
+    #[test]
+    fn a_plain_key_fires_while_ctrl_shift_or_alt_is_held() {
+        let b = Bindings {
+            read: Key::parse("Mouse 4"),
+            menu: Key::parse("F7"),
+            capture: false,
+        };
+        let x1 = |down| Raw::Button { b: Btn::X1, down };
+        for m in [0xA0u16, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x10, 0x11, 0x12] {
+            let mut s = State::default();
+            s.feed(Raw::KeyDown(m), &b);
+            // sprinting with Shift (or crouching with Ctrl) and pressing Mouse 4 or F7
+            assert_eq!(s.feed(x1(true), &b), (Action::Read, false), "{m:#x}");
+            s.feed(x1(false), &b);
+            assert_eq!(
+                s.feed(Raw::KeyDown(0x76), &b),
+                (Action::Menu, false),
+                "{m:#x}"
+            );
+            s.feed(Raw::KeyUp(0x76), &b);
+        }
+        // all three at once
+        let mut s = State::default();
+        s.set_mods(Mods {
+            ctrl: true,
+            shift: true,
+            alt: true,
+            win: false,
+        });
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Menu);
+        // Win+F7 is a Windows shortcut, not F7; Mouse 4 takes no modifiers and still fires
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(0x5B), &b);
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::None);
+        assert_eq!(s.feed(x1(true), &b).0, Action::Read);
+    }
+
+    #[test]
+    fn the_more_specific_key_wins() {
+        // F7 reads, Ctrl+F7 opens the menu
+        let b = Bindings {
+            read: Key::parse("F7"),
+            menu: Key::parse("Ctrl+F7"),
+            capture: false,
+        };
+        let mut s = State::default();
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Read);
+        s.feed(Raw::KeyUp(0x76), &b);
+        s.feed(Raw::KeyDown(0xA2), &b);
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Menu);
+        s.feed(Raw::KeyUp(0x76), &b);
+        // Ctrl+Shift+F7 is not Ctrl+F7: the plain F7 fires
+        s.feed(Raw::KeyDown(0xA0), &b);
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Read);
+        s.feed(Raw::KeyUp(0x76), &b);
+        s.feed(Raw::KeyUp(0xA0), &b);
+        s.feed(Raw::KeyUp(0xA2), &b);
+        // the other way round: the menu key plain, the read key with Shift
+        let b = Bindings {
+            read: Key::parse("Shift+F7"),
+            menu: Key::parse("F7"),
+            capture: false,
+        };
+        let mut s = State::default();
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Menu);
+        s.feed(Raw::KeyUp(0x76), &b);
+        s.feed(Raw::KeyDown(0xA1), &b);
+        assert_eq!(s.feed(Raw::KeyDown(0x76), &b).0, Action::Read);
+        s.feed(Raw::KeyUp(0x76), &b);
+        s.feed(Raw::KeyDown(0xA4), &b);
+        assert_eq!(
+            s.feed(Raw::KeyDown(0x76), &b).0,
+            Action::Menu,
+            "Shift+Alt+F7"
+        );
+    }
+
+    #[test]
+    fn capture_ignores_windows_shortcuts_and_keeps_waiting() {
+        let on = Bindings {
+            capture: true,
+            ..Bindings::default()
+        };
+        // (modifier key, key): Alt+Tab, Alt+Esc, Ctrl+Esc, Win+R, Win+Tab, right Win+D
+        for (m, vk) in [
+            (0xA4u16, VK_TAB),
+            (0xA5, VK_ESCAPE),
+            (0xA2, VK_ESCAPE),
+            (0x5B, 0x52),
+            (0x5B, VK_TAB),
+            (0x5C, 0x44),
+        ] {
+            let mut s = State::default();
+            assert_eq!(s.feed(Raw::KeyDown(m), &on), (Action::None, false));
+            // not taken and not swallowed: Windows gets it
+            assert_eq!(
+                s.feed(Raw::KeyDown(vk), &on),
+                (Action::None, false),
+                "{m:#x} {vk:#x}"
+            );
+            assert_eq!(s.feed(Raw::KeyUp(vk), &on), (Action::None, false));
+            assert_eq!(s.feed(Raw::KeyUp(m), &on), (Action::None, false));
+            // capture still waits: the next plain key is taken
+            assert_eq!(
+                s.feed(Raw::KeyDown(0x76), &on),
+                (Action::Captured(kb(0x76)), true),
+                "{m:#x} {vk:#x}"
+            );
+        }
+        // Win alone is never a key, and Win with a mouse button is not taken either
+        let mut s = State::default();
+        assert_eq!(s.feed(Raw::KeyDown(0x5B), &on), (Action::None, false));
+        assert_eq!(s.feed(Raw::KeyUp(0x5B), &on), (Action::None, false));
+        s.feed(Raw::KeyDown(0x5B), &on);
+        let x1 = |down| Raw::Button { b: Btn::X1, down };
+        assert_eq!(s.feed(x1(true), &on), (Action::None, false));
+        assert_eq!(s.feed(x1(false), &on), (Action::None, false));
+        s.feed(Raw::KeyUp(0x5B), &on);
+        // other combos are still keys: Ctrl+Tab is taken, Shift+Esc cancels as Esc does
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(0xA2), &on);
+        assert!(matches!(
+            s.feed(Raw::KeyDown(VK_TAB), &on).0,
+            Action::Captured(_)
+        ));
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(0xA0), &on);
+        assert_eq!(
+            s.feed(Raw::KeyDown(VK_ESCAPE), &on),
+            (Action::Cancelled, true)
+        );
+        // a mouse button while Ctrl is held is still taken (it takes no modifiers)
+        let mut s = State::default();
+        s.feed(Raw::KeyDown(0xA2), &on);
+        assert_eq!(
+            s.feed(x1(true), &on),
+            (Action::Captured(Key::Mouse(4)), true)
+        );
     }
 
     #[test]
@@ -762,8 +939,8 @@ mod tests {
             ..Bindings::default()
         };
         let mut s = State::default();
-        // Ctrl went down, its key-up never came (Win+L, a UAC prompt)
-        s.feed(Raw::KeyDown(0xA2), &b);
+        // Win went down, its key-up never came (Win+L, a UAC prompt)
+        s.feed(Raw::KeyDown(0x5B), &b);
         assert_eq!(s.feed(Raw::KeyDown(0x52), &b).0, Action::None);
         s.feed(Raw::KeyUp(0x52), &b);
         // the hook reads the modifiers from Windows before each event

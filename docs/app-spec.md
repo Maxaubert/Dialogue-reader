@@ -205,8 +205,14 @@ pub trait Tts: Send {
   longer than `LowLevelHooksTimeout`).
 - The read key and quick menu key are passed through to the game (not swallowed), except keys that are only used
   by DialogReader while the quick menu or zone edit is open.
+- Matching (Max, 2026-11-23): a key saved with modifiers (Ctrl+F7) fires only with exactly those modifiers. A key
+  saved without Ctrl, Shift or Alt also fires while any of them is held (Mouse 4 or F7 while sprinting with Shift).
+  When both keys could match, the more specific one wins (F7 and Ctrl+F7: Ctrl+F7 fires the Ctrl+F7 key). Not part
+  of Max's decision, kept as before: a keyboard key does not fire while Win is held (Win+key is a Windows shortcut).
 - Key capture ("Change" on the keys page): the next key or mouse button press is taken as the new key. Esc cancels.
-  Left and right mouse buttons are refused (a game needs them).
+  Left and right mouse buttons are refused (a game needs them). Alt+Tab, Alt+Esc, Ctrl+Esc, Win and Win+anything
+  are never taken: Windows gets them and capture keeps waiting. Capture ends as Cancel when the main window loses
+  the focus.
 - Elevated games: see Risks.
 
 ### 2.7 Windows and overlays
@@ -520,6 +526,15 @@ Navigation is one Slint enum property on the main window:
   exe plus window title. Replaces the "one profile per exe" refusal from M2. Built in M3a (section 2.8).
 - UI bits added in M2 without a mockup (rename field, notice strip, exe icons on page 02, scrolling lists, the blue
   box while drawing) are accepted as built. Max flags anything he dislikes when he sees it.
+
+### Decisions after M3b (Max, 2026-11-23)
+- Modifiers held still fire plain keys. A key saved without Shift, Ctrl or Alt fires while any of them is held
+  (Mouse 4 while sprinting with Shift). A key saved with modifiers (Ctrl+F7) still needs exactly those. When both
+  keys could match, the more specific one wins. Built in `crates/runtime/src/keys.rs` (section 2.6).
+- Key capture (Change on page 04 and Settings > Keys) ends as Cancel when the DialogReader main window loses the
+  focus (`dr_app::focus_lost`). Alt+Tab, Alt+Esc, Ctrl+Esc, Win and Win+anything are never taken as a key: they
+  are ignored and capture keeps waiting unless the focus is lost. No new UI text.
+- Pause stays on across a game switch: the next game opens "Paused" (Max: keep it paused). No code change.
 
 ### Kokoro engine (built 2026-11-23)
 - **Kokoro is bundled (Max, 2026-11-23).** His words: "kokoro voices should be bundled, if sonara fits or would be
