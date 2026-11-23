@@ -697,8 +697,7 @@ CLAUDE.md                          build, test and release block (shipping skill
 ```
 
 **Kokoro in the installer (added 2026-11-23, Max: Kokoro is bundled).** The installer ships next to
-`DialogReader.exe`: `onnxruntime.dll` (Microsoft's official CPU build, 1.28.2 or newer that has API 24, from the
-`onnxruntime-win-x64` zip; with `onnxruntime-LICENSE.txt` and `onnxruntime-ThirdPartyNotices.txt`), the four
+`DialogReader.exe`: `onnxruntime.dll` (Microsoft's official CPU build, 1.28.0 from the NuGet package `Microsoft.ML.OnnxRuntime`; with `onnxruntime-LICENSE.txt` and `onnxruntime-ThirdPartyNotices.txt`), the four
 Visual C++ DLLs it imports (`msvcp140.dll`, `msvcp140_1.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`, 14.40 or
 newer, app-local; Sonara's `packaging/runtime_dlls.py` shows how), and `kokoro\kokoro-v1.0.onnx` plus
 `kokoro\voices-v1.0.bin` (from the kokoro-onnx release `model-files-v1.0`, SHA-256 checked at build time, about
@@ -753,7 +752,7 @@ Built, not merged. Version 0.2.0 (`[workspace.package]` in the root `Cargo.toml`
   the icon and a version block (`embed-resource`, needs rc.exe from the Windows SDK).
 - `installer/DialogReader.iss` (Inno Setup 6), `installer/build.ps1`: per-user install to
   `%LOCALAPPDATA%\Programs\DialogReader`, no admin; `DialogReader-Setup-x64-<version>.exe` (336 MB). Ships the exe,
-  ONNX Runtime 1.28.2 with its licence and notices, the four VC++ DLLs (14.40 or newer), the Kokoro model and voices
+  ONNX Runtime 1.28.0 with its licence and notices, the four VC++ DLLs (14.40 or newer), the Kokoro model and voices
   (SHA-256 pinned, checked at build time) and `THIRD_PARTY_NOTICES.md`. `-Fetch` downloads ONNX Runtime and the
   Kokoro files from their official releases (CI); without it the files next to `target\ship\DialogReader.exe`
   are used. The uninstaller removes the Run value and keeps `%APPDATA%\DialogReader`.
@@ -809,13 +808,12 @@ Old (mockup) > new (app):
 5. Skia's bundled libraries (FreeType, HarfBuzz, libpng, zlib, ICU and so on) are not listed one by one in the
    notices yet.
 6. Show in the taskbar: on by default here (the mockup shows it off).
-7. CI is unproven: the capture and hidden-desktop tests may not run on a GitHub runner, and `release.yml` publishes
-   a release on every push to main once merged.
-8. ONNX Runtime download: on 2026-11-23 `github.com/microsoft/onnxruntime` (repo, API and the 1.28.2 release zip)
-   answered 404 from this PC, and NuGet has no 1.28.2 (1.28.0, then 1.29.0). So `build.ps1 -Fetch` (CI) stops at
-   that download; the local build uses the copy next to `target\ship` (SHA-256 pinned). Retry later, or pick another
-   ONNX Runtime version and source (the DLL pin changes with it). The Kokoro URLs answer. The review (2026-11-23)
-   confirmed it: the `installer` job of `ci.yml` and all of `release.yml` fail until this is chosen.
+7. CI is unproven: the capture and hidden-desktop tests may not run on a GitHub runner. `release.yml` is manual
+   only until the release host and signing are chosen.
+8. ONNX Runtime download (settled 2026-11-23, Max: "try another version"): `github.com/microsoft/onnxruntime`
+   answers 404, so `build.ps1` ships 1.28.0 from the official NuGet package `Microsoft.ML.OnnxRuntime`
+   (package and DLL SHA-256 pinned). Kokoro was checked on 1.28.0 from its own folder: first load 1.3 s, a 3.8 s
+   line in 0.5 s, 606 MB. The CI `installer` job is on again.
 9. A silent update over a running DialogReader now starts it again (with `--minimized`) after the install. A
    normal install still asks with its "Start DialogReader" box. Keep this?
 
