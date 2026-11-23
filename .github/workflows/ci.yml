@@ -36,8 +36,6 @@ jobs:
         run: python installer/notices.py --check
 
   installer:
-    # Off until the ONNX Runtime download source is chosen (github.com/microsoft/onnxruntime answers 404).
-    if: false
     runs-on: windows-latest
     timeout-minutes: 90
     steps:

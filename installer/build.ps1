@@ -24,19 +24,21 @@ $Repo = Split-Path -Parent $PSScriptRoot
 $Target = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $Repo 'target' }
 if (-not $From) { $From = Join-Path $Target 'ship' }
 
-# ONNX Runtime 1.28.2 CPU build for Windows x64 (Microsoft, MIT). The zip and the DLL inside it are pinned.
-$OrtVersion = '1.28.2'
-$OrtUrl = "https://github.com/microsoft/onnxruntime/releases/download/v$OrtVersion/onnxruntime-win-x64-$OrtVersion.zip"
-$OrtZipSha = 'c4eedd29489d5feca21866d054638416f3655bf6b18851b3b6b85c8313e95c35'
+# ONNX Runtime 1.28.0 CPU build for Windows x64 (Microsoft, MIT), from the official NuGet package
+# Microsoft.ML.OnnxRuntime (github.com/microsoft/onnxruntime answers 404 since 2026-11; Max chose another version,
+# 2026-11-23). The package and the DLL inside it are pinned.
+$OrtVersion = '1.28.0'
+$OrtUrl = "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/$OrtVersion/microsoft.ml.onnxruntime.$OrtVersion.nupkg"
+$OrtPkgSha = '769d1d3ea8ab6cd69f737c9dd4d4462aa4ad0ccfa106eaf506efc40d7bead5db'
 # Kokoro v1.0 from kokoro-onnx's release model-files-v1.0 (the same pins as Sonara's download.rs)
 $KokoroBase = 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0'
 $Pinned = [ordered]@{
-    'onnxruntime.dll'          = '1becbd71adbf49609d33195e29c9214969db3c3de69c81425bebe5a4b69aef97'
+    'onnxruntime.dll'          = '18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257'
     'kokoro\kokoro-v1.0.onnx'  = '7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5'
     'kokoro\voices-v1.0.bin'   = 'bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d'
 }
 $VcDlls = 'msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll'
-# The oldest Visual C++ runtime ONNX Runtime 1.28.2 runs with (VS 2022 17.10)
+# The oldest Visual C++ runtime ONNX Runtime 1.28 runs with (VS 2022 17.10)
 $VcMin = [version]'14.40.33810.0'
 
 function Get-Sha([string]$Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant() }
@@ -109,19 +111,18 @@ Copy-Item (Join-Path $Repo 'THIRD_PARTY_NOTICES.md') $Stage
 if ($Fetch) {
     $Cache = Join-Path $Target 'installer\cache'
     New-Item -ItemType Directory -Force $Cache | Out-Null
-    $zip = Join-Path $Cache "onnxruntime-win-x64-$OrtVersion.zip"
-    if (-not (Test-Path $zip) -or (Get-Sha $zip) -ne $OrtZipSha) {
+    $pkg = Join-Path $Cache "microsoft.ml.onnxruntime.$OrtVersion.zip"
+    if (-not (Test-Path $pkg) -or (Get-Sha $pkg) -ne $OrtPkgSha) {
         Write-Host "downloading $OrtUrl"
-        Invoke-WebRequest -Uri $OrtUrl -OutFile $zip
+        Invoke-WebRequest -Uri $OrtUrl -OutFile $pkg
     }
-    Assert-Sha $zip $OrtZipSha
+    Assert-Sha $pkg $OrtPkgSha
     $ortDir = Join-Path $Cache 'ort'
     if (Test-Path $ortDir) { Remove-Item -Recurse -Force $ortDir }
-    Expand-Archive -LiteralPath $zip -DestinationPath $ortDir
-    $root = Join-Path $ortDir "onnxruntime-win-x64-$OrtVersion"
-    Copy-Item (Join-Path $root 'lib\onnxruntime.dll') $Stage
-    Copy-Item (Join-Path $root 'LICENSE') (Join-Path $Stage 'onnxruntime-LICENSE.txt')
-    Copy-Item (Join-Path $root 'ThirdPartyNotices.txt') (Join-Path $Stage 'onnxruntime-ThirdPartyNotices.txt')
+    Expand-Archive -LiteralPath $pkg -DestinationPath $ortDir
+    Copy-Item (Join-Path $ortDir 'runtimes\win-x64\native\onnxruntime.dll') $Stage
+    Copy-Item (Join-Path $ortDir 'LICENSE') (Join-Path $Stage 'onnxruntime-LICENSE.txt')
+    Copy-Item (Join-Path $ortDir 'ThirdPartyNotices.txt') (Join-Path $Stage 'onnxruntime-ThirdPartyNotices.txt')
     foreach ($name in 'kokoro-v1.0.onnx', 'voices-v1.0.bin') {
         $file = Join-Path $Cache $name
         if (-not (Test-Path $file) -or (Get-Sha $file) -ne $Pinned["kokoro\$name"]) {
