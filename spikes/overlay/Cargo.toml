@@ -1,6 +1,6 @@
 [package]
 name = "overlay-spike"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "Spike: can Slint windows on winit be the in-game overlays (pill, quick menu, zone edit)?"
 publish = false

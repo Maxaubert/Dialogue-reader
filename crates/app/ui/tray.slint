@@ -1,0 +1,38 @@
+// The tray icon (spec 2.9, M5): left click opens the main window; the menu has Open, Pause/Resume and Quit.
+// A tray icon is its own top-level component (Slint's SystemTrayIcon); src/tray.rs makes it in the app only.
+export component Tray inherits SystemTrayIcon {
+    in property <bool> paused;
+    callback open();
+    callback pause();
+    callback quit();
+    icon: @image-url("icons/tray.png");
+    tooltip: "DialogReader";
+    title: "DialogReader";
+    clicked => {
+        root.open();
+    }
+    Menu {
+        MenuItem {
+            title: "Open";
+            activated => {
+                root.open();
+            }
+        }
+
+        MenuItem {
+            title: root.paused ? "Resume" : "Pause";
+            activated => {
+                root.pause();
+            }
+        }
+
+        MenuSeparator { }
+
+        MenuItem {
+            title: "Quit";
+            activated => {
+                root.quit();
+            }
+        }
+    }
+}

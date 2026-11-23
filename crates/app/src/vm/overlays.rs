@@ -414,7 +414,7 @@ impl Vm {
             Out::Quit => {
                 self.set_overlay_quiet(Overlay::None);
                 self.with_overlays(|o| o.hide_all());
-                let _ = slint::quit_event_loop();
+                crate::shell::quit();
             }
         }
         // Esc goes back from the voice list rather than closing. Only the Esc rule is sent: the hook may have
@@ -476,7 +476,8 @@ impl Vm {
     /// Settings in the quick menu: the main window comes to the front on that page.
     fn open_main(&mut self, page: Page) {
         let Some(w) = self.win() else { return };
-        let _ = w.show();
+        // the main window may be hidden in the tray (M5)
+        crate::shell::show_main(&w);
         w.set_switcher_open(false);
         w.set_page(page);
         self.page_changed();

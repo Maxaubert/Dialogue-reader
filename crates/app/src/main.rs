@@ -8,8 +8,17 @@
 //! `--fake` shows the mockup data instead of real profiles. `--preview-overlay <pill|quick-menu|quick-menu-voice|
 //! zone-edit>` shows an in-game overlay inside the main window (the mockup review; the real ones are windows).
 //! `--page <name>` opens a page directly. `--version` prints the version.
+//!
+//! M5: one DialogReader at a time (`dr_app::single`: a second start shows the first one's window and exits), the
+//! tray icon (`dr_app::tray`), close hides to the tray, and `--minimized` (Start with Windows) starts in the tray when
+//! "Open minimized" is on (with a tray icon: without one the window shows). `--no-tray` leaves the tray icon out (the
+//! single-instance test uses it). The listener window (`dr_app::single`) also ends the app for the installer and at
+//! the end of the Windows session, and makes the tray icon again after Explorer restarts.
 
 #![windows_subsystem = "windows"]
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use dr_app::Page;
 use slint::ComponentHandle;
@@ -18,13 +27,27 @@ fn main() -> Result<(), slint::PlatformError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--version") {
         attach_console();
-        println!("DialogReader {}", env!("CARGO_PKG_VERSION"));
+        println!("DialogReader {}", dr_app::VERSION);
         return Ok(());
     }
+    // before anything loads (voices, key hooks): a second start only asks the first to show its window
+    let instance = dr_app::single::name();
+    let _guard = match dr_app::single::claim(&instance) {
+        dr_app::single::Claim::First(g) => g,
+        dr_app::single::Claim::Second => {
+            dr_app::single::show_first(&instance, std::time::Duration::from_secs(20));
+            return Ok(());
+        }
+    };
+    // the listener window right away, so a second start finds it while voices and the window still load; its
+    // handlers are set in `run` (a show request that comes earlier waits for them)
+    let listener = dr_app::single::listen(&instance)
+        .map_err(|e| log("instance.log", &format!("{e}\n")))
+        .ok();
     // A panic in the shipped exe (panic = "abort") ends the app at once; this writes a crash log first.
     dr_app::crash::install(None);
     let overlays = select_renderer();
-    let r = run(&args, overlays);
+    let r = run(&args, overlays, listener.as_ref());
     // A window that cannot open (for example OpenGL fails) would end the app without a word: say why in the logs.
     if let Err(e) = &r {
         log(
@@ -35,7 +58,11 @@ fn main() -> Result<(), slint::PlatformError> {
     r
 }
 
-fn run(args: &[String], overlays: bool) -> Result<(), slint::PlatformError> {
+fn run(
+    args: &[String],
+    overlays: bool,
+    listener: Option<&dr_app::single::Listener>,
+) -> Result<(), slint::PlatformError> {
     let fake = args.iter().any(|a| a == "--fake");
     let paths = dr_runtime::Paths::from_env();
     let no_folder = paths.is_none() && !fake;
@@ -43,6 +70,14 @@ fn run(args: &[String], overlays: bool) -> Result<(), slint::PlatformError> {
     let mut speech = None;
     let source = match paths {
         Some(paths) if !fake => {
+            // Start with Windows follows this exe (a moved folder, a portable copy replaced by the installed one).
+            // Only here: tests and tools never write the app's Run value. An elevated app uses a task instead.
+            if !dr_runtime::elevation::self_elevated()
+                && let Ok(exe) = std::env::current_exe()
+                && let Err(e) = dr_runtime::autostart::Autostart::app().follow(&exe)
+            {
+                log("autostart.log", &format!("Start with Windows: {e}\n"));
+            }
             // the only place that can reach the speakers (the voice test and reading)
             let voices = Box::new(dr_app::vm::voices::Voices::real());
             speech = voices.speech.as_ref().map(|s| s.sender());
@@ -95,7 +130,74 @@ fn run(args: &[String], overlays: bool) -> Result<(), slint::PlatformError> {
             _ => {}
         }
     }
-    w.run()
+    // the tray icon keeps the app running while the window is hidden; without one, closing quits (shell.rs)
+    let no_tray = args.iter().any(|a| a == "--no-tray");
+    let tray: Rc<RefCell<Option<dr_app::tray::TrayIcon>>> = Rc::default();
+    if !no_tray {
+        make_tray(&w, &vm, &tray);
+    }
+    if let Some(l) = listener {
+        // a second start asks for the window (single.rs)
+        let weak = w.as_weak();
+        l.on_show(move || {
+            if let Some(w) = weak.upgrade() {
+                dr_app::shell::show_main_in_front(&w);
+            }
+        });
+        // the installer, the uninstaller or the end of the Windows session: end as tray Quit does
+        let v = Rc::downgrade(&vm);
+        l.on_quit(move || dr_app::tray::quit(&v));
+        // Explorer restarted: the tray icon is made again, after this message is handled
+        if !no_tray {
+            let (weak, v, t) = (w.as_weak(), Rc::downgrade(&vm), Rc::downgrade(&tray));
+            l.on_taskbar_created(move || {
+                let (weak, v, t) = (weak.clone(), v.clone(), t.clone());
+                slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                    if let (Some(w), Some(vm), Some(t)) = (weak.upgrade(), v.upgrade(), t.upgrade())
+                    {
+                        let existing = t.borrow().clone();
+                        match existing {
+                            Some(icon) => {
+                                if let Err(e) = icon.remake() {
+                                    log(
+                                        "tray.log",
+                                        &format!("the tray icon could not be made again: {e}\n"),
+                                    );
+                                }
+                            }
+                            None => make_tray(&w, &vm, &t),
+                        }
+                    }
+                });
+            });
+        }
+    }
+    // Start with Windows passes --minimized: only the tray icon shows when "Open minimized" is on. With no tray icon
+    // the window shows, so the app is never running with nothing on screen.
+    let minimized = args.iter().any(|a| a == "--minimized")
+        && vm.borrow().prefs().open_minimized
+        && dr_app::shell::tray_up();
+    if !minimized {
+        dr_app::shell::show_main(&w);
+    }
+    let r = slint::run_event_loop_until_quit();
+    let _ = w.hide();
+    r
+}
+
+/// Makes the tray icon into `slot`. A failure is written to `tray.log` (the app then runs without one).
+fn make_tray(
+    w: &dr_app::MainWindow,
+    vm: &dr_app::vm::Shared,
+    slot: &Rc<RefCell<Option<dr_app::tray::TrayIcon>>>,
+) {
+    match dr_app::tray::make(w, vm) {
+        Ok(t) => *slot.borrow_mut() = Some(t),
+        Err(e) => log(
+            "tray.log",
+            &format!("the tray icon could not be made: {e}\n"),
+        ),
+    }
 }
 
 /// Writes `text` to `name` in the logs folder (`%LOCALAPPDATA%\DialogReader\logs`).

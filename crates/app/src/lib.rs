@@ -6,11 +6,20 @@
 slint::include_modules!();
 
 pub mod crash;
+#[cfg(windows)]
+pub mod dialogs;
 pub mod fake;
 pub mod geom;
 pub mod overlay;
 pub mod screens;
+pub mod shell;
+#[cfg(windows)]
+pub mod single;
+pub mod tray;
 pub mod vm;
+
+/// The workspace version (Cargo.toml `[workspace.package]`): `--version`, Settings > Updates, the installer.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The main window with the fake data of the mockups (render-screens and the screen and nav tests).
 pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
@@ -41,18 +50,22 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
             w.window().set_maximized(!max);
         }
     });
-    let v = vm.clone();
+    // Close (the title bar button, Alt+F4) hides the window to the tray (M5); with no tray icon it quits
+    let (v, weak) = (vm.clone(), w.as_weak());
     w.window().on_close_requested(move || {
         v.borrow_mut().commit_rename();
-        // the overlay windows would keep the app running with no window to come back to (the tray is M5)
-        let _ = slint::quit_event_loop();
+        if let Some(w) = weak.upgrade() {
+            shell::close_main(&w);
+        }
         slint::CloseRequestResponse::HideWindow
     });
-    let v = vm.clone();
+    let (v, weak) = (vm.clone(), w.as_weak());
     chrome.on_close(move || {
         // a zone name still being typed is saved first
         v.borrow_mut().commit_rename();
-        let _ = slint::quit_event_loop();
+        if let Some(w) = weak.upgrade() {
+            shell::close_main(&w);
+        }
     });
     // the left button is down while a mouse button is held on the app (see keep_left_drags)
     let left = std::rc::Rc::new(std::cell::Cell::new(false));

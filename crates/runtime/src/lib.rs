@@ -4,7 +4,8 @@
 //! screenshot of a window with Windows Graphics Capture ([`screenshot`]), and the live view of the zone editor
 //! ([`live`]). M3a: the speech queue, the speech thread and audio out ([`speech`]). M3b: frames for the reader
 //! ([`capture`]), the reader thread ([`reader`]), the global keys ([`keys`]), elevated and fullscreen games
-//! ([`elevation`]), the activity log ([`activity`]) and the handle that runs them ([`runtime`]).
+//! ([`elevation`]), the activity log ([`activity`]) and the handle that runs them ([`runtime`]). M5: app settings
+//! ([`settings`]) and start with Windows ([`autostart`]).
 
 pub mod activity;
 pub mod capture;
@@ -12,9 +13,12 @@ pub mod keys;
 pub mod paths;
 pub mod profile;
 pub mod reader;
+pub mod settings;
 pub mod shot;
 pub mod speech;
 
+#[cfg(windows)]
+pub mod autostart;
 #[cfg(windows)]
 pub mod elevation;
 #[cfg(windows)]

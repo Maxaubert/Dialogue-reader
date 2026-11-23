@@ -30,6 +30,23 @@ pub struct FakeDesktop {
     /// How often "Add voices" asked to open the Windows speech settings.
     pub opened_settings: Rc<Cell<u32>>,
     pub live: FakeLive,
+    /// Start with Windows, Check now and the file dialogs (M5).
+    pub shell: FakeShell,
+}
+
+/// What the app asked of the desktop shell (M5). Nothing reaches the registry, the browser or a dialog.
+#[derive(Clone, Default)]
+pub struct FakeShell {
+    /// Start with Windows is on.
+    pub autostart: Rc<Cell<bool>>,
+    /// The next changes of Start with Windows fail.
+    pub autostart_fail: Rc<Cell<bool>>,
+    /// How often Start with Windows was changed.
+    pub autostart_sets: Rc<Cell<u32>>,
+    /// The web pages opened.
+    pub urls: Rc<RefCell<Vec<String>>>,
+    /// The file dialogs asked for: `Some(name)` for Export, `None` for Import.
+    pub picks: Rc<RefCell<Vec<Option<String>>>>,
 }
 
 /// The live view of the fake desktop: what was started and stopped, and the sink of the newest session.
@@ -132,6 +149,7 @@ impl FakeDesktop {
             front: Rc::new(RefCell::new(Vec::new())),
             opened_settings: Rc::new(Cell::new(0)),
             live: FakeLive::default(),
+            shell: FakeShell::default(),
         }
     }
 }
@@ -150,6 +168,35 @@ impl Desktop for FakeDesktop {
 
     fn open_speech_settings(&self) {
         self.opened_settings.set(self.opened_settings.get() + 1);
+    }
+
+    fn autostart(&self) -> Option<bool> {
+        Some(self.shell.autostart.get())
+    }
+
+    fn set_autostart(&self, on: bool) -> Result<(), String> {
+        if self.shell.autostart_fail.get() {
+            return Err("access denied".into());
+        }
+        self.shell
+            .autostart_sets
+            .set(self.shell.autostart_sets.get() + 1);
+        self.shell.autostart.set(on);
+        Ok(())
+    }
+
+    fn open_url(&self, url: &str) {
+        self.shell.urls.borrow_mut().push(url.into());
+    }
+
+    fn pick_file_then(
+        &self,
+        _owner: Option<isize>,
+        save: Option<String>,
+        _done: Box<dyn FnOnce(Option<std::path::PathBuf>) + Send>,
+    ) {
+        // the test answers through the window's file-picked callback, as the real dialog thread does
+        self.shell.picks.borrow_mut().push(save);
     }
 
     fn is_minimized(&self, w: &WinInfo) -> bool {

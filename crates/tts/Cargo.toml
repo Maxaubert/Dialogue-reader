@@ -1,6 +1,6 @@
 [package]
 name = "dr-tts"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "DialogReader speech: the Tts trait, the Kokoro engine, the Windows built-in voices engine, WAV parsing and a fake engine for tests"
 

@@ -1,6 +1,6 @@
 [package]
 name = "dr-app"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "DialogReader Windows app: Slint UI"
 
@@ -58,12 +58,14 @@ windows = { version = "=0.62.2", features = [
     "Win32_Graphics_OpenGL",
     "Win32_Security",
     "Win32_Storage_Xps",
+    "Win32_System_Com",
     "Win32_System_LibraryLoader",
     "Win32_System_StationsAndDesktops",
     "Win32_System_Threading",
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
 ] }
 
@@ -73,3 +75,5 @@ tempfile = "=3.27.0"
 
 [build-dependencies]
 slint-build = "=1.18.1"
+# The manifest, icon and version block of DialogReader.exe (app.rc, M5). Needs rc.exe from the Windows SDK.
+embed-resource = "=3.0.12"

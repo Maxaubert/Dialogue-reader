@@ -1,6 +1,6 @@
 [package]
 name = "dr-core"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "Dialogue reader engine: zones, change detection, OCR scheduling and dedup (no arena dependency)"
 
