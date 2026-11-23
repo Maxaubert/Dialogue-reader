@@ -10,11 +10,13 @@
 //! keep a small cover, made the first time the game switcher opens, and the screenshot size from the PNG header.
 
 mod live;
+pub mod overlays;
 pub mod reading;
 pub mod voices;
 pub mod zones;
 
 pub use live::{LiveRun, NOTE_CLOSED, NOTE_FAILED, NOTE_LIVE, NOTE_MINIMIZED};
+pub use overlays::attach_overlays;
 pub use reading::attach_runtime;
 
 use std::cell::RefCell;
@@ -471,6 +473,10 @@ pub struct Vm {
     test_running: Option<u64>,
     /// The Settings sliders moved and the profile is not saved yet (it is saved when they are let go).
     voice_dirty: bool,
+    /// The in-game overlays (M4): only the app makes them (`attach_overlays`).
+    overlays: Option<crate::overlay::Overlays>,
+    /// Mute from the quick menu (for this session; not saved).
+    muted: bool,
 }
 
 pub type Shared = Rc<RefCell<Vm>>;
@@ -504,6 +510,8 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         test_id: 0,
         test_running: None,
         voice_dirty: false,
+        overlays: None,
+        muted: false,
     };
     w.set_setup_zones(ModelRc::from(vm.setup_zones.clone()));
     w.set_zones(ModelRc::from(vm.zones.clone()));
@@ -1252,29 +1260,38 @@ impl Vm {
         };
         match self.shoot(&win) {
             Ok(shot) => {
-                let Some(real) = &self.real else { return };
-                let id = self.games[i].profile.id.clone();
-                if let Err(e) = shot.save_png(&real.paths.profile_png(&id)) {
-                    self.notice(&format!("The screenshot could not be saved: {e}"));
-                    return;
+                if self.adopt_shot(i, &shot).is_ok() {
+                    self.notice("");
                 }
-                self.main.rescale(shot.width as f32, shot.height as f32);
-                if let Some(w) = self.win() {
-                    w.set_shot(image_of(shot.width, shot.height, &shot.rgba));
-                    w.set_shot_w(shot.width as f32);
-                    w.set_shot_h(shot.height as f32);
-                }
-                self.games[i].cover = Some(cover_of(&shot));
-                self.games[i].shot_size = Some((shot.width, shot.height));
-                // the line under the stage on 11 keeps the live view note ("Live", or why the saved
-                // screenshot shows)
-                self.push_shot_info();
-                self.notice("");
-                self.save_main();
-                self.push_main();
             }
             Err(e) => self.notice(&format!("No new screenshot: {e}.")),
         }
+    }
+
+    /// A new screenshot of game `i` (the current one): saved as its picture, its zones keep their place on it,
+    /// and pages 10 and 11 show it. Retake and in-game zone edit use it.
+    fn adopt_shot(&mut self, i: usize, shot: &Shot) -> Result<(), ()> {
+        let Some(real) = &self.real else {
+            return Err(());
+        };
+        let id = self.games[i].profile.id.clone();
+        if let Err(e) = shot.save_png(&real.paths.profile_png(&id)) {
+            self.notice(&format!("The screenshot could not be saved: {e}"));
+            return Err(());
+        }
+        self.main.rescale(shot.width as f32, shot.height as f32);
+        if let Some(w) = self.win() {
+            w.set_shot(image_of(shot.width, shot.height, &shot.rgba));
+            w.set_shot_w(shot.width as f32);
+            w.set_shot_h(shot.height as f32);
+        }
+        self.games[i].cover = Some(cover_of(shot));
+        self.games[i].shot_size = Some((shot.width, shot.height));
+        // the line under the stage on 11 keeps the live view note ("Live", or why the saved screenshot shows)
+        self.push_shot_info();
+        self.save_main();
+        self.push_main();
+        Ok(())
     }
 
     /// Esc on 03 or 11: cancels a drag on the stage (the zone goes back, a new one is dropped). False when no

@@ -541,7 +541,7 @@ pill, the quick menu and zone edit, one renderer for all windows: femtovg or `sk
   thread. Its callback reads atomic "menu open" / "zone edit open" flags, decides, and posts the work with
   `slint::invoke_from_event_loop` (a slow hook is removed by Windows). A key belongs to whoever got its first
   key-down until it is released: auto-repeats and the key-up go the same way (`keys::Swallow` in the spike).
-  Injected keys (`LLKHF_INJECTED`, pad mappers) count as real keys in the spike; Max decides before M4.
+  Injected keys (`LLKHF_INJECTED`, pad mappers) count as real keys (M4 default, as in the spike; Max may flip it).
 - Card margins at least the shadow blur (40 px for the quick menu).
 Condition: Max's visible check (`cargo run -p overlay-spike --release -- demo`) shows see-through pill corners,
 click-through, the game around the menu card and through the zone edit veil. If the pill fails, it is drawn with
@@ -554,6 +554,126 @@ Screens of every overlay state rendered headless and compared with golden images
 
 **Done when.** On a borderless game the pill shows, the quick menu opens and works with the keyboard only, zone
 edit changes zones that the reader uses at once, the game never loses focus, and all headless tests pass.
+
+### Status (built 2026-11-23, branch feat/app-m4)
+
+The pill, the quick menu (with voice list) and zone edit are real overlay windows on the running game.
+`crates/app/README.md`, "In-game overlays (M4)", says how it works.
+
+**Files.**
+```
+crates/runtime/src/keys.rs        Overlay (none, menu, zones), Nav keys, which keys an open overlay takes, repeats,
+                                  the menu only over the game in front; Bindings::after (changes on the hook thread)
+crates/runtime/src/runtime.rs     Cmd::Overlay, Cmd::Hold (reading waits, apart from Pause), waker, overlay(), zones()
+crates/app/src/overlay/mod.rs     the three windows: show through the recipe, place, hide
+crates/app/src/overlay/win.rs     the spike's recipe (attributes hook, harden, subclass), game rect, monitor scale,
+                                  bring the main window to the front
+crates/app/src/overlay/place.rs   pill, menu centered on the game, zone edit window px <> capture px
+crates/app/src/overlay/quick_menu.rs  menu state machine
+crates/app/src/overlay/zone_edit.rs   zone edit on the Zones tab's editor (add, pick, remove, dim layer)
+crates/app/src/vm/overlays.rs     the view model side: sync with the hook, pill content, menu actions, zone edit
+crates/app/src/bin/overlay-probe.rs  hidden-desktop probe (game with a title bar, app code, positive control)
+crates/app/ui/overlays/windows.slint PillWindow, QuickMenuWindow, ZoneEditWindow (no popups)
+crates/app/tests/quick_menu.rs, place.rs, overlays.rs, overlay_win.rs
+```
+
+**Decisions taken in M4 (Max may change them).**
+- Injected keys (`LLKHF_INJECTED`: Steam Input, pad mappers) count as real keys, as in the spike.
+- The quick menu key opens the menu only while the game window (or a window it owns) is in front, and still goes
+  through to the game then (spec 2.6: keys go through). While an overlay is open, the quick menu key is taken: it
+  closes the menu, or goes from zone edit back to the menu.
+- The menu and zone edit close when the game is no longer in front (Alt+Tab, minimized, closed). The hook stops
+  taking their keys at once when the game leaves the front (it checks the foreground window on each key-down), not
+  only after the UI's next tick.
+- An open overlay never takes a key pressed with Win, Ctrl or Alt held: Ctrl+Esc, Ctrl+Shift+Esc, Alt+Esc,
+  Win+arrows, Alt+Enter and Alt+Space go to Windows and the game. Shift alone does not stop a key.
+- The pill shows only while the game is in front and being read (Reading or Paused): a topmost pill over another
+  app would be in the way. It hides while the menu or zone edit is open (spec 2.7). Its dot is green while
+  reading, grey when paused; the speaker of the line being spoken shows when Settings > Show the speaker is on, and
+  the wave is lit while a line plays. With no line playing it shows the dot and a grey wave (no text). The demo's
+  "pill at top center" while the menu was open was a demo detail: M4 follows mockup 13 (top right, 24 px in) and
+  spec 2.7 (hidden while the menu or zone edit is open).
+- Zone edit covers the DWM frame bounds, not only the client rect: Windows Graphics Capture of a window is
+  assumed to cover the same rect (true for the borderless check; for a game with a title bar only the window
+  placement was tested, on the hidden desktop), so a game with a title bar should line up too. Its frozen screenshot also becomes the profile's picture (as Retake). Each change is saved and sent
+  to the reader at once.
+- Reading is held while an overlay is open (`Cmd::Hold`), apart from the user's Pause.
+- The quick menu window is wide enough for the voice list on the right and as wide on the left, so the card stays
+  in the middle; a voice list longer than 8 rows scrolls with the highlight. A click outside the card closes the menu.
+- Speed steps 0.1 (0.5 to 2.0), Volume steps 5 %. Each step is saved to the profile at once. Mute is for the
+  session only.
+- Settings in the quick menu closes it and brings the main window to the front on Settings.
+- Closing the main window now quits the app (before, it was the last window; the overlays would keep the app
+  running with no window, and the tray is M5).
+- The renderer: the app ships skia-opengl; `main.rs` selects it in the same `BackendSelector` as the overlay hook.
+  If that fails, `renderer.log` says so and the overlays are off. `SLINT_BACKEND=winit-<renderer>` still works;
+  with `winit-software` (debug only) the overlays are off, as it draws their see-through margins black.
+
+**Text changes for Max to approve (M4)** (old > new):
+
+| Where | Old | New |
+|---|---|---|
+| 13 pill, no line playing | dot, "Arthur", lit wave | dot, grey wave (no text) |
+| 13 pill, paused | green dot | grey dot |
+| 15 quick menu, game name and voice | sample data (Red Dead Redemption 2, Adam) | the current game's name and voice |
+| overlay window titles (not shown on screen; Task Manager only) (new) | none | DialogReader status, DialogReader quick menu, DialogReader zone edit |
+
+No other new UI text.
+
+**Tests (all headless).** `tests/overlay_win.rs` (hidden desktop, skia-opengl, a dummy game with a title bar at the
+monitor's 225 %): styles kept after hide and show, same HWND, no `WM_ACTIVATE` or `WM_SETFOCUS` (a plain window
+activates as the positive control), pill click-through, menu and zone edit take the mouse with `MA_NOACTIVATE`,
+GL pixel format, see-through margins (alpha 0) with drawn cards, pill top right 24 px in, menu centered, zone edit
+over the frame bounds. `tests/overlays.rs` (testing backend, keys fed as the hook hands them): pill on and off,
+menu open, move, Esc, voice list Esc goes back, Speed and Mode saved, Stop is the user's Pause, Quit twice,
+Settings, menu only over the game in front, zone edit saves a zone and the runtime reads with it at once, Delete,
+Esc drops a box being drawn first, a mouse click on the Volume slider or a Mode button followed by keys (the
+menu still shows the new values), and a menu action never reopens a menu the hook closed. `tests/quick_menu.rs`, `tests/place.rs` (100, 150, 200, 225 %, a monitor left of
+the main one, a title bar) and the hook rules in `keys.rs` are pure (also: an open overlay takes no key with Win,
+Ctrl or Alt held, and none while the game is away).
+
+**Visible check (2026-11-23, run by Claude; Max gave the PC).** Ship build (`target\ship\DialogReader.exe`,
+skia-opengl) over a stand-in game: a fullscreen borderless Tk window (3840 x 2160, monitor at 225 %) with a checker
+pattern and a dialogue box, which logs keys, clicks and focus. A profile for it in a temp `APPDATA` and
+`LOCALAPPDATA`; Max's profiles untouched. Input from `keybd_event` / `mouse_event`. Quick menu key F7. Final clean
+run below (earlier runs failed only where the test's click landed on the main window); screenshots in the session
+scratchpad `m4-visible`.
+
+| Step | Result |
+|---|---|
+| 1 Pill on the game | Pass. Top right, 24 px in at 225 %; its corners show the game; ex-style 0x080801B8. |
+| 2 Click-through | Pass. A click on the pill reached the game; the game stayed in front. |
+| 3 Quick menu key | Pass. Menu centered (1 px off), its margin shows the game, the pill hides. |
+| 4 Arrows, Right, Esc | Pass. The menu moved and closed; the game got none of those keys, and got F7 down and up (the quick menu key goes through, spec 2.6). Positive control: after closing, Down reached the game. |
+| F1 Shortcuts (review fix) | Pass. With the menu open, Ctrl+Down reached the game and the menu did not move; plain Down was still the menu's. |
+| F2 Mouse then keys (review fix) | Pass. A click on the Volume slider (50 %), then Right: the menu showed 55 %; a click on "On key press", then Left: "Automatic" showed as chosen; reopened, it showed both. The game got no click and kept the focus. |
+| 4c Voice list | Pass. Right on Voice opens the list (as mockup 15-quick-menu-voice); the first Esc goes back to the menu, the second closes it; the game got no Esc or Right. |
+| 5 Manage zones | Pass. Zone edit over the frozen screenshot, the game dimmed (not black); a drag drew a box; picking Dialogue saved the zone (capture px, base 3840 x 2160); the drag did not reach the game. |
+| 6 Reader uses the new zone | Pass. The activity log got the line from the new zone at once ("ld nuggets were found near the rive": the text ran past the drawn box, so its ends were outside the zone). The pill's wave lit while it was spoken. |
+| 7 Taskbar, Alt+Tab | Pass. All three overlays: WS_EX_TOOLWINDOW, no WS_EX_APPWINDOW, no owner. |
+| 8 Focus | Pass. The game had 0 focus losses from step 1 to 7. |
+| 9 Settings | Pass. The main window came to the front on Settings; the pill hid (the game is not in front). |
+| 10 Quit twice | Pass. The first Enter armed Quit, the second ended the app (exit 0). |
+| 11 Logs | Pass. No `renderer.log`, no crash log, no overlay errors in `reading.log`. |
+
+Found on the way: on this PC another program eats the key-down of F8 (its key-up still arrives) also when
+DialogReader is not running (checked with the Tk game alone; `sonarad.exe` was running, not confirmed as the cause).
+So F7 was used. F8 as a quick menu key would open the menu but the game never sees F8 go down.
+
+Not covered: a real DirectX game (flip model, raw input, pause on focus loss), mixed-DPI monitors, a game with a
+title bar on screen (covered on the hidden desktop only), an elevated game. Part of Max's game check.
+
+**Open questions for Max (M4).**
+- The pill shows the speaker, not the line (mockup 13 and "Show the speaker"). Should it show the line being spoken
+  too (a new design)?
+- Injected keys count as real keys. Keep, or ignore them?
+- The quick menu key goes through to the game when it opens the menu (spec 2.6). Swallow it instead, so the game
+  never sees it?
+- Pill and menu only over the game in front; menu and zone edit close on Alt+Tab. Right?
+- Closing the main window now quits the app until the tray comes (M5). Right for now?
+- Manage zones when the screenshot fails: the menu stays open and `reading.log` says why; nothing shows in the game.
+  Add an in-game message (needs text)?
+- Speed shows "1x" for 1.0 (the M1 component); the mockup only shows "1.1x". Show "1.0x"?
 
 ## M5: settings, tray, start with Windows, installer, version
 

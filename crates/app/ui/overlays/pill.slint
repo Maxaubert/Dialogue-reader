@@ -5,6 +5,9 @@ import { Dot, PillWave } from "../components/base.slint";
 // The small in-game pill (13), reused on the welcome preview.
 export component OverlayPill inherits Rectangle {
     in property <string> speaker: "Arthur";
+    // the overlay window (M4): green dot while reading, grey otherwise; the wave is lit while a line is spoken
+    in property <bool> ok: true;
+    in property <bool> speaking: true;
     height: 32px;
     width: row.preferred-width;
     border-radius: 16px;
@@ -22,20 +25,25 @@ export component OverlayPill inherits Rectangle {
             alignment: center;
             Dot {
                 size: 6px;
+                tint: root.ok ? Palette.ok : Palette.text-3;
             }
         }
 
-        Text {
+        if root.speaker != "": Text {
             text: root.speaker;
             font-size: Type.fs1;
             font-weight: Type.w-medium;
             color: Palette.text;
             vertical-alignment: center;
+            max-width: 200px;
+            overflow: elide;
         }
 
         VerticalLayout {
             alignment: center;
-            PillWave { }
+            PillWave {
+                played: root.speaking ? 999 : 0;
+            }
         }
     }
 }

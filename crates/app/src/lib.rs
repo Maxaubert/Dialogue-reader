@@ -8,6 +8,7 @@ slint::include_modules!();
 pub mod crash;
 pub mod fake;
 pub mod geom;
+pub mod overlay;
 pub mod screens;
 pub mod vm;
 
@@ -43,6 +44,8 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
     let v = vm.clone();
     w.window().on_close_requested(move || {
         v.borrow_mut().commit_rename();
+        // the overlay windows would keep the app running with no window to come back to (the tray is M5)
+        let _ = slint::quit_event_loop();
         slint::CloseRequestResponse::HideWindow
     });
     let v = vm.clone();

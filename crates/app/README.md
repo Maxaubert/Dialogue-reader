@@ -2,7 +2,7 @@
 
 The Slint UI of DialogReader. It builds `DialogReader.exe`.
 
-**Status: M3b.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
+**Status: M4.** Every approved screen from `design/mockups/c-midnight` is built in Slint. Setup is real: profiles
 are saved as JSON in `%APPDATA%\DialogReader\profiles`, page 02 lists the running windows (games first), Continue
 takes one screenshot with Windows Graphics Capture, and pages 03 and 11 draw, select, move, resize, rename,
 re-kind, switch and delete zones on it (Ctrl+Z undoes the last change). The stages of 03, 10 and 11 show the
@@ -11,8 +11,9 @@ and Settings > Voices list the Windows voices; "Play sample" and "Test" speak on
 never in a test); voice, speed and volume are saved in the profile. Games that share an exe get one profile each,
 told apart by the window title. Since M3b the app reads the current game: it finds its window, captures it,
 reads it automatically or on the read key, speaks the lines, and shows the status, the line being spoken and Recent
-from the activity log (`log\<id>.jsonl`). Pause, Read now, Replay, Stop and key capture ("Change") work. The
-overlays still show fake data (M4). The plan
+from the activity log (`log\<id>.jsonl`). Pause, Read now, Replay, Stop and key capture ("Change") work. Since
+M4 the in-game overlays are real windows over the game (see "In-game overlays"): the status pill, the quick menu on
+the quick menu key, and zone edit over a frozen screenshot. The plan
 is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spec.md](../../docs/app-spec.md).
 
 ## Run, test, render
@@ -59,22 +60,31 @@ src/vm/zones.rs          zone drawing state: draw, select, move, resize, rename,
 src/vm/voices.rs         voices for the UI: the installed list, labels ("Windows · David"), the voice test thread
 src/vm/live.rs           live view of the game on the stages of 03, 10 and 11: start, stop, frames, fallback
 src/vm/reading.rs        reading: the runtime, status, now speaking, activity log, window search, key capture
+src/vm/overlays.rs       the in-game overlays in the view model: which one shows, the pill, quick menu actions, zone edit
+src/overlay/mod.rs       the three overlay windows: show (through the overlay recipe), place, hide
+src/overlay/win.rs       Win32: attributes hook, harden + subclass (docs/overlay-spike.md), game rect, monitor scale
+src/overlay/place.rs     placement math: pill, menu centered on the game, zone edit window px to capture px
+src/overlay/quick_menu.rs  quick menu state machine (keys and clicks to actions; Quit twice; voice list)
+src/overlay/zone_edit.rs zone edit on the Zones tab's editor: view zones, dim layer, pick, add, remove
 src/crash.rs             panic hook: crash log in %LOCALAPPDATA%\DialogReader\logs
 src/fake.rs              fake data of the mockups (behind vm::Source::Fake) and the zone edit callbacks
 src/geom.rs              stage mapping, drag to zone, hit tests, dim path (unit-tested)
 src/screens.rs           headless renderer and the screen list (sets Render.software)
 src/bin/render-screens.rs
+src/bin/overlay-probe.rs the overlay windows on a hidden desktop with a dummy game (tests/overlay_win.rs runs it)
 ui/theme.slint           tokens: Palette, Space, Radius, Size, Type, Shadow; Render; Kinds, Icons, Art
 ui/data.slint            view-model structs, Page and OverlayPreview enums
 ui/app.slint             MainWindow: pages, navigation, keys (Ctrl K, Esc, arrows), game switcher, overlay previews
 ui/components/           base (Button, Kbd, Toggle, Segmented, Slider, Card, ...), chrome (bars, steps, tabs), stage
 ui/pages/                welcome, pick_window, draw_zones, keys, voice, mode, overview, zones, settings, activity
-ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout, what the M4 overlay needs),
-                         quick_menu_preview (review only: menu over the game and its two other states), zone_edit
+ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout), quick_menu_preview (review only:
+                         menu over the game and its two other states), zone_edit, windows (the M4 overlay windows:
+                         PillWindow, QuickMenuWindow, ZoneEditWindow; no popups)
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
 ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
-tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs, voices.rs, reading.rs (testing
-                         backend), screens.rs (renders, compares with the mockups), common/ (fake desktop with a
+tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs, voices.rs, reading.rs,
+                         overlays.rs (testing backend), quick_menu.rs, place.rs (pure), overlay_win.rs (hidden
+                         desktop), screens.rs (renders, compares with the mockups), common/ (fake desktop with a
                          fake live view, fake voices, temp data folder, pointer input)
 examples/snapshot.rs     one page in a real window with a chosen renderer, saved as PNG (run on a hidden desktop)
 tools/hidden-run.ps1     runs a program on a hidden Windows desktop and waits for it
@@ -124,7 +134,7 @@ feature `renderer-skia` turns on Slint's `renderer-skia-opengl`, and `main.rs` s
 by name: the M4 overlays need OpenGL Skia, because Skia's default surface draws their see-through margins black
 (docs/overlay-spike.md). femtovg is the opt-in fallback `renderer-femtovg`. The software renderer is always built
 in: render-screens and the tests use it, and `SLINT_BACKEND=winit-software` makes the window use it when OpenGL
-fails. The measurements below are from the spike, when femtovg was still the default.
+fails (debug only: the in-game overlays are off then, as it draws their see-through margins black). The measurements below are from the spike, when femtovg was still the default.
 
 **Text ink.** `examples/snapshot.rs` opens the window on a hidden desktop (`tools/hidden-run.ps1`) on the overview
 page (10-main-b) and saves `Window::take_snapshot()`. For Skia that is a CPU re-render of the scene, not a
@@ -321,13 +331,39 @@ page) and page 11 (Zones) at 225 % and 150 %.
 - The live view attaches to the reader's capture session when both want the same window (one WGC session).
 - Raw errors (capture, OCR, hooks) go to `%LOCALAPPDATA%\DialogReader\logs\reading.log`.
 
-## Known gaps (M3b)
+## In-game overlays (M4)
 
-- Import settings and the other Settings buttons (Startup, overlay, updates) do nothing yet (M5). The quick menu
-  key does nothing until the quick menu is a real overlay (M4); the quick menu voice list is still sample data.
+- `main.rs` selects the winit backend with the overlay attributes hook (`overlay::win::attributes_hook`) and the
+  OpenGL renderer the build has (skia-opengl; femtovg with the fallback feature), then makes the three windows
+  (`overlay::Overlays::new(true)`) and hands them to the view model (`vm::attach_overlays`). If the backend cannot
+  be selected, `renderer.log` says so and the overlays are off (the quick menu key then does nothing).
+- Every show goes through the spike's recipe (`overlay::win::show_overlay`): extra styles, `SetLayeredWindowAttributes`
+  for the pill, topmost without activation, a property that marks the HWND, and a subclass that keeps the styles.
+- The key hook keeps which overlay is open (`dr_runtime::keys::Overlay`) and changes it at once for the quick menu
+  key and Esc; `Vm::overlay_sync` makes the windows match on every key event (the runtime's waker posts to the UI
+  thread) and on the 100 ms reading timer. While the menu is open the hook takes the arrows, Enter, Space, Esc and
+  the quick menu key; in zone edit it takes Delete, Backspace, Esc and the quick menu key (back to the menu).
+- The menu and zone edit open only over the game in front, and close when it is not in front any more. Reading is
+  held while one is open (not the user's Pause). The pill shows while the game is read (Reading or Paused) and is
+  in front, at Settings > In-game overlay > Position (kept for this session; saving it is M5).
+- Zone edit covers what the capture covers (the DWM frame bounds; the title bar too, for a game with one), shows a
+  frozen screenshot (also saved as the profile's picture, as Retake does) and edits the Zones tab's zones: every
+  change is saved and sent to the reader at once.
+- Closing the main window quits the app (the overlays would otherwise keep it running with no window; the tray is
+  M5).
+- Tests: `tests/overlay_win.rs` runs `overlay-probe` on a hidden desktop (styles kept after hide and show, no
+  activation with a positive control, click-through, `MA_NOACTIVATE`, GL pixel format, see-through margins with
+  skia-opengl, placement over a game with a title bar). `tests/overlays.rs` runs the view model on the testing
+  backend with keys fed as the hook hands them. `tests/quick_menu.rs` and `tests/place.rs` are pure.
+
+## Known gaps (M4)
+
+- Import settings and the other Settings buttons (Startup, overlay, updates) do nothing yet (M5). The overlay
+  Position and Show the speaker work for the running session only.
 - The reader follows the game picked in the app; it does not switch by itself when another profile's game starts.
 - No button restarts DialogReader as administrator for an elevated game (the notice says why; open question).
-- Overlays are previews inside the main window. Real overlay windows come in M4.
+- The overlays were checked on a stand-in game (a Tk window), not a DirectX game (flip model, raw input, games that
+  pause on focus loss): that is part of Max's game check.
 - The zone strip on Overview shows every zone in one row; many zones run past the edge (no "+N" chip with real
   data yet).
 - Page 02 shows the exe icon for real windows, not a live picture of the window.

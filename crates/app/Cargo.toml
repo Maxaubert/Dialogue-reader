@@ -17,6 +17,11 @@ path = "src/main.rs"
 name = "render-screens"
 path = "src/bin/render-screens.rs"
 
+# Checks the real overlay windows on a hidden desktop (tests/overlay_win.rs runs it). Nothing shows on screen.
+[[bin]]
+name = "overlay-probe"
+path = "src/bin/overlay-probe.rs"
+
 [features]
 # The real window draws with Skia through OpenGL (Max, 2026-11-22): its text matches the mockups. Overlays need
 # OpenGL Skia, not Skia's default surface, which draws their see-through margins black (docs/overlay-spike.md).
@@ -43,6 +48,24 @@ dr-runtime = { path = "../runtime" }
 dr-tts = { path = "../tts" }
 # Line kinds and skip reasons of the activity log (src/vm/reading.rs).
 dr-core = { path = "../core" }
+
+# The in-game overlay windows (src/overlay): extra window styles through the HWND, a window subclass, placement.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_Security",
+    "Win32_Storage_Xps",
+    "Win32_System_LibraryLoader",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"

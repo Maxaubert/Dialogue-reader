@@ -5,7 +5,10 @@
 //! - A profile is active after [`Cmd::Start`]. Reading runs while its game window is known ([`Cmd::Window`]; the
 //!   app finds the window with its profile rules and tells the runtime when it comes or goes).
 //! - The read key goes from the hook thread straight to the reader (`ReadNow`), without a stop on the UI
-//!   thread. The quick menu key and key capture come out as [`Ev::Key`].
+//!   thread. The quick menu key, the keys of an open overlay and key capture come out as [`Ev::Key`], and the
+//!   waker ([`Runtime::set_waker`]) tells the app at once (it need not wait for its timer).
+//! - The in-game overlays (M4): the hook keeps which one is open ([`Runtime::overlay`]); the app sets it with
+//!   [`Cmd::Overlay`] and holds reading while one is open ([`Cmd::Hold`], apart from the user's Pause).
 //! - Hooks exist only while a profile is active or a key capture is open (spec Risks).
 //! - [`Runtime::tick`] (the app calls it on a timer) notices a reader whose window closed, and checks for
 //!   exclusive fullscreen.
@@ -19,7 +22,7 @@ use std::time::{Duration, Instant};
 use dr_core::{Ocr, Zone};
 
 use crate::capture::FrameSource;
-use crate::keys::{Action, Bindings, Hooks, Key};
+use crate::keys::{Action, Bindings, Hooks, Key, Overlay};
 use crate::live::Attacher;
 use crate::profile::Mode;
 use crate::reader::{ReadCfg, Reader, ReaderCmd, ReaderEv};
@@ -116,7 +119,22 @@ pub enum Cmd {
     },
     /// Key capture on or off: the next key or mouse button comes out as [`Ev::Key`].
     CaptureKey(bool),
+    /// The in-game overlay that is open now, and whether Esc closes it (false while the quick menu's voice list
+    /// or a new zone's kind picker is open). The hook takes that overlay's keys from the game.
+    Overlay {
+        open: Overlay,
+        esc_closes: bool,
+    },
+    /// Only whether Esc closes the open overlay: the overlay itself stays as the hook has it (the quick menu key may
+    /// have closed the menu meanwhile, and that must not be undone).
+    EscCloses(bool),
+    /// Reading waits while an overlay is open (on), and goes on after (off). Not the user's Pause: the status
+    /// and [`Runtime::is_paused`] do not change.
+    Hold(bool),
 }
+
+/// Called on the hook thread right after a key event is sent, so the app can take it at once. Must not wait.
+pub type Waker = Arc<dyn Fn() + Send + Sync>;
 
 /// What reading does now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -154,6 +172,8 @@ pub struct Runtime {
     cfg: Option<RunCfg>,
     target: Option<Target>,
     paused: bool,
+    /// Reading waits for an open overlay.
+    held: bool,
     reader: Option<Reader>,
     attacher: Option<Attacher>,
     /// Set by the reader when its frames ended or it has no OCR.
@@ -162,6 +182,7 @@ pub struct Runtime {
     /// The reader's command channel, for the hook thread (the read key).
     to_reader: Arc<Mutex<Option<Sender<ReaderCmd>>>>,
     bindings: Arc<Mutex<Bindings>>,
+    waker: Arc<Mutex<Option<Waker>>>,
     hooks: Option<Hooks>,
     capturing: bool,
     status: Status,
@@ -184,12 +205,14 @@ impl Runtime {
             cfg: None,
             target: None,
             paused: false,
+            held: false,
             reader: None,
             attacher: None,
             ended: Arc::default(),
             no_ocr: Arc::default(),
             to_reader: Arc::default(),
             bindings: Arc::default(),
+            waker: Arc::default(),
             hooks: None,
             capturing: false,
             status: Status::Stopped,
@@ -228,6 +251,38 @@ impl Runtime {
         self.hooks.is_some()
     }
 
+    /// The overlay that is open as the hook sees it (the quick menu key and Esc change it on the hook thread).
+    pub fn overlay(&self) -> Overlay {
+        self.lock_bindings().overlay
+    }
+
+    /// The zones reading uses now (the active profile's, switched on).
+    pub fn zones(&self) -> Vec<Zone> {
+        self.cfg
+            .as_ref()
+            .map(|c| c.read.zones.clone())
+            .unwrap_or_default()
+    }
+
+    /// Reading waits for an open overlay ([`Cmd::Hold`]).
+    pub fn is_held(&self) -> bool {
+        self.held
+    }
+
+    /// Runs `w` on the hook thread after each key event it sends (the app wakes its UI thread with it).
+    pub fn set_waker(&mut self, w: Option<Waker>) {
+        *self.waker.lock().unwrap_or_else(|e| e.into_inner()) = w;
+    }
+
+    /// Runs a key action as the hook would after deciding it (tests, and the hidden-desktop probe, which get no
+    /// real keys): the overlay changes, then the action goes out.
+    pub fn feed_key(&mut self, a: Action) {
+        self.lock_bindings().after(a);
+        if a != Action::None {
+            let _ = self.tx.send(Ev::Key(a));
+        }
+    }
+
     pub fn send(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Start(cfg) => {
@@ -250,6 +305,7 @@ impl Runtime {
                 if t != self.target {
                     self.stop_reader();
                     self.target = t;
+                    self.lock_bindings().game = t.map(|t| t.hwnd);
                     self.said_elevated = false;
                     self.said_fullscreen = false;
                 }
@@ -264,14 +320,26 @@ impl Runtime {
                     let mut b = self.lock_bindings();
                     b.read = None;
                     b.menu = None;
+                    b.game = None;
+                    b.overlay = Overlay::None;
                 }
                 self.sync();
             }
             Cmd::Pause(p) => {
                 self.paused = p;
-                self.to_reader(ReaderCmd::Pause(p));
+                self.to_reader(ReaderCmd::Pause(p || self.held));
                 self.sync();
             }
+            Cmd::Hold(h) => {
+                self.held = h;
+                self.to_reader(ReaderCmd::Pause(self.paused || h));
+            }
+            Cmd::Overlay { open, esc_closes } => {
+                let mut b = self.lock_bindings();
+                b.overlay = open;
+                b.esc_closes = esc_closes;
+            }
+            Cmd::EscCloses(e) => self.lock_bindings().esc_closes = e,
             Cmd::ReadNow => self.to_reader(ReaderCmd::ReadNow),
             Cmd::SetMode(m) => {
                 if let Some(c) = &mut self.cfg {
@@ -401,7 +469,7 @@ impl Runtime {
                 let _ = tx.send(Ev::Reader(e));
             }),
         );
-        if self.paused {
+        if self.paused || self.held {
             reader.send(ReaderCmd::Pause(true));
         }
         *self.to_reader.lock().unwrap_or_else(|e| e.into_inner()) = Some(reader.sender());
@@ -420,6 +488,7 @@ impl Runtime {
         }
         let tx = self.tx.clone();
         let to_reader = self.to_reader.clone();
+        let waker = self.waker.clone();
         let on_action: crate::keys::OnAction = Arc::new(move |a| match a {
             // straight to the reader: no stop on the UI thread
             Action::Read => {
@@ -430,6 +499,10 @@ impl Runtime {
             Action::None => {}
             other => {
                 let _ = tx.send(Ev::Key(other));
+                let w = waker.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                if let Some(w) = w {
+                    w();
+                }
             }
         });
         match Hooks::install(self.bindings.clone(), on_action) {

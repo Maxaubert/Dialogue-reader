@@ -60,7 +60,7 @@ pub const NOTE_CLICK: &str =
 type Found = (u64, Vec<WinInfo>);
 
 pub struct ReadState {
-    rt: Option<Runtime>,
+    pub(super) rt: Option<Runtime>,
     timer: slint::Timer,
     log: Option<Log>,
     /// The profile id of the game whose log is open.
@@ -247,7 +247,7 @@ impl Vm {
         w.set_log(ModelRc::from(self.reading.all.clone()));
     }
 
-    fn err(&self, text: &str) {
+    pub(super) fn err(&self, text: &str) {
         if let Some(p) = &self.reading.err_log {
             super::voices::append_log(p, text);
         }
@@ -363,6 +363,7 @@ impl Vm {
         }
         self.search_window();
         self.push_status();
+        self.overlay_sync();
     }
 
     /// Takes every speech event: line events go to the log and the "now speaking" card; the voice test's events
@@ -665,8 +666,22 @@ impl Vm {
         }
     }
 
-    /// A key action from the hooks: key capture, or the quick menu key (M4).
+    /// A key action from the hooks: the quick menu key and the keys of an open overlay (M4), or key capture.
     pub fn key_event(&mut self, a: Action) {
+        match a {
+            // the hook changed the open overlay already: the windows follow
+            Action::Menu => {
+                self.overlay_sync();
+                return;
+            }
+            Action::Nav(n) => {
+                // a key that came with the quick menu key in the same batch finds its window open
+                self.overlay_sync();
+                self.overlay_nav(n);
+                return;
+            }
+            _ => {}
+        }
         let Some(which) = self.reading.capture else {
             return;
         };
