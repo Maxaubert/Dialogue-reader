@@ -495,10 +495,9 @@ Navigation is one Slint enum property on the main window:
 12. Games that share an exe (M3a review): the first profile of an exe gets its title when a second game of that exe
     is set up, and titles are compared without counters (FPS, frame times, percent, versions). Open: let Max edit
     the saved title on page 02 (new UI, needs a mockup). The reviewer advised doing it.
-13. Kokoro details (2026-11-23): is 500 to 600 MB of memory next to a game fine, and should the model load at app
-    start (now) or at the first game or sample? Should Windows voices stay pickable on page 05 when Kokoro is
-    there (today an old Windows pick shows and speaks as "Kokoro · Heart")? What should the page 05 button say and
-    do? Is the 250 ms gap between sentences right (heard by Max)?
+13. Kokoro details (2026-11-23). Decided by Max: the model loads at app start (500 to 600 MB is fine), and page
+    05 lists only Kokoro voices when Kokoro is there. Still open: the page 05 button text and action, and the
+    250 ms gap between sentences (heard by Max).
 
 ### Decisions after M2 (Max, 2026-11-22)
 - Games that share one exe (emulators, javaw.exe, Game.exe): allow several profiles per exe and tell them apart by
