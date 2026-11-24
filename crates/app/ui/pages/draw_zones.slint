@@ -9,7 +9,7 @@ import { ObHead } from "../components/chrome.slint";
 import { Stage, LiveNote, LiveView } from "../components/stage.slint";
 
 // "Draw zone" (.zt-draw): a button that stays on (surface-3 and a white border) while the tool is picked.
-component DrawToggle inherits Rectangle {
+export component DrawToggle inherits Rectangle {
     in-out property <bool> on;
     height: Size.ctl;
     width: lay.preferred-width;
@@ -74,7 +74,7 @@ component DrawToggle inherits Rectangle {
 }
 
 // The kind of the selected zone, or of the next box (.seg.kinds): icon and name, the picked one in white.
-component KindSeg inherits Rectangle {
+export component KindSeg inherits Rectangle {
     in property <Kind> kind: Kind.dialogue;
     callback picked(Kind);
     height: Size.ctl;

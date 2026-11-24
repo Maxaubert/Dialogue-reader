@@ -421,6 +421,21 @@ fn zone_row(z: &EdZone) -> ZoneData {
     }
 }
 
+/// The Overview zone chips: one per kind that has a zone, in the order Speaker, Dialogue, Pickups, Prompts
+/// (Ignore zones are not listed). A chip is on while any zone of its kind is on.
+fn kind_chips(zones: &[EdZone]) -> Vec<ZoneData> {
+    use dr_runtime::Kind as K;
+    [K::Speaker, K::Dialogue, K::Notification, K::Prompt]
+        .into_iter()
+        .filter(|&k| zones.iter().any(|z| z.kind == k))
+        .map(|k| ZoneData {
+            kind: ui_kind(k),
+            on: zones.iter().any(|z| z.kind == k && z.on),
+            ..ZoneData::default()
+        })
+        .collect()
+}
+
 /// Zones from a profile, in pixels of a `w` x `h` screenshot.
 pub fn ed_zones(p: &Profile, w: u32, h: u32) -> Vec<EdZone> {
     p.zones
@@ -1472,6 +1487,7 @@ impl Vm {
     fn push_main(&self) {
         sync(&self.zones, self.main.zones.iter().map(zone_row).collect());
         if let Some(w) = self.win() {
+            w.set_zone_kinds(ModelRc::new(VecModel::from(kind_chips(&self.main.zones))));
             w.set_zones_selected(self.main.selected.map_or(-1, |i| i as i32));
             if w.get_page() != Page::DrawZones {
                 self.push_tools(&w, &self.main);
@@ -1609,6 +1625,14 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.commit_rename();
         let changed = usize::try_from(i).is_ok_and(|i| vm.editor(page).set_on(i, on));
         vm.after(page, changed);
+    });
+    let v = vm.clone();
+    w.on_kind_toggle(move |k, on| {
+        // the chips are on the Overview: they change the current game's zones
+        let mut vm = v.borrow_mut();
+        vm.commit_rename();
+        let changed = vm.main.set_kind_on(disk_kind(k), on);
+        vm.after(Page::Overview, changed);
     });
     let v = vm.clone();
     let weak = w.as_weak();

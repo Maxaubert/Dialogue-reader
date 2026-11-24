@@ -40,8 +40,8 @@ pub const TICK: Duration = Duration::from_millis(100);
 const SEARCH: Duration = Duration::from_secs(1);
 /// Lines kept for "Show all".
 pub const KEEP: usize = 200;
-/// Rows of Recent on Overview.
-pub const RECENT: usize = 5;
+/// Rows of the read list on the Overview (the panel shows as many as fit).
+pub const RECENT: usize = 16;
 
 pub const STATUS_READING: &str = "Reading";
 pub const STATUS_PAUSED: &str = "Paused";
@@ -172,11 +172,27 @@ pub fn short_speaker(who: &str) -> String {
 /// A log line as a Recent or activity row.
 pub fn row(e: &Entry) -> LineData {
     LineData {
-        time: activity::local_time(e.t).into(),
+        time: short_time(&activity::local_time(e.t)).into(),
         kind: kind_of(&e.kind),
         who: short_speaker(&e.who).into(),
         line: e.text.as_str().into(),
-        skip: e.skip.map_or("", Skip::text).into(),
+        skip: e.skip.map_or("", skip_tag).into(),
+    }
+}
+
+/// "21:42" of "21:42:18": the list rows show hours and minutes.
+fn short_time(t: &str) -> &str {
+    t.get(..5).unwrap_or(t)
+}
+
+/// The small tag of a skipped row (TEXT.md: "off" and "repeat"; the other three are new words).
+pub fn skip_tag(s: Skip) -> &'static str {
+    match s {
+        Skip::PromptsOff => "off",
+        Skip::AlreadyRead => "repeat",
+        Skip::TooOld => "late",
+        Skip::VoiceError => "error",
+        Skip::Stopped => "stopped",
     }
 }
 
@@ -218,9 +234,10 @@ pub fn entry_of(item: &Item, skip: Option<Skip>) -> Entry {
 }
 
 /// The line being spoken: (speaker part, line).
+/// The speaker (no colon: it sits on its own line over the line) and the line of the Now panel.
 fn now_of(item: &Item) -> (String, String) {
     let e = entry_of(item, None);
-    (e.who, e.text)
+    (e.who.trim_end_matches(':').to_string(), e.text)
 }
 
 /// Builds the runtime into the view model and starts its timer. Only `main.rs` passes a real one.
@@ -859,7 +876,7 @@ mod tests {
             )
         });
         assert_eq!(r.kind, Kind::Prompts);
-        assert_eq!(r.skip.as_str(), "Prompts off");
+        assert_eq!(r.skip.as_str(), "off");
         assert_eq!(r.who.as_str(), "");
         assert_eq!(who_of("Dutch:"), "Dutch:");
         assert_eq!(who_of("  "), "");

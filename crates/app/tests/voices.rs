@@ -57,7 +57,7 @@ fn page_05_lists_the_voices_and_plays_a_sample_with_the_page_settings() {
         ("American English · Female", "US · Female")
     );
     assert_eq!(w.get_voices_problem(), "");
-    assert_eq!(w.get_voices_desc(), "Built into Windows · 2 voices");
+    assert_eq!(w.get_voices_desc(), "Windows 2");
     assert!(!w.get_voice_testing(), "nothing plays at the start");
 
     w.set_page(Page::Voice);
@@ -104,7 +104,7 @@ fn with_no_voice_installed_the_pages_say_so_and_finish_still_saves() {
     let opened = desktop.opened_settings.clone();
     let (w, _vm) = real_window_with(&paths, desktop, Voices::none());
     assert_eq!(w.get_voices().row_count(), 0);
-    assert_eq!(w.get_voices_desc(), "Built into Windows · none installed");
+    assert_eq!(w.get_voices_desc(), "No voices found");
     assert_eq!(
         w.get_voices_problem(),
         "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice."
@@ -155,7 +155,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
         press(&w, "Continue", AccessibleRole::Button);
     }
     press(&w, "Finish", AccessibleRole::Button);
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voice_label(), "David");
     assert_eq!(w.get_game_voice(), 0);
 
     w.set_page(Page::Settings);
@@ -163,7 +163,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
     w.set_game_speed(0.75);
     w.set_game_volume(0.3);
     w.invoke_game_voice_changed();
-    assert_eq!(w.get_voice_label(), "Windows · Zira");
+    assert_eq!(w.get_voice_label(), "Zira");
     // a moving slider is not saved on every step; letting it go saves
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
     assert!((p.voice.volume - 0.8).abs() < 1e-4, "{}", p.voice.volume);
@@ -175,7 +175,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
 
     // Test in Settings speaks with the game's voice (the list scrolls to Voices first: hidden rows are not found)
     w.invoke_settings_jump(3);
-    press(&w, "Test the voice", AccessibleRole::Button);
+    press(&w, "Play a sample", AccessibleRole::Button);
     wait_test_end(&vm);
     let call = tts.calls().pop().unwrap();
     assert_eq!((call.voice.as_str(), call.speed), ("fake-zira", 1.5));
@@ -200,7 +200,7 @@ fn a_saved_voice_that_is_gone_falls_back_to_the_first() {
     let (vs, _, _) = voices(0.0);
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_game_voice(), 0);
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voice_label(), "David");
 }
 
 #[test]
@@ -213,7 +213,7 @@ fn an_old_windows_id_without_a_prefix_still_picks_its_voice() {
     let (vs, _, _) = voices(0.0);
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_game_voice(), 1);
-    assert_eq!(w.get_voice_label(), "Windows · Zira");
+    assert_eq!(w.get_voice_label(), "Zira");
 }
 
 /// A finished game, its window and view model, on fake voices whose engine takes `delay` to make a sound.
@@ -333,7 +333,7 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
     };
     assert_eq!(names(&w), ["Heart", "Adam"]);
     assert!(w.get_kokoro_desc().starts_with("Installed · 2 voices"));
-    assert_eq!(w.get_voice_label(), "Kokoro · Heart");
+    assert_eq!(w.get_voice_label(), "Heart");
 
     // the model fails on its own thread; the next page change shows the Windows voices
     watch.set(LoadState::Failed("onnxruntime.dll is too old".into()));
@@ -344,5 +344,5 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
         w.get_kokoro_desc(),
         "Not found · Windows voices speak instead"
     );
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voice_label(), "David");
 }

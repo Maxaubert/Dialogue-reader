@@ -1,87 +1,11 @@
-// Activity list ("Show all" from Recent): every read and skipped line, filter All / Read / Skipped.
-import { Palette, Space, Radius, Size, Type, Icons, Kind, Kinds } from "../theme.slint";
+// Activity (d-black 17-activity), pushed from "Show all": every read and skipped line in the Overview list style,
+// in a 720 px column. "Today" and the filter (All, Read, Skipped) above one panel. A row has its kind icon (the kind
+// name is its tooltip), the line, an "off" or "repeat" tag for a skipped line and the time; replay covers the time
+// on hover. The rows fade in 30 ms apart; rows after the 6th share the 6th row's delay. Empty: "Nothing read yet."
+// and Read now.
+import { Palette, Space, Radius, Size, Type, Motion, Icons, Kind, Kinds } from "../theme.slint";
 import { LineData } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, Card, CardHead, Segmented } from "../components/base.slint";
-
-component LogRow inherits Rectangle {
-    in property <LineData> item;
-    in property <bool> first;
-    height: 44px;
-    if !root.first: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-    HorizontalLayout {
-        padding-left: Space.s5;
-        padding-right: Space.s4;
-        spacing: Space.s3;
-        Text {
-            width: 64px;
-            text: root.item.time;
-            font-family: Type.mono;
-            font-size: Type.fs1;
-            color: Palette.text-2;
-            vertical-alignment: center;
-        }
-
-        HorizontalLayout {
-            width: 96px;
-            spacing: Space.s2;
-            CIcon {
-                source: Kinds.icon(root.item.kind);
-            }
-
-            Text {
-                text: Kinds.name(root.item.kind);
-                font-size: Type.fs1;
-                font-weight: Type.w-medium;
-                color: Palette.text-2;
-                vertical-alignment: center;
-            }
-        }
-
-        HorizontalLayout {
-            horizontal-stretch: 1;
-            spacing: 4px;
-            if root.item.who != "": Text {
-                text: root.item.who;
-                font-weight: Type.w-medium;
-                color: Palette.text-2;
-                vertical-alignment: center;
-                horizontal-stretch: 0;
-            }
-            Text {
-                text: root.item.line;
-                color: root.item.skip != "" ? Palette.text-3 : Palette.text;
-                vertical-alignment: center;
-                overflow: elide;
-                horizontal-stretch: 1;
-                min-width: 0px;
-            }
-        }
-
-        // the reason ends where the replay icon of the other rows ends (button 32 px, icon 16 px)
-        if root.item.skip != "": HorizontalLayout {
-            padding-right: (Size.ctl - Size.icon) / 2;
-            Text {
-                text: root.item.skip;
-                font-size: Type.fs1;
-                color: Palette.text-3;
-                vertical-alignment: center;
-            }
-        }
-        if root.item.skip == "": VerticalLayout {
-            alignment: center;
-            Button {
-                icon-only: true;
-                icon: Icons.replay;
-                kind: BtnKind.ghost;
-                label: "Replay";
-            }
-        }
-    }
-}
+import { Button, BtnKind, ListRow, Panel, Segmented } from "../components/base.slint";
 
 export component ActivityTab inherits Rectangle {
     in property <[LineData]> log;
@@ -89,43 +13,96 @@ export component ActivityTab inherits Rectangle {
     callback back();
     // "Read now" on the empty list (app.slint: the same as Read now on the Overview)
     callback read-now();
-    VerticalLayout {
-        padding: Space.s5;
-        Card {
-            VerticalLayout {
-                padding: 1px;
-                alignment: start;
-                CardHead {
-                    title: "Activity";
-                    pad-left: Space.s5;
-                    pad-right: Space.s4;
-                    VerticalLayout {
-                        alignment: center;
-                        Segmented {
-                            items: ["All", "Read", "Skipped"];
-                            selected: root.filter;
-                            select(i) => {
-                                root.filter = i;
-                            }
-                        }
+    // the replay button of row i (the log, newest first)
+    callback replay(int);
+    // false until the page is made: the rows fade in from it
+    property <bool> entered: false;
+    init => {
+        root.entered = true;
+    }
+    property <length> col-w: 720px;
+
+    Flickable {
+        content-height: col.preferred-height;
+        col := VerticalLayout {
+            x: (parent.width - root.col-w) / 2;
+            width: root.col-w;
+            padding-top: Space.s4 + Space.s2;
+            padding-bottom: Space.s7;
+            alignment: start;
+            spacing: Space.s2;
+            HorizontalLayout {
+                padding-left: Space.s1;
+                height: 28px;
+                Text {
+                    text: "Today";
+                    font-size: Type.fs-small;
+                    color: Palette.text-2;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                Segmented {
+                    items: ["All", "Read", "Skipped"];
+                    selected: root.filter;
+                    item-h: 22px;
+                    item-pad: 10px;
+                    select(i) => {
+                        root.filter = i;
+                    }
+                }
+            }
+
+            if root.log.length == 0: Panel {
+                VerticalLayout {
+                    padding: Space.s4 + 4px;
+                    spacing: Space.s3;
+                    alignment: start;
+                    Text {
+                        text: "Nothing read yet.";
+                        color: Palette.text-2;
                     }
 
-                    VerticalLayout {
-                        alignment: center;
+                    HorizontalLayout {
+                        alignment: start;
                         Button {
-                            text: "Back to overview";
-                            icon: Icons.arrow-left;
+                            kind: BtnKind.primary;
+                            text: "Read now";
+                            icon: Icons.play-fill;
+                            icon-size: 14px;
                             clicked => {
-                                root.back();
+                                root.read-now();
                             }
                         }
                     }
                 }
-
-                for l[i] in root.log: VerticalLayout {
-                    if root.filter == 0 || (root.filter == 1 && l.skip == "") || (root.filter == 2 && l.skip != ""): LogRow {
-                        item: l;
-                        first: i == 0;
+            }
+            if root.log.length > 0: Panel {
+                VerticalLayout {
+                    padding: Space.s1 + 1px;
+                    // a plain `for` of rows, so a row's full-text card can lie over the rows below it
+                    for l[i] in root.log: ListRow {
+                        property <bool> shown: root.filter == 0 || (root.filter == 1) == (l.skip == "");
+                        icon: Kinds.icon(l.kind);
+                        icon-tip: Kinds.name(l.kind);
+                        speaker: l.who;
+                        line: l.line;
+                        off: l.skip != "";
+                        tag: l.skip;
+                        meta: l.time;
+                        replay-label: l.skip == "" ? "Replay" : "";
+                        rest-bg: Palette.surface-1;
+                        height: self.shown ? self.natural-h : 0px;
+                        visible: self.shown;
+                        opacity: root.entered ? 1 : 0;
+                        animate opacity {
+                            duration: Motion.page;
+                            delay: Motion.instant ? 0ms : Motion.push-gap + min(i, 5) * 30ms;
+                            easing: cubic-bezier(0.16, 1, 0.3, 1);
+                        }
+                        replay => {
+                            root.replay(i);
+                        }
                     }
                 }
             }

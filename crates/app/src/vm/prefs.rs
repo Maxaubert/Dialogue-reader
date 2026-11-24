@@ -16,9 +16,10 @@ use crate::Page;
 /// docs/app-plan.md, M5 open questions.
 pub const RELEASES_URL: &str = "https://github.com/Maxaubert/dialogue-reader-rs/releases";
 
-/// The line under the version in the app. It says what Check now does; the app cannot know yet whether it is the
-/// latest version (no update check is built in, spec 6 item 2).
-pub const UPDATE_NOTE: &str = "Check now opens the releases page in your browser.";
+/// What follows the version in Settings > App ("0.2.0, up to date" in the mockup). Empty in the app: it cannot know
+/// yet whether it is the latest version (no update check is built in, spec 6 item 2). The Check now tooltip says
+/// what the button does.
+pub const UPDATE_NOTE: &str = "";
 
 /// Said when a setting changes but settings.json must not be written (it is from a newer DialogReader, or it could
 /// not be read or moved aside).

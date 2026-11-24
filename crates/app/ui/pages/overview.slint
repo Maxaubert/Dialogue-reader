@@ -1,405 +1,32 @@
-// 10-main-b overview: control bar, game picture with zone strip, now speaking, recent lines.
-import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+// The Overview (d-black 10-overview): a toolbar on black, the game picture in a letterbox frame with the zone chips
+// under it, and the Now panel (the line being read, then the read list) on the right.
+// Page coordinates: the title strip is above the page, so the toolbar sits 12 px down and the frame 60 px down.
+import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData, LineData } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, Card, CardHead, Toggle, Dot, Kbd, PillWave, VSep } from "../components/base.slint";
+import { Button, BtnKind, IconButton, OptButton, ZoneChip, ListRow, Panel, Wave } from "../components/base.slint";
 import { Stage, LiveNote, LiveView } from "../components/stage.slint";
 
-// Mode / voice / key pick in the control bar (.sbar .opt).
-component BarOption inherits Rectangle {
-    in property <image> icon;
-    in property <string> text;
-    in property <string> kbd;
-    in property <string> label;
-    callback clicked();
-    height: Size.ctl;
-    horizontal-stretch: 0;
-    border-radius: Radius.md;
-    background: touch.has-hover ? Palette.surface-2 : transparent;
-    accessible-role: combobox;
-    accessible-label: root.label;
-    accessible-action-default => {
-        root.clicked();
-    }
-    HorizontalLayout {
-        padding-left: Space.s2;
-        padding-right: Space.s2;
-        spacing: Space.s2;
-        CIcon {
-            source: root.icon;
-        }
-
-        if root.text != "": Text {
-            text: root.text;
-            color: Palette.text;
-            vertical-alignment: center;
-        }
-        if root.kbd != "": VerticalLayout {
-            alignment: center;
-            Kbd {
-                text: root.kbd;
-                small: true;
-            }
-        }
-        CIcon {
-            source: Icons.chev-down;
-        }
-    }
-
-    touch := TouchArea {
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
-export component ControlBar inherits Card {
-    in property <bool> paused: false;
-    // what reading does now ("Reading", "Paused", "Not running"); green only while reading
-    in property <string> status: root.paused ? "Paused" : "Reading";
-    in property <bool> status-ok: !root.paused;
-    in property <bool> automatic: true;
-    in property <string> voice: "Kokoro · Adam";
-    in property <string> read-key: "Mouse 4";
-    callback read-now();
-    callback pause();
-    callback mode();
-    callback voice-clicked();
-    callback key-clicked();
-    height: 48px;
-    HorizontalLayout {
-        padding-left: Space.s5 + 1px;
-        padding-right: Space.s2 + 1px;
-        spacing: Space.s2;
-        HorizontalLayout {
-            spacing: Space.s2;
-            horizontal-stretch: 0;
-            VerticalLayout {
-                alignment: center;
-                Dot {
-                    tint: root.status-ok ? Palette.ok : Palette.text-3;
-                }
-            }
-
-            Text {
-                text: root.status;
-                font-weight: Type.w-medium;
-                color: Palette.text;
-                vertical-alignment: center;
-            }
-        }
-
-        Rectangle {
-            horizontal-stretch: 1;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Button {
-                text: "Read now";
-                icon: Icons.play;
-                clicked => {
-                    root.read-now();
-                }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Button {
-                text: root.paused ? "Resume" : "Pause";
-                icon: root.paused ? Icons.play : Icons.pause;
-                clicked => {
-                    root.pause();
-                }
-            }
-        }
-
-        HorizontalLayout {
-            padding-left: Space.s2;
-            padding-right: Space.s2;
-            VerticalLayout {
-                alignment: center;
-                VSep { }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            BarOption {
-                icon: Icons.zap;
-                text: root.automatic ? "Automatic" : "On key press";
-                label: "Mode";
-                clicked => {
-                    root.mode();
-                }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            BarOption {
-                icon: Icons.volume;
-                text: root.voice;
-                label: "Voice";
-                clicked => {
-                    root.voice-clicked();
-                }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            BarOption {
-                icon: Icons.mouse;
-                kbd: root.read-key;
-                label: "Read key";
-                clicked => {
-                    root.key-clicked();
-                }
-            }
-        }
-    }
-}
-
-// Zones under the picture: icon, name, toggle; more zones behind a "+N" chip.
-component ZoneStrip inherits Rectangle {
-    in-out property <[ZoneData]> zones;
-    in-out property <[ZoneData]> extra;
-    callback edit();
-    callback toggle(int, bool);
-    height: 52px;
-    Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-
-    HorizontalLayout {
-        padding-left: Space.s4;
-        padding-right: Space.s2;
-        Rectangle {
-            horizontal-stretch: 1;
-            min-width: 0px;
-            clip: true;
-            HorizontalLayout {
-                x: 0;
-                width: self.preferred-width;
-                alignment: start;
-                for z[i] in root.zones: VerticalLayout {
-                    padding-right: Space.s3;
-                    alignment: center;
-                    Rectangle {
-                        height: 36px;
-                        HorizontalLayout {
-                            padding-left: Space.s1;
-                            padding-right: Space.s4;
-                            spacing: Space.s2;
-                            CIcon {
-                                source: Kinds.icon(z.kind);
-                                color: z.on ? Palette.text-2 : Palette.text-3;
-                            }
-
-                            Text {
-                                text: z.name;
-                                font-weight: Type.w-medium;
-                                color: z.on ? Palette.text : Palette.text-2;
-                                vertical-alignment: center;
-                            }
-
-                            HorizontalLayout {
-                                padding-left: Space.s1;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Toggle {
-                                        on: z.on;
-                                        label: z.name;
-                                        toggled(v) => {
-                                            z.on = v;
-                                            root.toggle(i, v);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            x: parent.width - 1px;
-                            width: 1px;
-                            background: Palette.line;
-                        }
-                    }
-                }
-                for z[i] in root.extra: VerticalLayout {
-                    padding-right: Space.s3;
-                    alignment: center;
-                    Rectangle {
-                        height: 36px;
-                        HorizontalLayout {
-                            padding-left: Space.s1;
-                            padding-right: Space.s4;
-                            spacing: Space.s2;
-                            CIcon {
-                                source: Kinds.icon(z.kind);
-                                color: z.on ? Palette.text-2 : Palette.text-3;
-                            }
-
-                            Text {
-                                text: z.name;
-                                font-weight: Type.w-medium;
-                                color: z.on ? Palette.text : Palette.text-2;
-                                vertical-alignment: center;
-                            }
-
-                            HorizontalLayout {
-                                padding-left: Space.s1;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Toggle {
-                                        on: z.on;
-                                        label: z.name;
-                                        toggled(v) => {
-                                            z.on = v;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // fade to the card color on the right
-            Rectangle {
-                x: parent.width - 48px;
-                width: 48px;
-                background: @linear-gradient(90deg, Palette.surface-clear 0%, Palette.surface 100%);
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            padding-left: Space.s2;
-            padding-right: Space.s2;
-            Rectangle {
-                height: 28px;
-                border-radius: 14px;
-                background: Palette.surface-3;
-                accessible-role: button;
-                accessible-label: root.extra.length + " more zones";
-                HorizontalLayout {
-                    padding-left: Space.s3;
-                    padding-right: Space.s2;
-                    spacing: Space.s1;
-                    Text {
-                        text: "+" + root.extra.length;
-                        font-size: Type.fs1;
-                        font-weight: Type.w-semibold;
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                    }
-
-                    CIcon {
-                        source: Icons.chev-down;
-                    }
-                }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Button {
-                icon-only: true;
-                icon: Icons.pencil;
-                kind: BtnKind.ghost;
-                label: "Edit zones";
-                clicked => {
-                    root.edit();
-                }
-            }
-        }
-    }
-}
-
-// One recent line: grey kind icon, the line, time (+ why it was skipped), replay.
-export component RecentRow inherits Rectangle {
-    in property <LineData> item;
-    in property <bool> first;
-    callback replay();
-    height: 52px;
-    if !root.first: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-    HorizontalLayout {
-        padding-left: Space.s4;
-        padding-right: Space.s2;
-        spacing: Space.s3;
-        CIcon {
-            source: Kinds.icon(root.item.kind);
-        }
-
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 1;
-            HorizontalLayout {
-                spacing: 4px;
-                height: Type.lh2;
-                if root.item.who != "": Text {
-                    text: root.item.who;
-                    font-weight: Type.w-medium;
-                    color: Palette.text-2;
-                    vertical-alignment: center;
-                    horizontal-stretch: 0;
-                }
-                Text {
-                    text: root.item.line;
-                    color: root.item.skip != "" ? Palette.text-3 : Palette.text;
-                    vertical-alignment: center;
-                    overflow: elide;
-                    horizontal-stretch: 1;
-                    min-width: 0px;
-                }
-            }
-
-            Text {
-                text: root.item.skip != "" ? root.item.time + " · " + root.item.skip : root.item.time;
-                height: Type.lh1;
-                font-family: Type.mono;
-                font-size: Type.fs1;
-                color: Palette.text-3;
-                vertical-alignment: center;
-            }
-        }
-
-        if root.item.skip == "": VerticalLayout {
-            alignment: center;
-            Button {
-                width: 28px;
-                height: 28px;
-                icon-only: true;
-                icon: Icons.replay;
-                kind: BtnKind.ghost;
-                label: "Replay";
-                clicked => {
-                    root.replay();
-                }
-            }
-        }
-    }
+// The Now panel waveform (.wave): 28 lime bars, flat and grey while paused.
+component NowWave inherits Wave {
+    bars: [6, 10, 16, 9, 20, 13, 7, 15, 22, 12, 8, 17, 11, 19, 9, 6, 13, 18, 10, 7, 14, 20, 12, 8, 5, 11, 16, 9];
+    bar-w: 2px;
+    gap: 3px;
+    height: 24px;
 }
 
 export component OverviewTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
-    in-out property <[ZoneData]> extra-zones;
+    // one chip per kind (Rust: vm::kind_chips)
+    in property <[ZoneData]> kinds;
     in property <[LineData]> recent;
     in property <bool> paused: false;
-    in property <string> status: root.paused ? "Paused" : "Reading";
-    in property <bool> status-ok: !root.paused;
+    // false: the game is not running (status "Game not running"): the stage says so and the controls are off
+    in property <bool> running: true;
     in-out property <bool> automatic: true;
-    in property <string> voice: "Kokoro · Adam";
+    in property <string> voice: "Adam";
     in property <string> read-key: "Mouse 4";
-    in property <string> now-who: "Arthur:";
+    // the speaker of the line in Now, with no colon ("Arthur")
+    in property <string> now-who: "Arthur";
     in property <string> now-line: "We need to get these horses moving before the snow buries us.";
     callback read-now();
     callback pause();
@@ -413,217 +40,331 @@ export component OverviewTab inherits Rectangle {
     // "Switch game" on the stage when the game is not running: opens the switcher (app.slint)
     callback switch-game();
     callback mode-changed(bool);
-    callback toggle(int, bool);
+    // a zone chip: every zone of that kind on or off
+    callback kind-toggle(Kind, bool);
     in property <image> shot: Art.scene;
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> contain: false;
-    VerticalLayout {
-        padding: Space.s5;
-        spacing: Space.s3;
-        alignment: start;
-        ControlBar {
-            paused: root.paused;
-            status: root.status;
-            status-ok: root.status-ok;
-            automatic: root.automatic;
-            voice: root.voice;
-            read-key: root.read-key;
-            read-now => {
+
+    // the frame (left of the Now panel) and the 16:9 stage centred in it
+    property <length> panel-w: 320px;
+    property <length> frame-x: Size.page-x;
+    property <length> frame-y: 60px;
+    property <length> frame-w: root.width - 2 * Size.page-x - Space.s4 - root.panel-w;
+    property <length> frame-h: root.height - root.frame-y - Space.s2 - Size.row - Size.page-x;
+    property <length> stage-w: min(root.frame-w, root.frame-h * 16 / 9);
+    property <length> stage-h: root.stage-w * 9 / 16;
+
+    // the toolbar (.ov-tb)
+    HorizontalLayout {
+        x: Size.page-x;
+        y: 12px;
+        width: root.width - 2 * Size.page-x;
+        height: Size.ctl;
+        spacing: Space.s2;
+        Button {
+            kind: BtnKind.primary;
+            text: "Read now";
+            icon: Icons.play-fill;
+            icon-size: 14px;
+            enabled: root.running;
+            clicked => {
                 root.read-now();
             }
-            pause => {
+        }
+
+        Button {
+            kind: BtnKind.ghost;
+            text: root.paused ? "Resume" : "Pause";
+            icon: root.paused ? Icons.play : Icons.pause;
+            icon-size: 14px;
+            enabled: root.running;
+            clicked => {
                 root.pause();
             }
-            voice-clicked => {
-                root.voice-clicked();
-            }
-            key-clicked => {
-                root.key-clicked();
-            }
-            mode => {
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        OptButton {
+            icon: Icons.zap;
+            text: root.automatic ? "Automatic" : "On key press";
+            label: "Mode";
+            clicked => {
                 root.automatic = !root.automatic;
                 root.mode-changed(root.automatic);
             }
         }
 
+        OptButton {
+            icon: Icons.volume;
+            text: root.voice;
+            label: "Voice";
+            clicked => {
+                root.voice-clicked();
+            }
+        }
+
+        OptButton {
+            icon: @image-url("../icons/keyboard.svg");
+            text: root.read-key;
+            label: "Read key";
+            clicked => {
+                root.key-clicked();
+            }
+        }
+    }
+
+    // the letterbox frame (.frame)
+    Rectangle {
+        x: root.frame-x;
+        y: root.frame-y;
+        width: root.frame-w;
+        height: root.frame-h;
+        border-radius: Radius.lg;
+        background: Palette.surface-1;
+        border-width: 1px;
+        border-color: Palette.line;
+    }
+
+    // the game picture (.stage): a click opens Zones, like the pencil
+    if root.running: Rectangle {
+        x: root.frame-x + (root.frame-w - root.stage-w) / 2;
+        y: root.frame-y + (root.frame-h - root.stage-h) / 2;
+        width: root.stage-w;
+        height: root.stage-h;
+        Stage {
+            source: root.shot;
+            src-w: root.shot-w;
+            src-h: root.shot-h;
+            contain: root.contain;
+            zones: root.zones;
+            labels: false;
+            quiet: true;
+            radius: Radius.lg;
+            behind: Palette.surface-1;
+        }
+
+        stage-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.edit-zones();
+            }
+        }
+
+        Rectangle {
+            border-radius: Radius.lg;
+            border-width: 1px;
+            border-color: stage-touch.has-hover ? Palette.line-2 : Palette.line;
+            animate border-color {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+        }
+    }
+
+    // not running: one line and one button in the middle of the frame (rule 4.1.7)
+    if !root.running: VerticalLayout {
+        x: root.frame-x;
+        y: root.frame-y;
+        width: root.frame-w;
+        height: root.frame-h;
+        alignment: center;
+        spacing: Space.s3;
+        Text {
+            text: "Game not running.";
+            color: Palette.text-2;
+            horizontal-alignment: center;
+        }
+
         HorizontalLayout {
-            spacing: Space.s3;
-            alignment: start;
-            // the game picture card, and the live view note in a small line under it
-            VerticalLayout {
-                width: 1120px;
-                alignment: start;
-                Card {
-                    height: 1px + 629px + 52px + 1px;
-                    VerticalLayout {
-                        padding: 1px;
-                        Stage {
-                            height: 629px;
-                            source: root.shot;
-                            src-w: root.shot-w;
-                            src-h: root.shot-h;
-                            contain: root.contain;
-                            zones: root.zones;
-                            labels: false;
-                            radius: Radius.lg;
-                            round-bottom: false;
-                            behind: Palette.bg;
-                        }
-
-                        ZoneStrip {
-                            zones <=> root.zones;
-                            extra <=> root.extra-zones;
-                            edit => {
-                                root.edit-zones();
-                            }
-                            toggle(i, v) => {
-                                root.toggle(i, v);
-                            }
-                        }
-                    }
-                }
-
-                // "Live", or why the saved screenshot shows: under the picture, never on it. Not in the zone strip:
-                // a long note there pushed the zone toggles out.
-                if root.contain && LiveView.note != "": HorizontalLayout {
-                    alignment: start;
-                    padding-top: Space.s2;
-                    padding-left: Space.s4;
-                    LiveNote { }
+            alignment: center;
+            Button {
+                text: "Switch game";
+                clicked => {
+                    root.switch-game();
                 }
             }
+        }
+    }
 
-            VerticalLayout {
-                spacing: Space.s3;
-                alignment: start;
-                horizontal-stretch: 1;
-                Card {
+    // why the saved screenshot shows (not "Live": TEXT.md drops it here): in the frame under the picture, never on it
+    if root.running && root.contain && LiveView.note != "" && !LiveView.note-live: LiveNote {
+        x: root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1;
+        y: root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2;
+    }
+
+    // the zone chips (.zs) and the pencil
+    HorizontalLayout {
+        x: root.frame-x;
+        y: root.frame-y + root.frame-h + Space.s2;
+        width: root.frame-w;
+        height: Size.row;
+        spacing: Space.s1;
+        for k in root.kinds: VerticalLayout {
+            alignment: center;
+            ZoneChip {
+                kind: k.kind;
+                on: k.on;
+                enabled: root.running;
+                toggled(v) => {
+                    root.kind-toggle(k.kind, v);
+                }
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: Icons.pencil;
+                tip: "Edit zones";
+                enabled: root.running;
+                clicked => {
+                    root.edit-zones();
+                }
+            }
+        }
+    }
+
+    // the Now panel (.panel.now)
+    Panel {
+        x: root.frame-x + root.frame-w + Space.s4;
+        y: root.frame-y;
+        width: root.panel-w;
+        height: root.height - root.frame-y - Size.page-x;
+        clip: true;
+        // nothing read at all: one grey line in the middle
+        if root.now-line == "" && root.recent.length == 0: Text {
+            text: "Nothing read yet.";
+            color: Palette.text-2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if root.now-line != "" || root.recent.length > 0: VerticalLayout {
+            padding: 1px;
+            // the line being read (.np): the speaker, the line at 20 px, then the waveform, Replay and Stop
+            if root.now-line != "": VerticalLayout {
+                padding-left: Space.s4 - 1px;
+                padding-right: Space.s4 - 1px;
+                padding-top: Space.s4 - 1px;
+                padding-bottom: Space.s3;
+                spacing: Space.s2;
+                min-height: 186px - 1px;
+                vertical-stretch: 0;
+                if root.now-who != "": Text {
+                    text: root.now-who;
+                    font-size: Type.fs-small;
+                    color: Palette.text-2;
+                    height: Type.lh-small;
+                }
+                Text {
+                    text: root.now-line;
+                    font-size: Type.fs-hero;
+                    font-weight: Type.w-hero;
+                    line-height-factor: Type.lhf-140;
+                    letter-spacing: -0.1px;
+                    color: Palette.text;
+                    wrap: word-wrap;
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                }
+
+                HorizontalLayout {
+                    padding-top: Space.s2;
+                    spacing: Space.s1;
+                    height: 28px + Space.s2;
                     VerticalLayout {
-                        padding: Space.s4 + 1px;
-                        spacing: Space.s3;
-                        // The line being spoken: 16 px, CSS line-height 1.4. StyledText has no line height, so the
-                        // whole line is one Text and the speaker prefix is drawn over its start in grey (medium).
-                        Rectangle {
-                            height: now-text.preferred-height;
-                            now-text := Text {
-                                x: 0;
-                                y: 0;
-                                width: parent.width;
-                                // nothing spoken yet (a game just opened): a grey hint in its place
-                                text: root.now-line == "" ? "Nothing read yet. Lines show here as they are spoken." : root.now-who == "" ? root.now-line : root.now-who + " " + root.now-line;
-                                font-size: Type.fs3;
-                                line-height-factor: Type.lhf-140;
-                                wrap: word-wrap;
-                                color: root.now-line == "" ? Palette.text-3 : Palette.text;
-                            }
-
-                            if root.now-who != "" && root.now-line != "": Rectangle {
-                                x: 0;
-                                y: 0;
-                                width: who-text.preferred-width;
-                                height: who-text.preferred-height;
-                                background: Palette.surface;
-                                who-text := Text {
-                                    x: 0;
-                                    y: 0;
-                                    text: root.now-who;
-                                    font-size: Type.fs3;
-                                    font-weight: Type.w-medium;
-                                    line-height-factor: Type.lhf-140;
-                                    color: Palette.text-2;
-                                }
-                            }
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        NowWave {
+                            played: root.paused ? 0 : 999;
                         }
+                    }
 
-                        HorizontalLayout {
-                            spacing: Space.s2;
-                            VerticalLayout {
-                                alignment: center;
-                                PillWave {
-                                    big: true;
-                                }
-                            }
+                    IconButton {
+                        small: true;
+                        icon: Icons.replay;
+                        tip: "Replay";
+                        clicked => {
+                            root.replay();
+                        }
+                    }
 
-                            Rectangle {
-                                horizontal-stretch: 1;
-                            }
-
-                            Button {
-                                icon-only: true;
-                                icon: Icons.replay;
-                                kind: BtnKind.ghost;
-                                label: "Replay";
-                                clicked => {
-                                    root.replay();
-                                }
-                            }
-
-                            Button {
-                                icon-only: true;
-                                icon: Icons.stop;
-                                kind: BtnKind.ghost;
-                                label: "Stop";
-                                clicked => {
-                                    root.stop();
-                                }
-                            }
+                    IconButton {
+                        small: true;
+                        icon: Icons.stop;
+                        tip: "Stop";
+                        clicked => {
+                            root.stop();
                         }
                     }
                 }
+            }
+            if root.now-line == "": Rectangle {
+                height: 186px - 1px;
+                Text {
+                    text: "Nothing read yet.";
+                    color: Palette.text-2;
+                }
+            }
+            // the read list (.list): rows of one or two lines; the panel shows as many as fit
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Palette.line;
+                }
 
-                Card {
-                    VerticalLayout {
-                        padding: 1px;
-                        CardHead {
-                            height: 44px;
-                            title: "Recent";
-                            pad-left: Space.s4;
-                            pad-right: Space.s2;
-                        }
-
-                        for r[i] in root.recent: RecentRow {
-                            item: r;
-                            first: i == 0;
+                // a Flickable that does not scroll: the rows do not make the panel taller, they are cut at its end
+                Flickable {
+                    interactive: false;
+                    content-height: rows.preferred-height;
+                    rows := VerticalLayout {
+                        padding: Space.s1;
+                        padding-top: Space.s1 + 1px;
+                        alignment: start;
+                        for r[i] in root.recent: ListRow {
+                            icon: Kinds.icon(r.kind);
+                            speaker: r.who;
+                            line: r.line;
+                            off: r.skip != "";
+                            tag: r.skip;
+                            replay-label: r.skip == "" ? "Replay" : "";
+                            rest-bg: Palette.surface-1;
                             replay => {
                                 root.recent-replay(i);
                             }
                         }
-                        Rectangle {
-                            height: 40px;
-                            accessible-role: button;
-                            accessible-label: "Show all";
-                            accessible-action-default => {
-                                root.show-all();
-                            }
-                            Rectangle {
-                                y: 0;
-                                height: 1px;
-                                background: Palette.line;
-                            }
+                    }
+                }
+            }
 
-                            HorizontalLayout {
-                                alignment: center;
-                                spacing: Space.s1;
-                                Text {
-                                    text: "Show all";
-                                    font-weight: Type.w-medium;
-                                    color: show-touch.has-hover ? Palette.text : Palette.text-2;
-                                    vertical-alignment: center;
-                                }
+            // Show all (.foot)
+            Rectangle {
+                height: Size.row;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Palette.line;
+                }
 
-                                CIcon {
-                                    source: Icons.chev-right;
-                                    color: Palette.text-2;
-                                }
-                            }
-
-                            show-touch := TouchArea {
-                                clicked => {
-                                    root.show-all();
-                                }
-                            }
-                        }
+                Button {
+                    kind: BtnKind.ghost;
+                    text: "Show all";
+                    trail: Icons.chev-right;
+                    fg: Palette.text-2;
+                    clicked => {
+                        root.show-all();
                     }
                 }
             }

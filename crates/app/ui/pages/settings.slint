@@ -1,61 +1,20 @@
-// 12 settings. The Shortcuts section of the mockup becomes "Keys": the same two 04-read-key-d cards as onboarding
-// (read key and quick menu key). Max picked "D everywhere", 2026-11-22.
-// M5: the Startup and In-game overlay rows are saved (src/vm/prefs.rs), Updates shows the real version, and a
-// "Games" section (no mockup; listed in docs/app-plan.md, "Text changes for Max to approve (M5)") exports and
-// imports a game.
+// Settings (d-black 12-settings): one 640 px column, no side list. Group labels above panels of 44 px rows:
+// Startup, In-game overlay, Keys, Voice and App. The Startup and In-game overlay rows are saved
+// (src/vm/prefs.rs); the voice, speed and volume are the current game's (saved in its profile).
 import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
-import { Icon, CIcon, Button, BtnKind, Card, Toggle, Segmented, Kbd, Slider } from "../components/base.slint";
+import { Button, IconButton, Toggle, Segmented, Slider, Panel, GroupLabel, SettingRow } from "../components/base.slint";
 import { VoiceData } from "../data.slint";
 import { KeysCard } from "keys.slint";
 
-component SetRow inherits Rectangle {
+// A group label and its panel.
+component Group inherits VerticalLayout {
     in property <string> title;
-    in property <string> desc;
-    in property <bool> first;
-    height: root.desc != "" ? 63px : 57px;
-    if !root.first: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
+    spacing: Space.s2;
     HorizontalLayout {
-        padding-left: Space.s5;
-        padding-right: Space.s5;
-        spacing: Space.s4;
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 1;
-            Text {
-                text: root.title;
-                height: Type.lh2;
-                font-weight: Type.w-medium;
-                color: Palette.text;
-                vertical-alignment: center;
-            }
-
-            if root.desc != "": Text {
-                text: root.desc;
-                height: Type.lh1;
-                font-size: Type.fs1;
-                color: Palette.text-3;
-                vertical-alignment: center;
-            }
+        padding-left: Space.s1;
+        GroupLabel {
+            text: root.title;
         }
-
-        @children
-    }
-}
-
-component Section inherits VerticalLayout {
-    in property <string> title;
-    spacing: Space.s3;
-    Text {
-        text: root.title;
-        height: 23px;
-        font-size: Type.fs3;
-        font-weight: Type.w-semibold;
-        color: Palette.text;
-        vertical-alignment: center;
     }
 
     @children
@@ -76,6 +35,40 @@ component RowToggle inherits VerticalLayout {
     }
 }
 
+// A slider with its value on the right ("1.1x", "80%").
+component RowSlider inherits HorizontalLayout {
+    in-out property <float> value;
+    in property <string> label;
+    in property <string> shown;
+    callback changed();
+    callback released();
+    spacing: Space.s4;
+    width: 208px;
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 1;
+        Slider {
+            value <=> root.value;
+            label: root.label;
+            changed => {
+                root.changed();
+            }
+            released => {
+                root.released();
+            }
+        }
+    }
+
+    Text {
+        width: 32px;
+        text: root.shown;
+        font-size: Type.fs-small;
+        color: Palette.text-2;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
 export component SettingsTab inherits Rectangle {
     in-out property <bool> start-with-windows: true;
     in-out property <bool> open-minimized: true;
@@ -87,8 +80,8 @@ export component SettingsTab inherits Rectangle {
     in property <string> menu-key: "F7";
     in property <int> capturing: -1;
     in property <string> version: "";
-    // under the version (the mockup text with the fake data; the app says what Check now does)
-    in property <string> update-note: "You have the latest version.";
+    // after the version ("0.2.0, up to date"); the app leaves it empty, it cannot check yet (src/vm/prefs.rs)
+    in property <string> update-note: "up to date";
     // the automatic install row (the mockup shows it; the app hides it until updates can install, spec 6 item 2)
     in property <bool> show-auto-update: true;
     // a Startup or In-game overlay row changed (saved by src/vm/prefs.rs)
@@ -96,11 +89,12 @@ export component SettingsTab inherits Rectangle {
     callback check-updates();
     callback export-game();
     callback import-game();
-    // Voices: Kokoro (first, as in mockup 12) and the Windows voices, and the current game's voice, speed and
-    // volume (saved in its profile)
+    // Voice: the current game's voice, speed and volume (saved in its profile), and how many voices there are
     in property <[VoiceData]> voices;
-    in property <string> voices-desc: "Built into Windows · 11 voices";
-    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
+    // "Kokoro 11 · Windows 11" (src/vm/voices.rs, Voices::desc)
+    in property <string> voices-desc: "Kokoro 11 · Windows 11";
+    // no longer shown (one Voices row); kept for the view model
+    in property <string> kokoro-desc;
     in property <string> game: "Red Dead Redemption 2";
     in property <bool> has-game: true;
     in-out property <int> game-voice: 0;
@@ -114,7 +108,6 @@ export component SettingsTab inherits Rectangle {
     callback voice-saved();
     callback test();
     callback stop-test();
-    in-out property <int> section: 0;
     callback change-key(int);
     // opens the voice picker (render-screens shows it open)
     public function open-voice-list() {
@@ -123,282 +116,234 @@ export component SettingsTab inherits Rectangle {
     public function close-voice-list() {
         list.close();
     }
+    // scrolls to a group: 0 Startup, 1 In-game overlay, 2 Keys, 3 Voice, 4 and 5 App
     public function jump(i: int) {
-        root.section = i;
         flick.content-y = -max(0px, min(
-            i == 0 ? startup.y : i == 1 ? overlay.y : i == 2 ? keys.y : i == 3 ? voices.y : i == 4 ? updates.y : games.y,
-            col.preferred-height + 2 * Size.page-x - flick.height));
+            (i == 0 ? startup.y : i == 1 ? overlay.y : i == 2 ? keys.y : i == 3 ? voice.y : app.y) - Space.s4,
+            col.preferred-height - flick.height));
     }
-    HorizontalLayout {
-        padding-left: Size.page-x;
-        spacing: Space.s7;
-        VerticalLayout {
-            padding-top: Size.page-x;
-            width: 200px;
-            spacing: 2px;
-            alignment: start;
-            for s[i] in ["Startup", "In-game overlay", "Keys", "Voices", "Updates", "Games"]: Rectangle {
-                height: Size.ctl;
-                border-radius: Radius.md;
-                background: i == root.section ? Palette.surface-2 : (nav-touch.has-hover ? Palette.surface : transparent);
-                accessible-role: tab;
-                accessible-label: s;
-                accessible-item-selected: i == root.section;
-                accessible-action-default => {
-                    root.jump(i);
-                }
-                Text {
-                    x: Space.s3;
-                    text: s;
-                    font-weight: Type.w-medium;
-                    color: i == root.section ? Palette.text : Palette.text-2;
-                    vertical-alignment: center;
-                }
+    property <bool> can-voice: root.voices.length > 0 && root.has-game;
 
-                nav-touch := TouchArea {
-                    clicked => {
-                        root.jump(i);
+    flick := Flickable {
+        content-height: col.preferred-height;
+        col := VerticalLayout {
+            x: (parent.width - 640px) / 2;
+            width: 640px;
+            padding-top: Space.s5;
+            padding-bottom: Space.s7;
+            spacing: Space.s6;
+            alignment: start;
+            startup := Group {
+                title: "Startup";
+                Panel {
+                    VerticalLayout {
+                        padding: 1px;
+                        SettingRow {
+                            first: true;
+                            text: "Start with Windows";
+                            RowToggle {
+                                on <=> root.start-with-windows;
+                                label: "Start with Windows";
+                                toggled => {
+                                    root.changed();
+                                }
+                            }
+                        }
+
+                        SettingRow {
+                            text: "Open minimized";
+                            RowToggle {
+                                on <=> root.open-minimized;
+                                label: "Open minimized";
+                                toggled => {
+                                    root.changed();
+                                }
+                            }
+                        }
+
+                        SettingRow {
+                            text: "Show in taskbar";
+                            RowToggle {
+                                on <=> root.show-in-taskbar;
+                                label: "Show in taskbar";
+                                toggled => {
+                                    root.changed();
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        flick := Flickable {
-            horizontal-stretch: 1;
-            content-height: col.preferred-height + 2 * Size.page-x;
-            col := VerticalLayout {
-                x: (flick.width - 720px) / 2 - Size.page-x / 2;
-                y: Size.page-x;
-                width: 720px;
-                spacing: Space.s6;
-                alignment: start;
-                startup := Section {
-                    title: "Startup";
-                    Card {
-                        VerticalLayout {
-                            padding: 1px;
-                            SetRow {
-                                first: true;
-                                title: "Start with Windows";
-                                desc: "Runs in the tray, ready when a game starts.";
-                                RowToggle {
-                                    on <=> root.start-with-windows;
-                                    label: "Start with Windows";
-                                    toggled => {
-                                        root.changed();
-                                    }
-                                }
-                            }
-
-                            SetRow {
-                                title: "Open minimized";
-                                desc: "Skip the main window at startup.";
-                                RowToggle {
-                                    on <=> root.open-minimized;
-                                    label: "Open minimized";
-                                    toggled => {
-                                        root.changed();
-                                    }
-                                }
-                            }
-
-                            SetRow {
-                                title: "Show in the taskbar";
-                                desc: "Otherwise only the tray icon shows.";
-                                RowToggle {
-                                    on <=> root.show-in-taskbar;
-                                    label: "Show in the taskbar";
-                                    toggled => {
+            overlay := Group {
+                title: "In-game overlay";
+                Panel {
+                    VerticalLayout {
+                        padding: 1px;
+                        SettingRow {
+                            first: true;
+                            text: "Status pill";
+                            VerticalLayout {
+                                alignment: center;
+                                Segmented {
+                                    items: ["Top right", "Bottom", "Off"];
+                                    selected: root.pill-position;
+                                    item-h: 22px;
+                                    item-pad: Space.s3;
+                                    select(i) => {
+                                        root.pill-position = i;
                                         root.changed();
                                     }
                                 }
                             }
                         }
+
+                        SettingRow {
+                            text: "Show speaker name";
+                            RowToggle {
+                                on <=> root.show-speaker;
+                                label: "Show speaker name";
+                                toggled => {
+                                    root.changed();
+                                }
+                            }
+                        }
                     }
                 }
+            }
 
-                overlay := Section {
-                    title: "In-game overlay";
-                    Card {
-                        VerticalLayout {
-                            padding: 1px;
-                            SetRow {
-                                first: true;
-                                title: "Position";
-                                desc: "Where the small status pill sits.";
-                                VerticalLayout {
-                                    alignment: center;
-                                    Segmented {
-                                        items: ["Top right", "Bottom center", "Off"];
-                                        selected: root.pill-position;
-                                        select(i) => {
-                                            root.pill-position = i;
-                                            root.changed();
+            keys := Group {
+                title: "Keys";
+                KeysCard {
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                    capturing: root.capturing;
+                    tip: "Click to change";
+                    change(i) => {
+                        root.change-key(i);
+                    }
+                }
+            }
+
+            voice := Group {
+                title: "Voice";
+                Panel {
+                    VerticalLayout {
+                        padding: 1px;
+                        SettingRow {
+                            first: true;
+                            text: "Narrator";
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 200px;
+                                    height: Size.ctl;
+                                    border-radius: Radius.md;
+                                    border-width: 1px;
+                                    border-color: pick-touch.has-hover && root.can-voice ? Palette.line-2 : Palette.line;
+                                    background: pick-touch.has-hover && root.can-voice ? Palette.surface-3 : Palette.surface-2;
+                                    accessible-role: combobox;
+                                    accessible-label: "Narrator";
+                                    accessible-value: root.voices.length > 0 ? root.voices[root.game-voice].name : "No voice";
+                                    accessible-enabled: root.can-voice;
+                                    accessible-action-default => {
+                                        if root.can-voice {
+                                            list.show();
                                         }
                                     }
-                                }
-                            }
+                                    HorizontalLayout {
+                                        padding-left: Space.s3 - 1px;
+                                        padding-right: Space.s3 - 1px;
+                                        spacing: Space.s2;
+                                        Text {
+                                            text: root.voices.length > 0 ? root.voices[root.game-voice].name : "No voice";
+                                            font-weight: Type.w-strong;
+                                            color: root.can-voice ? Palette.text : Palette.text-off;
+                                            vertical-alignment: center;
+                                            horizontal-stretch: 0;
+                                        }
 
-                            SetRow {
-                                title: "Show the speaker";
-                                desc: "Otherwise only the status dot shows.";
-                                RowToggle {
-                                    on <=> root.show-speaker;
-                                    label: "Show the speaker";
-                                    toggled => {
-                                        root.changed();
+                                        Text {
+                                            text: root.voices.length > 0 ? root.voices[root.game-voice].short : "";
+                                            color: Palette.text-2;
+                                            vertical-alignment: center;
+                                            horizontal-stretch: 1;
+                                            overflow: elide;
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: Icons.chev-down-sm;
+                                                width: 14px;
+                                                height: 14px;
+                                                colorize: Palette.text-2;
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
 
-                keys := Section {
-                    title: "Keys";
-                    KeysCard {
-                        read-key: root.read-key;
-                        menu-key: root.menu-key;
-                        capturing: root.capturing;
-                        change(i) => {
-                            root.change-key(i);
-                        }
-                    }
-                }
-
-                voices := Section {
-                    title: "Voices";
-                    Card {
-                        VerticalLayout {
-                            padding: 1px;
-                            SetRow {
-                                first: true;
-                                title: "Kokoro";
-                                desc: root.kokoro-desc;
-                            }
-
-                            SetRow {
-                                title: "Windows voices";
-                                desc: root.voices-desc;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Button {
-                                        text: "Add voices";
-                                        icon: Icons.download;
+                                    pick-touch := TouchArea {
                                         clicked => {
-                                            root.add-voices();
+                                            if root.can-voice {
+                                                list.show();
+                                            }
                                         }
                                     }
-                                }
-                            }
 
-                            SetRow {
-                                title: "Voice for this game";
-                                desc: root.has-game ? root.game : "Set up a game first.";
-                                HorizontalLayout {
-                                    spacing: Space.s2;
-                                    alignment: end;
-                                    VerticalLayout {
-                                        alignment: center;
+                                    list := PopupWindow {
+                                        x: 0;
+                                        y: parent.height + Space.s1;
+                                        width: parent.width;
+                                        height: Math.min(root.voices.length, 6) * Size.ctl + 2 * Space.s1;
                                         Rectangle {
-                                            width: 200px;
-                                            height: Size.ctl;
+                                            width: 100%;
+                                            height: 100%;
+                                            background: Palette.float;
                                             border-radius: Radius.md;
                                             border-width: 1px;
-                                            border-color: Palette.line-2;
-                                            background: Palette.surface-2;
-                                            accessible-role: combobox;
-                                            accessible-label: "Voice for this game";
-                                            accessible-value: root.voices.length > 0 ? root.voices[root.game-voice].name : "No voice";
-                                            accessible-action-default => {
-                                                if root.voices.length > 0 && root.has-game {
-                                                    list.show();
-                                                }
-                                            }
-                                            HorizontalLayout {
-                                                padding-left: Space.s3 + 1px;
-                                                padding-right: Space.s3 + 1px;
-                                                Text {
-                                                    text: root.voices.length > 0 ? root.voices[root.game-voice].engine + " · " + root.voices[root.game-voice].name : "No voice";
-                                                    color: Palette.text;
-                                                    vertical-alignment: center;
-                                                    horizontal-stretch: 1;
-                                                }
-
-                                                CIcon {
-                                                    source: Icons.chev-down;
-                                                    color: Palette.text-2;
-                                                }
-                                            }
-
-                                            TouchArea {
-                                                clicked => {
-                                                    if root.voices.length > 0 && root.has-game {
-                                                        list.show();
-                                                    }
-                                                }
-                                            }
-
-                                            list := PopupWindow {
-                                                x: 0;
-                                                y: parent.height + Space.s1;
-                                                width: parent.width;
-                                                height: Math.min(root.voices.length, 6) * Size.ctl + 2 * Space.s1;
-                                                Rectangle {
-                                                    width: 100%;
-                                                    height: 100%;
-                                                    background: Palette.surface-2;
-                                                    border-radius: Radius.md;
-                                                    border-width: 1px;
-                                                    border-color: Palette.line-2;
-                                                    // six rows show; the rest scroll
-                                                    Flickable {
-                                                        x: Space.s1;
-                                                        y: Space.s1;
-                                                        width: parent.width - 2 * Space.s1;
-                                                        height: Math.min(root.voices.length, 6) * Size.ctl;
-                                                        content-height: root.voices.length * Size.ctl;
-                                                    VerticalLayout {
-                                                        for v[i] in root.voices: Rectangle {
-                                                            height: Size.ctl;
-                                                            border-radius: Radius.sm;
-                                                            background: i == root.game-voice || row-touch.has-hover ? Palette.surface-3 : transparent;
-                                                            accessible-role: list-item;
-                                                            accessible-label: v.name;
-                                                            accessible-item-selected: i == root.game-voice;
+                                            border-color: Palette.float-line;
+                                            // six rows show; the rest scroll
+                                            Flickable {
+                                                x: Space.s1;
+                                                y: Space.s1;
+                                                width: parent.width - 2 * Space.s1;
+                                                height: Math.min(root.voices.length, 6) * Size.ctl;
+                                                content-height: root.voices.length * Size.ctl;
+                                                VerticalLayout {
+                                                    for v[i] in root.voices: Rectangle {
+                                                        height: Size.ctl;
+                                                        border-radius: Radius.sm;
+                                                        background: i == root.game-voice || row-touch.has-hover ? Palette.surface-3 : transparent;
+                                                        accessible-role: list-item;
+                                                        accessible-label: v.name;
+                                                        accessible-item-selected: i == root.game-voice;
+                                                        HorizontalLayout {
+                                                            padding-left: Space.s2;
+                                                            padding-right: Space.s2;
+                                                            spacing: Space.s2;
                                                             Text {
-                                                                x: Space.s2;
-                                                                text: v.name + "  ·  " + v.short;
+                                                                text: v.name;
                                                                 color: Palette.text;
                                                                 vertical-alignment: center;
+                                                                horizontal-stretch: 1;
+                                                                overflow: elide;
                                                             }
 
-                                                            row-touch := TouchArea {
-                                                                clicked => {
-                                                                    root.game-voice = i;
-                                                                    root.voice-picked(i);
-                                                                }
+                                                            Text {
+                                                                text: v.short;
+                                                                color: Palette.text-2;
+                                                                vertical-alignment: center;
+                                                                horizontal-stretch: 0;
+                                                            }
+                                                        }
+
+                                                        row-touch := TouchArea {
+                                                            clicked => {
+                                                                root.game-voice = i;
+                                                                root.voice-picked(i);
                                                             }
                                                         }
                                                     }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    VerticalLayout {
-                                        alignment: center;
-                                        Button {
-                                            text: root.testing ? "Stop" : "Test";
-                                            label: "Test the voice";
-                                            icon: root.testing ? Icons.stop : Icons.play;
-                                            enabled: root.voices.length > 0 && root.has-game;
-                                            clicked => {
-                                                if root.testing {
-                                                    root.stop-test();
-                                                } else {
-                                                    root.test();
                                                 }
                                             }
                                         }
@@ -406,137 +351,123 @@ export component SettingsTab inherits Rectangle {
                                 }
                             }
 
-                            SetRow {
-                                title: "Speed";
-                                HorizontalLayout {
-                                    spacing: Space.s3;
-                                    width: 260px;
-                                    VerticalLayout {
-                                        alignment: center;
-                                        horizontal-stretch: 1;
-                                        Slider {
-                                            value <=> root.game-speed;
-                                            changed => {
-                                                root.voice-changed();
-                                            }
-                                            released => {
-                                                root.voice-saved();
-                                            }
+                            VerticalLayout {
+                                alignment: center;
+                                IconButton {
+                                    icon: root.testing ? Icons.stop : Icons.play;
+                                    tip: root.testing ? "Stop" : "Play a sample";
+                                    enabled: root.can-voice;
+                                    clicked => {
+                                        if root.testing {
+                                            root.stop-test();
+                                        } else {
+                                            root.test();
                                         }
-                                    }
-
-                                    Text {
-                                        width: 40px;
-                                        text: Math.round(Math.max(0.25, root.game-speed) * 20) / 10 + "×";
-                                        font-family: Type.mono;
-                                        font-size: Type.fs1;
-                                        color: Palette.text-2;
-                                        horizontal-alignment: right;
-                                        vertical-alignment: center;
                                     }
                                 }
                             }
+                        }
 
-                            SetRow {
-                                title: "Volume";
-                                HorizontalLayout {
-                                    spacing: Space.s3;
-                                    width: 260px;
-                                    VerticalLayout {
-                                        alignment: center;
-                                        horizontal-stretch: 1;
-                                        Slider {
-                                            value <=> root.game-volume;
-                                            changed => {
-                                                root.voice-changed();
-                                            }
-                                            released => {
-                                                root.voice-saved();
-                                            }
-                                        }
-                                    }
+                        SettingRow {
+                            text: "Speed";
+                            RowSlider {
+                                value <=> root.game-speed;
+                                label: "Speed";
+                                shown: Math.round(Math.max(0.25, root.game-speed) * 20) / 10 + "x";
+                                changed => {
+                                    root.voice-changed();
+                                }
+                                released => {
+                                    root.voice-saved();
+                                }
+                            }
+                        }
 
-                                    Text {
-                                        width: 40px;
-                                        text: Math.round(root.game-volume * 100) + "%";
-                                        font-family: Type.mono;
-                                        font-size: Type.fs1;
-                                        color: Palette.text-2;
-                                        horizontal-alignment: right;
-                                        vertical-alignment: center;
+                        SettingRow {
+                            text: "Volume";
+                            RowSlider {
+                                value <=> root.game-volume;
+                                label: "Volume";
+                                shown: Math.round(root.game-volume * 100) + "%";
+                                changed => {
+                                    root.voice-changed();
+                                }
+                                released => {
+                                    root.voice-saved();
+                                }
+                            }
+                        }
+
+                        SettingRow {
+                            text: "Voices";
+                            Text {
+                                text: root.voices-desc;
+                                color: Palette.text-2;
+                                vertical-alignment: center;
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    text: "Add voices";
+                                    clicked => {
+                                        root.add-voices();
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                updates := Section {
-                    title: "Updates";
-                    Card {
-                        VerticalLayout {
-                            padding: 1px;
-                            SetRow {
-                                first: true;
-                                title: "Version " + root.version;
-                                desc: root.update-note;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Button {
-                                        text: "Check now";
-                                        icon: Icons.refresh;
-                                        clicked => {
-                                            root.check-updates();
-                                        }
+            app := Group {
+                title: "App";
+                Panel {
+                    VerticalLayout {
+                        padding: 1px;
+                        SettingRow {
+                            first: true;
+                            text: root.update-note == "" ? root.version : root.version + ", " + root.update-note;
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    text: "Check now";
+                                    tip: "Opens the releases page";
+                                    clicked => {
+                                        root.check-updates();
                                     }
-                                }
-                            }
-
-                            if root.show-auto-update: SetRow {
-                                title: "Install updates automatically";
-                                desc: "Only when no game is running.";
-                                RowToggle {
-                                    on <=> root.auto-update;
-                                    label: "Install updates automatically";
                                 }
                             }
                         }
-                    }
-                }
 
-                games := Section {
-                    title: "Games";
-                    Card {
-                        VerticalLayout {
-                            padding: 1px;
-                            SetRow {
-                                first: true;
-                                title: "Export this game";
-                                desc: root.has-game ? root.game : "Set up a game first.";
-                                VerticalLayout {
-                                    alignment: center;
-                                    Button {
-                                        text: "Export";
-                                        icon: Icons.download;
-                                        enabled: root.has-game;
-                                        clicked => {
-                                            root.export-game();
-                                        }
+                        if root.show-auto-update: SettingRow {
+                            text: "Auto-update";
+                            RowToggle {
+                                on <=> root.auto-update;
+                                label: "Auto-update";
+                            }
+                        }
+
+                        SettingRow {
+                            text: "Game profile";
+                            off: !root.has-game;
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    text: "Export";
+                                    enabled: root.has-game;
+                                    clicked => {
+                                        root.export-game();
                                     }
                                 }
                             }
 
-                            SetRow {
-                                title: "Import a game";
-                                desc: "Adds a game from an exported file.";
-                                VerticalLayout {
-                                    alignment: center;
-                                    Button {
-                                        text: "Import";
-                                        icon: Icons.upload;
-                                        clicked => {
-                                            root.import-game();
-                                        }
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    text: "Import";
+                                    clicked => {
+                                        root.import-game();
                                     }
                                 }
                             }

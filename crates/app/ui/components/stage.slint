@@ -34,6 +34,8 @@ export component Stage inherits Rectangle {
     in property <ZoneData> draft;
     in property <[ZoneData]> zones;
     in property <bool> labels: true;
+    // the Overview (.zo): thin outlines only (white 38 %, 1 px, no fill); a click goes to the page, not a zone
+    in property <bool> quiet: false;
     in property <int> selected: -1;
     in property <length> radius: Radius.md;
     in property <bool> round-top: true;
@@ -88,15 +90,15 @@ export component Stage inherits Rectangle {
         // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
         property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
-        line: self.sel ? Palette.on : Palette.text;
+        line: root.quiet ? #FFFFFF61 : self.sel ? Palette.on : Palette.text;
         x: root.off-x + z.x * root.scale * 1px;
         y: root.off-y + z.y * root.scale * 1px;
         width: z.w * root.scale * 1px;
         height: z.h * root.scale * 1px;
         selected: self.sel;
         dim: !z.on;
-        line-w: self.sel ? 2px : 1.5px;
-        background: z.on ? self.zf : self.zf.with-alpha(0.063);
+        line-w: root.quiet ? 1px : self.sel ? 2px : 1.5px;
+        background: root.quiet ? transparent : z.on ? self.zf : self.zf.with-alpha(0.063);
         if self.sel: Rectangle {
             for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
                 x: parent.width * p.x - 4px;
@@ -109,7 +111,7 @@ export component Stage inherits Rectangle {
                 border-color: Palette.on-ink;
             }
         }
-        if !root.interactive: TouchArea {
+        if !root.interactive && !root.quiet: TouchArea {
             clicked => {
                 root.zone-clicked(i);
             }

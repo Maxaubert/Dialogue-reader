@@ -171,11 +171,11 @@ impl Voices {
             .unwrap_or_default()
     }
 
-    /// "Kokoro · Heart" or "Windows · David" for a saved id (see [`Voices::index_of`]); "No voice" when there is
-    /// none.
+    /// The voice name for the Overview ("Heart", "David") of a saved id (see [`Voices::index_of`]); "No voice" when
+    /// there is none.
     pub fn label(&self, id: &str) -> String {
         match self.list.get(self.index_of(id)) {
-            Some(v) => format!("{} · {}", engine_label(v.engine), v.name),
+            Some(v) => v.name.clone(),
             None => "No voice".into(),
         }
     }
@@ -192,12 +192,13 @@ impl Voices {
         }
     }
 
-    /// The Settings line under "Windows voices".
+    /// The Settings "Voices" row: how many voices each engine has ("Kokoro 11 · Windows 11"). Kokoro is left out
+    /// when its files are missing.
     pub fn desc(&self) -> String {
-        match self.windows_count {
-            0 => "Built into Windows · none installed".into(),
-            1 => "Built into Windows · 1 voice".into(),
-            n => format!("Built into Windows · {n} voices"),
+        match (self.kokoro, self.windows_count) {
+            (true, n) => format!("Kokoro {} · Windows {n}", self.list.len()),
+            (false, 0) => "No voices found".into(),
+            (false, n) => format!("Windows {n}"),
         }
     }
 
@@ -346,12 +347,12 @@ mod tests {
         assert_eq!(row(&v("c", "X", "de-DE", None)).desc.as_str(), "de-DE");
         // ids carry the engine; an old id without it is a Windows id
         assert_eq!(vs.list[1].id, "win:b");
-        assert_eq!(vs.label("win:b"), "Windows · Hazel");
+        assert_eq!(vs.label("win:b"), "Hazel");
         assert_eq!(vs.index_of("b"), 1);
         // empty or uninstalled id: the first voice, also for speaking
-        assert_eq!(vs.label(""), "Windows · David");
+        assert_eq!(vs.label(""), "David");
         assert_eq!(vs.effective("gone"), "win:a");
-        assert_eq!(vs.desc(), "Built into Windows · 2 voices");
+        assert_eq!(vs.desc(), "Windows 2");
         assert_eq!(vs.kokoro_desc(), "Not found · Windows voices speak instead");
         assert_eq!(vs.problem_text(), "");
         let none = Voices::none();
@@ -388,10 +389,10 @@ mod tests {
             ["kokoro:af_heart", "kokoro:am_adam", "kokoro:bm_george"]
         );
         // a new game speaks with Heart; an old Windows id that is not in the list too
-        assert_eq!(vs.label(""), "Kokoro · Heart");
+        assert_eq!(vs.label(""), "Heart");
         assert_eq!(vs.effective(""), "kokoro:af_heart");
         assert_eq!(vs.effective("a"), "kokoro:af_heart");
-        assert_eq!(vs.label("kokoro:am_adam"), "Kokoro · Adam");
+        assert_eq!(vs.label("kokoro:am_adam"), "Adam");
         let r = row(&vs.list[2]);
         assert_eq!(
             (
@@ -403,7 +404,7 @@ mod tests {
             ("George", "British English · Male", "UK · Male", "Kokoro")
         );
         assert_eq!(vs.kokoro_desc(), "Installed · 3 voices · 354 MB");
-        assert_eq!(vs.desc(), "Built into Windows · 2 voices");
+        assert_eq!(vs.desc(), "Kokoro 3 · Windows 2");
         assert_eq!(
             error_text(ErrorKind::Engine),
             "The voice could not speak the sample."
@@ -426,13 +427,13 @@ mod tests {
         assert!(!vs.check_kokoro());
         watch.set(LoadState::Ready);
         assert!(!vs.check_kokoro());
-        assert_eq!(vs.label(""), "Kokoro · Heart");
+        assert_eq!(vs.label(""), "Heart");
         // failed: the Windows voices, once
         watch.set(LoadState::Failed("onnxruntime.dll is too old".into()));
         assert!(vs.check_kokoro());
         assert!(!vs.check_kokoro());
         assert!(!vs.kokoro);
-        assert_eq!(vs.label(""), "Windows · David");
+        assert_eq!(vs.label(""), "David");
         assert_eq!(vs.effective("kokoro:af_heart"), "win:a");
         assert_eq!(vs.kokoro_desc(), "Not found · Windows voices speak instead");
         let log = std::fs::read_to_string(dir.path().join("speech.log")).unwrap();

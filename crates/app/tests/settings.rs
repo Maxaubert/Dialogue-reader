@@ -54,8 +54,8 @@ fn settings_are_saved_and_read_back() {
         "Start with Windows went to the desktop"
     );
     toggle(&w, "Open minimized");
-    toggle(&w, "Show in the taskbar");
-    toggle(&w, "Show the speaker");
+    toggle(&w, "Show in taskbar");
+    toggle(&w, "Show speaker name");
     w.set_pill_position(1);
     w.invoke_settings_changed();
 
@@ -139,7 +139,7 @@ fn a_change_that_cannot_be_saved_is_said() {
     std::fs::write(paths.settings(), newer).unwrap();
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     w.set_page(Page::Settings);
-    toggle(&w, "Show the speaker");
+    toggle(&w, "Show speaker name");
     assert_eq!(
         w.get_notice().as_str(),
         dr_app::vm::prefs::NOT_SAVED,

@@ -1,13 +1,13 @@
 //! Zone drawing on the Zones tab (11) through simulated pointer events on the Slint testing backend: drag to
-//! add, click to select, drag a corner, Delete, kind change, rename, undo. Each change is saved to the profile
-//! in a temp data folder.
+//! add, click to select, drag a corner, Delete, kind change, rename (view model only), undo. Each change is saved
+//! to the profile in a temp data folder.
 
 mod common;
 
 use common::*;
 use dr_app::{Kind, Page};
 use dr_runtime::{Paths, Profile, Shot, ZoneCfg, profile};
-use i_slint_backend_testing::{AccessibleRole, ElementHandle};
+use i_slint_backend_testing::AccessibleRole;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model};
 
@@ -47,7 +47,7 @@ fn draw_select_resize_delete_and_kind() {
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
 
     // drag to add (draw tool)
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     assert!(w.get_zones_draw());
     drag(&w, &s, (100.0, 100.0), (500.0, 300.0));
     assert_eq!(w.get_zones().row_count(), 2);
@@ -62,7 +62,7 @@ fn draw_select_resize_delete_and_kind() {
     assert_eq!(p.zones[1].base, [SHOT_W, SHOT_H]);
 
     // click to select (select tool)
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     click(&w, &s, (900.0, 950.0));
     assert_eq!(w.get_zones_selected(), 0);
     // click on empty space: nothing selected
@@ -121,13 +121,8 @@ fn draw_select_resize_delete_and_kind() {
     assert_eq!(w.get_zones().row_count(), 1);
 }
 
-/// The "Zone name" text field of the selected row.
-fn name_field(w: &dr_app::MainWindow) -> ElementHandle {
-    ElementHandle::find_by_accessible_label(w, "Zone name")
-        .next()
-        .expect("a name field in the selected row")
-}
-
+/// Zones has no name field since d-black (a zone shows its kind name, TEXT.md), but the view model still renames:
+/// typed text waits, and the end of typing saves it as one change and one undo step.
 #[test]
 fn typed_rename_is_one_change_and_one_undo_step() {
     let (_dir, paths) = temp_paths();
@@ -135,42 +130,19 @@ fn typed_rename_is_one_change_and_one_undo_step() {
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     go_zones(&w);
     w.invoke_zone_select(0);
-    w.set_zones_selected(0);
-    let f = name_field(&w);
-    // click into the field, select all, type a new name
-    let at = f.absolute_position();
-    let size = f.size();
-    let p = slint::LogicalPosition::new(at.x + size.width / 2.0, at.y + size.height / 2.0);
-    let win = w.window();
-    win.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-    win.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-    ctrl_key(&w, "a");
-    for c in "Lines".chars() {
-        key(&w, c.to_string());
+    for n in ["L", "Li", "Lin", "Line", "Lines"] {
+        w.invoke_zone_rename(0, n.into());
     }
-    assert_eq!(f.accessible_value().unwrap_or_default(), "Lines");
     // not saved while typing, and the model keeps the old name
     assert_eq!(on_disk(&paths).zones[0].name, "Subtitles");
     assert_eq!(w.get_zones().row_data(0).unwrap().name, "Subtitles");
-    key(&w, slint::platform::Key::Return);
+    w.invoke_zone_rename_done();
     assert_eq!(w.get_zones().row_data(0).unwrap().name, "Lines");
     assert_eq!(on_disk(&paths).zones[0].name, "Lines");
-    // Enter gave the keys back to the window: Ctrl+Z is the zone undo, one step for the whole old name, and the
-    // field follows
+    // Ctrl+Z is the zone undo, one step for the whole old name
     ctrl_key(&w, "z");
     assert_eq!(w.get_zones().row_data(0).unwrap().name, "Subtitles");
     assert_eq!(on_disk(&paths).zones[0].name, "Subtitles");
-    slint::platform::update_timers_and_animations();
-    assert_eq!(
-        name_field(&w).accessible_value().unwrap_or_default(),
-        "Subtitles"
-    );
 }
 
 #[test]
@@ -196,7 +168,7 @@ fn delete_while_dragging_a_zone_does_not_crash() {
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     go_zones(&w);
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     let win = w.window();
     win.dispatch_event(WindowEvent::PointerMoved {
@@ -227,7 +199,7 @@ fn overview_mode_button_is_saved() {
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     assert_eq!(on_disk(&paths).mode, dr_runtime::Mode::Auto);
-    press(&w, "Mode", AccessibleRole::Combobox);
+    press(&w, "Mode", AccessibleRole::Button);
     assert!(!w.get_automatic());
     assert_eq!(on_disk(&paths).mode, dr_runtime::Mode::Manual);
 }
@@ -238,7 +210,8 @@ fn overview_toggle_is_saved() {
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     assert!(on_disk(&paths).zones[0].on);
-    press(&w, "Subtitles", AccessibleRole::Checkbox);
+    // the Dialogue chip switches every dialogue zone (here only Subtitles)
+    press(&w, "Dialogue", AccessibleRole::Checkbox);
     assert!(!w.get_zones().row_data(0).unwrap().on);
     let p = on_disk(&paths);
     assert!(!p.zones[0].on);
@@ -281,18 +254,18 @@ fn tool_choice_survives_other_actions() {
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     go_zones(&w);
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     assert!(w.get_zones_draw());
-    // picking a kind, clicking a row and switching a zone keep the draw tool
+    // picking a kind, selecting a zone and switching a zone keep the draw tool
     press(&w, "Speaker", AccessibleRole::Tab);
     w.invoke_zone_select(0);
-    press(&w, "Subtitles", AccessibleRole::Checkbox);
+    w.invoke_zone_toggle(0, false);
     assert!(w.get_zones_draw(), "the tool flipped back to Select");
     // so a drag that starts on a zone draws a new one instead of moving it
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     drag(&w, &s, (300.0, 920.0), (700.0, 1060.0));
     assert_eq!(w.get_zones().row_count(), 2);
-    // selecting the Subtitles row made its kind (Dialogue) the kind for new zones
+    // selecting the Subtitles zone made its kind (Dialogue) the kind for new zones
     assert_eq!(w.get_zones().row_data(1).unwrap().kind, Kind::Dialogue);
     let z0 = w.get_zones().row_data(0).unwrap();
     assert!(

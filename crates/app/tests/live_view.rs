@@ -140,8 +140,13 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     assert!(s.on());
     assert!(s.vm.borrow().live_showing());
     assert_eq!(s.note(), NOTE_LIVE);
-    // the "Live" note: small, under the game picture
-    note_under_the_picture(&s.w, NOTE_LIVE);
+    // d-black (TEXT.md): the Overview has no "Live" note; only a reason why the saved screenshot shows is there
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(&s.w, "Live view")
+            .next()
+            .is_none(),
+        "no Live note on the Overview"
+    );
     let g = s.w.global::<LiveView>();
     assert_eq!(g.get_frame().size().width, 640);
     assert_eq!((g.get_w(), g.get_h()), (SHOT_W as f32, SHOT_H as f32));
@@ -224,7 +229,7 @@ fn zones_follow_a_game_that_changed_size() {
     assert_eq!(on_disk(&s.paths).zones[0].base, [SHOT_W, SHOT_H]);
 
     // a drag on the live picture: stage coordinates map to capture pixels
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, 3840.0, 2160.0);
     drag(&s.w, &st, (200.0, 200.0), (1000.0, 600.0));
     assert_eq!(s.w.get_zones().row_count(), 2);
@@ -259,7 +264,7 @@ fn a_size_change_waits_for_the_end_of_a_drag() {
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, SHOT_W as f32, SHOT_H as f32);
     let win = s.w.window();
     use slint::platform::{PointerEventButton, WindowEvent};
@@ -300,7 +305,7 @@ fn a_size_change_during_a_cancelled_drag_shows_after_the_cancel() {
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, SHOT_W as f32, SHOT_H as f32);
     let win = s.w.window();
     use slint::platform::{PointerEventButton, WindowEvent};

@@ -201,6 +201,43 @@ pub fn all() -> Vec<Screen> {
                 page(w, Page::Overview);
             },
         },
+        // d-black states (after the others: they change the data): Activity with nothing read, Zones with a box
+        // at the top edge (its tag goes under it), Zones with no zone
+        Screen {
+            name: "17-activity-empty",
+            setup: |w| {
+                w.set_log(slint::ModelRc::default());
+                page(w, Page::Activity);
+            },
+        },
+        Screen {
+            name: "11-zones-top",
+            setup: |w| {
+                use slint::Model;
+                let mut zones: Vec<crate::ZoneData> = w.get_zones().iter().collect();
+                zones.push(crate::ZoneData {
+                    name: "Pickups".into(),
+                    kind: crate::Kind::Pickups,
+                    on: true,
+                    x: 640.0,
+                    y: 4.0,
+                    w: 340.0,
+                    h: 44.0,
+                });
+                w.set_zones_selected(zones.len() as i32 - 1);
+                w.set_zone_kind(crate::Kind::Pickups);
+                w.set_zones(slint::ModelRc::new(slint::VecModel::from(zones)));
+                page(w, Page::Zones);
+            },
+        },
+        Screen {
+            name: "11-zones-empty",
+            setup: |w| {
+                w.set_zones_selected(-1);
+                w.set_zones(slint::ModelRc::default());
+                page(w, Page::Zones);
+            },
+        },
     ]
 }
 

@@ -332,6 +332,19 @@ pub fn go_overview(w: &MainWindow) {
     assert_eq!(w.get_page(), Page::Overview);
 }
 
+/// Picks the zone tool: "Draw zone" on (draws, also over a zone) or off (a drag on a zone moves it). "Draw zone"
+/// is a button that stays on, so it is pressed only when it must change (pages 03 and 11).
+pub fn draw_tool(w: &MainWindow, on: bool) {
+    let now = if w.get_page() == dr_app::Page::DrawZones {
+        w.get_setup_draw()
+    } else {
+        w.get_zones_draw()
+    };
+    if now != on {
+        press(w, "Draw zone", AccessibleRole::Button);
+    }
+}
+
 /// Zones, the way a user gets there: the Overview, then the pencil ("Edit zones").
 pub fn go_zones(w: &MainWindow) {
     go_overview(w);

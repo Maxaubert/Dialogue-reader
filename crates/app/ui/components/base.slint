@@ -1100,7 +1100,9 @@ export component ListRow inherits Rectangle {
     // the text is cut when the whole text needs more than two lines
     property <bool> cut: measure.preferred-height > t.height + 1px;
     property <bool> card: touch.has-hover && root.cut;
-    height: max(Size.list, t.height + 16px);
+    // the row's own height (one or two lines); a filtered list sets `height: 0` on the rows it hides
+    out property <length> natural-h: max(Size.list, t.height + 16px);
+    height: root.natural-h;
     border-radius: Radius.md;
     background: root.row-bg;
     z: root.card ? 10 : 0;

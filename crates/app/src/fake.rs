@@ -68,25 +68,6 @@ pub fn ed_zones(prompts_on: bool) -> Vec<EdZone> {
         .collect()
 }
 
-fn extra_zones() -> Vec<ZoneData> {
-    [
-        (Kind::Dialogue, "Letters"),
-        (Kind::Pickups, "Shop prices"),
-        (Kind::Dialogue, "Journal"),
-    ]
-    .iter()
-    .map(|&(kind, name)| ZoneData {
-        name: s(name),
-        kind,
-        on: true,
-        x: 0.0,
-        y: 0.0,
-        w: 0.0,
-        h: 0.0,
-    })
-    .collect()
-}
-
 pub fn edit_zones() -> Vec<EditZone> {
     ZONES
         .iter()
@@ -183,69 +164,30 @@ fn menu_voices() -> Vec<VoiceData> {
     .collect()
 }
 
+/// The read list of the mockups (17-activity): times as the rows show them, skipped rows with their tag.
 pub fn log() -> Vec<LineData> {
     [
-        (
-            "21:42:18",
-            Kind::Dialogue,
-            "Arthur:",
-            "We need to get these horses moving before the snow buries us.",
-            "",
-        ),
-        ("21:42:11", Kind::Pickups, "", "+1 Ginseng", ""),
-        (
-            "21:42:09",
-            Kind::Prompts,
-            "",
-            "Hold E to talk",
-            "Prompts off",
-        ),
-        (
-            "21:41:57",
-            Kind::Dialogue,
-            "Dutch:",
-            "We ride at first light. Nobody stays behind.",
-            "",
-        ),
-        ("21:41:50", Kind::Dialogue, "Arthur:", "I hear you.", ""),
-        (
-            "21:41:49",
-            Kind::Dialogue,
-            "Arthur:",
-            "I hear you.",
-            "Already read",
-        ),
-        ("21:41:32", Kind::Pickups, "", "+2 Yarrow", ""),
-        (
-            "21:40:58",
-            Kind::Dialogue,
-            "Sadie:",
-            "Then stop talking and start digging.",
-            "",
-        ),
-        ("21:40:41", Kind::Pickups, "", "Donated to camp: $5.00", ""),
-        (
-            "21:40:12",
-            Kind::Dialogue,
-            "Charles:",
-            "Tracks lead north. Two riders, maybe three.",
-            "",
-        ),
-        ("21:39:55", Kind::Pickups, "", "+1 Venison", ""),
-        (
-            "21:39:30",
-            Kind::Dialogue,
-            "Arthur:",
-            "Keep your voice down.",
-            "",
-        ),
-        (
-            "21:39:02",
-            Kind::Dialogue,
-            "Javier:",
-            "The wagon wheel is cracked. It will not last the night.",
-            "",
-        ),
+        ("21:42", Kind::Dialogue, "Arthur:", "We need to get these horses moving before the snow buries us.", ""),
+        ("21:42", Kind::Pickups, "", "+1 Ginseng", ""),
+        ("21:42", Kind::Prompts, "", "Hold E to talk", "off"),
+        ("21:41", Kind::Dialogue, "Dutch:", "We ride at first light. Nobody stays behind.", ""),
+        ("21:41", Kind::Dialogue, "Arthur:", "I hear you.", ""),
+        ("21:41", Kind::Dialogue, "Arthur:", "I hear you.", "repeat"),
+        ("21:41", Kind::Pickups, "", "+1 Bourbon", ""),
+        ("21:40", Kind::Dialogue, "Hosea:", "If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.", ""),
+        ("21:40", Kind::Dialogue, "Sadie:", "Then stop talking and start digging.", ""),
+        ("21:40", Kind::Pickups, "", "Donated to camp: $5.00", ""),
+        ("21:40", Kind::Dialogue, "Charles:", "Tracks lead north. Two riders, maybe three.", ""),
+        ("21:39", Kind::Pickups, "", "+2 Arrows", ""),
+        ("21:39", Kind::Dialogue, "Arthur:", "Keep your voice down.", ""),
+        ("21:39", Kind::Prompts, "", "Hold E to talk", "off"),
+        ("21:39", Kind::Dialogue, "Javier:", "The wagon wheel is cracked. It will not last the night, and the next town is a full day east of here, past the river and the old mill, so either we fix it with what we have tonight or we leave the wagon and carry the rest on the horses.", ""),
+        ("21:38", Kind::Pickups, "", "+1 Venison", ""),
+        ("21:38", Kind::Dialogue, "Dutch:", "Have a little faith, Arthur.", ""),
+        ("21:37", Kind::Dialogue, "Arthur:", "Easy, girl. Easy.", ""),
+        ("21:37", Kind::Pickups, "", "+1 Oregano", ""),
+        ("21:36", Kind::Dialogue, "Hosea:", "We should keep moving.", ""),
+        ("21:36", Kind::Dialogue, "Charles:", "The horses need rest.", ""),
     ]
     .iter()
     .map(|&(t, kind, who, line, skip)| LineData {
@@ -304,11 +246,12 @@ fn refresh_dim(w: &MainWindow) {
 /// Puts the fake data that has no real source yet into the window and wires the zone edit callbacks.
 /// Zones, windows and games come through the view-model layer (`vm::install`).
 pub fn fill(w: &MainWindow) {
-    w.set_extra_zones(model(extra_zones()));
     w.set_voices(model(voices()));
     w.set_menu_voices(model(menu_voices()));
     let log = log();
-    w.set_recent(model(log[..5].to_vec()));
+    w.set_recent(model(
+        log[..crate::vm::reading::RECENT.min(log.len())].to_vec(),
+    ));
     w.set_log(model(log));
     w.set_edit_zones(model(edit_zones()));
     w.set_version(env!("CARGO_PKG_VERSION").into());

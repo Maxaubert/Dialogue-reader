@@ -242,11 +242,10 @@ fn zone_toggle_changes_the_view_model() {
     let w = window();
     w.set_page(Page::Overview);
     assert!(!w.get_zones().row_data(3).unwrap().on, "prompts start off");
-    press(&w, "Button prompts", AccessibleRole::Checkbox);
+    // the Prompts chip switches every prompt zone (the only one here is row 3)
+    press(&w, "Prompts", AccessibleRole::Checkbox);
     assert!(w.get_zones().row_data(3).unwrap().on);
-    // the Zones page shows the same model
-    w.set_page(Page::Zones);
-    press(&w, "Button prompts", AccessibleRole::Checkbox);
+    press(&w, "Prompts", AccessibleRole::Checkbox);
     assert!(!w.get_zones().row_data(3).unwrap().on);
 }
 
