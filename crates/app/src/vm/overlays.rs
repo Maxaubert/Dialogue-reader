@@ -10,7 +10,7 @@
 //! - The pill shows while the game is read (Reading or Paused) and is in front, at the place set in Settings
 //!   (top right, bottom center, off). Its dot is green while reading; the speaker of the line being spoken shows
 //!   (if "Show the speaker" is on) and the wave is lit while it is spoken.
-//! - Zone edit freezes a screenshot of the game (it becomes the profile's picture, as Retake does) and edits the
+//! - Zone edit freezes a screenshot of the game (it becomes the profile's picture) and edits the
 //!   same zones as the Zones tab; each change is saved and sent to the reader at once.
 
 use std::cell::RefCell;

@@ -12,7 +12,7 @@ use dr_runtime::profile;
 use dr_runtime::speech::{NullSink, Speech, VoiceSettings};
 use dr_tts::{Engines, FakeTts};
 use i_slint_backend_testing::{AccessibleRole, ElementHandle};
-use slint::Model;
+use slint::{ComponentHandle, Model};
 
 /// Fake voices with access to the engine's call log and the sink's log.
 fn voices(scale: f64) -> (Voices, FakeTts, NullSink) {
@@ -341,4 +341,68 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
     assert_eq!(names(&w), ["David", "Zira"]);
     assert_eq!(w.get_voices_desc(), "Windows 2");
     assert_eq!(w.get_voice_label(), "David");
+}
+
+/// The Voice button of the Overview toolbar opens a voice picker in place (Max, 2026-11-24), not Settings. A
+/// pick sets and saves the game's voice and closes the list; Esc and a click outside close it too.
+#[test]
+fn the_overview_voice_button_picks_a_voice_in_place() {
+    let (_dir, paths) = temp_paths();
+    let (vs, _, _) = voices(0.0);
+    let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    for _ in 0..3 {
+        press(&w, "Continue", AccessibleRole::Button);
+    }
+    press(&w, "Finish", AccessibleRole::Button);
+    settle();
+    assert_eq!(w.get_page(), Page::Overview);
+    assert_eq!(w.get_voice_label(), "David");
+    let rows = |w: &dr_app::MainWindow| {
+        ElementHandle::find_by_accessible_label(w, "Zira")
+            .filter(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+            .count()
+    };
+    assert_eq!(rows(&w), 0, "closed at first");
+
+    // open: the page stays, the voices show, the game's voice is the picked row
+    press(&w, "Voice", AccessibleRole::Button);
+    assert!(w.get_voice_menu());
+    assert_eq!(w.get_page(), Page::Overview);
+    assert_eq!(rows(&w), 1);
+    let david = ElementHandle::find_by_accessible_label(&w, "David")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+        .expect("David in the list");
+    assert_eq!(david.accessible_item_selected(), Some(true));
+
+    // Esc closes it, and the page stays
+    key(&w, slint::platform::Key::Escape);
+    assert!(!w.get_voice_menu());
+    assert_eq!(w.get_page(), Page::Overview);
+
+    // a click outside closes it
+    press(&w, "Voice", AccessibleRole::Button);
+    assert!(w.get_voice_menu());
+    let win = w.window();
+    let at = slint::LogicalPosition::new(400.0, 400.0);
+    win.dispatch_event(slint::platform::WindowEvent::PointerPressed {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    win.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    assert!(!w.get_voice_menu());
+    assert_eq!(w.get_page(), Page::Overview, "the click did not open Zones");
+
+    // a pick sets the game's voice, saves it and closes the list
+    press(&w, "Voice", AccessibleRole::Button);
+    press(&w, "Zira", AccessibleRole::ListItem);
+    assert!(!w.get_voice_menu());
+    assert_eq!(w.get_game_voice(), 1);
+    assert_eq!(w.get_voice_label(), "Zira");
+    let p = profile::load(&paths.profile_json("test-game")).unwrap();
+    assert_eq!(p.voice.id, "win:fake-zira");
 }

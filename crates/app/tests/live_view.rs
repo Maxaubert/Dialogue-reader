@@ -168,9 +168,15 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     go_zones(&s.w);
     s.tick();
     assert_eq!((s.live.starts.get(), s.live.stops.get()), (1, 0));
-    // live: no screenshot time, the note says "Live"
+    // live: no screenshot time, and no "Live" note in the toolbar (Max, 2026-11-24)
     assert_eq!(s.w.get_shot_time(), "");
     assert_eq!(s.note(), NOTE_LIVE);
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(&s.w, "Live view")
+            .next()
+            .is_none(),
+        "no Live note on Zones"
+    );
 
     // Settings has no stage: it stops, and the saved screenshot is back
     go_settings(&s.w);
@@ -393,12 +399,9 @@ fn a_capture_that_fails_shows_the_saved_screenshot_with_a_note() {
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.note(), NOTE_FAILED);
     assert!(!s.on());
-    // page 11 has the note in its line under the stage, and a new screenshot keeps it there
+    // page 11 has the note in its line under the stage, with the time of the saved screenshot
     go_zones(&s.w);
     s.tick();
-    assert_eq!(s.note(), NOTE_FAILED);
-    s.w.invoke_retake_shot();
-    assert_eq!(s.w.get_notice(), "", "the retake worked");
     assert_eq!(s.note(), NOTE_FAILED);
     assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
@@ -531,8 +534,13 @@ fn setup_page_shows_the_picked_window_live() {
     live.frame(2560, 1440, 872, 490);
     vm.borrow_mut().live_arrived();
     assert!(w.global::<LiveView>().get_on());
-    // the "Live" note is in a line under the picture
-    note_under_the_picture(&w, NOTE_LIVE);
+    // no "Live" note on step 2 (Max, 2026-11-24): the moving picture says it
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(&w, "Live view")
+            .next()
+            .is_none(),
+        "no Live note on step 2"
+    );
     // a zone drawn on the live picture is in its pixels
     let st = stage(&w, 2560.0, 1440.0);
     drag(&w, &st, (200.0, 1200.0), (2300.0, 1350.0));

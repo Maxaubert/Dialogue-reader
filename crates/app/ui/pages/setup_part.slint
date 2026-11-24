@@ -39,3 +39,42 @@ export component SetupPart inherits Rectangle {
     opacity: 1 - Math.pow(1 - root.p, 4);
     @children
 }
+
+// How much a setup step grows in a big window (Max, 2026-11-24: "make these cards bigger and center them"): 1 up
+// to a 1440 px wide window, then with the width, at most 1.4, and never more than lets content `fit-h` px tall fit in
+// the height `h` with 16 px above and under it. `w` and `h` are the size of the page area (the window under the
+// title strip, above the setup footer). Steps 1 to 5 and the footer fit the tallest step (Mark where text shows
+// up), so nothing changes size from step to step; Welcome fits its own content.
+export global SetupZoom {
+    out property <length> tallest: 664px;
+    public pure function k(w: length, h: length, fit-h: length) -> float {
+        return Math.clamp(Math.min(w / 1440px, (h - 32px) / Math.max(1px, fit-h)), 1, 1.4);
+    }
+}
+
+// A setup step in a big window: its children are laid out in a page of `vw` x `vh` (the size / k), and that page
+// is drawn k times bigger, so it fills the area again. `top` puts content of height `content-h` in the middle.
+// `below` is room under the area that counts for the middle (Welcome has no footer: it centres in the window).
+// The children use `vw`, `vh` and `top` (not `parent`: in a page, `parent` is the SetupStage, not the scaled page).
+// The software renderer (render-screens) cannot scale: there k only changes where things sit, never their size.
+export component SetupStage inherits Rectangle {
+    in property <length> content-h;
+    // the height the zoom must leave room for: the tallest step (Welcome: its own content)
+    in property <length> fit-h: SetupZoom.tallest;
+    in property <length> below: 0px;
+    out property <float> k: SetupZoom.k(root.width, root.height + root.below, root.fit-h);
+    // the size of the page the children see
+    out property <length> vw: root.width / root.k;
+    out property <length> vh: (root.height + root.below) / root.k;
+    // the y of the content in that page: centred, at least 16 px down
+    out property <length> top: Math.max(16px, (root.vh - root.content-h) / 2);
+    Rectangle {
+        x: (root.width - root.vw) / 2;
+        y: (root.height + root.below - root.vh) / 2;
+        width: root.vw;
+        height: root.vh;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-scale: root.k;
+        @children
+    }
+}

@@ -89,19 +89,22 @@ const fn m(name: &'static str, shot: &'static str, mean: f64, changed: f64) -> M
 
 /// Every screen with a d-black shot. The limits sit 0.4 above the values measured on 2026-11-24, so a real
 /// change fails and text rendering noise does not. The stages draw the SVG scene, not the shot's bitmap, and the
-/// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher.
+/// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher. Re-measured the same day after
+/// Max's follow-ups: the setup steps (01 to 06, 18-voice-none) sit in the middle of the window now, not at the
+/// top as in the shots, the step 5 summary and the step 1 pictures are gone, and the Zones toolbar has Done as a
+/// secondary button with the Overview's margins and no camera, so those limits are higher.
 const MOCKUPS: [Mockup; 22] = [
-    m("01-welcome", "01-setup-0-welcome", 0.9, 0.6),
-    m("02-pick-window", "01-setup-1-game", 0.8, 0.6),
-    m("03-draw-zones", "01-setup-2-zones", 1.8, 0.7),
-    m("04-read-key-d", "01-setup-3-keys", 0.6, 0.5),
-    m("05-voice", "01-setup-4-voice", 1.7, 0.9),
-    m("18-voice-none", "01-setup-4-voice-none", 0.7, 0.5),
-    m("06-mode", "01-setup-5-mode", 1.0, 0.7),
+    m("01-welcome", "01-setup-0-welcome", 23.8, 22.8),
+    m("02-pick-window", "01-setup-1-game", 4.9, 2.2),
+    m("03-draw-zones", "01-setup-2-zones", 7.9, 7.4),
+    m("04-read-key-d", "01-setup-3-keys", 2.5, 1.3),
+    m("05-voice", "01-setup-4-voice", 4.5, 2.8),
+    m("18-voice-none", "01-setup-4-voice-none", 2.7, 2.0),
+    m("06-mode", "01-setup-5-mode", 4.4, 3.1),
     m("10-main-b", "10-overview", 2.3, 2.0),
     m("19-overview-not-running", "10-overview-off", 0.6, 0.5),
-    m("11-zones", "11-zones", 2.8, 1.0),
-    m("11-zones-top", "11-zones-top", 3.0, 0.9),
+    m("11-zones", "11-zones", 3.2, 1.0),
+    m("11-zones-top", "11-zones-top", 3.5, 0.9),
     m("11-zones-empty", "11-zones-empty", 1.6, 0.9),
     m("12-settings", "12-settings", 1.7, 1.3),
     m("13-overlay", "13-pill", 0.5, 0.4),

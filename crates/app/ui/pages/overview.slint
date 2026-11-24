@@ -13,10 +13,11 @@ import {
     Kind,
     Kinds,
 } from "../theme.slint";
-import { ZoneData, LineData } from "../data.slint";
+import { ZoneData, LineData, VoiceData } from "../data.slint";
 import {
     Button,
     BtnKind,
+    CIcon,
     IconButton,
     OptButton,
     ZoneChip,
@@ -114,6 +115,94 @@ component NowWave inherits Wave {
     height: 24px;
 }
 
+// The voice picker of the Overview toolbar (Max, 2026-11-24): the voices under the Voice button, the game's voice
+// with a check. A click picks one and closes the list; Esc (app.slint) or a click outside closes it. Eight rows
+// show; the rest scroll.
+component VoiceMenu inherits Rectangle {
+    in property <[VoiceData]> voices;
+    in property <int> current;
+    callback picked(int);
+    property <int> rows: Math.max(1, Math.min(root.voices.length, 8));
+    width: 280px;
+    height: root.rows * Size.list + 2 * Space.s1 + 2px;
+    border-radius: Radius.lg;
+    border-width: 1px;
+    border-color: Palette.float-line;
+    background: Palette.float;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    accessible-role: list;
+    accessible-label: "Voices";
+    // clicks on the list never reach the page under it
+    TouchArea { }
+
+    if root.voices.length == 0: Text {
+        x: Space.s3 + 1px;
+        text: "No voices found.";
+        color: Palette.text-2;
+        vertical-alignment: center;
+    }
+    Flickable {
+        x: Space.s1 + 1px;
+        y: Space.s1 + 1px;
+        width: parent.width - 2 * Space.s1 - 2px;
+        height: root.rows * Size.list;
+        content-height: root.voices.length * Size.list;
+        VerticalLayout {
+            alignment: start;
+            for v[i] in root.voices: Rectangle {
+                height: Size.list;
+                border-radius: Radius.md;
+                background: row-touch.has-hover ? Palette.surface-3 : transparent;
+                accessible-role: list-item;
+                accessible-label: v.name;
+                accessible-item-selected: i == root.current;
+                accessible-action-default => {
+                    root.picked(i);
+                }
+                row-touch := TouchArea {
+                    clicked => {
+                        root.picked(i);
+                    }
+                }
+
+                HorizontalLayout {
+                    padding-left: Space.s2;
+                    padding-right: Space.s2;
+                    spacing: Space.s2;
+                    Rectangle {
+                        width: Size.icon;
+                        if i == root.current: CIcon {
+                            source: Icons.check;
+                            color: Palette.text;
+                        }
+                    }
+
+                    Text {
+                        text: v.name;
+                        color: Palette.text;
+                        font-weight: i == root.current ? Type.w-strong : Type.w-body;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+
+                    Text {
+                        text: v.short;
+                        font-size: Type.fs-small;
+                        color: Palette.text-2;
+                        vertical-alignment: center;
+                        horizontal-stretch: 0;
+                        accessible-role: none;
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component OverviewTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
     // one chip per kind (Rust: vm::kind_chips)
@@ -144,7 +233,11 @@ export component OverviewTab inherits Rectangle {
     callback replay();
     callback stop();
     callback recent-replay(int);
-    callback voice-clicked();
+    // the voice picker (VoiceMenu): the voices, the game's voice (index in `voices`), open or not
+    in property <[VoiceData]> voices;
+    in property <int> game-voice;
+    in-out property <bool> voice-open: false;
+    callback voice-picked(int);
     callback key-clicked();
     callback edit-zones();
     callback show-all();
@@ -214,12 +307,12 @@ export component OverviewTab inherits Rectangle {
                 }
             }
 
-            OptButton {
+            voice-btn := OptButton {
                 icon: Icons.volume;
                 text: root.voice;
                 label: "Voice";
                 clicked => {
-                    root.voice-clicked();
+                    root.voice-open = !root.voice-open;
                 }
             }
 
@@ -229,6 +322,16 @@ export component OverviewTab inherits Rectangle {
                 label: "Read key";
                 clicked => {
                     root.key-clicked();
+                }
+            }
+
+            // at the same place and of the same kind as "Done" on Zones: the two swap in place (Max, 2026-11-24)
+            Button {
+                text: "Edit zones";
+                icon: Icons.pencil;
+                enabled: root.running;
+                clicked => {
+                    root.edit-zones();
                 }
             }
         }
@@ -252,7 +355,7 @@ export component OverviewTab inherits Rectangle {
             border-color: Palette.line;
         }
 
-        // the game picture (.stage): a click opens Zones, like the pencil
+        // the game picture (.stage): a click opens Zones, like "Edit zones"
     if root.running: Rectangle {
             x: root.frame-x + (root.frame-w - root.stage-w) / 2;
             y: root.frame-y + (root.frame-h - root.stage-h) / 2;
@@ -337,7 +440,7 @@ export component OverviewTab inherits Rectangle {
         }
     }
 
-    // the zone chips (.zs) and the pencil
+    // the zone chips (.zs)
     FinishPart {
         n: 3;
         run: root.finish;
@@ -361,18 +464,6 @@ export component OverviewTab inherits Rectangle {
             }
             Rectangle {
                 horizontal-stretch: 1;
-            }
-
-            VerticalLayout {
-                alignment: center;
-                IconButton {
-                    icon: Icons.pencil;
-                    tip: "Edit zones";
-                    enabled: root.running;
-                    clicked => {
-                        root.edit-zones();
-                    }
-                }
             }
         }
     }
@@ -519,6 +610,23 @@ export component OverviewTab inherits Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    // the voice picker over the page; a click anywhere else on the page closes it
+    if root.voice-open: TouchArea {
+        clicked => {
+            root.voice-open = false;
+        }
+    }
+    if root.voice-open: VoiceMenu {
+        x: Math.min(Size.page-x + voice-btn.x, root.width - Size.page-x - self.width);
+        y: 12px + Size.ctl + Space.s1;
+        voices: root.voices;
+        current: root.game-voice;
+        picked(i) => {
+            root.voice-open = false;
+            root.voice-picked(i);
         }
     }
 }

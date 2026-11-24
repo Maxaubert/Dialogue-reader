@@ -285,12 +285,6 @@ fn an_unreadable_exe_is_matched_by_title_only() {
     d.windows = vec![win("Other", "", false)];
     let (w, _vm) = real_window(&paths, d);
     assert!(!w.get_games().row_data(0).unwrap().running);
-    w.invoke_retake_shot();
-    assert!(
-        w.get_notice().contains("Hidden Game is not running"),
-        "{}",
-        w.get_notice()
-    );
 }
 
 #[test]
@@ -409,4 +403,42 @@ fn broken_profile_is_kept_and_reported() {
     assert_eq!(w.get_page(), Page::Welcome);
     assert!(w.get_notice().contains("old.json"), "{}", w.get_notice());
     assert!(paths.profiles().join("old.json.bad").exists());
+}
+
+/// Max runs the window maximized on a 2560 px screen (2026-11-24): the setup steps are drawn bigger (1.4 times at
+/// 2560 x 1380) and in the middle. A drag on the bigger step 2 picture still lands on the right image pixels.
+#[test]
+fn a_zone_drawn_in_a_big_window_lands_on_the_right_pixels() {
+    let (_dir, paths) = temp_paths();
+    let (w, _vm) = real_window(&paths, FakeDesktop::new());
+    w.window().set_size(slint::LogicalSize::new(2560.0, 1380.0));
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::DrawZones);
+    let st = ElementHandle::find_by_accessible_label(&w, "Screenshot")
+        .next()
+        .expect("the step 2 picture");
+    // the element keeps its 960 x 540 layout size; on screen it is 1.4 times that, in the middle of the window
+    let (pos, size) = (st.absolute_position(), st.size());
+    let (vw, vh) = (size.width * 1.4, size.height * 1.4);
+    assert!((vw - 1344.0).abs() < 1.0, "{size:?}");
+    assert!(
+        (pos.x + vw / 2.0 - 1280.0).abs() < 1.0,
+        "centred: {pos:?} {size:?}"
+    );
+    let scale = (vw / SHOT_W as f32).min(vh / SHOT_H as f32);
+    let s = StageAt {
+        x: pos.x + (vw - SHOT_W as f32 * scale) / 2.0,
+        y: pos.y + (vh - SHOT_H as f32 * scale) / 2.0,
+        scale,
+    };
+    drag(&w, &s, (200.0, 900.0), (1700.0, 1000.0));
+    assert_eq!(w.get_setup_zones().row_count(), 1);
+    let z = w.get_setup_zones().row_data(0).unwrap();
+    let got = [z.x, z.y, z.w, z.h];
+    let want = [200.0, 900.0, 1500.0, 100.0];
+    assert!(
+        got.iter().zip(want).all(|(a, b)| (a - b).abs() < 3.0),
+        "{got:?}"
+    );
 }

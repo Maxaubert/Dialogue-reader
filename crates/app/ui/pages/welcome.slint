@@ -1,8 +1,18 @@
-// Setup step 0, Welcome (d-black 01-setup, #step0): top-aligned in the 960 px column like the steps. Left: the title,
-// one line, the three steps as a numbered list, Get started and Import settings. Right: a small picture of a game
-// with its zones (the dialogue zone live, in lime) and the status pill "Arthur".
-import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Icons, Art, Kind } from "../theme.slint";
+// Setup step 0, Welcome (d-black 01-setup, #step0): the 960 px column in the middle of the window, bigger in a big
+// window (SetupStage). Left: the title, one line, the three steps as a numbered list, Get started and Import
+// settings. Right: a small picture of a game with its zones (the dialogue zone live, in lime) and the status pill
+// "Arthur".
+import { SetupPart, SetupStage } from "setup_part.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Icons,
+    Art,
+    Kind,
+} from "../theme.slint";
 import { Button, BtnKind, Dot, ZoneOutline } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
 import { Stage } from "../components/stage.slint";
@@ -78,103 +88,109 @@ export component WelcomePage inherits Rectangle {
         { name: "Prompts", kind: Kind.prompts, on: true, x: 1228, y: 690, w: 284, h: 68 },
         { name: "Ignore", kind: Kind.ignore, on: true, x: 112, y: 682, w: 176, h: 176 },
     ];
-    HorizontalLayout {
-        x: (parent.width - Size.col) / 2;
-        y: Space.s7;
-        width: Size.col;
-        height: self.preferred-height;
-        spacing: 64px;
-        alignment: start;
-        VerticalLayout {
-            width: 400px;
+    stage := SetupStage {
+        // there is no footer on Welcome: the middle is the middle of the window
+        below: 72px;
+        content-h: body.preferred-height;
+        fit-h: body.preferred-height;
+        body := HorizontalLayout {
+            x: (stage.vw - Size.col) / 2;
+            y: stage.top;
+            width: Size.col;
+            height: self.preferred-height;
+            spacing: 64px;
             alignment: start;
-            SetupPart {
-                n: 0;
-                ObHead {
-                    title: "Hear the text in your games.";
-                    lead: "Reads game dialogue and pop-ups aloud. Runs on your PC.";
-                }
-            }
-
-            SetupPart {
-                n: 1;
-                VerticalLayout {
-                    padding-top: Space.s6;
-                    padding-bottom: Space.s6;
-                    spacing: Space.s3;
-                    StepItem {
-                        n: "1";
-                        text: "Pick your game";
-                    }
-
-                    StepItem {
-                        n: "2";
-                        text: "Mark where text shows up";
-                    }
-
-                    StepItem {
-                        n: "3";
-                        text: "Choose a key, a voice and a mode";
-                    }
-                }
-            }
-
-            SetupPart {
-                n: 2;
-                HorizontalLayout {
-                    spacing: Space.s2;
-                    alignment: start;
-                    Button {
-                        text: "Get started";
-                        kind: BtnKind.primary;
-                        clicked => {
-                            root.get-started();
-                        }
-                    }
-
-                    Button {
-                        text: "Import settings";
-                        icon: Icons.upload;
-                        clicked => {
-                            root.import-settings();
-                        }
-                    }
-                }
-            }
-        }
-
-        SetupPart {
-            n: 3;
             VerticalLayout {
+                width: 400px;
                 alignment: start;
-                Rectangle {
-                    width: Size.col - 400px - 64px;
-                    height: self.width * 9 / 16;
-                    art := Stage {
-                        labels: false;
-                        zones: root.art-zones;
-                        radius: Radius.lg;
-                        behind: Palette.bg;
-                        // the dialogue zone is the one being read: the live outline
-                        for z in root.art-zones: ZoneOutline {
-                            visible: z.kind == Kind.dialogue;
-                            live: true;
-                            x: art.off-x + z.x * art.scale * 1px;
-                            y: art.off-y + z.y * art.scale * 1px;
-                            width: z.w * art.scale * 1px;
-                            height: z.h * art.scale * 1px;
+                SetupPart {
+                    n: 0;
+                    ObHead {
+                        title: "Hear the text in your games.";
+                        lead: "Reads game dialogue and pop-ups aloud. Runs on your PC.";
+                    }
+                }
+
+                SetupPart {
+                    n: 1;
+                    VerticalLayout {
+                        padding-top: Space.s6;
+                        padding-bottom: Space.s6;
+                        spacing: Space.s3;
+                        StepItem {
+                            n: "1";
+                            text: "Pick your game";
                         }
-                        ArtPill {
-                            x: parent.width - self.width - Space.s3;
-                            y: Space.s3;
+
+                        StepItem {
+                            n: "2";
+                            text: "Mark where text shows up";
+                        }
+
+                        StepItem {
+                            n: "3";
+                            text: "Choose a key, a voice and a mode";
                         }
                     }
+                }
 
-                    // the hairline of the frame, over the picture
+                SetupPart {
+                    n: 2;
+                    HorizontalLayout {
+                        spacing: Space.s2;
+                        alignment: start;
+                        Button {
+                            text: "Get started";
+                            kind: BtnKind.primary;
+                            clicked => {
+                                root.get-started();
+                            }
+                        }
+
+                        Button {
+                            text: "Import settings";
+                            icon: Icons.upload;
+                            clicked => {
+                                root.import-settings();
+                            }
+                        }
+                    }
+                }
+            }
+
+            SetupPart {
+                n: 3;
+                VerticalLayout {
+                    alignment: start;
                     Rectangle {
-                        border-radius: Radius.lg;
-                        border-width: 1px;
-                        border-color: Palette.line;
+                        width: Size.col - 400px - 64px;
+                        height: self.width * 9 / 16;
+                        art := Stage {
+                            labels: false;
+                            zones: root.art-zones;
+                            radius: Radius.lg;
+                            behind: Palette.bg;
+                            // the dialogue zone is the one being read: the live outline
+                            for z in root.art-zones: ZoneOutline {
+                                visible: z.kind == Kind.dialogue;
+                                live: true;
+                                x: art.off-x + z.x * art.scale * 1px;
+                                y: art.off-y + z.y * art.scale * 1px;
+                                width: z.w * art.scale * 1px;
+                                height: z.h * art.scale * 1px;
+                            }
+                            ArtPill {
+                                x: parent.width - self.width - Space.s3;
+                                y: Space.s3;
+                            }
+                        }
+
+                        // the hairline of the frame, over the picture
+                        Rectangle {
+                            border-radius: Radius.lg;
+                            border-width: 1px;
+                            border-color: Palette.line;
+                        }
                     }
                 }
             }

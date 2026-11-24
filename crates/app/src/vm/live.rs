@@ -10,7 +10,8 @@
 //! - Overview (10) runs it only while the app window has the focus (Max, 2026-11-23): when he goes back to the
 //!   game, the session stops and the last frame stays on the stage (no switch to the saved screenshot, the note
 //!   stays). It starts again when the app gets the focus back. Pages 03 and 11 do not care about the focus.
-//! - The note ("Live", or why the saved screenshot shows) is in the line under the stage, never on the picture.
+//! - Why the saved screenshot shows is said in the line under the stage, never on the picture. "Live" itself is
+//!   not shown anywhere (Max, 2026-11-24): the picture moving says it.
 //! - Zones stay in capture pixels. While frames show, the editor uses the capture size (`Editor::rescale` when
 //!   the game changes size, after a drag ends). When the live view stops, it goes back to the saved screenshot's
 //!   size, and a small note on the stage says why the saved screenshot shows. A frame of a new size that comes
@@ -18,7 +19,8 @@
 //! - The game's window is searched on another thread (the window list takes about 10 ms).
 //! - The start returns at once (`dr_runtime::live` builds the session on a helper thread). A start Windows
 //!   refuses comes back as the end of the session: "no live picture" while the window is open, "closed" if not.
-//! - "Retake screenshot" still updates the saved still.
+//! - There is no "Retake screenshot" (Max, 2026-11-24): the saved still changes at setup and with the in-game
+//!   zone edit only.
 //! - While the reader captures the same window (M3b), the live view attaches to the reader's capture session
 //!   instead of starting a second one on that window (`dr_runtime::live::Attacher`). When the reader starts or
 //!   stops, the live view moves to or from it on the next check, and the last frame stays on the stage meanwhile.

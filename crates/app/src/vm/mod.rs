@@ -1204,13 +1204,10 @@ impl Vm {
                 } else {
                     self.setup = Editor::new(Vec::new(), shot.width as f32, shot.height as f32);
                 }
-                let img = image_of(shot.width, shot.height, &shot.rgba);
-                w.set_setup_shot(img.clone());
+                w.set_setup_shot(image_of(shot.width, shot.height, &shot.rgba));
                 w.set_setup_shot_w(shot.width as f32);
                 w.set_setup_shot_h(shot.height as f32);
                 w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
-                w.set_setup_game(win.title.as_str().into());
-                w.set_setup_cover(img);
                 self.setup_shot = Some(shot);
                 self.setup_win = Some(win);
                 self.notice("");
@@ -1361,60 +1358,8 @@ impl Vm {
         }
     }
 
-    fn retake(&mut self, setup: bool) {
-        if self.real.is_none() {
-            return;
-        }
-        if setup {
-            let Some(win) = self.setup_win.clone() else {
-                return;
-            };
-            match self.shoot(&win) {
-                Ok(shot) => {
-                    self.setup.rescale(shot.width as f32, shot.height as f32);
-                    if let Some(w) = self.win() {
-                        let img = image_of(shot.width, shot.height, &shot.rgba);
-                        w.set_setup_shot(img.clone());
-                        w.set_setup_shot_w(shot.width as f32);
-                        w.set_setup_shot_h(shot.height as f32);
-                        w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
-                        w.set_setup_cover(img);
-                    }
-                    self.setup_shot = Some(shot);
-                    self.notice("");
-                    self.push_setup();
-                }
-                Err(e) => self.notice(&format!("No new screenshot: {e}.")),
-            }
-            return;
-        }
-        let Some(i) = self.current else { return };
-        self.refresh_windows();
-        let profiles = self.profiles();
-        let Some(win) = self
-            .windows
-            .iter()
-            .find(|w| best_profile(profiles.iter().copied(), w) == Some(i))
-            .cloned()
-        else {
-            let name = self.games[i].profile.name.clone();
-            self.notice(&format!(
-                "{name} is not running. Start it to take a new screenshot."
-            ));
-            return;
-        };
-        match self.shoot(&win) {
-            Ok(shot) => {
-                if self.adopt_shot(i, &shot).is_ok() {
-                    self.notice("");
-                }
-            }
-            Err(e) => self.notice(&format!("No new screenshot: {e}.")),
-        }
-    }
-
     /// A new screenshot of game `i` (the current one): saved as its picture, its zones keep their place on it,
-    /// and pages 10 and 11 show it. Retake and in-game zone edit use it.
+    /// and pages 10 and 11 show it. In-game zone edit uses it.
     fn adopt_shot(&mut self, i: usize, shot: &Shot) -> Result<(), ()> {
         let Some(real) = &self.real else {
             return Err(());
@@ -1686,14 +1631,6 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.commit_rename();
         let changed = vm.editor(page).undo();
         vm.after(page, changed);
-    });
-    let v = vm.clone();
-    let weak = w.as_weak();
-    w.on_retake_shot(move || {
-        let Some(w) = weak.upgrade() else { return };
-        let mut vm = v.borrow_mut();
-        vm.commit_rename();
-        vm.retake(w.get_page() == Page::DrawZones);
     });
     let v = vm.clone();
     w.on_windows_refresh(move || {

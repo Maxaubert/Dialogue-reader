@@ -4,8 +4,9 @@
 //!
 //! Build: `cargo build --release -p dr-app --features renderer-femtovg --example snapshot` (Skia, femtovg and
 //! software all built in). Run through tools/hidden-run.ps1:
-//! `snapshot <skia|skia-opengl|femtovg|software> <page> <out.png> [scale]`. The scale is the window scale factor
-//! (SLINT_SCALE_FACTOR); the default is 1, which gives a 1440 x 900 PNG. Use 2.25 for a 225% screen.
+//! `snapshot <skia|skia-opengl|femtovg|software> <page> <out.png> [scale] [WxH]`. The scale is the window scale
+//! factor (SLINT_SCALE_FACTOR); the default is 1, which gives a 1440 x 900 PNG. Use 2.25 for a 225% screen. WxH is
+//! the window size in logical px (default 1440x900), for example 2560x1380 for a big window.
 
 use std::time::Duration;
 
@@ -13,13 +14,21 @@ use slint::ComponentHandle;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let (renderer, page, out, scale) = match args.as_slice() {
-        [r, p, o] => (r, p, o, "1"),
-        [r, p, o, s] => (r, p, o, s.as_str()),
+    let (renderer, page, out, scale, size) = match args.as_slice() {
+        [r, p, o] => (r, p, o, "1", "1440x900"),
+        [r, p, o, s] => (r, p, o, s.as_str(), "1440x900"),
+        [r, p, o, s, z] => (r, p, o, s.as_str(), z.as_str()),
         _ => {
-            eprintln!("usage: snapshot <renderer> <page> <out.png> [scale]");
+            eprintln!("usage: snapshot <renderer> <page> <out.png> [scale] [WxH]");
             std::process::exit(2);
         }
+    };
+    let Some((width, height)) = size
+        .split_once('x')
+        .and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)))
+    else {
+        eprintln!("bad size: {size}");
+        std::process::exit(2);
     };
     let Some(page) = dr_app::page_from_name(page) else {
         eprintln!("unknown page: {page}");
@@ -54,7 +63,7 @@ fn main() {
         .expect("select renderer");
     let w = dr_app::build_main_window().expect("window");
     w.set_page(page);
-    w.window().set_size(slint::LogicalSize::new(1440.0, 900.0));
+    w.window().set_size(slint::LogicalSize::new(width, height));
     w.show().expect("show");
     let weak = w.as_weak();
     let out = out.clone();

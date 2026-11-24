@@ -25,6 +25,7 @@ fn page(w: &MainWindow, p: Page) {
     w.set_sheet(false);
     w.set_overlay(OverlayPreview::None);
     w.set_switcher_open(false);
+    w.set_voice_menu(false);
     w.invoke_settings_close_voice_list();
     w.set_page(p);
 }
@@ -69,6 +70,14 @@ pub fn all() -> Vec<Screen> {
         Screen {
             name: "10-main-b",
             setup: |w| page(w, Page::Overview),
+        },
+        // No mockup (Max, 2026-11-24): the voice picker of the Overview toolbar, open
+        Screen {
+            name: "10-overview-voice-menu",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_voice_menu(true);
+            },
         },
         Screen {
             name: "11-zones",

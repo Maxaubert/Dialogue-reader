@@ -740,3 +740,101 @@ fn activity_filter_keeps_only_its_rows_and_closes_the_gaps() {
         [top + 72.0]
     );
 }
+
+/// A real left click in the middle of the element with this label and role.
+fn click(w: &MainWindow, label: &str, role: AccessibleRole) {
+    let e = ElementHandle::find_by_accessible_label(w, label)
+        .find(|e| e.accessible_role() == Some(role))
+        .unwrap_or_else(|| panic!("no {role:?} labelled {label:?}"));
+    let (p, s) = (e.absolute_position(), e.size());
+    let at = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    let win = w.window();
+    win.dispatch_event(WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerExited);
+}
+
+/// Max, 2026-11-24: a click on the game name while the switcher is open closes it (it opened it before, and a
+/// second click did nothing). Ctrl K toggles the same way, also after the name opened it.
+#[test]
+fn the_game_name_and_ctrl_k_toggle_the_switcher() {
+    let w = window();
+    w.set_page(Page::Overview);
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(w.get_switcher_open());
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(
+        !w.get_switcher_open(),
+        "a second click on the name closes it"
+    );
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(w.get_switcher_open());
+    ctrl_k(&w);
+    assert!(!w.get_switcher_open(), "Ctrl K closes what the name opened");
+    ctrl_k(&w);
+    assert!(w.get_switcher_open());
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(!w.get_switcher_open(), "the name closes what Ctrl K opened");
+}
+
+/// Max, 2026-11-24: "Edit zones" on the Overview and "Done" on Zones are the same kind of button at the same
+/// place, so they swap in place.
+#[test]
+fn edit_zones_and_done_swap_in_place() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let rect = |w: &MainWindow, label: &str| {
+        let e = ElementHandle::find_by_accessible_label(w, label)
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+            .unwrap_or_else(|| panic!("no button {label:?}"));
+        let (p, s) = (e.absolute_position(), e.size());
+        (p.x, p.y, s.width, s.height)
+    };
+    let edit = rect(&w, "Edit zones");
+    // no pencil icon button is left under the picture
+    let edit_buttons = ElementHandle::find_by_accessible_label(&w, "Edit zones")
+        .filter(|e| e.accessible_role() == Some(AccessibleRole::Button))
+        .map(|e| {
+            let p = e.absolute_position();
+            (p.x as i32, p.y as i32)
+        })
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(edit_buttons.len(), 1, "{edit_buttons:?}");
+    press(&w, "Edit zones", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Zones);
+    let done = rect(&w, "Done");
+    // the same right edge, top and height (the widths follow the words)
+    assert!(
+        (edit.0 + edit.2 - (done.0 + done.2)).abs() < 0.5,
+        "{edit:?} {done:?}"
+    );
+    assert!((edit.1 - done.1).abs() < 0.5, "{edit:?} {done:?}");
+    assert!((edit.3 - done.3).abs() < 0.5, "{edit:?} {done:?}");
+    press(&w, "Done", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Overview);
+}
+
+/// Max, 2026-11-24: the title strip has no status dot (it had a "Reading" tip).
+#[test]
+fn the_title_strip_has_no_status_dot() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let strip_items: Vec<String> = ElementQuery::from_root(&w)
+        .match_descendants()
+        .find_all()
+        .into_iter()
+        .filter(|e| e.absolute_position().y < 40.0 && e.accessible_role().is_some())
+        .filter_map(|e| e.accessible_label().map(|l| l.to_string()))
+        .collect();
+    assert!(
+        !strip_items.iter().any(|l| l == "Reading" || l == "Status"),
+        "{strip_items:?}"
+    );
+}

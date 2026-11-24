@@ -503,7 +503,7 @@ frame is what the reader spends on a frame (crops, signatures, OCR). A press is 
   - The exclusive fullscreen notice may be a false alarm on DX12 flip-model games where capture still works
     (not checked; step 1 of the manual check).
 - An attached live view gets about 12 frames a second (15 before). `Drop for Speech` still waits for one synth call
-  at exit, and the screenshot (Continue, Retake) still runs on the UI thread.
+  at exit, and the screenshot (Continue) still runs on the UI thread.
 
 ## M4: overlays
 
@@ -595,7 +595,7 @@ crates/app/tests/quick_menu.rs, place.rs, overlays.rs, overlay_win.rs
   spec 2.7 (hidden while the menu or zone edit is open).
 - Zone edit covers the DWM frame bounds, not only the client rect: Windows Graphics Capture of a window is
   assumed to cover the same rect (true for the borderless check; for a game with a title bar only the window
-  placement was tested, on the hidden desktop), so a game with a title bar should line up too. Its frozen screenshot also becomes the profile's picture (as Retake). Each change is saved and sent
+  placement was tested, on the hidden desktop), so a game with a title bar should line up too. Its frozen screenshot also becomes the profile's picture. Each change is saved and sent
   to the reader at once.
 - Reading is held while an overlay is open (`Cmd::Hold`), apart from the user's Pause.
 - The quick menu window is wide enough for the voice list on the right and as wide on the left, so the card stays
@@ -816,6 +816,36 @@ Old (mockup) > new (app):
    line in 0.5 s, 606 MB. The CI `installer` job is on again.
 9. A silent update over a running DialogReader now starts it again (with `--minimized`) after the install. A
    normal install still asks with its "Start DialogReader" box. Keep this?
+
+## Follow-ups from Max's screenshots (2026-11-24, branch feat/motion-polish)
+
+Max runs the window maximized on a 2560 px screen at 150 % (about 1707 x 912 logical px). What changed, and how it
+differs from the d-black mockups:
+
+1. Welcome and every setup step sit in the middle of the window, on both axes, at every size (the mockups put
+   them at the top). In a window wider than 1440 px they are drawn bigger: 1 at 1440 px wide, then with the width,
+   at most 1.4, and never more than lets the tallest step (step 2, 664 px) fit in the height. All steps 1 to 5 and
+   the footer use the same factor, so nothing changes size between steps; Welcome fits its own content
+   (`ui/pages/setup_part.slint`, `SetupZoom`, `SetupStage`). About 1.16 on Max's screen, 1.4 at 2560 x 1380.
+   The software renderer (render-screens) cannot scale: its PNGs show the steps in the middle but not bigger.
+   `examples/snapshot.rs` takes a window size now (`... 1 2560x1380`) to see the real look on Skia.
+2. Step 1: each row shows its window's own exe icon (24 px), with no frame and no game picture. A window with no
+   icon (a protected game, the fake data) leaves the room empty, so the names line up.
+3. Step 5: no summary line under the two cards ("5 zones · Mouse 4 · Adam 1.1x").
+4. Zones toolbar and step 2: no "Retake screenshot" button and no "Live" note. The screenshot time and the reason
+   the saved screenshot shows ("Saved screenshot · the game is closed") stay. The saved screenshot now changes only
+   at setup and with the in-game zone edit; while the game is live the picture moves by itself.
+5. "Edit zones" is a secondary button (pencil and text) at the right end of the Overview toolbar, and "Done" on
+   Zones is the same kind of button (check and text) at the same place, so the two swap in place. The pencil icon
+   button under the picture is gone; a click on the picture still opens Zones. The Zones toolbar has the
+   Overview's 24 px margins now (the picture keeps 32 px).
+6. The game name in the title strip closes the switcher when it is open (as Ctrl K).
+7. The Voice button of the Overview toolbar opens a voice list under it (the game's voice has a check; eight rows
+   show, the rest scroll; "No voices found." when there is none). A pick sets and saves the game's voice; Esc or a
+   click outside closes it. It used to open Settings.
+8. The title strip has no status dot. "Reading" and "Paused" still show elsewhere (the in-game pill, the Pause or
+   Resume button, the switcher row); "Game not running." is on the Overview stage. "Stopped" and "Cannot read" were
+   only in the dot's tip and are not shown in the window now.
 
 ## After v1
 

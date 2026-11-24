@@ -14,11 +14,8 @@ import {
     Button,
     BtnKind,
     IconButton,
-    StatusDot,
-    Status,
 } from "base.slint";
 
-export { Status }
 export global Chrome {
     callback minimize();
     callback maximize();
@@ -164,7 +161,7 @@ component LeadButton inherits Rectangle {
 // What the strip lead shows: the brand (setup), the game name (Overview) or back plus the page name (sub-pages).
 export enum StripMode { setup, main, sub }
 
-// A part of the strip tail (the status dot, the gear) that fades in when it comes (Finish, or a sub-page closed):
+// A part of the strip tail (the gear) that fades in when it comes (Finish, or a sub-page closed):
 // 160 ms after an 80 ms wait, as the lead swap. The fade is worked out from the clock, as the part is made in the
 // frame that first draws it (see pages/setup_part.slint). With `run` false (the launch) it shows at once.
 component TailPart inherits Rectangle {
@@ -202,8 +199,8 @@ component LeadPart inherits Rectangle {
 }
 
 // The title strip (40 px, no line under it). Left: the brand, the game name (click or Ctrl K opens the switcher)
-// or back plus the page name. Right: the status dot with its tip, the gear (Overview only) and the window
-// controls. Empty space drags the window; a double click maximizes it.
+// or back plus the page name. Right: the gear (Overview only) and the window controls. There is no status dot
+// (Max, 2026-11-24). Empty space drags the window; a double click maximizes it.
 export component TitleStrip inherits Rectangle {
     in property <StripMode> mode: StripMode.main;
     // the game name as shown (app.slint holds the old name while it rolls out)
@@ -212,12 +209,10 @@ export component TitleStrip inherits Rectangle {
     // from 8 px below as `roll-in` goes from 0 to 1 (140 ms, app.slint)
     in property <bool> rolling: false;
     in property <float> roll-in: 1;
-    // a move was made in the UI: the dot and the gear fade in when they come (not at launch)
+    // a move was made in the UI: the gear fades in when it comes (not at launch)
     in property <bool> armed: false;
     // the sub-page name next to the back chevron ("Settings", "Zones", "Activity")
     in property <string> page-name;
-    in property <Status> status: Status.reading;
-    in property <string> status-tip: "Reading";
     in property <bool> show-gear: true;
     callback game-clicked();
     callback back();
@@ -315,15 +310,6 @@ export component TitleStrip inherits Rectangle {
             }
         }
 
-        if root.mode != StripMode.setup: TailPart {
-            run: root.armed;
-            width: 40px;
-            height: Size.strip;
-            StatusDot {
-                status: root.status;
-                tip: root.status-tip;
-            }
-        }
         if root.mode == StripMode.main && root.show-gear: TailPart {
             run: root.armed;
             width: Size.ctl + 2 * Space.s1;
@@ -343,7 +329,7 @@ export component TitleStrip inherits Rectangle {
 }
 
 // Setup footer: Back on the left, the step dots in the middle, the main action (white pill) on the right, in the
-// 960 px column. The active dot is 20 px wide (260 ms).
+// 960 px column (wider in a big window). The active dot is 20 px wide (260 ms).
 export component ObFoot inherits Rectangle {
     in property <string> primary: "Continue";
     in property <image> primary-icon: Icons.arrow-right;
@@ -351,13 +337,15 @@ export component ObFoot inherits Rectangle {
     in property <int> step: 1;
     // a problem with this step, said in plain words (no screenshot, could not save)
     in property <string> notice;
+    // the width of the column: wider in a big window, where the steps are drawn bigger (SetupZoom)
+    in property <length> column: Size.col;
     callback back();
     callback next();
     height: 72px;
     // the buttons sit 16 px down in the 72 px footer (.obf .btn), the dots 28 px down
     HorizontalLayout {
-        x: (parent.width - Size.col) / 2;
-        width: Size.col;
+        x: (parent.width - root.column) / 2;
+        width: root.column;
         padding-top: Space.s4;
         padding-bottom: Space.s5;
         Button {

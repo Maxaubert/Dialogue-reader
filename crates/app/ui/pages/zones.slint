@@ -1,5 +1,5 @@
-// Zones (d-black 11-zones): one toolbar on black (Draw zone, the kinds, Delete zone; the live note, Retake screenshot
-// and Done on the right), then the picture with the zones as large as the page allows. Dragging on empty picture
+// Zones (d-black 11-zones): one toolbar on black (Draw zone, the kinds, Delete zone; the screenshot time while the
+// game is not live, and Done on the right), then the picture with the zones as large as the page allows. Dragging on empty picture
 // always draws; "Draw zone" also draws over another zone (src/vm/zones.rs). Each zone has a tag with its kind
 // name above it, under it when there is no room above, and inside it when there is no room under it either.
 import {
@@ -37,7 +37,6 @@ export component ZonesTab inherits Rectangle {
     in property <Kind> kind: Kind.dialogue;
     callback pointer(int, float, float, float);
     callback kind-picked(Kind);
-    callback retake();
     // "Done": back to the Overview (app.slint)
     callback done();
     // the stage grow from the Overview (README motion table, 11-zones 4): 0 at the Overview stage, 1 here. The
@@ -51,10 +50,11 @@ export component ZonesTab inherits Rectangle {
     property <length> sw: max(160px, min(root.width - 2 * root.pad, (root.height - root.top - Space.s4) * 16 / 9));
     property <length> sh: root.sw * 9 / 16;
 
+    // the toolbar has the Overview toolbar's margins (Done is where "Edit zones" is); the picture keeps 32 px
     Rectangle {
-        x: root.pad;
+        x: Size.page-x;
         y: 12px;
-        width: root.width - 2 * root.pad;
+        width: root.width - 2 * Size.page-x;
         height: Size.ctl;
         opacity: root.tools;
         HorizontalLayout {
@@ -92,14 +92,6 @@ export component ZonesTab inherits Rectangle {
                 horizontal-stretch: 1;
             }
 
-            IconButton {
-                icon: Icons.camera;
-                tip: "Retake screenshot";
-                clicked => {
-                    root.retake();
-                }
-            }
-
             // "Live", or the screenshot's time (src/vm/live.rs)
         ShotNote {
                 contain: root.contain;
@@ -107,9 +99,10 @@ export component ZonesTab inherits Rectangle {
                 padding-right: Space.s2;
             }
 
+            // at the same place and of the same kind as "Edit zones" on the Overview: the two swap in place
             Button {
-                kind: BtnKind.primary;
                 text: "Done";
+                icon: Icons.check;
                 clicked => {
                     root.done();
                 }

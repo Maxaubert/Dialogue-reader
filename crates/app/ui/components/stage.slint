@@ -131,6 +131,9 @@ export component Stage inherits Rectangle {
     in property <float> tags-o: 1;
     // false while the stage grows or shrinks: its size is told to the live view only once it is still
     in property <bool> settled: true;
+    // the stage is drawn this many times bigger (a setup step in a big window, SetupStage): the live view makes its
+    // frames for the size on screen
+    in property <float> zoom: 1;
     // real screenshots (contain) follow the live view when there is one
     property <bool> live: root.contain && LiveView.on;
     property <float> pw: root.live ? LiveView.w : root.src-w;
@@ -150,22 +153,27 @@ export component Stage inherits Rectangle {
     clip: true;
     init => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed width => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed height => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed zoom => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed settled => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     Image {
@@ -326,8 +334,9 @@ export component LiveNote inherits Rectangle {
         }
     }
 }
-// The end of the Zones and step 2 toolbars: "Live" while the game shows live (LiveNote), else the time of the
-// saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the game is closed").
+// The end of the Zones and step 2 toolbars: nothing while the game shows live (no "Live" note, Max 2026-11-24), else
+// the time of the saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the
+// game is closed").
 export component ShotNote inherits HorizontalLayout {
     // real screenshots: the live view and its note can show
     in property <bool> contain;
@@ -336,7 +345,7 @@ export component ShotNote inherits HorizontalLayout {
     property <bool> live: root.contain && LiveView.on;
     spacing: Space.s3;
     horizontal-stretch: 0;
-    if root.contain && LiveView.note != "": VerticalLayout {
+    if root.contain && LiveView.note != "" && !LiveView.note-live: VerticalLayout {
         alignment: center;
         LiveNote { }
     }

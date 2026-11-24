@@ -2,7 +2,7 @@
 // keycap starts key capture ("Press a key"); the next key or mouse button becomes the key. Esc, a click on the
 // keycap again or the window losing the focus ends it, and Alt+Tab and Win are never taken (src/vm/reading.rs).
 // Settings shows the same KeysCard.
-import { SetupPart } from "setup_part.slint";
+import { SetupPart, SetupStage } from "setup_part.slint";
 import { Palette, Space, Size } from "../theme.slint";
 import { Keycap, Panel, SettingRow } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
@@ -59,32 +59,35 @@ export component KeysPage inherits Rectangle {
     in property <string> menu-key: "F7";
     in property <int> capturing: -1;
     callback change(int);
-    VerticalLayout {
-        x: (parent.width - Size.col) / 2;
-        y: Space.s7;
-        width: Size.col;
-        height: self.preferred-height;
-        alignment: start;
-        SetupPart {
-            n: 0;
-            ObHead {
-                title: "Your keys";
-                lead: "Click a key to change it.";
+    stage := SetupStage {
+        content-h: body.preferred-height;
+        body := VerticalLayout {
+            x: (stage.vw - Size.col) / 2;
+            y: stage.top;
+            width: Size.col;
+            height: self.preferred-height;
+            alignment: start;
+            SetupPart {
+                n: 0;
+                ObHead {
+                    title: "Your keys";
+                    lead: "Click a key to change it.";
+                }
             }
-        }
 
-        Rectangle {
-            height: Space.s5;
-        }
+            Rectangle {
+                height: Space.s5;
+            }
 
-        SetupPart {
-            n: 1;
-            KeysCard {
-                read-key: root.read-key;
-                menu-key: root.menu-key;
-                capturing: root.capturing;
-                change(i) => {
-                    root.change(i);
+            SetupPart {
+                n: 1;
+                KeysCard {
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                    capturing: root.capturing;
+                    change(i) => {
+                        root.change(i);
+                    }
                 }
             }
         }
