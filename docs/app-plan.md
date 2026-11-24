@@ -871,6 +871,24 @@ differs from the d-black mockups:
     Activity the list panel. The Zones picture crossfades over the old one, as the Overview's does. While the game
     shows live, the old picture is the last live frame.
 
+## Follow-ups from Max's screenshots, round 3 (2026-11-24, branch feat/voice-preview-delete-profile)
+
+1. Overview voice list: each row ends with a play button ("Play a sample") that plays that voice at the game's
+   speed and volume without picking it. It is a stop button while it plays; another row's button switches; a pick,
+   Esc or a click outside closes the list and stops it. As every sample (Settings, step 4), it stops a line that is
+   being read and clears the queue. The list is 300 px wide now (was 280).
+2. Overview: the Now panel is as tall as the picture frame, so their tops and bottoms line up at every size; the
+   zone chips stay under the frame. The frame has the only outline (the picture in it has none, so a picture that
+   nearly fills the frame no longer shows two). The frame's outline lights up on hover, and a click anywhere in the
+   frame opens Zones.
+3. Game switcher: the highlighted row ends with a trash button (tip "Delete game"); "Reading" stays on every row.
+   A click (or the Delete key) turns it into a red "Delete" on that row; Enter or a click deletes, Esc, another row
+   or the mouse leaving the row cancels. Delete removes the game's profile, its `.bad`/`.tmp` copies, its
+   screenshot and its activity log (only files in the data folder). The current game makes way for the game now
+   at its place (or the last one); with no game left the app goes to Welcome.
+4. `render-screens` takes a window size (`-- <out-dir> 1707x912`) and has three more screens:
+   `10-overview-voice-preview`, `10-overview-real-shot`, `14-game-switcher-delete`.
+
 ## After v1
 
 - Zone-only frame copies in `dr-core` to cut CPU on 4K.

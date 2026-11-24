@@ -1,6 +1,9 @@
 // 14 game switcher (d-black 14-game-switcher): a scrim under the title strip and a panel under the game name.
 // The game name or Ctrl K opens it. Type to search; Up and Down move the highlight (it glides 120 ms); Enter
 // switches; Esc or a click outside closes it. Rust filters the games (`hits`, src/vm/mod.rs).
+// Delete a game (Max, 2026-11-24): the highlighted row has a trash button at its right end (the Delete key does
+// the same). It asks first: the button becomes a small "Delete" on that row, which Enter or a click confirms. Esc,
+// another row or the mouse leaving the row cancels it.
 // Motion (README, 7 and 8): scrim 0 to 0.6, panel opacity, y -8 to 0 and scale 0.98 to 1, 180 ms ease-out;
 // close 140 ms ease-in.
 import {
@@ -13,15 +16,21 @@ import {
     Icons,
 } from "../theme.slint";
 import { GameData } from "../data.slint";
-import { CIcon, Icon, Thumb } from "../components/base.slint";
+import { CIcon, Icon, Thumb, IconButton, Button, BtnKind } from "../components/base.slint";
 
-// One game row (.gr): picture, name, and "Reading" or when it was last played on the right.
+// One game row (.gr): picture, name, and "Reading" or when it was last played on the right. The highlighted row
+// ends with a trash button; while `confirm`, a "Delete" button instead.
 component GameItem inherits Rectangle {
     in property <GameData> game;
     in property <bool> current;
     in property <bool> hi;
+    in property <bool> confirm;
     callback clicked();
     callback hovered();
+    // the mouse left the row
+    callback left();
+    callback delete-asked();
+    callback delete-confirmed();
     height: Size.media;
     accessible-role: list-item;
     accessible-label: root.game.name;
@@ -29,6 +38,7 @@ component GameItem inherits Rectangle {
     accessible-action-default => {
         root.clicked();
     }
+    // the row's buttons are inside its TouchArea, so the row keeps its hover while the mouse is on them
     touch := TouchArea {
         clicked => {
             root.clicked();
@@ -36,13 +46,14 @@ component GameItem inherits Rectangle {
         changed has-hover => {
             if self.has-hover {
                 root.hovered();
+            } else {
+                root.left();
             }
         }
-    }
 
     HorizontalLayout {
         padding-left: Space.s2;
-        padding-right: Space.s3;
+        padding-right: root.hi || root.confirm ? Space.s2 : Space.s3;
         spacing: Space.s3;
         VerticalLayout {
             alignment: center;
@@ -83,6 +94,32 @@ component GameItem inherits Rectangle {
             vertical-alignment: center;
             accessible-role: none;
         }
+
+        if root.hi && !root.confirm: VerticalLayout {
+            alignment: center;
+            IconButton {
+                small: true;
+                icon: Icons.trash;
+                tip: "Delete game";
+                label: "Delete " + root.game.name;
+                clicked => {
+                    root.delete-asked();
+                }
+            }
+        }
+        if root.confirm: VerticalLayout {
+            alignment: center;
+            Button {
+                kind: BtnKind.danger;
+                text: "Delete";
+                label: "Confirm delete " + root.game.name;
+                height: 28px;
+                clicked => {
+                    root.delete-confirmed();
+                }
+            }
+        }
+    }
     }
 }
 
@@ -97,30 +134,69 @@ export component GameSwitcher inherits Rectangle {
     in-out property <string> query;
     // the highlight moved with the mouse: it glides 360 ms (keys: 120 ms)
     property <bool> by-mouse: false;
+    // the row (a place in `hits`) that asks "Delete?" now (-1: none)
+    in-out property <int> confirm: -1;
     callback close();
     // a game was picked (its index in `games`)
     callback choose(int);
     callback add-game();
     callback search(string);
+    // Delete was confirmed (the game's index in `games`)
+    callback delete-game(int);
     // the switcher opened: an empty search, the highlight on the first game that is not the current one
     changed open => {
         if root.open {
             root.query = "";
             root.search("");
+            root.confirm = -1;
             root.highlight = root.current == 0 && root.games.length > 1 ? 1 : 0;
         }
     }
+
     public function focus-search() {
         search.focus();
     }
     public function step(d: int) {
         root.by-mouse = false;
+        // another row: a Delete that was asked is off
+        root.confirm = -1;
         root.highlight = Math.max(0, Math.min(root.hits.length - 1, root.highlight + d));
     }
+    // Enter: switches to the highlighted game, or deletes it while it asks
     public function pick() {
+        if root.confirm >= 0 {
+            root.confirm-delete();
+            return;
+        }
         if root.highlight >= 0 && root.highlight < root.hits.length {
             root.choose(root.hits[root.highlight]);
         }
+    }
+    // the trash button or the Delete key: the highlighted row asks first
+    public function ask-delete() {
+        if root.highlight >= 0 && root.highlight < root.hits.length {
+            root.confirm = root.highlight;
+        }
+    }
+    // Esc: a Delete that was asked is off (true), or there was none (false: Esc closes the switcher)
+    public function cancel-delete() -> bool {
+        if root.confirm < 0 {
+            return false;
+        }
+        root.confirm = -1;
+        true
+    }
+    function confirm-delete() {
+        if root.confirm < 0 || root.confirm >= root.hits.length {
+            root.confirm = -1;
+            return;
+        }
+        let gi = root.hits[root.confirm];
+        root.confirm = -1;
+        root.delete-game(gi);
+        // the list is shorter now (Rust set `hits`)
+        root.by-mouse = false;
+        root.highlight = Math.max(0, Math.min(root.highlight, root.hits.length - 1));
     }
     property <float> t: root.open ? 1 : 0;
     animate t {
@@ -204,8 +280,14 @@ export component GameSwitcher inherits Rectangle {
                                 root.pick();
                                 return accept;
                             }
+                            if e.text == Key.Delete && root.hits.length > 0 {
+                                root.ask-delete();
+                                return accept;
+                            }
                             if e.text == Key.Escape {
-                                root.close();
+                                if !root.cancel-delete() {
+                                    root.close();
+                                }
                                 return accept;
                             }
                             reject
@@ -217,6 +299,7 @@ export component GameSwitcher inherits Rectangle {
                             single-line: true;
                             accessible-label: "Search games";
                             edited => {
+                                root.confirm = -1;
                                 root.search(self.text);
                                 root.highlight = 0;
                             }
@@ -273,12 +356,29 @@ export component GameSwitcher inherits Rectangle {
                         game: root.games[gi];
                         current: gi == root.current;
                         hi: j == root.highlight;
+                        confirm: j == root.confirm;
                         clicked => {
                             root.choose(gi);
                         }
                         hovered => {
+                            if root.highlight != j {
+                                root.confirm = -1;
+                            }
                             root.by-mouse = true;
                             root.highlight = j;
+                        }
+                        left => {
+                            if root.confirm == j {
+                                root.confirm = -1;
+                            }
+                        }
+                        delete-asked => {
+                            root.highlight = j;
+                            root.confirm = j;
+                        }
+                        delete-confirmed => {
+                            root.confirm = j;
+                            root.confirm-delete();
                         }
                     }
                     if root.hits.length == 0: HorizontalLayout {

@@ -117,14 +117,19 @@ component NowWave inherits Wave {
 
 // The voice picker of the Overview toolbar (Max, 2026-11-24): the voices under the Voice button, the game's voice
 // with a check. A click picks one and closes the list; Esc (app.slint) or a click outside closes it. Eight rows
-// show; the rest scroll.
+// show; the rest scroll. The play button of a row plays a sample of that voice without picking it; it is a stop
+// button while that sample plays, and closing the list stops it (app.slint).
 component VoiceMenu inherits Rectangle {
     in property <[VoiceData]> voices;
     in property <int> current;
+    // the row whose sample plays (-1: none)
+    in property <int> playing: -1;
     callback picked(int);
+    callback preview(int);
+    callback preview-stop();
     // up to 8 rows show; with more, 7 and a half show, so the cut row says the list goes on
     property <length> list-h: root.voices.length > 8 ? 7.5 * Size.list : Math.max(1, root.voices.length) * Size.list;
-    width: 280px;
+    width: 300px;
     height: root.list-h + 2 * Space.s1 + 2px;
     // the list opens on the current voice: scrolled so its row is in the middle when it is below the first rows
     init => {
@@ -174,7 +179,7 @@ component VoiceMenu inherits Rectangle {
 
                 HorizontalLayout {
                     padding-left: Space.s2;
-                    padding-right: Space.s2;
+                    padding-right: Space.s1;
                     spacing: Space.s2;
                     Rectangle {
                         width: Size.icon;
@@ -201,6 +206,23 @@ component VoiceMenu inherits Rectangle {
                         vertical-alignment: center;
                         horizontal-stretch: 0;
                         accessible-role: none;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            small: true;
+                            icon: i == root.playing ? Icons.stop : Icons.play;
+                            tip: i == root.playing ? "Stop" : "Play a sample";
+                            label: i == root.playing ? "Stop" : "Play a sample of " + v.name;
+                            clicked => {
+                                if i == root.playing {
+                                    root.preview-stop();
+                                } else {
+                                    root.preview(i);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -245,7 +267,11 @@ export component OverviewTab inherits Rectangle {
     in property <[VoiceData]> voices;
     in property <int> game-voice;
     in-out property <bool> voice-open: false;
+    // the voice list row whose sample plays (-1: none)
+    in property <int> voice-playing: -1;
     callback voice-picked(int);
+    callback voice-preview(int);
+    callback voice-preview-stop();
     callback key-clicked();
     callback edit-zones();
     callback show-all();
@@ -352,7 +378,8 @@ export component OverviewTab inherits Rectangle {
         run: root.finish;
         scale: true;
         transform-origin: { x: root.frame-x + root.frame-w / 2, y: root.frame-y + root.frame-h / 2 };
-    // the letterbox frame (.frame)
+    // the letterbox frame (.frame): the only outline here (the stage in it has none, or a picture that nearly
+    // fills the frame showed a double frame, Max 2026-11-24); it lights up on hover while a click opens Zones
     Rectangle {
             x: root.frame-x;
             y: root.frame-y;
@@ -360,11 +387,9 @@ export component OverviewTab inherits Rectangle {
             height: root.frame-h;
             border-radius: Radius.lg;
             background: Palette.surface-1;
-            border-width: 1px;
-            border-color: Palette.line;
         }
 
-        // the game picture (.stage): a click opens Zones, like "Edit zones"
+        // the game picture (.stage)
     if root.running: Rectangle {
             x: root.frame-x + (root.frame-w - root.stage-w) / 2;
             y: root.frame-y + (root.frame-h - root.stage-h) / 2;
@@ -398,21 +423,32 @@ export component OverviewTab inherits Rectangle {
                 behind: Palette.surface-1;
             }
 
-            stage-touch := TouchArea {
-                mouse-cursor: pointer;
-                clicked => {
-                    root.edit-zones();
-                }
-            }
+        }
 
-            Rectangle {
-                border-radius: Radius.lg;
-                border-width: 1px;
-                border-color: stage-touch.has-hover ? Palette.line-2 : Palette.line;
-                animate border-color {
-                    duration: Motion.fast;
-                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-                }
+        // a click on the picture or the band around it opens Zones, like "Edit zones"
+        stage-touch := TouchArea {
+            enabled: root.running;
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            mouse-cursor: root.running ? pointer : default;
+            clicked => {
+                root.edit-zones();
+            }
+        }
+
+        Rectangle {
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            border-radius: Radius.lg;
+            border-width: 1px;
+            border-color: root.running && stage-touch.has-hover ? Palette.line-2 : Palette.line;
+            animate border-color {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
             }
         }
 
@@ -488,7 +524,8 @@ export component OverviewTab inherits Rectangle {
         x: root.frame-x + root.frame-w + Space.s4;
         y: root.frame-y;
         width: root.panel-w;
-        height: root.height - root.frame-y - Size.page-x;
+        // as tall as the frame: their tops and bottoms line up (Max, 2026-11-24); the zone chips are under the frame
+        height: root.frame-h;
         Panel {
             clip: true;
         // nothing read at all: one grey line in the middle
@@ -644,9 +681,16 @@ export component OverviewTab inherits Rectangle {
         y: 12px + Size.ctl + Space.s1;
         voices: root.voices;
         current: root.game-voice;
+        playing: root.voice-playing;
         picked(i) => {
             root.voice-open = false;
             root.voice-picked(i);
+        }
+        preview(i) => {
+            root.voice-preview(i);
+        }
+        preview-stop => {
+            root.voice-preview-stop();
         }
     }
 }

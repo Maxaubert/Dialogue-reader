@@ -1267,3 +1267,67 @@ fn clicks_land_on_the_bigger_setup() {
     click_at(&w, 1500.0, 878.0);
     assert_eq!(w.get_page(), Page::DrawZones);
 }
+
+/// Delete in the game switcher (Max, 2026-11-24) on the sample games: the highlighted row's trash button or the
+/// Delete key asks first; Esc or another row cancels; Enter or the "Delete" button confirms. The list loses the row
+/// and the current game stays current.
+#[test]
+fn the_switcher_deletes_a_game_after_asking() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let names = |w: &MainWindow| {
+        w.get_games()
+            .iter()
+            .map(|g| g.name.to_string())
+            .collect::<Vec<_>>()
+    };
+    let asks = |w: &MainWindow, name: &str| {
+        ElementHandle::find_by_accessible_label(w, &format!("Confirm delete {name}"))
+            .next()
+            .is_some()
+    };
+    let before = names(&w);
+    assert_eq!(w.get_current_game(), 0);
+    ctrl_k(&w);
+    let sat = before[1].clone();
+    // only the highlighted row has the trash button
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, &format!("Delete {}", before[2]))
+            .next()
+            .is_none()
+    );
+    press(&w, &format!("Delete {sat}"), AccessibleRole::Button);
+    assert!(asks(&w, &sat));
+    key(&w, Key::Escape);
+    assert!(!asks(&w, &sat));
+    assert!(w.get_switcher_open(), "the first Esc only cancels");
+    // the Delete key asks; another row cancels; Enter confirms
+    key(&w, Key::Delete);
+    assert!(asks(&w, &sat));
+    key(&w, Key::DownArrow);
+    assert!(!asks(&w, &sat));
+    key(&w, Key::UpArrow);
+    key(&w, Key::Delete);
+    key(&w, Key::Return);
+    assert_eq!(names(&w).len(), before.len() - 1);
+    assert!(!names(&w).contains(&sat));
+    assert_eq!(w.get_current_game(), 0, "the current game stays");
+    assert!(w.get_switcher_open());
+    // a click on the row's "Delete" confirms too; a game above the current one moves it up
+    key(&w, Key::Escape);
+    w.set_current_game(2);
+    ctrl_k(&w);
+    let first = names(&w)[0].clone();
+    let cur = names(&w)[2].clone();
+    for _ in 0..3 {
+        key(&w, Key::UpArrow);
+    }
+    press(&w, &format!("Delete {first}"), AccessibleRole::Button);
+    press(
+        &w,
+        &format!("Confirm delete {first}"),
+        AccessibleRole::Button,
+    );
+    assert!(!names(&w).contains(&first));
+    assert_eq!(names(&w)[w.get_current_game() as usize], cur);
+}
