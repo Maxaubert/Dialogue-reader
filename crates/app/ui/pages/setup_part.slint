@@ -1,0 +1,20 @@
+// One part of a setup step (.sx in d-black 01-setup): it fades in with the step slide, 80 ms after the old step
+// starts to go, the parts 40 ms apart (at most 6). The page slot moves the step sideways; the part only fades.
+// With instant motion (tests, renders) it shows at once.
+import { Motion } from "../theme.slint";
+
+export component SetupPart inherits Rectangle {
+    // the place of the part in its step, from 0
+    in property <int> n: 0;
+    property <bool> shown: false;
+    init => {
+        root.shown = true;
+    }
+    opacity: root.shown ? 1 : 0;
+    animate opacity {
+        duration: Motion.push-in;
+        delay: Motion.push-gap + Math.min(root.n, 5) * Motion.stagger;
+        easing: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @children
+}

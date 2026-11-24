@@ -516,6 +516,10 @@ pub struct Vm {
     shown_games: Vec<usize>,
     shown_others: Vec<usize>,
     search: String,
+    /// Page 02 has no Refresh button: while it shows it asks once a second, the quick list (no icons) is read on
+    /// another thread, and only a list that changed is read again in full ([`Vm::auto_refresh_windows`]).
+    pick_looking: bool,
+    pick_found: std::sync::Arc<std::sync::Mutex<Option<Vec<WinInfo>>>>,
     /// Page 03: the window being set up, its screenshot, its zones.
     setup_win: Option<WinInfo>,
     setup_shot: Option<Shot>,
@@ -565,6 +569,8 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         shown_games: Vec::new(),
         shown_others: Vec::new(),
         search: String::new(),
+        pick_looking: false,
+        pick_found: Default::default(),
         setup_win: None,
         setup_shot: None,
         setup: fake_setup(),
@@ -1038,6 +1044,43 @@ impl Vm {
         self.push_games();
     }
 
+    /// Page 02, once a second: looks for windows that opened, closed or changed, and lists them again when there
+    /// are any. The window picked before stays picked ([`Vm::refresh_windows`]).
+    fn auto_refresh_windows(&mut self) {
+        if self.real.is_none() {
+            return;
+        }
+        if !self.pick_looking {
+            self.pick_looking = true;
+            let exes = self.profile_exes();
+            let found = self.pick_found.clone();
+            if let Some(real) = &self.real {
+                real.desktop.windows_quick_then(
+                    exes,
+                    Box::new(move |list| {
+                        if let Ok(mut f) = found.lock() {
+                            *f = Some(list);
+                        }
+                    }),
+                );
+            }
+        }
+        // the answer: now (the fake desktop) or at a later tick (the real one reads it on another thread)
+        let Some(list) = self.pick_found.lock().ok().and_then(|mut f| f.take()) else {
+            return;
+        };
+        self.pick_looking = false;
+        let key = |w: &WinInfo| (w.hwnd, w.title.clone(), w.exe.clone(), w.game, w.minimized);
+        let same = list.len() == self.windows.len()
+            && list
+                .iter()
+                .zip(&self.windows)
+                .all(|(a, b)| key(a) == key(b));
+        if !same {
+            self.refresh_windows();
+        }
+    }
+
     /// Fills the page 02 lists. `before` (the window picked before) stays picked when it is still listed.
     fn apply_search(&mut self, before: Option<WinKey>) {
         let q = self.search.trim().to_lowercase();
@@ -1114,7 +1157,7 @@ impl Vm {
         }
         let Some(w) = self.win() else { return false };
         let Some(win) = self.picked(w.get_picked_window()).cloned() else {
-            self.notice("Pick a window first. Start your game, then press Refresh.");
+            self.notice("Pick a window first. Start your game, then pick it.");
             return false;
         };
         // spec 2.8: several games can share an exe (told apart by the window title), but one window has one profile
@@ -1617,7 +1660,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.retake(w.get_page() == Page::DrawZones);
     });
     let v = vm.clone();
-    w.on_windows_refresh(move || v.borrow_mut().refresh_windows());
+    w.on_windows_refresh(move || {
+        // the page's timer can fire while another callback holds the view model: the next tick tries again
+        if let Ok(mut vm) = v.try_borrow_mut() {
+            vm.auto_refresh_windows();
+        }
+    });
     let v = vm.clone();
     w.on_windows_search(move |q| {
         let mut vm = v.borrow_mut();
@@ -1712,7 +1760,7 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.setup_win = None;
         vm.setup_shot = None;
         vm.refresh_windows();
-        w.set_setup_draw(true);
+        w.set_setup_draw(false);
         w.set_notice("".into());
         if vm.real.is_some() {
             w.set_adding_game(true);

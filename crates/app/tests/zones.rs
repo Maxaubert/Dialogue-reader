@@ -252,7 +252,8 @@ fn draw_zones_page_in_setup() {
     press(&w, "Get started", AccessibleRole::Button);
     press(&w, "Continue", AccessibleRole::Button);
     assert_eq!(w.get_page(), Page::DrawZones);
-    assert!(w.get_setup_draw(), "page 03 starts with the draw tool");
+    // d-black: "Draw zone" starts off; a drag on empty picture draws anyway (it only matters over a zone)
+    assert!(!w.get_setup_draw(), "page 03 starts with Draw zone off");
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     drag(&w, &s, (100.0, 100.0), (400.0, 200.0));
     // a drag too small for a zone adds nothing

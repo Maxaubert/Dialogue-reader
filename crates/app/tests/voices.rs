@@ -30,15 +30,6 @@ fn voices(scale: f64) -> (Voices, FakeTts, NullSink) {
     (v, tts, sink)
 }
 
-/// The button labelled `label` can be pressed.
-fn enabled(w: &dr_app::MainWindow, label: &str) -> bool {
-    ElementHandle::find_by_accessible_label(w, label)
-        .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
-        .unwrap_or_else(|| panic!("no button labelled {label:?}"))
-        .accessible_enabled()
-        != Some(false)
-}
-
 /// Lets the Slint change handlers run (`changed page`), as the event loop does.
 fn settle() {
     slint::platform::update_timers_and_animations();
@@ -70,10 +61,11 @@ fn page_05_lists_the_voices_and_plays_a_sample_with_the_page_settings() {
     assert!(!w.get_voice_testing(), "nothing plays at the start");
 
     w.set_page(Page::Voice);
-    w.set_picked_voice(1);
     w.set_voice_speed(0.75);
     w.set_voice_volume(0.4);
-    press(&w, "Play sample", AccessibleRole::Button);
+    // the play button of the Zira row picks Zira and plays her sample
+    press(&w, "Play a sample of Zira", AccessibleRole::Button);
+    assert_eq!(w.get_picked_voice(), 1);
     assert!(w.get_voice_testing());
     wait_test_end(&vm);
     assert!(!w.get_voice_testing());
@@ -92,7 +84,7 @@ fn stop_ends_the_sample() {
     let (vs, _, _) = voices(1.0);
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     std::thread::sleep(Duration::from_millis(200));
     assert!(vm.borrow_mut().poll_test());
     assert!(
@@ -119,9 +111,17 @@ fn with_no_voice_installed_the_pages_say_so_and_finish_still_saves() {
     );
     assert_eq!(w.get_voice_label(), "No voice");
     w.set_page(Page::Voice);
-    // nothing to play: the button is off
-    assert!(!enabled(&w, "Play sample"));
-    press(&w, "Play sample", AccessibleRole::Button);
+    // nothing to play: no play button, the page says so
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Play a sample of David")
+            .next()
+            .is_none()
+    );
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "No voices found.")
+            .next()
+            .is_some()
+    );
     assert!(!w.get_voice_testing());
     assert_eq!(w.get_notice(), "");
     press(&w, "Add voices", AccessibleRole::Button);
@@ -239,7 +239,7 @@ fn leaving_the_page_stops_the_sample_and_saves_moved_sliders() {
     settle();
     w.set_page(Page::Voice);
     settle();
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     assert!(vm.borrow_mut().poll_test());
     w.set_page(Page::Keys);
     settle();
@@ -266,9 +266,9 @@ fn a_quick_stop_and_play_follows_the_second_sample() {
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     tts.set_delay(Duration::from_millis(300));
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     press(&w, "Stop", AccessibleRole::Button);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     // the first sample is cut while it is made; the second one is made after it
     std::thread::sleep(Duration::from_millis(400));
     assert!(vm.borrow_mut().poll_test(), "the second sample still plays");
@@ -287,7 +287,7 @@ fn a_failed_test_says_why_in_plain_words() {
         "Windows voices: speak: The system cannot find the file specified.",
     ));
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     wait_test_end(&vm);
     assert!(!w.get_voice_testing());
     assert_eq!(w.get_notice(), "The voice could not speak the sample.");
@@ -300,7 +300,7 @@ fn the_page_05_volume_slider_changes_a_playing_sample() {
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     w.set_page(Page::Voice);
     w.set_voice_volume(0.4);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     let end = Instant::now() + Duration::from_secs(5);
     while sink.played().is_empty() {
         assert!(Instant::now() < end);

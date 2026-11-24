@@ -1,19 +1,96 @@
-// 05 voice. Kokoro voices (as in the approved mockup); the Windows voices when Kokoro's files are missing.
-import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+// Setup step 4, Pick a voice (d-black 01-setup, #step4). Left: "Voices", one 36 px row per voice with a play button
+// ("Play a sample"); the picked voice has the surface-3 fill, which glides (360 ms). With no voice: "No voices
+// found." and Add voices. Right: "Sound" with Speed and Volume.
+import { SetupPart } from "setup_part.slint";
+import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
 import { VoiceData } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, Card, CardHead, ITile, Chip, Slider, Wave, SmallLabel } from "../components/base.slint";
+import { Button, IconButton, Slider, Wave, GroupLabel, Panel, SettingRow } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
+
+component VoiceRow inherits Rectangle {
+    in property <VoiceData> voice;
+    in property <bool> sel;
+    // this row's sample is playing: the button stops it
+    in property <bool> playing;
+    callback clicked();
+    callback play();
+    callback stop();
+    height: Size.list;
+    border-radius: Radius.md;
+    background: !root.sel && touch.has-hover ? Palette.surface-2 : transparent;
+    animate background {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: list-item;
+    accessible-label: root.voice.name;
+    accessible-item-selected: root.sel;
+    accessible-action-default => {
+        root.clicked();
+    }
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Space.s3;
+        padding-right: Space.s1;
+        spacing: Space.s3;
+        Text {
+            text: root.voice.name;
+            color: Palette.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.voice.short;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+
+        if root.playing: VerticalLayout {
+            alignment: center;
+            Wave {
+                height: 16px;
+                bars: [6, 11, 15, 9, 13, 7, 12, 8];
+                gap: 2px;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                small: true;
+                icon: root.playing ? Icons.stop : Icons.play;
+                tip: root.playing ? "Stop" : "Play a sample";
+                label: root.playing ? "Stop" : "Play a sample of " + root.voice.name;
+                clicked => {
+                    if root.playing {
+                        root.stop();
+                    } else {
+                        root.play();
+                    }
+                }
+            }
+        }
+    }
+}
 
 export component VoicePage inherits Rectangle {
     in property <[VoiceData]> voices;
     in-out property <int> selected: 0;
     in-out property <float> speed: 0.55;
     in-out property <float> volume: 0.8;
-    // engine of the list, for its header ("Kokoro voices", "Windows voices")
+    // kept for app.slint: the engine of the list, why it is empty (the page says "No voices found.")
     in property <string> engine: "Kokoro";
-    // why the list is empty (no Kokoro files and no Windows voice installed)
     in property <string> problem;
-    // a sample is playing: the button says Stop, the wave shows how far it got
+    // a sample is playing (started on this page)
     in property <bool> testing;
     in property <int> test-played: 0;
     in property <string> test-time: "0:00";
@@ -24,122 +101,100 @@ export component VoicePage inherits Rectangle {
     callback sample(int);
     // the Volume slider moved (a playing sample follows it)
     callback volume-moved();
+    // the row whose sample plays (picking another row while it plays keeps the stop button on this one)
+    property <int> played: -1;
+    // speed: the slider runs from 0 to 2x, the profile keeps at least 0.5x; shown with one decimal ("1.0x")
+    property <int> tenths: Math.round(Math.max(0.25, root.speed) * 20);
+    property <length> list-y: Space.s7 + head.preferred-height + Space.s5 + Type.lh-small + Space.s2;
+    property <length> list-max: Math.max(3 * Size.list, root.height - root.list-y - Space.s5 - 2 * Space.s1 - 2px);
     VerticalLayout {
         x: (parent.width - Size.col) / 2;
+        y: Space.s7;
         width: Size.col;
-        padding-top: Space.s7;
+        height: self.preferred-height;
         alignment: start;
-        ObHead {
-            title: "Pick a voice";
-            lead: "Voices run on your PC. Nothing is sent online.";
+        SetupPart {
+            n: 0;
+            head := ObHead {
+                title: "Pick a voice";
+                lead: "Runs offline.";
+            }
         }
 
         Rectangle {
-            height: Space.s6;
+            height: Space.s5;
         }
 
-        HorizontalLayout {
-            spacing: Space.s5;
-            height: 460px;
-            Card {
+        SetupPart {
+            n: 1;
+            HorizontalLayout {
+                spacing: Space.s5;
                 VerticalLayout {
-                    padding: 1px;
+                    width: 560px;
+                    spacing: Space.s2;
                     alignment: start;
-                    CardHead {
-                        title: root.engine + " voices";
-                        count: root.voices.length;
+                    HorizontalLayout {
+                        padding-left: Space.s1;
+                        GroupLabel {
+                            text: "Voices";
+                        }
+                    }
+
+                    Panel {
                         VerticalLayout {
-                            alignment: center;
-                            Button {
-                                text: "Add voices";
-                                icon: Icons.download;
-                                kind: BtnKind.ghost;
-                                fg: Palette.text-2;
-                                icon-color: Palette.text-2;
-                                clicked => {
-                                    root.add-voices();
+                            if root.voices.length == 0: HorizontalLayout {
+                                padding-left: Space.s4 + 1px;
+                                padding-right: Space.s3 + 1px;
+                                padding-top: Space.s4 + 1px;
+                                padding-bottom: Space.s4 + 1px;
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: "No voices found.";
+                                    color: Palette.text-2;
+                                    vertical-alignment: center;
+                                }
+
+                                Button {
+                                    text: "Add voices";
+                                    clicked => {
+                                        root.add-voices();
+                                    }
                                 }
                             }
-                        }
-                    }
-
-                    if root.voices.length == 0: HorizontalLayout {
-                        padding-left: Space.s5;
-                        padding-right: Space.s5;
-                        height: 120px;
-                        Text {
-                            text: root.problem != "" ? root.problem : "No voice found.";
-                            color: Palette.text-2;
-                            wrap: word-wrap;
-                            vertical-alignment: center;
-                            line-height-factor: Type.lhf-150;
-                        }
-                    }
-
-                    // six rows show; the rest scroll (11 voices in the sample data). With no voice the list takes no
-                    // room and the message above shows instead.
-                    Flickable {
-                        height: root.voices.length > 0 ? 6 * 60px : 0px;
-                        content-height: root.voices.length * 60px;
-                        VerticalLayout {
-                            for v[i] in root.voices: Rectangle {
-                                height: 60px;
-                                background: i == root.selected ? Palette.surface-2 : transparent;
-                                accessible-role: list-item;
-                                accessible-label: v.name;
-                                accessible-item-selected: i == root.selected;
-                                accessible-action-default => {
-                                    root.selected = i;
-                                }
-                                if i > 0: Rectangle {
-                                    y: 0;
-                                    height: 1px;
-                                    background: Palette.line;
-                                }
-                                TouchArea {
-                                    clicked => {
-                                        root.selected = i;
-                                    }
-                                }
-
-                                HorizontalLayout {
-                                    padding-left: Space.s5;
-                                    padding-right: Space.s5;
-                                    spacing: Space.s3;
-                                    VerticalLayout {
-                                        alignment: center;
-                                        ITile {
-                                            icon: Icons.audio;
-                                            on: i == root.selected;
+                            if root.voices.length > 0: VerticalLayout {
+                                padding: Space.s1 + 1px;
+                                // a long list scrolls
+                                Flickable {
+                                    height: Math.min(root.voices.length * Size.list, root.list-max);
+                                    content-height: root.voices.length * Size.list;
+                                    Rectangle {
+                                        y: Math.max(0, root.selected) * Size.list;
+                                        height: Size.list;
+                                        border-radius: Radius.md;
+                                        background: Palette.surface-3;
+                                        visible: root.selected >= 0 && root.selected < root.voices.length;
+                                        animate y {
+                                            duration: Motion.glide;
+                                            easing: cubic-bezier(0.16, 1, 0.3, 1);
                                         }
                                     }
 
                                     VerticalLayout {
-                                        alignment: center;
-                                        horizontal-stretch: 1;
-                                        Text {
-                                            text: v.name;
-                                            height: Type.lh2;
-                                            font-weight: Type.w-medium;
-                                            color: Palette.text;
-                                            vertical-alignment: center;
-                                        }
-
-                                        Text {
-                                            text: v.desc;
-                                            height: Type.lh1;
-                                            font-size: Type.fs1;
-                                            color: Palette.text-3;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-
-                                    if i == root.selected: VerticalLayout {
-                                        alignment: center;
-                                        Chip {
-                                            text: "Selected";
-                                            dot: false;
-                                            icon: Icons.check-sm;
+                                        alignment: start;
+                                        for v[i] in root.voices: VoiceRow {
+                                            voice: v;
+                                            sel: i == root.selected;
+                                            playing: root.testing && i == root.played;
+                                            clicked => {
+                                                root.selected = i;
+                                            }
+                                            play => {
+                                                root.played = i;
+                                                root.sample(i);
+                                            }
+                                            stop => {
+                                                root.stop-test();
+                                            }
                                         }
                                     }
                                 }
@@ -147,136 +202,64 @@ export component VoicePage inherits Rectangle {
                         }
                     }
                 }
-            }
 
-            Card {
-                width: 400px;
                 VerticalLayout {
-                    padding: 1px;
-                    CardHead {
-                        title: "Test it";
-                        Text {
-                            text: root.voices.length > 0 ? root.voices[root.selected].engine + " · " + root.voices[root.selected].name : "No voice";
-                            font-size: Type.fs1;
-                            color: Palette.text-3;
-                            vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    spacing: Space.s2;
+                    alignment: start;
+                    HorizontalLayout {
+                        padding-left: Space.s1;
+                        GroupLabel {
+                            text: "Sound";
                         }
                     }
 
-                    VerticalLayout {
-                        padding: Space.s5;
-                        spacing: Space.s5;
-                        vertical-stretch: 1;
+                    Panel {
                         VerticalLayout {
-                            spacing: Space.s2;
-                            SmallLabel {
-                                text: "Sample line";
-                            }
-
-                            Rectangle {
-                                height: 68px;
-                                border-radius: Radius.md;
-                                border-width: 1px;
-                                border-color: Palette.line-2;
-                                background: Palette.surface-2;
-                                Text {
-                                    x: Space.s3 + 1px;
-                                    y: Space.s3 + 1px;
-                                    width: parent.width - 2 * (Space.s3 + 1px);
-                                    text: "Arthur: We need to get these horses moving before the snow buries us.";
-                                    color: Palette.text;
-                                    wrap: word-wrap;
-                                    line-height-factor: Type.lhf-150;
-                                }
-                            }
-                        }
-
-                        VerticalLayout {
-                            spacing: Space.s2;
-                            HorizontalLayout {
-                                SmallLabel {
-                                    text: "Speed";
-                                    horizontal-stretch: 1;
+                            padding: 1px;
+                            SettingRow {
+                                text: "Speed";
+                                first: true;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Slider {
+                                        width: 120px;
+                                        label: "Speed";
+                                        value <=> root.speed;
+                                    }
                                 }
 
-                                // the slider runs from 0 to 2x speed; the profile keeps at least 0.5x
                                 Text {
-                                    text: Math.round(Math.max(0.25, root.speed) * 20) / 10 + "×";
-                                    font-family: Type.mono;
-                                    font-size: Type.fs1;
+                                    width: 32px;
+                                    text: Math.floor(root.tenths / 10) + "." + Math.mod(root.tenths, 10) + "x";
+                                    font-size: Type.fs-small;
                                     color: Palette.text-2;
+                                    horizontal-alignment: right;
                                     vertical-alignment: center;
                                 }
                             }
 
-                            Slider {
-                                value <=> root.speed;
-                            }
-                        }
-
-                        VerticalLayout {
-                            spacing: Space.s2;
-                            HorizontalLayout {
-                                SmallLabel {
-                                    text: "Volume";
-                                    horizontal-stretch: 1;
+                            SettingRow {
+                                text: "Volume";
+                                VerticalLayout {
+                                    alignment: center;
+                                    Slider {
+                                        width: 120px;
+                                        label: "Volume";
+                                        value <=> root.volume;
+                                        changed => {
+                                            root.volume-moved();
+                                        }
+                                    }
                                 }
 
                                 Text {
+                                    width: 32px;
                                     text: Math.round(root.volume * 100) + "%";
-                                    font-family: Type.mono;
-                                    font-size: Type.fs1;
+                                    font-size: Type.fs-small;
                                     color: Palette.text-2;
+                                    horizontal-alignment: right;
                                     vertical-alignment: center;
-                                }
-                            }
-
-                            Slider {
-                                value <=> root.volume;
-                                changed => {
-                                    root.volume-moved();
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            height: 66px;
-                            border-radius: Radius.lg;
-                            border-width: 1px;
-                            border-color: Palette.line;
-                            background: Palette.surface-2;
-                            HorizontalLayout {
-                                padding-left: Space.s4 + 1px;
-                                padding-right: Space.s4 + 1px;
-                                spacing: Space.s3;
-                                Wave {
-                                    horizontal-stretch: 1;
-                                    bars: [12, 20, 30, 29, 25, 21, 18, 12, 17, 24, 16, 10, 17, 24, 30, 37, 30, 21, 11, 23, 24, 17, 10, 21, 31, 27, 35, 31, 21, 12, 17, 26, 15, 11];
-                                    played: root.testing ? root.test-played : 0;
-                                }
-
-                                Text {
-                                    text: root.test-time;
-                                    font-family: Type.mono;
-                                    font-size: Type.fs1;
-                                    color: Palette.text-2;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-
-                        Button {
-                            text: root.testing ? "Stop" : "Play sample";
-                            icon: root.testing ? Icons.stop : Icons.play;
-                            large: true;
-                            horizontal-stretch: 1;
-                            // with no voice there is nothing to play (the list says why)
-                            enabled: root.voices.length > 0;
-                            clicked => {
-                                if root.testing {
-                                    root.stop-test();
-                                } else {
-                                    root.test();
                                 }
                             }
                         }

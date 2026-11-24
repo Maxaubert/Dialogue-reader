@@ -46,6 +46,9 @@ component PageSlot inherits Rectangle {
     in property <bool> armed: true;
     // Activity: it rises from y +24 px instead of moving sideways, and sinks back
     in property <bool> rise: false;
+    // Finish: the setup fades out in 140 ms (ease-in) and the Overview comes in 80 ms later, its opacity and
+    // scale (0.98 to 1) in 320 ms (ease-out-strong), with no side move (README motion table, 01-setup 3)
+    in property <bool> morph: false;
     // the page for the accessibility tree ("Settings page"); the tests count the pages that are there
     in property <string> name;
     accessible-role: tab-panel;
@@ -54,13 +57,13 @@ component PageSlot inherits Rectangle {
     out property <bool> alive: root.shown || root.t > 0.001;
     property <float> t: root.shown ? 1 : 0;
     animate t {
-        duration: !root.armed ? 0ms : root.shown ? (root.fwd ? Motion.push-in : Motion.back-in) : (root.fwd ? Motion.push-out : Motion.back-out);
+        duration: !root.armed ? 0ms : root.morph ? (root.shown ? (Motion.instant ? 0ms : 320ms) : Motion.exit) : root.shown ? (root.fwd ? Motion.push-in : Motion.back-in) : (root.fwd ? Motion.push-out : Motion.back-out);
         delay: root.armed && root.shown ? Motion.push-gap : 0ms;
         easing: root.shown ? cubic-bezier(0.16, 1, 0.3, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     property <length> way-in: root.rise ? 24px : root.fwd ? 24px : -24px;
     property <length> way-out: root.rise ? 24px : root.fwd ? -16px : 16px;
-    property <length> off: (1 - root.t) * (root.shown ? root.way-in : root.way-out);
+    property <length> off: root.morph ? 0px : (1 - root.t) * (root.shown ? root.way-in : root.way-out);
     opacity: root.t;
     visible: root.t > 0.01;
     Rectangle {
@@ -68,6 +71,7 @@ component PageSlot inherits Rectangle {
         y: root.rise ? root.off : 0px;
         width: root.width;
         height: root.height;
+        transform-scale: root.morph && root.shown ? 0.98 + 0.02 * root.t : 1;
         @children
     }
 
@@ -141,7 +145,7 @@ export component MainWindow inherits Window {
     // zone editing on 03 (setup-*) and 11 (zones-*)
     in-out property <int> setup-selected: 1;
     in-out property <int> zones-selected: 1;
-    in-out property <bool> setup-draw: true;
+    in-out property <bool> setup-draw: false;
     in-out property <bool> zones-draw: false;
     in property <Kind> zone-kind: Kind.dialogue;
     in property <bool> drafting: false;
@@ -178,6 +182,8 @@ export component MainWindow inherits Window {
     // set from Rust before the first move in the UI (the launch) just shows, with no push.
     property <bool> fwd: true;
     property <bool> armed: false;
+    // Finish was pressed: the Mode page and the Overview morph instead of pushing (PageSlot.morph)
+    property <bool> finishing: false;
     // switch game (240 ms): the old name rolls out while `rolling`, the content dips and comes back
     property <bool> rolling: false;
     property <string> old-game-name;
@@ -292,6 +298,7 @@ export component MainWindow inherits Window {
         }
         root.fwd = true;
         root.armed = true;
+        root.finishing = false;
         root.page = p;
     }
     function go-back(p: Page) {
@@ -301,6 +308,7 @@ export component MainWindow inherits Window {
         }
         root.fwd = false;
         root.armed = true;
+        root.finishing = false;
         root.page = p;
     }
     // back chevron, Esc and Done on a sub-page
@@ -346,6 +354,7 @@ export component MainWindow inherits Window {
             root.go(Page.mode);
         } else if root.page == Page.mode {
             root.go(Page.overview);
+            root.finishing = true;
         }
     }
     // The game name, Ctrl K and "Switch game" on the stage open the switcher.
@@ -431,6 +440,11 @@ export component MainWindow inherits Window {
                 if e.text == Key.Escape && root.zone-cancel() {
                     return accept;
                 }
+            }
+            // Enter in setup: Get started, Continue or Finish (not while key capture waits for a key)
+            if root.setup && e.text == Key.Return && root.overlay == OverlayPreview.none && !root.switcher-open && root.capturing-key < 0 {
+                root.next();
+                return accept;
             }
             if e.text == Key.Escape && root.overlay == OverlayPreview.none && !root.switcher-open {
                 // key capture takes Esc itself (through the key hook): the page stays
@@ -560,6 +574,9 @@ export component MainWindow inherits Window {
                         retake => {
                             root.retake-shot();
                         }
+                        delete-zone => {
+                            root.zone-delete();
+                        }
                     }
                 }
 
@@ -613,6 +630,7 @@ export component MainWindow inherits Window {
                 }
 
                 mode-slot := PageSlot {
+                    morph: root.finishing;
                     name: "Mode page";
                     shown: root.page == Page.mode;
                     fwd: root.fwd;
@@ -625,13 +643,14 @@ export component MainWindow inherits Window {
                         zone-count: root.setup-zones.length;
                         read-key: root.read-key;
                         menu-key: root.menu-key;
-                        voice: root.voices.length > 0 ? root.voices[root.picked-voice].engine + " · " + root.voices[root.picked-voice].name : "No voice";
+                        voice: root.voices.length > 0 ? root.voices[root.picked-voice].name : "";
                         speed: root.voice-speed;
                         has-voice: root.voices.length > 0;
                     }
                 }
 
                 overview-slot := PageSlot {
+                    morph: root.finishing;
                     name: "Overview page";
                     shown: root.page == Page.overview;
                     fwd: root.fwd;
@@ -833,30 +852,40 @@ export component MainWindow inherits Window {
             }
 
             // the setup footer: there on every setup step, faded out on Welcome
+            // room for the setup footer (drawn below, outside the layout, so it can fade out after Finish)
             if root.setup: Rectangle {
-                height: foot.preferred-height;
-                opacity: root.page != Page.welcome ? 1 : 0;
-                visible: self.opacity > 0.01;
-                animate opacity {
-                    duration: root.armed ? (root.page != Page.welcome ? Motion.push-in : Motion.push-out) : 0ms;
-                    delay: root.armed && root.page != Page.welcome ? Motion.push-gap : 0ms;
-                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-                }
-                foot := ObFoot {
-                    step: root.step;
-                    notice: root.notice;
-                    primary: root.page == Page.mode ? "Finish" : "Continue";
-                    primary-icon: root.page == Page.mode ? Icons.check : Icons.arrow-right;
-                    back => {
-                        root.back();
-                    }
-                    next => {
-                        root.next();
-                    }
-                }
-
-                if root.page == Page.welcome: TouchArea { }
+                height: 72px;
             }
+        }
+
+        // The setup footer: there on every setup step, faded out on Welcome. It fades in with the push of the
+        // first step, and out in 140 ms (ease-in) at Finish while the Overview comes in.
+        foot-host := Rectangle {
+            property <bool> on: root.setup && root.page != Page.welcome;
+            y: parent.height - self.height;
+            height: 72px;
+            opacity: self.on ? 1 : 0;
+            visible: self.opacity > 0.01;
+            animate opacity {
+                duration: !root.armed ? 0ms : foot-host.on ? Motion.push-in : root.setup ? Motion.push-out : Motion.exit;
+                delay: root.armed && foot-host.on ? Motion.push-gap : 0ms;
+                easing: foot-host.on ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+            }
+            foot := ObFoot {
+                // after Finish the footer keeps step 5 and "Finish" while it fades out
+                step: root.setup ? root.step : 5;
+                notice: root.setup ? root.notice : "";
+                primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
+                primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
+                back => {
+                    root.back();
+                }
+                next => {
+                    root.next();
+                }
+            }
+
+            if !foot-host.on: TouchArea { }
         }
 
         if root.sheet: ComponentSheet { }

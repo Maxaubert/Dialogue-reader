@@ -1,248 +1,138 @@
-// 06 mode, with the setup summary.
-import { Palette, Space, Radius, Size, Type, Icons, Kind, Kinds } from "../theme.slint";
-import { Icon, CIcon, Card, Radio, Dot, Kbd, Thumb, SmallLabel } from "../components/base.slint";
+// Setup step 5, How should it read? (d-black 01-setup, #step5): two cards, the picked one with the white border and
+// the surface-2 fill, then one summary line ("5 zones · Mouse 4 · Adam 1.1x") that follows what was picked.
+import { SetupPart } from "setup_part.slint";
+import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
+import { CIcon } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
 
-component ModeCard inherits Card {
+component ModeCard inherits Rectangle {
     in property <image> icon;
     in property <string> title;
-    in property <string> line1;
-    in property <string> line2;
+    in property <string> line;
+    in property <bool> selected;
     callback clicked();
-    height: 187px;
+    height: lay.preferred-height;
+    border-radius: Radius.lg;
+    border-width: 1px;
+    background: root.selected ? Palette.surface-2 : Palette.surface-1;
+    border-color: root.selected ? Palette.on : touch.has-hover ? Palette.line-2 : Palette.line;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, border-color, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
     accessible-role: radio-button;
     accessible-label: root.title;
     accessible-checked: root.selected;
     accessible-action-default => {
         root.clicked();
     }
-    TouchArea {
+    touch := TouchArea {
         clicked => {
             root.clicked();
         }
     }
 
-    VerticalLayout {
-        padding: Space.s5 + 1px;
-        spacing: Space.s3;
+    lay := VerticalLayout {
+        padding: Space.s5 - 4px + 1px;
+        spacing: Space.s1;
         HorizontalLayout {
-            alignment: space-between;
-            Rectangle {
-                width: 40px;
-                height: 40px;
-                border-radius: Radius.md;
-                background: root.selected ? Palette.accent-soft : Palette.surface-3;
-                Icon {
-                    source: root.icon;
-                    color: root.selected ? Palette.accent : Palette.text;
-                }
-            }
-
-            VerticalLayout {
-                alignment: center;
-                Radio {
-                    on: root.selected;
-                }
+            padding-bottom: Space.s3 - Space.s1;
+            alignment: start;
+            CIcon {
+                source: root.icon;
+                size: Size.icon-lg;
+                color: root.selected ? Palette.text : Palette.text-2;
             }
         }
 
         Text {
             text: root.title;
-            height: 21px;
-            font-size: Type.fs3;
-            font-weight: Type.w-medium;
+            height: Type.lh-body;
+            font-weight: Type.w-strong;
             color: Palette.text;
-            vertical-alignment: center;
+            accessible-role: none;
         }
 
         Text {
-            text: root.line1;
-            height: Type.lh2;
-            color: Palette.text;
-            vertical-alignment: center;
-        }
-
-        Text {
-            text: root.line2;
-            height: Type.lh2;
+            text: root.line;
+            height: Type.lh-body;
             color: Palette.text-2;
-            vertical-alignment: center;
+            accessible-role: none;
         }
-    }
-}
-
-component SumRow inherits Rectangle {
-    in property <string> key;
-    in property <bool> first;
-    height: 48px;
-    if !root.first: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-    HorizontalLayout {
-        padding-left: Space.s5;
-        padding-right: Space.s5;
-        spacing: Space.s4;
-        alignment: start;
-        Text {
-            width: 120px;
-            text: root.key;
-            color: Palette.text-2;
-            vertical-alignment: center;
-        }
-
-        @children
     }
 }
 
 export component ModePage inherits Rectangle {
     in-out property <bool> automatic: true;
-    in property <string> game: "Red Dead Redemption 2";
-    in property <string> art: "rdr2";
+    // kept for app.slint (the summary no longer shows the game)
+    in property <string> game;
+    in property <string> art;
     in property <image> cover;
+    in property <string> menu-key;
     in property <int> zone-count: 5;
     in property <string> read-key: "Mouse 4";
-    in property <string> menu-key: "F7";
-    in property <string> voice: "Kokoro · Adam";
+    // the name of the picked voice ("Adam")
+    in property <string> voice: "Adam";
     // false: no voice at all (no Kokoro files and no Windows voice)
     in property <bool> has-voice: true;
     // page 05 slider, 0 to 1 for 0x to 2x (the profile keeps 0.5x to 2x)
     in property <float> speed: 0.55;
+    property <int> tenths: Math.round(Math.max(0.25, root.speed) * 20);
     VerticalLayout {
         x: (parent.width - Size.col) / 2;
+        y: Space.s7;
         width: Size.col;
-        padding-top: Space.s7;
+        height: self.preferred-height;
         alignment: start;
-        ObHead {
-            title: "How should it read?";
-            lead: "You can switch any time from the main window.";
-        }
-
-        Rectangle {
-            height: Space.s6;
-        }
-
-        HorizontalLayout {
-            spacing: Space.s4;
-            ModeCard {
-                width: (Size.col - Space.s4) / 2;
-                icon: Icons.zap;
-                title: "Automatic";
-                line1: "Reads new text the moment it appears in a zone.";
-                line2: "Good for story games and long talks.";
-                selected: root.automatic;
-                clicked => {
-                    root.automatic = true;
-                }
-            }
-
-            ModeCard {
-                width: (Size.col - Space.s4) / 2;
-                icon: Icons.mouse;
-                title: "On key press";
-                line1: "Reads every zone once when you press your read key.";
-                line2: "Good when you only want some lines.";
-                selected: !root.automatic;
-                clicked => {
-                    root.automatic = false;
-                }
+        SetupPart {
+            n: 0;
+            ObHead {
+                title: "How should it read?";
             }
         }
 
         Rectangle {
-            height: Space.s6;
+            height: Space.s5;
         }
 
-        SmallLabel {
-            text: "Your setup for " + root.game;
+        SetupPart {
+            n: 1;
+            HorizontalLayout {
+                spacing: Space.s4;
+                ModeCard {
+                    width: (Size.col - Space.s4) / 2;
+                    icon: Icons.zap;
+                    title: "Automatic";
+                    line: "Reads new text as it appears.";
+                    selected: root.automatic;
+                    clicked => {
+                        root.automatic = true;
+                    }
+                }
+
+                ModeCard {
+                    width: (Size.col - Space.s4) / 2;
+                    icon: @image-url("../icons/keyboard.svg");
+                    title: "On key press";
+                    line: "Reads when you press your key.";
+                    selected: !root.automatic;
+                    clicked => {
+                        root.automatic = false;
+                    }
+                }
+            }
         }
 
         Rectangle {
-            height: Space.s3;
+            height: Space.s5;
         }
 
-        Card {
-            VerticalLayout {
-                padding: 1px;
-                SumRow {
-                    key: "Game";
-                    first: true;
-                    VerticalLayout {
-                        alignment: center;
-                        Thumb {
-                            width: 24px;
-                            height: 24px;
-                            art: root.art;
-                            picture: root.cover;
-                            radius: Radius.xs;
-                        }
-                    }
-
-                    Text {
-                        text: root.game;
-                        font-weight: Type.w-medium;
-                        color: Palette.text;
-                        vertical-alignment: center;
-                    }
-                }
-
-                SumRow {
-                    key: "Zones";
-                    Text {
-                        text: root.zone-count + " zones";
-                        font-weight: Type.w-medium;
-                        color: Palette.text;
-                        vertical-alignment: center;
-                    }
-
-                    HorizontalLayout {
-                        spacing: Space.s2;
-                        for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: VerticalLayout {
-                            alignment: center;
-                            Dot {
-                                // grey: zone kinds have no color (Max, 2026-11-22)
-                                tint: Palette.text-3;
-                            }
-                        }
-                    }
-                }
-
-                SumRow {
-                    key: "Read key";
-                    VerticalLayout {
-                        alignment: center;
-                        Kbd {
-                            text: root.read-key;
-                        }
-                    }
-                }
-
-                SumRow {
-                    key: "Quick menu key";
-                    VerticalLayout {
-                        alignment: center;
-                        Kbd {
-                            text: root.menu-key;
-                        }
-                    }
-                }
-
-                SumRow {
-                    key: "Voice";
-                    Text {
-                        text: root.voice;
-                        font-weight: Type.w-medium;
-                        color: Palette.text;
-                        vertical-alignment: center;
-                    }
-
-                    Text {
-                        text: root.has-voice ? Math.round(Math.max(0.25, root.speed) * 20) / 10 + "× speed" : "Nothing is spoken until you add a voice.";
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                    }
-                }
+        SetupPart {
+            n: 2;
+            Text {
+                text: root.zone-count + (root.zone-count == 1 ? " zone · " : " zones · ") + root.read-key + " · " + (root.has-voice ? root.voice + " " + Math.floor(root.tenths / 10) + "." + Math.mod(root.tenths, 10) + "x" : "No voice yet");
+                color: Palette.text-2;
             }
         }
     }

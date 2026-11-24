@@ -1,125 +1,55 @@
-// 04-read-key-d "Your keys": the read key and the quick menu key (onboarding step 3). Settings shows the same
-// KeysCard (Max picked "D everywhere", 2026-11-22).
-import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
-import { Icon, CIcon, Button, BtnKind, Card, KeyCap } from "../components/base.slint";
-
-component KeyRow inherits Card {
-    in property <string> name;
-    in property <string> desc;
-    in property <string> key;
-    in property <image> icon;
-    in property <image> key-icon;
-    in property <bool> main: false;
-    // waiting for the new key (key capture): the keycap asks for it, the button cancels
-    in property <bool> capturing: false;
-    property <image> no-icon;
-    callback change();
-    height: 92px;
-    border-color: root.main ? Palette.accent : Palette.line;
-    // main card: a light accent wash from the left
-    if root.main: Rectangle {
-        x: 1px;
-        y: 1px;
-        width: parent.width - 2px;
-        height: parent.height - 2px;
-        border-radius: Radius.lg - 1px;
-        background: @linear-gradient(90deg, Palette.accent-wash 0%, Palette.accent-wash-mid 60%, Palette.accent-clear 100%);
-    }
-    HorizontalLayout {
-        padding-left: Space.s5 + 1px;
-        padding-right: Space.s3 + 1px;
-        spacing: 20px;
-        VerticalLayout {
-            alignment: center;
-            Rectangle {
-                width: 44px;
-                height: 44px;
-                border-radius: 10px;
-                background: root.main ? Palette.accent-soft : Palette.surface-3;
-                Icon {
-                    source: root.icon;
-                    width: 22px;
-                    height: 22px;
-                    color: root.main ? Palette.accent : Palette.text-2;
-                }
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 1;
-            spacing: 2px;
-            Text {
-                text: root.name;
-                height: 24px;
-                font-size: 18px;
-                font-weight: Type.w-semibold;
-                letter-spacing: Type.ls-card-title;
-                color: Palette.text;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: root.desc;
-                height: 20px;
-                font-size: Type.fs2;
-                color: root.main ? Palette.text-2 : Palette.text-3;
-                vertical-alignment: center;
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            KeyCap {
-                text: root.capturing ? "Press a key" : root.key;
-                icon: root.capturing ? root.no-icon : root.key-icon;
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Button {
-                width: 84px;
-                text: root.capturing ? "Cancel" : "Change";
-                label: (root.capturing ? "Cancel " : "Change ") + root.name;
-                kind: BtnKind.ghost;
-                fg: Palette.text-3;
-                clicked => {
-                    root.change();
-                }
-            }
-        }
-    }
-}
+// Setup step 3, Your keys (d-black 01-setup, #step3): one panel with the read key and the menu key. A click on a
+// keycap starts key capture ("Press a key"); the next key or mouse button becomes the key. Esc, a click on the
+// keycap again or the window losing the focus ends it, and Alt+Tab and Win are never taken (src/vm/reading.rs).
+// Settings shows the same KeysCard.
+import { SetupPart } from "setup_part.slint";
+import { Palette, Space, Size } from "../theme.slint";
+import { Keycap, Panel, SettingRow } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
 
 export component KeysCard inherits VerticalLayout {
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     // the row waiting for a key: 0 read, 1 quick menu, -1 none
     in property <int> capturing: -1;
+    // the keycap tooltip (Settings: "Click to change"); empty: none
+    in property <string> tip;
     callback change(int);
-    spacing: Space.s3;
-    KeyRow {
-        name: "Read zones now";
-        desc: "Reads all your zones out loud";
-        key: root.read-key;
-        icon: Icons.volume-lg;
-        key-icon: Icons.mouse;
-        main: true;
-        capturing: root.capturing == 0;
-        change => {
-            root.change(0);
-        }
-    }
+    Panel {
+        VerticalLayout {
+            padding: 1px;
+            SettingRow {
+                text: "Read key";
+                first: true;
+                VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: root.read-key;
+                        label: "Read key: " + root.read-key;
+                        tip: root.tip;
+                        capturing: root.capturing == 0;
+                        clicked => {
+                            root.change(0);
+                        }
+                    }
+                }
+            }
 
-    KeyRow {
-        name: "Quick menu";
-        desc: "Opens the quick menu over your game";
-        key: root.menu-key;
-        icon: Icons.panel-lg;
-        capturing: root.capturing == 1;
-        change => {
-            root.change(1);
+            SettingRow {
+                text: "Menu key";
+                VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: root.menu-key;
+                        label: "Menu key: " + root.menu-key;
+                        tip: root.tip;
+                        capturing: root.capturing == 1;
+                        clicked => {
+                            root.change(1);
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -130,24 +60,26 @@ export component KeysPage inherits Rectangle {
     in property <int> capturing: -1;
     callback change(int);
     VerticalLayout {
-        alignment: center;
-        spacing: Space.s6;
-        padding-bottom: Space.s6;
-        Text {
-            text: "Your keys";
-            height: 37px;
-            font-size: Type.fs5;
-            font-weight: Type.w-semibold;
-            letter-spacing: Type.ls-display;
-            color: Palette.text;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        x: (parent.width - Size.col) / 2;
+        y: Space.s7;
+        width: Size.col;
+        height: self.preferred-height;
+        alignment: start;
+        SetupPart {
+            n: 0;
+            ObHead {
+                title: "Your keys";
+                lead: "Click a key to change it.";
+            }
         }
 
-        HorizontalLayout {
-            alignment: center;
+        Rectangle {
+            height: Space.s5;
+        }
+
+        SetupPart {
+            n: 1;
             KeysCard {
-                width: 720px;
                 read-key: root.read-key;
                 menu-key: root.menu-key;
                 capturing: root.capturing;

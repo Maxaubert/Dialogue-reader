@@ -13,9 +13,10 @@
 //!   five, "Show all" the newest [`KEEP`].
 //! - A game change stops the reader and the speech of the game before; what it read or queued is logged under it
 //!   (a speech mark tells when its last events came).
-//! - Key capture ("Change" on the keys page and in Settings): the runtime installs the hooks while it is open; the
-//!   next key or mouse button (not left or right click) becomes the key. Esc, "Cancel" or the app window losing
-//!   the focus ends it. Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are never taken (`dr_runtime::keys`).
+//! - Key capture (a click on a keycap, on the keys page and in Settings): the runtime installs the hooks while it is
+//!   open; the next key or mouse button (not left or right click) becomes the key. Esc, a second click on the
+//!   keycap or the app window losing the focus ends it. Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are never taken
+//!   (`dr_runtime::keys`).
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -652,7 +653,7 @@ impl Vm {
         self.speech_cmd(speech::Cmd::ReplayLines(lines_of(e)));
     }
 
-    /// "Change" on a key row: starts key capture for it (0 read key, 1 quick menu key), or ends it ("Cancel").
+    /// A click on a keycap: starts key capture for it (0 read key, 1 quick menu key), or ends it (a second click).
     pub fn key_change(&mut self, which: i32) {
         if self.reading.capture == Some(which) {
             self.end_capture();
@@ -748,7 +749,7 @@ impl Vm {
         }
     }
 
-    /// Ends key capture as Esc or "Cancel" does: the key stays as it was. Also when the app window loses the
+    /// Ends key capture as Esc or a second click on the keycap does: the key stays as it was. Also when the app window loses the
     /// focus (`crate::focus_lost`): Alt+Tab, Win or a click in the game must not leave capture open.
     pub fn cancel_capture(&mut self) {
         if self.reading.capture.is_some() {

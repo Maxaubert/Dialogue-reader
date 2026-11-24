@@ -417,3 +417,61 @@ fn motion_only_one_page_takes_input_while_pages_change() {
     assert_eq!(w.get_page(), Page::Overview);
     assert_eq!(pages(&w), ["Overview page"]);
 }
+
+#[test]
+fn enter_walks_the_setup_but_not_during_key_capture() {
+    let w = window();
+    assert_eq!(w.get_page(), Page::Welcome);
+    // Enter is Get started on Welcome, then Continue
+    for expected in [Page::PickWindow, Page::DrawZones, Page::Keys] {
+        key(&w, Key::Return);
+        assert_eq!(w.get_page(), expected);
+    }
+    // a click on a keycap starts key capture: Enter waits for the key hook
+    press(&w, "Read key: Mouse 4", AccessibleRole::Button);
+    assert_eq!(w.get_capturing_key(), 0);
+    key(&w, Key::Return);
+    assert_eq!(w.get_page(), Page::Keys);
+    // a second click on the keycap ends the capture
+    press(&w, "Press a key", AccessibleRole::Button);
+    assert_eq!(w.get_capturing_key(), -1);
+    for expected in [Page::Voice, Page::Mode, Page::Overview] {
+        key(&w, Key::Return);
+        assert_eq!(w.get_page(), expected);
+    }
+    // Enter does nothing on the main pages
+    key(&w, Key::Return);
+    assert_eq!(w.get_page(), Page::Overview);
+}
+
+#[test]
+fn motion_finish_fades_the_setup_into_the_overview() {
+    let w = window_with(true);
+    w.set_page(Page::Voice);
+    press(&w, "Continue", AccessibleRole::Button);
+    settle();
+    press(&w, "Finish", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Overview);
+    // 100 ms in: the setup and its footer still fade out (140 ms), the Overview waits 80 ms, then comes in
+    wait(100);
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Finish")
+            .next()
+            .is_some(),
+        "the footer fades out, it does not vanish"
+    );
+    settle();
+    assert_eq!(pages(&w), ["Overview page"]);
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Finish")
+            .next()
+            .is_none(),
+        "no footer is left"
+    );
+    // the footer took no click while it faded: Back is gone with it
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Back")
+            .next()
+            .is_none()
+    );
+}

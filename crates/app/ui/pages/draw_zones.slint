@@ -1,37 +1,148 @@
-// 03 draw zones.
-import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+// Setup step 2, Mark where text shows up (d-black 01-setup, #step2). One toolbar row on black (Draw zone, the kinds,
+// Delete zone; Retake screenshot and the live note on the right), then the picture with the zones, 960 x 540.
+// Dragging on empty picture always draws; "Draw zone" also draws over another zone (src/vm/zones.rs).
+import { SetupPart } from "setup_part.slint";
+import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Card, CardHead, SmallLabel } from "../components/base.slint";
+import { CIcon, IconButton } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
-import { Stage, ZoneRow, ZoneTools, LiveNote, LiveView } from "../components/stage.slint";
+import { Stage, LiveNote, LiveView } from "../components/stage.slint";
 
-export component KindHelp inherits VerticalLayout {
-    for k in [
-        { kind: Kind.dialogue, d: "Spoken lines" },
-        { kind: Kind.speaker, d: "Who is talking" },
-        { kind: Kind.pickups, d: "Item pop-ups" },
-        { kind: Kind.prompts, d: "Button hints" },
-        { kind: Kind.ignore, d: "Never read" },
-    ]: HorizontalLayout {
-        height: 28px;
-        spacing: Space.s3;
+// "Draw zone" (.zt-draw): a button that stays on (surface-3 and a white border) while the tool is picked.
+component DrawToggle inherits Rectangle {
+    in-out property <bool> on;
+    height: Size.ctl;
+    width: lay.preferred-width;
+    border-radius: Radius.md;
+    border-width: 1px;
+    border-color: root.on ? Palette.on : touch.has-hover ? Palette.line-2 : Palette.line;
+    background: root.on || touch.has-hover ? Palette.surface-3 : Palette.surface-2;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, border-color, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: "Draw zone";
+    accessible-checked: root.on;
+    accessible-action-default => {
+        root.on = !root.on;
+    }
+    touch := TouchArea {
+        clicked => {
+            root.on = !root.on;
+        }
+    }
+
+    lay := HorizontalLayout {
+        padding-left: Space.s3 - 1px;
+        padding-right: Space.s3 - 1px;
+        spacing: Space.s2;
         CIcon {
-            source: Kinds.icon(k.kind);
+            source: @image-url("../icons/draw.svg");
+            color: root.on ? Palette.text : Palette.text-2;
         }
 
         Text {
-            text: Kinds.name(k.kind);
-            width: 72px;
-            font-weight: Type.w-medium;
+            text: "Draw zone";
+            font-weight: Type.w-strong;
             color: Palette.text;
             vertical-alignment: center;
         }
+    }
 
-        Text {
-            text: k.d;
-            color: Palette.text-2;
-            vertical-alignment: center;
-            horizontal-stretch: 1;
+    Tooltip {
+        Rectangle {
+            border-radius: Radius.md;
+            border-width: 1px;
+            border-color: Palette.line-2;
+            background: Palette.surface-2;
+            HorizontalLayout {
+                padding-left: Space.s2;
+                padding-right: Space.s2;
+                padding-top: Space.s1;
+                padding-bottom: Space.s1;
+                Text {
+                    text: "Draw a zone, also over another zone";
+                    font-size: Type.fs-small;
+                    color: Palette.text;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}
+
+// The kind of the selected zone, or of the next box (.seg.kinds): icon and name, the picked one in white.
+component KindSeg inherits Rectangle {
+    in property <Kind> kind: Kind.dialogue;
+    callback picked(Kind);
+    height: Size.ctl;
+    width: lay.preferred-width;
+    border-radius: Radius.md;
+    background: Palette.surface-2;
+    border-width: 1px;
+    border-color: Palette.line;
+    lay := HorizontalLayout {
+        padding: 3px;
+        for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
+            property <bool> on: k == root.kind;
+            border-radius: Radius.sm;
+            background: self.on ? Palette.on : transparent;
+            animate background {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+            accessible-role: tab;
+            accessible-label: Kinds.name(k);
+            accessible-item-selected: self.on;
+            accessible-action-default => {
+                root.picked(k);
+            }
+            HorizontalLayout {
+                padding-left: Space.s3;
+                padding-right: Space.s3;
+                spacing: Space.s2;
+                CIcon {
+                    source: Kinds.icon(k);
+                    size: 14px;
+                    color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                }
+
+                Text {
+                    text: Kinds.name(k);
+                    font-weight: on ? Type.w-strong : Type.w-body;
+                    color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                    vertical-alignment: center;
+                }
+            }
+
+            kt := TouchArea {
+                clicked => {
+                    root.picked(k);
+                }
+            }
+
+            Tooltip {
+                Rectangle {
+                    border-radius: Radius.md;
+                    border-width: 1px;
+                    border-color: Palette.line-2;
+                    background: Palette.surface-2;
+                    HorizontalLayout {
+                        padding-left: Space.s2;
+                        padding-right: Space.s2;
+                        padding-top: Space.s1;
+                        padding-bottom: Space.s1;
+                        Text {
+                            text: Kinds.tip(k);
+                            font-size: Type.fs-small;
+                            color: Palette.text;
+                            accessible-role: none;
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -39,7 +150,7 @@ export component KindHelp inherits VerticalLayout {
 export component DrawZonesPage inherits Rectangle {
     in-out property <[ZoneData]> zones;
     in-out property <int> selected: 1;
-    in-out property <bool> draw: true;
+    in-out property <bool> draw: false;
     // zone editing (src/vm): the picture, the box being drawn, the kind picker
     in property <image> shot: Art.scene;
     in property <float> shot-w: 1600;
@@ -55,125 +166,126 @@ export component DrawZonesPage inherits Rectangle {
     callback rename-done(bool);
     callback kind-picked(Kind);
     callback retake();
+    // the trash button: deletes the selected zone
+    callback delete-zone();
+    // the column top: title and lead, the toolbar
+    property <length> stage-y: Space.s7 + head.preferred-height + Space.s5 + Size.ctl + Space.s3;
     VerticalLayout {
         x: (parent.width - Size.col) / 2;
+        y: Space.s7;
         width: Size.col;
-        padding-top: Space.s7;
-        alignment: start;
-        ObHead {
-            title: "Mark where text shows up";
-            lead: "Drag on the screenshot to draw a zone, then pick what kind of text it holds.";
-        }
-    }
-
-    VerticalLayout {
-        x: (parent.width - 1216px) / 2;
-        y: Space.s7 + 37px + Space.s2 + 23px + Space.s5;
-        width: 1216px;
         height: self.preferred-height;
         alignment: start;
-        ZoneTools {
-            draw <=> root.draw;
-            kind: root.kind;
-            kind-picked(k) => {
-                root.kind-picked(k);
-            }
-            retake => {
-                root.retake();
+        SetupPart {
+            n: 0;
+            head := ObHead {
+                title: "Mark where text shows up";
+                lead: "Drag to box text. Pick its kind.";
             }
         }
 
         Rectangle {
-            height: Space.s4;
+            height: Space.s5;
         }
 
-        HorizontalLayout {
-            spacing: Space.s5;
-            height: 490px;
-            Stage {
-                width: 872px;
-                source: root.shot;
-                src-w: root.shot-w;
-                src-h: root.shot-h;
-                contain: root.contain;
-                interactive: true;
-                drafting: root.drafting;
-                draft: root.draft;
-                zones: root.zones;
-                selected: root.selected;
-                behind: Palette.bg;
-                pointer(k, x, y, s) => {
-                    root.pointer(k, x, y, s);
+        SetupPart {
+            n: 1;
+            HorizontalLayout {
+                height: Size.ctl;
+                spacing: Space.s2;
+                DrawToggle {
+                    on <=> root.draw;
                 }
-            }
 
-            Card {
-                VerticalLayout {
-                    padding: 1px;
-                    CardHead {
-                        title: "Zones";
-                        count: root.zones.length;
-                    }
-
-                    // a long zone list scrolls
-                    Flickable {
-                        vertical-stretch: 1;
-                        content-height: rows.preferred-height;
-                        rows := VerticalLayout {
-                            width: parent.width;
-                            alignment: start;
-                            for z[i] in root.zones: ZoneRow {
-                                zone: z;
-                                first: i == 0;
-                                selected: i == root.selected;
-                                editable: true;
-                                clicked => {
-                                    root.selected = i;
-                                    root.select(i);
-                                }
-                                toggled(v) => {
-                                    z.on = v;
-                                    root.toggle(i, v);
-                                }
-                                renamed(t) => {
-                                    root.rename(i, t);
-                                }
-                                rename-done(e) => {
-                                    root.rename-done(e);
-                                }
-                            }
-                        }
-                    }
-
+                Rectangle {
+                    width: 1px + 2 * Space.s1;
                     Rectangle {
-                        height: 1px;
+                        width: 1px;
+                        height: 20px;
                         background: Palette.line;
                     }
+                }
 
-                    VerticalLayout {
-                        padding-left: Space.s5;
-                        padding-right: Space.s5;
-                        padding-top: Space.s3;
-                        padding-bottom: Space.s4;
-                        SmallLabel {
-                            text: "What each kind does";
-                        }
+                KindSeg {
+                    kind: root.kind;
+                    picked(k) => {
+                        root.kind-picked(k);
+                    }
+                }
 
-                        Rectangle {
-                            height: Space.s1;
-                        }
+                IconButton {
+                    icon: Icons.trash;
+                    tip: "Delete zone";
+                    enabled: root.selected >= 0 && root.selected < root.zones.length;
+                    clicked => {
+                        root.delete-zone();
+                    }
+                }
 
-                        KindHelp { }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                IconButton {
+                    icon: Icons.camera;
+                    tip: "Retake screenshot";
+                    clicked => {
+                        root.retake();
                     }
                 }
             }
         }
+    }
 
-        // "Live", or why the saved screenshot shows: in a line under the picture, never on it
-        if root.contain && LiveView.note != "": HorizontalLayout {
-            alignment: start;
-            padding-top: Space.s2;
-            LiveNote { }
+    // 960 x 540, smaller when the window is short (room stays for the live note and above the footer)
+    pic := SetupPart {
+        n: 2;
+        x: (parent.width - Size.col) / 2;
+        y: root.stage-y;
+        width: Size.col;
+        height: Math.max(160px, Math.min(Size.col * 9 / 16, parent.height - root.stage-y - Space.s7));
+        Stage {
+            source: root.shot;
+            src-w: root.shot-w;
+            src-h: root.shot-h;
+            contain: root.contain;
+            interactive: true;
+            drafting: root.drafting;
+            draft: root.draft;
+            zones: root.zones;
+            selected: root.selected;
+            radius: Radius.lg;
+            behind: Palette.bg;
+            pointer(k, x, y, s) => {
+                root.pointer(k, x, y, s);
+            }
         }
+
+        Rectangle {
+            border-radius: Radius.lg;
+            border-width: 1px;
+            border-color: Palette.line;
+        }
+
+        // no zone yet: what to do, in the middle of the picture
+        if root.zones.length == 0 && !root.drafting: Rectangle {
+            width: hint.preferred-width + 2 * Space.s4;
+            height: hint.preferred-height + 2 * Space.s2;
+            border-radius: Radius.lg;
+            background: Palette.float;
+            border-width: 1px;
+            border-color: Palette.float-line;
+            hint := Text {
+                text: "Drag to box text.";
+                color: Palette.text;
+                accessible-role: none;
+            }
+        }
+    }
+
+    // "Live", or why the saved screenshot shows: in a line under the picture, never on it
+    if root.contain && LiveView.note != "": LiveNote {
+        x: pic.x + Space.s1;
+        y: pic.y + pic.height + Space.s2;
     }
 }
