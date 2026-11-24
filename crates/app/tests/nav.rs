@@ -866,7 +866,8 @@ fn trace_switch(w: &MainWindow, parts: &[Find]) -> SwitchTrace {
     let before = w.get_current_game();
     ctrl_k(w);
     assert!(w.get_switcher_open(), "Ctrl K opens the switcher");
-    // a click on the third game (after a page push the switcher's keys do not reach it in the testing backend)
+    // a click on the third game. Seen 2026-11-24, also before this branch: after a page push with motion on,
+    // Ctrl K opens the switcher but typing, Down and Enter do nothing (the search field does not keep the keys).
     wait(200);
     let row = ElementHandle::find_by_element_type_name(w, "GameItem")
         .nth(2)
@@ -1092,4 +1093,48 @@ fn motion_a_new_line_only_fades_under_reduce_motion() {
     assert_eq!(early, end, "nothing moves");
     assert_eq!(y0, t_end.absolute_position().y);
     dr_app::set_reduce_motion(None);
+}
+
+/// The same on Activity: the new row's room grows, and the rows below move down by its height.
+#[test]
+fn motion_a_new_line_slides_into_activity() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    press(&w, "Show all", AccessibleRole::Button);
+    settle();
+    let before = list_rows(&w);
+    let mut rows: Vec<dr_app::LineData> = w.get_log().iter().collect();
+    rows.insert(
+        0,
+        dr_app::LineData {
+            time: "21:31".into(),
+            kind: dr_app::Kind::Dialogue,
+            who: "Sadie:".into(),
+            line: "Let us get to work.".into(),
+            skip: "".into(),
+        },
+    );
+    w.set_log(slint::ModelRc::new(slint::VecModel::from(rows)));
+    w.invoke_lines_arrived(0, 1);
+    wait(10);
+    let early = list_rows(&w);
+    assert!(
+        early[0].1 < 0.4 * before[0].1,
+        "the new row starts small: {early:?}"
+    );
+    wait(80);
+    let mid = list_rows(&w);
+    assert!(mid[0].1 > early[0].1, "{early:?} {mid:?}");
+    assert!(
+        mid[1].0 > early[1].0 + 4.0,
+        "the rows below move down: {early:?} {mid:?}"
+    );
+    wait(150);
+    let end = list_rows(&w);
+    assert!(
+        (end[1].0 - (before[0].0 + end[0].1)).abs() < 1.0,
+        "{before:?} {end:?}"
+    );
+    let label = "Sadie: Let us get to work.";
+    assert!(row_text(&w, label).computed_opacity() > 0.99);
 }
