@@ -362,3 +362,49 @@ fn a_game_switch_stops_speech_and_keeps_the_logs_apart() {
     assert!(new.is_empty(), "{new:?}");
     assert_eq!(a.w.get_now_line().as_str(), "");
 }
+
+/// Deleting the game being read (Max, 2026-11-24): its line was spoken but not taken in yet when the game goes.
+/// What it spoke and the Stop that follows never make its log file again; the other game becomes current.
+#[test]
+fn deleting_the_game_being_read_leaves_no_log_behind() {
+    let a = app_with(Some(Profile::new("zed-game", "Zed Game", "ZedGame.exe")));
+    assert!(a.until(WAIT, |a| a.w.get_status_text().as_str()
+        == reading::STATUS_READING));
+    // the line starts on the speech thread; its events wait (no tick takes them in)
+    let end = Instant::now() + WAIT;
+    while !a
+        .vm
+        .borrow()
+        .speech_status()
+        .is_some_and(|s| s.speaking.is_some())
+    {
+        assert!(Instant::now() < end, "the line was never spoken");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let i = (0..2)
+        .find(|&i| {
+            a.w.get_games()
+                .row_data(i)
+                .is_some_and(|g| g.name.as_str() == "Test Game")
+        })
+        .expect("the game is listed");
+    a.vm.borrow_mut().delete_game(i);
+    assert!(!a.paths.activity_log("test-game").exists());
+    assert!(!a.paths.profile_json("test-game").exists());
+    let idle = |a: &App| {
+        a.vm.borrow()
+            .speech_status()
+            .is_some_and(|s| s.speaking.is_none() && s.queued == 0)
+    };
+    assert!(a.until(WAIT, idle), "speech did not stop");
+    // the events of the Stop come after it: let them in
+    a.until(Duration::from_millis(500), |_| false);
+    assert!(
+        !a.paths.activity_log("test-game").exists(),
+        "the deleted game's log came back"
+    );
+    assert_eq!(a.w.get_games().row_count(), 1);
+    assert_eq!(a.w.get_current_game(), 0);
+    assert!(a.log().is_empty(), "{:?}", a.log());
+    assert_eq!(a.w.get_page(), Page::Overview);
+}

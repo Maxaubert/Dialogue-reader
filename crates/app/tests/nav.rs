@@ -1331,3 +1331,68 @@ fn the_switcher_deletes_a_game_after_asking() {
     assert!(!names(&w).contains(&first));
     assert_eq!(names(&w)[w.get_current_game() as usize], cur);
 }
+
+/// Delete in the switcher with the mouse (real pointer events at 1440 x 900): the trash button asks without
+/// switching game; another row or leaving the row cancels; the "Delete" in its place deletes.
+#[test]
+fn the_switcher_delete_by_mouse() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let win = w.window();
+    let to = |x: f32, y: f32| {
+        win.dispatch_event(WindowEvent::PointerMoved {
+            position: slint::LogicalPosition::new(x, y),
+        });
+    };
+    let click = |x: f32, y: f32| {
+        let at = slint::LogicalPosition::new(x, y);
+        win.dispatch_event(WindowEvent::PointerMoved { position: at });
+        win.dispatch_event(WindowEvent::PointerPressed {
+            position: at,
+            button: PointerEventButton::Left,
+        });
+        win.dispatch_event(WindowEvent::PointerReleased {
+            position: at,
+            button: PointerEventButton::Left,
+        });
+    };
+    let names = |w: &MainWindow| {
+        w.get_games()
+            .iter()
+            .map(|g| g.name.to_string())
+            .collect::<Vec<_>>()
+    };
+    let before = names(&w);
+    let confirm = format!("Confirm delete {}", before[1]);
+    let asks = |w: &MainWindow| {
+        ElementHandle::find_by_accessible_label(w, &confirm)
+            .any(|e| e.accessible_role() == Some(AccessibleRole::Button))
+    };
+    ctrl_k(&w);
+    // the rows are 48 px tall from y 98; the second row's trash button is at its right end
+    let (row2, row3, trash) = (170.0, 218.0, 465.0);
+    to(300.0, row2);
+    click(trash, row2);
+    assert!(asks(&w), "the trash button asks");
+    assert!(w.get_switcher_open());
+    assert_eq!(w.get_current_game(), 0, "no game switch");
+    assert_eq!(names(&w), before);
+    // another row cancels
+    to(300.0, row3);
+    assert!(!asks(&w));
+    // leaving the row cancels
+    to(300.0, row2);
+    click(trash, row2);
+    assert!(asks(&w));
+    to(300.0, 600.0);
+    assert!(!asks(&w));
+    assert!(w.get_switcher_open());
+    // the "Delete" in the trash button's place deletes
+    to(300.0, row2);
+    click(trash, row2);
+    assert!(asks(&w));
+    click(450.0, row2);
+    assert_eq!(names(&w).len(), before.len() - 1);
+    assert!(!names(&w).contains(&before[1]));
+    assert_eq!(w.get_current_game(), 0);
+}

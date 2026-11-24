@@ -1403,36 +1403,41 @@ impl Vm {
         };
         let Some(g) = self.games.get(i) else { return };
         let id = g.profile.id.clone();
-        let log_path = real.paths.activity_log(&id);
-        if let Err(e) = profile::delete(&real.paths, &id) {
+        let paths = real.paths.clone();
+        let log_path = paths.activity_log(&id);
+        let was_current = self.current == Some(i);
+        if was_current {
+            // leave the game first: what it read or had queued is written now (to the files deleted below), and
+            // nothing of it is saved again
+            self.voice_dirty = false;
+            if self.test_running.is_some() {
+                self.stop_test();
+            }
+            self.live_stop();
+            self.current = None;
+            self.reading_start();
+        }
+        // lines of it that come later (its speech is stopping) are dropped, or they would make its log again
+        self.forget_log(&log_path);
+        if let Err(e) = profile::delete(&paths, &id) {
+            if was_current {
+                self.open_game(i, None);
+            }
             self.notice(&format!("The game could not be deleted: {e}"));
             return;
         }
         self.games.remove(i);
         match self.current {
-            Some(c) if c == i => {
-                // nothing of the deleted game is saved again
-                self.voice_dirty = false;
-                if self.test_running.is_some() {
-                    self.stop_test();
-                }
-                self.current = None;
-                if self.games.is_empty() {
-                    self.live_stop();
-                    self.reading_start();
-                    self.forget_log(&log_path);
-                    self.main = Editor::new(Vec::new(), 1600.0, 900.0);
-                    self.main.draw = false;
-                    self.push_games();
-                    self.push_main();
-                    w.set_adding_game(false);
-                    w.set_switcher_open(false);
-                    w.set_page(Page::Welcome);
-                } else {
-                    self.open_game(i.min(self.games.len() - 1), None);
-                    self.forget_log(&log_path);
-                }
+            _ if was_current && self.games.is_empty() => {
+                self.main = Editor::new(Vec::new(), 1600.0, 900.0);
+                self.main.draw = false;
+                self.push_games();
+                self.push_main();
+                w.set_adding_game(false);
+                w.set_switcher_open(false);
+                w.set_page(Page::Welcome);
             }
+            _ if was_current => self.open_game(i.min(self.games.len() - 1), None),
             Some(c) if c > i => {
                 self.current = Some(c - 1);
                 self.push_games();
