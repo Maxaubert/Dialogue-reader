@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>13 Pill</title><link rel="stylesheet" href="tokens.css"><style>
+.game{position:relative;width:1440px;height:900px;overflow:hidden;background:#000}
+.gpic{position:absolute;left:-80px;top:0;width:1600px;height:900px}
+.gpic .scene{width:100%;height:100%;display:block}
+.float{background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6)}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+
+.pill{position:absolute;display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:var(--r-pill);opacity:0;white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--live);flex:none}
+.pill.noname span{display:none}
+.pill.tr{right:24px;top:24px}
+.pill.bt{bottom:24px}
+</style></head>
+<body class="">
+<div class="app game"><div class="gpic"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="pill float tr" id="pill"><i></i><span id="pill-who">Arthur</span></div></div><div class="mock"><b>Try it</b><span class="btn" id="m-one">Play a line</span><span class="btn" id="m-two">Two lines in a row</span><span>Status pill</span><span class="seg" id="m-pos"><span class="on" data-p="tr">Top right</span><span data-p="bt">Bottom</span></span><label><input type="checkbox" id="m-name" checked> Show speaker name</label><label><input type="checkbox" id="m-slow"> Slow motion x4</label></div><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* Pill (transition 9): show 180 ease-out, opacity 0 to 1 and y 6 to 0. After the line ends: 600 ms hold, then hide 200 ease-in.
+   A new line during the hold cancels the hide; only the name crossfades (120 ms). */
+const P=$('pill'); let shown=false, endT=null, hideT=null;
+function place(){ if(P.classList.contains('bt')) P.style.left=((1440-P.offsetWidth)/2)+'px'; else P.style.left=''; }
+function say(who,ms=2400){
+  clearTimeout(endT); clearTimeout(hideT);
+  if(shown){ $('pill-who').textContent=who; place(); tween($('pill-who'),{opacity:[0,1]},M.fast,M.out); }
+  else { $('pill-who').textContent=who; place(); shown=true; tween(P,{opacity:[0,1],y:[6,0]},M.base,M.out); }
+  endT=setTimeout(()=>{ hideT=setTimeout(()=>{ shown=false; tween(P,{opacity:[null,0]},200,M.in); },600*SLOW); },ms*SLOW);
+}
+$('m-one').onclick=()=>say('Arthur');
+$('m-two').onclick=()=>{ say('Arthur',1400); setTimeout(()=>say('Dutch'),1600*SLOW); };
+$('m-pos').onclick=e=>{const s=e.target.closest('span[data-p]'); if(!s) return; [...s.parentNode.children].forEach(x=>x.classList.toggle('on',x===s));
+  P.classList.remove('tr','bt'); P.classList.add(s.dataset.p); place();};
+$('m-name').onchange=e=>{P.classList.toggle('noname',!e.target.checked); place();};
+bindSlow();
+const s=Q.get('s')||'';
+if(Q.get('pos')==='bt') document.querySelector('#m-pos span[data-p="bt"]').click();
+if(s==='shown'){ INSTANT=true; say('Arthur',1e9); INSTANT=false; }
+if(s==='show-mid'){ say('Arthur',1e9); freeze(); }
+</script>
+</body></html>
