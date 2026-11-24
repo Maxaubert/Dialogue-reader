@@ -478,11 +478,14 @@ mod imp {
                         // renderer output: see-through margin, drawn pill (at the right end, 8 px in)
                         r.put("pill.corner_alpha", alpha_at(o.pill.window(), 0.0, 0.0));
                         r.put("pill.body_alpha", alpha_at(o.pill.window(), 0.9, 0.5));
+                        // the shadow fits in the window: nothing is drawn on its bottom edge
+                        r.put("pill.edge_alpha", alpha_at(o.pill.window(), 0.9, 1.0));
                     }
                     1 => {
                         check(&mut r, "menu", o.menu.window(), win::Kind::Menu, game);
                         r.put("menu.corner_alpha", alpha_at(o.menu.window(), 0.0, 0.0));
                         r.put("menu.card_alpha", alpha_at(o.menu.window(), 0.5, 0.3));
+                        r.put("menu.edge_alpha", alpha_at(o.menu.window(), 0.5, 0.0));
                     }
                     _ => check(&mut r, "zone", o.zones.window(), win::Kind::Zone, game),
                 });
@@ -586,6 +589,12 @@ mod imp {
                     1 => ("menufade", win::Kind::Menu),
                     _ => ("zonefade", win::Kind::Zone),
                 };
+                // the fade in has ended: the window is drawn in full
+                match which {
+                    0 => r.put("pillfade.shown_alpha", alpha_at(o.pill.window(), 0.9, 0.5)),
+                    1 => r.put("menufade.shown_alpha", alpha_at(o.menu.window(), 0.5, 0.3)),
+                    _ => {}
+                }
                 match which {
                     0 => o.pill_on(false, Some(&g), PillAt::TopRight),
                     1 => {

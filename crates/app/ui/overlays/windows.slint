@@ -82,6 +82,8 @@ export component QuickMenuWindow inherits Window {
     callback choose-voice(int);
     // a click outside the menu
     callback outside();
+    // room for the card's shadow: it reaches 12 px above the card (24 px blur, 12 px down); the voice list's
+    // room is under the card, and the sides are wider still
     out property <length> margin: 24px;
     // the middle of the card, in window px (the window is placed so it is the game's middle)
     out property <length> group-cy: root.margin + menu.height / 2;

@@ -383,6 +383,10 @@ fn zone_edit_saves_a_new_zone_and_the_reader_uses_it_at_once() {
     );
     assert_eq!(z.get_zones().row_count(), 2);
     assert_eq!(z.get_selected(), 1);
+    // the kind picker under the selected zone changes its kind, saved
+    z.invoke_set_kind(UiKind::Pickups);
+    assert_eq!(a.saved().zones[1].kind, Kind::Notification);
+    assert_eq!(z.get_zones().row_data(1).unwrap().kind, UiKind::Pickups);
     // Delete removes the selected zone, saved
     a.nav(Nav::Delete);
     assert_eq!(a.saved().zones.len(), 1);
@@ -508,6 +512,60 @@ fn the_speed_slider_follows_the_keys_and_the_mouse() {
     a.nav(Nav::Left);
     assert!((m.get_speed() - (s - 0.1)).abs() < 1e-4);
     assert!((a.saved().voice.speed - (s - 0.1)).abs() < 1e-4);
+}
+
+/// Moves the testing clock by `ms`, in small steps (timers and animations run as in a real window).
+fn wait(ms: u64) {
+    let mut left = ms;
+    while left > 0 {
+        let step = left.min(10);
+        i_slint_backend_testing::mock_elapsed_time(Duration::from_millis(step));
+        left -= step;
+    }
+}
+
+#[test]
+fn a_hide_waits_for_the_fade_and_a_new_show_keeps_the_window() {
+    use dr_app::overlay::place::{GameWin, PillAt};
+    // the testing backend for this thread, then overlay windows with the real motion
+    let _a = app();
+    dr_app::set_instant_motion(false);
+    let mut o = Overlays::new(false).expect("overlay windows");
+    dr_app::set_instant_motion(true);
+    let g = GameWin::fake(1920, 1080);
+    let shown = |w: &slint::Window| w.is_visible();
+    o.pill_on(true, Some(&g), PillAt::TopRight);
+    assert!(shown(o.pill.window()));
+    // hidden: the window stays while it fades (200 ms), then goes
+    o.pill_on(false, Some(&g), PillAt::TopRight);
+    assert!(!o.pill_shown);
+    assert!(shown(o.pill.window()), "gone before the fade");
+    wait(100);
+    assert!(shown(o.pill.window()));
+    wait(300);
+    assert!(!shown(o.pill.window()), "still there after the fade");
+    // shown again while it fades: the hide that was waiting does not take it away
+    o.pill_on(true, Some(&g), PillAt::TopRight);
+    o.pill_on(false, Some(&g), PillAt::TopRight);
+    wait(100);
+    o.pill_on(true, Some(&g), PillAt::TopRight);
+    wait(400);
+    assert!(
+        shown(o.pill.window()),
+        "a new show was undone by the old hide"
+    );
+    // the menu and zone edit work the same way
+    assert!(o.menu_on(&g));
+    o.shown = Overlay::Menu;
+    o.menu_off();
+    assert!(shown(o.menu.window()));
+    wait(300);
+    assert!(!shown(o.menu.window()));
+    assert!(o.zones_on(&g));
+    o.zones_off();
+    assert!(shown(o.zones.window()));
+    wait(300);
+    assert!(!shown(o.zones.window()));
 }
 
 #[test]

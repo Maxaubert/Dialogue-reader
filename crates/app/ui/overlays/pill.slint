@@ -34,8 +34,10 @@ export component OverlayPill inherits Rectangle {
     background: Palette.float;
     border-width: 1px;
     border-color: Palette.float-line;
-    drop-shadow-offset-y: 12px;
-    drop-shadow-blur: 24px;
+    // a smaller shadow than the mockup's (0 12 24): the pill window has an 8 px margin, and a shadow that reaches
+    // past it would be cut off at the window's edge
+    drop-shadow-offset-y: 2px;
+    drop-shadow-blur: 4px;
     drop-shadow-color: #00000099;
     accessible-role: text;
     accessible-label: root.name != "" ? root.name : root.ok ? "Reading" : "Paused";

@@ -357,4 +357,7 @@ export component GameSwitcher inherits Rectangle {
             }
         }
     }
+
+    // while it fades out, the switcher takes no clicks
+    if !root.open: TouchArea { }
 }

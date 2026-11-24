@@ -110,6 +110,15 @@ fn overlay_windows_keep_their_styles_and_never_activate() {
             "{key}: still shown after the fade"
         );
     }
+    assert!(
+        num(&m, "pillfade.shown_alpha") >= 200,
+        "the pill never faded in"
+    );
+    assert_eq!(
+        num(&m, "menufade.shown_alpha"),
+        255,
+        "the menu never faded in"
+    );
     assert_eq!(get(&m, "pillfade.fading.center_hits"), "game");
     assert_eq!(get(&m, "pillfade.mid.center_hits"), "game");
 
@@ -142,6 +151,9 @@ fn overlay_windows_keep_their_styles_and_never_activate() {
         "menu margin not see-through"
     );
     assert_eq!(num(&m, "menu.card_alpha"), 255, "menu card not opaque");
+    // the shadows end inside the windows (a cut shadow would show a hard edge)
+    assert!(num(&m, "pill.edge_alpha") <= 8, "pill shadow cut off");
+    assert!(num(&m, "menu.edge_alpha") <= 8, "menu shadow cut off");
 
     // placement: the pill at the top right of the client area, the menu centered on it, zone edit over what the
     // capture covers (the game has a title bar, so that is more than the client area)

@@ -253,6 +253,22 @@ fn typing_in_the_switcher_narrows_the_games() {
 }
 
 #[test]
+fn ctrl_k_closes_the_switcher_from_the_search_field() {
+    let w = window();
+    w.set_page(Page::Overview);
+    ctrl_k(&w);
+    assert!(w.get_switcher_open());
+    // the search field has the keys now; Ctrl K still closes, and types nothing
+    ctrl_k(&w);
+    assert!(!w.get_switcher_open());
+    ctrl_k(&w);
+    assert!(w.get_switcher_open());
+    assert_eq!(w.get_switcher_hits().row_count(), 4, "the search is empty");
+    ctrl_k(&w);
+    assert!(!w.get_switcher_open());
+}
+
+#[test]
 fn gear_then_ctrl_k_opens_the_switcher_over_settings() {
     let w = window();
     w.set_page(Page::Overview);
