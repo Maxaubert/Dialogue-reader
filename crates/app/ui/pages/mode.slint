@@ -130,7 +130,12 @@ export component ModePage inherits Rectangle {
 
         SetupPart {
             n: 2;
+            height: Type.lh-body;
             Text {
+                x: 0;
+                width: parent.width;
+                height: parent.height;
+                vertical-alignment: center;
                 text: root.zone-count + (root.zone-count == 1 ? " zone · " : " zones · ") + root.read-key + " · " + (root.has-voice ? root.voice + " " + Math.floor(root.tenths / 10) + "." + Math.mod(root.tenths, 10) + "x" : "No voice yet");
                 color: Palette.text-2;
             }
