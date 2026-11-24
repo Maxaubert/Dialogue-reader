@@ -4,7 +4,7 @@
 // the selected zone, Esc drops a box being drawn, then finishes.
 // The bar (Done) sits top centre. When the selected box, its tag or the picker would sit under it, it moves to
 // the first place clear of every zone: bottom centre, top right, top left (Rust works out which are clear:
-// src/overlay/zone_edit.rs, bar_clear).
+// src/overlay/zone_edit.rs, bar_clear). It comes home when home is clear again, with some slack (`want-at`).
 // The selected zone has 8 resize handles, as on Zones: drag one to resize (Rust keeps the smallest size and the
 // edges of the picture, and saves on the release). Esc, a right press or a lost pointer puts the zone back.
 // Motion (README, 11): shade 180 ms; outlines and tags 180 ms after 60 ms; bar 180 ms, y -8 to 0; all ease-out.
@@ -317,13 +317,24 @@ export component ZoneEdit inherits Rectangle {
     pure function bar-y(p: int) -> length {
         return p == 1 ? root.height - Space.s5 - bar.height : Space.s5;
     }
-    pure function hits(p: int, x: length, y: length, w: length, h: length) -> bool {
-        return x < root.bar-x(p) + bar.width + Space.s2 && x + w > root.bar-x(p) - Space.s2 && y < root.bar-y(p) + bar.height + Space.s2 && y + h > root.bar-y(p) - Space.s2;
+    // m: the room kept around the bar
+    pure function hits(p: int, m: length, x: length, y: length, w: length, h: length) -> bool {
+        return x < root.bar-x(p) + bar.width + m && x + w > root.bar-x(p) - m && y < root.bar-y(p) + bar.height + m && y + h > root.bar-y(p) - m;
     }
-    pure function sel-hits(p: int) -> bool {
-        return root.has-sel && (root.hits(p, root.sx - 2px, root.sy - 2px, root.sw + 4px, root.sh + 4px) || root.hits(p, root.sx - 1px, root.sel-tag == 0 ? root.sy - 28px : root.sel-tag == 1 ? root.sy + root.sh + 4px : root.sy + 4px, 130px, 24px) || root.hits(p, root.pick-x, root.pick-y, picker.width, picker.height));
+    pure function sel-hits(p: int, m: length) -> bool {
+        return root.has-sel && (root.hits(p, m, root.sx - 2px, root.sy - 2px, root.sw + 4px, root.sh + 4px) || root.hits(p, m, root.sx - 1px, root.sel-tag == 0 ? root.sy - 28px : root.sel-tag == 1 ? root.sy + root.sh + 4px : root.sy + 4px, 130px, 24px) || root.hits(p, m, root.pick-x, root.pick-y, picker.width, picker.height));
     }
-    property <int> want-at: !root.sel-hits(0) ? 0 : root.bar-clear[1] && !root.sel-hits(1) ? 1 : root.bar-clear[2] && !root.sel-hits(2) ? 2 : root.bar-clear[3] && !root.sel-hits(3) ? 3 : !root.sel-hits(1) ? 1 : !root.sel-hits(2) ? 2 : !root.sel-hits(3) ? 3 : 0;
+    // Hysteresis (so the bar does not jump back and forth while a box is drawn or resized at the edge of a place):
+    // the bar stays where it is until the selection comes within 8 px of it, and it moves to a place (home too)
+    // only when the selection is 24 px clear of it. It goes home again once home is that clear of the selection
+    // and clear of every zone (mockup 16, keepBarClear). Else it takes the first place clear of every zone, else
+    // the first place clear of the selection.
+    property <length> stay-m: Space.s2;
+    property <length> go-m: Space.s5;
+    pure function free(p: int) -> bool {
+        return root.bar-clear[p] && !root.sel-hits(p, root.go-m);
+    }
+    property <int> want-at: root.bar-at != 0 && root.bar-clear[0] && !root.sel-hits(0, root.go-m) ? 0 : !root.sel-hits(root.bar-at, root.stay-m) ? root.bar-at : root.free(1) ? 1 : root.free(2) ? 2 : root.free(3) ? 3 : !root.sel-hits(1, root.go-m) ? 1 : !root.sel-hits(2, root.go-m) ? 2 : !root.sel-hits(3, root.go-m) ? 3 : !root.sel-hits(0, root.go-m) ? 0 : root.bar-at;
     property <int> bar-at: 0;
     property <bool> bar-moving: false;
     changed want-at => {

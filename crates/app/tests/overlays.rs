@@ -532,6 +532,53 @@ fn zone_edit_handles_take_the_pointer() {
     assert!(z.get_draft());
 }
 
+/// Where Done is in zone edit (the bar's place).
+fn done_at(z: &dr_app::ZoneEditWindow) -> (i32, i32) {
+    slint::platform::update_timers_and_animations();
+    let d = i_slint_backend_testing::ElementHandle::find_by_accessible_label(z, "Done")
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button))
+        .expect("Done");
+    let p = d.absolute_position();
+    (p.x.round() as i32, p.y.round() as i32)
+}
+
+/// Max, 2026-11-24: the zone edit bar jumped back and forth while a zone sat at the edge of its home spot. It now
+/// leaves a place when the selection comes within 8 px, and comes back only when the selection is 24 px clear.
+#[test]
+fn the_zone_edit_bar_does_not_jump_at_the_edge_of_home() {
+    let a = app();
+    a.key(Action::Menu);
+    a.nav(Nav::Enter);
+    let z = a.vm.borrow().overlays().unwrap().zones.clone_strong();
+    // a box under the middle of the bar's home (top centre, y 24 to 72), its tag above it
+    z.invoke_commit(UiKind::Speaker, 800.0, 200.0, 300.0, 40.0);
+    let home = done_at(&z);
+    let mut places = vec![home];
+    let mut step = |y: f32| {
+        z.invoke_resize_move(900.0, y);
+        let at = done_at(&z);
+        if places.last() != Some(&at) {
+            places.push(at);
+        }
+    };
+    // the top edge goes up 1 px at a time until the tag is under the bar, and back down
+    assert!(z.invoke_resize_start(1));
+    for y in (90..=200).rev() {
+        step(y as f32);
+    }
+    // a box that sits at the edge (moving by a few px) does not move the bar
+    for y in [110, 112, 109, 113, 110, 114, 108] {
+        step(y as f32);
+    }
+    for y in 90..=200 {
+        step(y as f32);
+    }
+    z.invoke_resize_end(900.0, 200.0);
+    assert_eq!(places.len(), 3, "out once and home once: {places:?}");
+    assert_ne!(places[1], home);
+    assert_eq!(places[2], home);
+}
+
 #[test]
 fn the_quick_menu_key_goes_from_zone_edit_back_to_the_menu() {
     let a = app();
