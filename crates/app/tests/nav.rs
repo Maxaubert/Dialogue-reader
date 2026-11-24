@@ -408,6 +408,49 @@ fn motion_gear_then_ctrl_k() {
     assert_eq!(pages(&w), ["Settings page"]);
 }
 
+/// Seen 2026-11-24: with motion on, after a push to Settings, Activity or Zones, Ctrl K opened the switcher but
+/// typing, Down and Enter did nothing (the search field did not get the keys). They must work after any push.
+#[test]
+fn motion_ctrl_k_after_a_push_types_in_the_search() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    settle();
+    for open in ["Settings", "Show all", "Edit zones"] {
+        w.set_current_game(0);
+        press(&w, open, AccessibleRole::Button);
+        settle();
+        assert_ne!(w.get_page(), Page::Overview, "{open}");
+        ctrl_k(&w);
+        assert!(w.get_switcher_open(), "{open}");
+        wait(200);
+        let hits = |w: &MainWindow| w.get_switcher_hits().iter().collect::<Vec<i32>>();
+        assert_eq!(hits(&w), [0, 1, 2, 3], "{open}: every game at first");
+        for c in ["S", "a", "t"] {
+            key(&w, c);
+        }
+        assert_eq!(hits(&w), [1], "{open}: typing narrows the games");
+        key(&w, Key::Escape);
+        assert!(!w.get_switcher_open(), "{open}: Esc closes");
+        assert_ne!(
+            w.get_page(),
+            Page::Overview,
+            "{open}: Esc closes the switcher only"
+        );
+        wait(200);
+        // opened again: the highlight starts on the second game, Down moves it to the third, Enter picks it
+        ctrl_k(&w);
+        wait(200);
+        key(&w, Key::DownArrow);
+        key(&w, Key::Return);
+        assert!(!w.get_switcher_open(), "{open}: Enter picks");
+        settle();
+        assert_eq!(w.get_current_game(), 2, "{open}: Down then Enter");
+        key(&w, Key::Escape);
+        settle();
+        assert_eq!(w.get_page(), Page::Overview, "{open}");
+    }
+}
+
 #[test]
 fn motion_switch_game_rolls_the_name_in_240_ms() {
     let w = window_with(true);

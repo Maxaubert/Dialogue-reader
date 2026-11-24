@@ -127,7 +127,10 @@ export component GameSwitcher inherits Rectangle {
         duration: root.open ? Motion.base : Motion.exit;
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
-    visible: self.t > 0.01;
+    // visible as soon as it opens, while t is still 0: Ctrl K gives the search field the keys in the same step,
+    // and Slint takes the focus away from an item that is hidden (after a page push the opening starts at
+    // t = 0, so typing, Down and Enter did nothing)
+    visible: root.open || self.t > 0.01;
 
     // scrim under the title strip; a click on it closes the switcher
     Rectangle {

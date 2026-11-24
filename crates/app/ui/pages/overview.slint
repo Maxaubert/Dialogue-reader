@@ -335,6 +335,7 @@ export component OverviewTab inherits Rectangle {
 
             // at the same place and of the same kind as "Done" on Zones: the two swap in place (Max, 2026-11-24)
             Button {
+                kind: BtnKind.primary;
                 text: "Edit zones";
                 icon: Icons.pencil;
                 enabled: root.running;

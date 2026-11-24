@@ -117,8 +117,10 @@ const fn step(
 /// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher. Re-measured the same day after
 /// Max's follow-ups: the setup steps (01 to 06, 18-voice-none) sit in the middle of the window now, not at the
 /// top as in the shots, so their page is compared `dy` px lower (the title strip and the footer stay put). The
-/// step 5 summary and the step 1 pictures are gone, and the Zones toolbar has Done as a secondary button with
-/// the Overview's margins and no camera, so those limits are a little higher.
+/// step 5 summary and the step 1 pictures are gone, and the Zones toolbar has the Overview's margins and no
+/// camera, so those limits are a little higher. Later the same day Max asked for "Edit zones" (Overview) and
+/// "Done" (Zones) as the white primary pill: the Zones shots match better, and the Overview and the switcher
+/// over it (the mockups have a grey "Edit zones") were re-measured.
 const MOCKUPS: [Mockup; 22] = [
     step("01-welcome", "01-setup-0-welcome", (243, 0), 0.8, 0.6),
     step("02-pick-window", "01-setup-1-game", (15, 72), 1.2, 1.0),
@@ -133,14 +135,14 @@ const MOCKUPS: [Mockup; 22] = [
         0.5,
     ),
     step("06-mode", "01-setup-5-mode", (262, 72), 1.0, 1.1),
-    m("10-main-b", "10-overview", 2.3, 2.0),
+    m("10-main-b", "10-overview", 2.9, 2.5),
     m("19-overview-not-running", "10-overview-off", 0.6, 0.5),
     m("11-zones", "11-zones", 3.2, 1.0),
     m("11-zones-top", "11-zones-top", 3.5, 0.9),
     m("11-zones-empty", "11-zones-empty", 1.6, 0.9),
     m("12-settings", "12-settings", 1.7, 1.3),
     m("13-overlay", "13-pill", 0.5, 0.4),
-    m("14-game-switcher", "14-game-switcher", 1.6, 0.5),
+    m("14-game-switcher", "14-game-switcher", 1.8, 0.9),
     m("15-quick-menu-a", "15-quick-menu", 1.2, 1.1),
     m("15-quick-menu-voice", "15-quick-menu-voice", 1.6, 1.5),
     m("16-zone-edit", "16-zone-edit", 1.0, 0.5),

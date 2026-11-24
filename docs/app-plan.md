@@ -839,7 +839,7 @@ differs from the d-black mockups:
 4. Zones toolbar and step 2: no "Retake screenshot" button and no "Live" note. The screenshot time and the reason
    the saved screenshot shows ("Saved screenshot · the game is closed") stay. The saved screenshot now changes only
    at setup and with the in-game zone edit; while the game is live the picture moves by itself.
-5. "Edit zones" is a secondary button (pencil and text) at the right end of the Overview toolbar, and "Done" on
+5. "Edit zones" is the white primary pill (pencil and text; Max, 2026-11-24, after a picture of "Done") at the right end of the Overview toolbar, and "Done" on
    Zones is the same kind of button (check and text) at the same place, so the two swap in place. The pencil icon
    button under the picture is gone; a click on the picture still opens Zones. The Zones toolbar has the
    Overview's 24 px margins now (the picture keeps 32 px).
