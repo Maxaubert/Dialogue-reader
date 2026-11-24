@@ -20,7 +20,7 @@ fn up_and_down_walk_the_rows_in_order_and_wrap() {
         assert_eq!(m.key(Nav::Down), Out::None);
         seen.push(m.highlight);
     }
-    // Manage zones, Stop, Mute, Voice, Speed, Volume, Mode, Settings, Quit, then round to the top
+    // Edit zones, Stop, Mute, Voice, Speed, Volume, Mode, Settings, Quit, then round to the top
     assert_eq!(seen, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 0]);
     m.key(Nav::Up);
     assert_eq!(m.highlight, qm::QUIT);

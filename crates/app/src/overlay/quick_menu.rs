@@ -2,7 +2,7 @@
 //! unit-tested (`tests/quick_menu.rs`). Keys come from the hook ([`Menu::key`]), clicks from the window
 //! ([`Menu::activate`]); each returns what the app must do ([`Out`]).
 //!
-//! Order (design rule): Manage zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit.
+//! Order (design rule): Edit zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit.
 //! Up and Down move and wrap around. Left and Right change Speed, Volume and Mode, and Right opens the voice
 //! list. Enter or Space selects. Esc closes. Quit needs two presses: the first arms it ("Press again to quit"),
 //! moving away disarms it. In the voice list Up and Down move (no wrap), Space plays a sample, Enter chooses,

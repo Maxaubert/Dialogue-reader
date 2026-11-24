@@ -222,6 +222,37 @@ fn game_name_opens_the_switcher_and_enter_switches() {
 }
 
 #[test]
+fn typing_in_the_switcher_narrows_the_games() {
+    let w = window();
+    w.set_page(Page::Overview);
+    ctrl_k(&w);
+    let hits = |w: &MainWindow| w.get_switcher_hits().iter().collect::<Vec<i32>>();
+    assert_eq!(hits(&w), [0, 1, 2, 3], "every game at first");
+    // the search field has the keys: typing narrows the list (any case), Enter picks the first match
+    for c in ["S", "a", "t"] {
+        key(&w, c);
+    }
+    assert_eq!(hits(&w), [1]);
+    // nothing matches: the list says so
+    key(&w, "z");
+    assert!(hits(&w).is_empty());
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "No games found.")
+            .next()
+            .is_some()
+    );
+    key(&w, Key::Backspace);
+    key(&w, Key::Return);
+    assert!(!w.get_switcher_open());
+    assert_eq!(w.get_current_game(), 1);
+    // opened again, the search is empty
+    ctrl_k(&w);
+    assert_eq!(hits(&w), [0, 1, 2, 3]);
+    key(&w, Key::Escape);
+    assert!(!w.get_switcher_open());
+}
+
+#[test]
 fn gear_then_ctrl_k_opens_the_switcher_over_settings() {
     let w = window();
     w.set_page(Page::Overview);
@@ -254,7 +285,7 @@ fn quick_menu_keys_and_esc() {
     let w = window();
     w.set_page(Page::Overview);
     w.set_overlay(OverlayPreview::QuickMenu);
-    // Enter on the first row, Manage zones, opens zone edit
+    // Enter on the first row, Edit zones, opens zone edit
     key(&w, Key::Return);
     assert_eq!(w.get_overlay(), OverlayPreview::ZoneEdit);
     w.set_overlay(OverlayPreview::QuickMenu);

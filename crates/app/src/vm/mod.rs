@@ -568,6 +568,8 @@ pub struct Vm {
     prefs: dr_runtime::settings::Settings,
     /// settings.json must not be written (newer format, or a broken file that could not be moved aside).
     prefs_read_only: bool,
+    /// What the game switcher searches for (its rows are the games whose name holds it).
+    switcher_query: String,
 }
 
 pub type Shared = Rc<RefCell<Vm>>;
@@ -607,6 +609,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         muted: false,
         prefs: dr_runtime::settings::Settings::default(),
         prefs_read_only: false,
+        switcher_query: String::new(),
     };
     w.set_setup_zones(ModelRc::from(vm.setup_zones.clone()));
     w.set_zones(ModelRc::from(vm.zones.clone()));
@@ -625,6 +628,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             vm.games_running.set_vec(crate::fake::windows().0);
             vm.other_windows.set_vec(crate::fake::windows().1);
             vm.game_rows.set_vec(crate::fake::games());
+            vm.push_switcher_hits();
         }
         Source::Real {
             paths,
@@ -728,22 +732,30 @@ impl Vm {
         self.games.iter().map(|g| &g.profile).collect()
     }
 
+    /// The switcher's rows: the games whose name holds what was typed (any case), all of them for an empty search.
+    fn push_switcher_hits(&self) {
+        let Some(w) = self.win() else { return };
+        let names: Vec<SharedString> = (0..self.game_rows.row_count())
+            .filter_map(|i| self.game_rows.row_data(i).map(|g| g.name))
+            .collect();
+        let hits = switcher_hits(&names, &self.switcher_query);
+        w.set_switcher_hits(ModelRc::new(VecModel::from(hits)));
+    }
+
     fn push_games(&self) {
         let on = running(&self.profiles(), &self.windows);
         let rows = self
             .games
             .iter()
             .zip(on)
-            .map(|(g, is_running)| {
-                let n = g.profile.zones.len();
+            .enumerate()
+            .map(|(i, (g, is_running))| {
+                // TEXT.md: "Reading" or when it was last played. Profiles do not keep when a game was last
+                // played, so only the game being read says something.
+                let reading = is_running && self.current == Some(i);
                 GameData {
                     name: g.profile.name.as_str().into(),
-                    meta: format!(
-                        "{} · {n} zone{}",
-                        if is_running { "Running" } else { "Not running" },
-                        if n == 1 { "" } else { "s" }
-                    )
-                    .into(),
+                    meta: if reading { "Reading" } else { "" }.into(),
                     art: SharedString::default(),
                     running: is_running,
                     cover: g.cover.clone().unwrap_or_default(),
@@ -751,6 +763,7 @@ impl Vm {
             })
             .collect();
         sync(&self.game_rows, rows);
+        self.push_switcher_hits();
         if let (Some(w), Some(i)) = (self.win(), self.current) {
             w.set_current_game(i as i32);
         }
@@ -1712,6 +1725,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
     let v = vm.clone();
     w.on_switcher_opened(move || v.borrow_mut().load_covers());
     let v = vm.clone();
+    w.on_switcher_search(move |q| {
+        let mut vm = v.borrow_mut();
+        vm.switcher_query = q.to_string();
+        vm.push_switcher_hits();
+    });
+    let v = vm.clone();
     w.on_mode_changed(move |a| v.borrow_mut().set_mode(a));
     let v = vm.clone();
     w.on_setup_cancelled(move || v.borrow_mut().cancel_setup());
@@ -1808,6 +1827,17 @@ fn wire(w: &MainWindow, vm: &Shared) {
             }
         }
     });
+}
+
+/// The games (indices into `names`) whose name holds `query`, case ignored. An empty search keeps them all.
+pub fn switcher_hits(names: &[SharedString], query: &str) -> Vec<i32> {
+    let q = query.trim().to_lowercase();
+    names
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| q.is_empty() || n.to_lowercase().contains(&q))
+        .map(|(i, _)| i as i32)
+        .collect()
 }
 
 #[cfg(test)]

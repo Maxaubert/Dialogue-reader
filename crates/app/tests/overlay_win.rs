@@ -85,6 +85,34 @@ fn overlay_windows_keep_their_styles_and_never_activate() {
         );
     }
 
+    // a hide fades first (the real motion): the window stays shown with its styles while it fades, takes no
+    // focus, the pill stays click-through, and the window is hidden once the fade has ended
+    for key in ["pillfade", "menufade", "zonefade"] {
+        for phase in ["fading", "mid"] {
+            let g = |f: &str| get(&m, &format!("{key}.{phase}.{f}")).to_string();
+            assert_eq!(
+                g("visible"),
+                "true",
+                "{key}.{phase}: hidden before the fade ended"
+            );
+            assert_eq!(
+                g("has_all"),
+                "true",
+                "{key}.{phase}: overlay styles missing"
+            );
+            assert_eq!(g("activations"), "0", "{key}.{phase}: got WM_ACTIVATE");
+            assert_eq!(g("setfocus"), "0", "{key}.{phase}: got WM_SETFOCUS");
+            assert_eq!(g("active_is_self"), "false", "{key}.{phase}: active");
+        }
+        assert_eq!(
+            get(&m, &format!("{key}.after_visible")),
+            "false",
+            "{key}: still shown after the fade"
+        );
+    }
+    assert_eq!(get(&m, "pillfade.fading.center_hits"), "game");
+    assert_eq!(get(&m, "pillfade.mid.center_hits"), "game");
+
     // the pill is click-through; the menu and zone edit take the mouse but never activate on a click
     assert_eq!(get(&m, "pill.center_hits"), "game");
     assert_eq!(get(&m, "pill2.center_hits"), "game");

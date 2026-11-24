@@ -151,8 +151,9 @@ fn menu_voices() -> Vec<VoiceData> {
         ("Adam", "US · Male"),
         ("Bella", "US · Female"),
         ("Michael", "US · Male"),
-        ("Sarah", "US · Female"),
         ("Emma", "UK · Female"),
+        ("George", "UK · Male"),
+        ("Sky", "US · Female"),
     ]
     .iter()
     .map(|&(n, sh)| VoiceData {
@@ -202,26 +203,10 @@ pub fn log() -> Vec<LineData> {
 
 pub fn games() -> Vec<GameData> {
     [
-        ("Red Dead Redemption 2", "Reading · 5 zones", "rdr2", true),
-        ("Satisfactory", "Paused · 4 zones", "satis", true),
-        (
-            "Persona 4 Golden",
-            "Last played 2 days ago · 3 zones",
-            "p4g",
-            false,
-        ),
-        (
-            "Clair Obscur: Expedition 33",
-            "Last played last week · 4 zones",
-            "e33",
-            false,
-        ),
-        (
-            "Kingdom Come: Deliverance II",
-            "Last played Oct 30 · 2 zones",
-            "kcd2",
-            false,
-        ),
+        ("Red Dead Redemption 2", "Reading", "rdr2", true),
+        ("Satisfactory", "2 days ago", "satis", true),
+        ("Persona 4 Golden", "Last week", "p4g", false),
+        ("Kingdom Come: Deliverance II", "In March", "kcd2", false),
     ]
     .iter()
     .map(|&(n, m, a, r)| GameData {
@@ -238,9 +223,11 @@ fn rect(z: &EditZone) -> Rect {
     Rect::new(z.x, z.y, z.w, z.h)
 }
 
-fn refresh_dim(w: &MainWindow) {
+/// The zone edit bar's places clear of every zone (src/overlay/zone_edit.rs).
+fn refresh_bar(w: &MainWindow) {
     let rects: Vec<Rect> = w.get_edit_zones().iter().map(|z| rect(&z)).collect();
-    w.set_edit_dim(geom::dim_path(FRAME_W, FRAME_H, &rects).into());
+    let clear = crate::overlay::zone_edit::bar_clear(&rects, FRAME_W, FRAME_H);
+    w.set_edit_bar_clear(ModelRc::new(VecModel::from(clear.to_vec())));
 }
 
 /// Puts the fake data that has no real source yet into the window and wires the zone edit callbacks.
@@ -255,7 +242,7 @@ pub fn fill(w: &MainWindow) {
     w.set_log(model(log));
     w.set_edit_zones(model(edit_zones()));
     w.set_version(env!("CARGO_PKG_VERSION").into());
-    refresh_dim(w);
+    refresh_bar(w);
 
     let weak = w.as_weak();
     w.on_edit_pick(move |x, y| {
@@ -273,7 +260,7 @@ pub fn fill(w: &MainWindow) {
         {
             vm.remove(i as usize);
             w.set_edit_selected(-1);
-            refresh_dim(&w);
+            refresh_bar(&w);
         }
     });
     let weak = w.as_weak();
@@ -294,7 +281,18 @@ pub fn fill(w: &MainWindow) {
             });
             w.set_edit_selected(vm.row_count() as i32 - 1);
             w.set_edit_draft(false);
-            refresh_dim(&w);
+            refresh_bar(&w);
+        }
+    });
+    let weak = w.as_weak();
+    w.on_edit_set_kind(move |kind| {
+        let Some(w) = weak.upgrade() else { return };
+        let (zones, i) = (w.get_edit_zones(), w.get_edit_selected());
+        if let Ok(i) = usize::try_from(i)
+            && let Some(mut z) = zones.row_data(i)
+        {
+            z.kind = kind;
+            zones.set_row_data(i, z);
         }
     });
 }

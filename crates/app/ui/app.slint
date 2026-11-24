@@ -102,7 +102,8 @@ export component MainWindow inherits Window {
     in-out property <int> current-game: 0;
     in-out property <[EditZone]> edit-zones;
     in-out property <int> edit-selected: 1;
-    in property <string> edit-dim;
+    // zone edit preview: the bar's places clear of every zone (top centre, bottom centre, top right, top left)
+    in property <[bool]> edit-bar-clear: [true, true, true, true];
     in-out property <bool> edit-draft: true;
     in-out property <length> edit-draft-x: 930px;
     in-out property <length> edit-draft-y: 150px;
@@ -197,6 +198,8 @@ export component MainWindow inherits Window {
     callback edit-commit(Kind, length, length, length, length);
     callback edit-remove(int);
     callback edit-pick(length, length) -> int;
+    // zone edit preview: the kind picker under the selected zone
+    callback edit-set-kind(Kind);
     callback settings-jump(int);
     // Settings (M5, src/vm/prefs.rs): a Startup or In-game overlay row changed, Check now, Export and Import of a
     // game ("Import settings" on the welcome page imports a game too)
@@ -230,6 +233,9 @@ export component MainWindow inherits Window {
     callback game-chosen(int);
     // the switcher opened: covers of the other games are made the first time
     callback switcher-opened();
+    // the switcher's search: Rust sets `switcher-hits` (the games that match, as indices into `games`)
+    callback switcher-search(string);
+    in-out property <[int]> switcher-hits;
     callback add-game();
     // Back on page 02 of "Add game": the main pages show the current game again
     callback setup-cancelled();
@@ -372,6 +378,13 @@ export component MainWindow inherits Window {
         root.zone-rename-done();
         root.switcher-open = true;
         root.switcher-opened();
+        switcher.focus-search();
+    }
+    // the search field had the keys: they come back to the window
+    changed switcher-open => {
+        if !self.switcher-open {
+            keys.focus();
+        }
     }
     // A game was picked in the switcher. The game changes at once (Rust loads it); only the look takes 240 ms:
     // the old name rolls out in 100 ms and the new one in 140 ms, and the page content dips with it.
@@ -415,15 +428,15 @@ export component MainWindow inherits Window {
                     return accept;
                 }
                 if e.text == Key.UpArrow {
-                    switcher.highlight = Math.max(0, switcher.highlight - 1);
+                    switcher.step(-1);
                     return accept;
                 }
                 if e.text == Key.DownArrow {
-                    switcher.highlight = Math.min(root.games.length - 1, switcher.highlight + 1);
+                    switcher.step(1);
                     return accept;
                 }
-                if e.text == Key.Return && switcher.highlight >= 0 && switcher.highlight < root.games.length {
-                    root.switch-to(switcher.highlight);
+                if e.text == Key.Return {
+                    switcher.pick();
                     return accept;
                 }
             }
@@ -880,8 +893,12 @@ export component MainWindow inherits Window {
         if root.sheet: ComponentSheet { }
 
         switcher := GameSwitcher {
-            visible: root.switcher-open;
+            open: root.switcher-open;
             games: root.games;
+            hits: root.switcher-hits;
+            search(q) => {
+                root.switcher-search(q);
+            }
             current: root.current-game;
             close => {
                 root.switcher-open = false;
@@ -917,7 +934,10 @@ export component MainWindow inherits Window {
             visible: root.overlay == OverlayPreview.zone-edit;
             zones <=> root.edit-zones;
             selected <=> root.edit-selected;
-            dim-commands: root.edit-dim;
+            bar-clear: root.edit-bar-clear;
+            set-kind(k) => {
+                root.edit-set-kind(k);
+            }
             draft <=> root.edit-draft;
             draft-x <=> root.edit-draft-x;
             draft-y <=> root.edit-draft-y;

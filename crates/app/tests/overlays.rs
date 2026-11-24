@@ -413,13 +413,11 @@ fn the_quick_menu_key_goes_from_zone_edit_back_to_the_menu() {
     assert_eq!(a.menu().get_highlight(), 0);
 }
 
-/// The volume slider of the open menu (its accessible value is the percent it shows).
-fn slider(m: &dr_app::QuickMenuWindow) -> i_slint_backend_testing::ElementHandle {
-    i_slint_backend_testing::ElementQuery::from_root(m)
-        .match_descendants()
-        .match_accessible_role(i_slint_backend_testing::AccessibleRole::Slider)
-        .find_first()
-        .expect("the volume slider")
+/// A slider of the open menu, "Speed" or "Volume" (its accessible value is its place in percent).
+fn slider(m: &dr_app::QuickMenuWindow, label: &str) -> i_slint_backend_testing::ElementHandle {
+    i_slint_backend_testing::ElementHandle::find_by_accessible_label(m, label)
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Slider))
+        .unwrap_or_else(|| panic!("no {label} slider"))
 }
 
 /// A Mode button of the open menu ("Automatic" or "On key press").
@@ -436,8 +434,11 @@ fn volume_and_mode_follow_the_keys_after_a_mouse_click() {
     a.key(Action::Menu);
     let m = a.menu();
     // a click in the middle of the slider: 50 %, saved when let go
-    slider(&m).mock_single_click(PointerEventButton::Left);
-    assert_eq!(slider(&m).accessible_value().unwrap().as_str(), "50");
+    slider(&m, "Volume").mock_single_click(PointerEventButton::Left);
+    assert_eq!(
+        slider(&m, "Volume").accessible_value().unwrap().as_str(),
+        "50"
+    );
     assert!((a.saved().voice.volume - 0.5).abs() < 0.01);
     // then Right on Volume: the slider shows the new value
     for _ in 0..qm::VOLUME {
@@ -445,7 +446,10 @@ fn volume_and_mode_follow_the_keys_after_a_mouse_click() {
     }
     a.nav(Nav::Right);
     assert!((a.saved().voice.volume - 0.55).abs() < 0.01);
-    assert_eq!(slider(&m).accessible_value().unwrap().as_str(), "55");
+    assert_eq!(
+        slider(&m, "Volume").accessible_value().unwrap().as_str(),
+        "55"
+    );
     // a click on "On key press", then Left on Mode: "Automatic" shows as chosen
     mode_button(&m, "On key press").mock_single_click(PointerEventButton::Left);
     assert_eq!(a.saved().mode, dr_runtime::Mode::Manual);
@@ -463,11 +467,47 @@ fn volume_and_mode_follow_the_keys_after_a_mouse_click() {
     // and on the next open, the menu shows what the profile has
     a.nav(Nav::Esc);
     a.key(Action::Menu);
-    assert_eq!(slider(&m).accessible_value().unwrap().as_str(), "55");
+    assert_eq!(
+        slider(&m, "Volume").accessible_value().unwrap().as_str(),
+        "55"
+    );
     assert_eq!(
         mode_button(&m, "Automatic").accessible_item_selected(),
         Some(true)
     );
+}
+
+#[test]
+fn the_speed_slider_follows_the_keys_and_the_mouse() {
+    use slint::platform::PointerEventButton;
+    let a = app();
+    a.key(Action::Menu);
+    let m = a.menu();
+    // 1.0x on the 0.5x to 2.0x range: a third of the way
+    assert_eq!(
+        slider(&m, "Speed").accessible_value().unwrap().as_str(),
+        "33"
+    );
+    // Right on Speed: 1.1x, the knob follows, saved at once
+    for _ in 0..qm::SPEED {
+        a.nav(Nav::Down);
+    }
+    a.nav(Nav::Right);
+    assert_eq!(m.get_speed(), 1.1);
+    assert_eq!(
+        slider(&m, "Speed").accessible_value().unwrap().as_str(),
+        "40"
+    );
+    assert_eq!(a.saved().voice.speed, 1.1);
+    // a click in the middle: 1.25x snaps to the 0.1 steps of the keys, saved when let go
+    slider(&m, "Speed").mock_single_click(PointerEventButton::Left);
+    let s = m.get_speed();
+    assert!((s - 1.3).abs() < 1e-4 || (s - 1.2).abs() < 1e-4, "{s}");
+    assert_eq!(a.saved().voice.speed, s);
+    // and Left after the click steps from there
+    a.nav(Nav::Left);
+    assert!((m.get_speed() - (s - 0.1)).abs() < 1e-4);
+    assert!((a.saved().voice.speed - (s - 0.1)).abs() < 1e-4);
 }
 
 #[test]

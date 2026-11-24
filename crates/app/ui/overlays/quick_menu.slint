@@ -1,105 +1,35 @@
-// 15-quick-menu-a and 15-quick-menu-voice: the centered in-game quick menu, its key hints and the voice flyout.
-// This file holds only what the overlay window (M4) needs. The review previews are in quick_menu_preview.slint.
-// Order (design rule): Manage zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit (press twice).
-import { Palette, Shadow, Space, Radius, Size, Type, Icons, Art } from "../theme.slint";
+// 15 quick menu (d-black 15-quick-menu): the in-game menu and its voice list. This file holds what the overlay
+// window (M4) needs; the review preview is in quick_menu_preview.slint.
+// Rows: Edit zones, Stop, Mute, Voice, Speed, Volume, Mode, Settings, Quit (press twice). The header shows the
+// game and a small status, as the game has no title strip. No key hints (one place for key hints: the switcher).
+// One highlight glides between the rows (120 ms, keys). Keys come from the low-level hook, never from focus.
+import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
 import { VoiceData } from "../data.slint";
-import { Icon, CIcon, Toggle, Segmented, Slider } from "../components/base.slint";
+import { Icon, CIcon, Toggle, Segmented, Slider, Dot } from "../components/base.slint";
 
-// Keycap in the quick menu hints (.q9k).
-component QKey inherits Rectangle {
-    in property <string> text;
-    height: 22px;
-    min-width: 22px;
-    horizontal-stretch: 0;
-    border-radius: 6px;
-    border-width: 1px;
-    border-color: Palette.line-2;
-    background: Palette.surface-2;
-    HorizontalLayout {
-        padding-left: 7px;
-        padding-right: 7px;
-        alignment: center;
-        Text {
-            text: root.text;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
-            color: Palette.text-2;
-            letter-spacing: root.text == "↑↓" || root.text == "←→" ? Type.ls-arrows : 0px;
-            vertical-alignment: center;
-        }
+// The app's speed range (SPEED_MIN, SPEED_MAX in src/overlay/quick_menu.rs): the slider runs 0.5x to 2.0x.
+export global QmSpeed {
+    out property <float> min: 0.5;
+    out property <float> max: 2.0;
+    // "1.1x": one decimal, also for whole numbers ("1.0x")
+    public pure function text(s: float) -> string {
+        let t = Math.round(s * 10);
+        return Math.floor(t / 10) + "." + Math.mod(t, 10) + "x";
     }
 }
 
-export struct Hint {
-    key: string,
-    text: string,
-}
-
-// The key hint pill under the menu (.q9-pill).
-export component QmHints inherits Rectangle {
-    in property <[Hint]> hints;
-    height: 38px;
-    width: row.preferred-width;
-    border-radius: 19px;
-    border-width: 1px;
-    border-color: Palette.line-2;
-    background: Palette.panel;
-    drop-shadow-offset-y: Shadow.pop-y;
-    drop-shadow-blur: Shadow.pop-blur;
-    drop-shadow-color: Shadow.pop-color;
-    row := HorizontalLayout {
-        padding-left: Space.s4 + 1px;
-        padding-right: Space.s4 + 1px;
-        spacing: 18px;
-        for h in root.hints: HorizontalLayout {
-            spacing: 7px;
-            VerticalLayout {
-                alignment: center;
-                QKey {
-                    text: h.key;
-                }
-            }
-
-            Text {
-                text: h.text;
-                font-size: Type.fs1;
-                font-weight: Type.w-medium;
-                color: Palette.text-3;
-                vertical-alignment: center;
-            }
-        }
-    }
-}
-
-// One menu row (.qa9 .r). `hi` = keyboard focus, `arm` = Quit pressed once, `faint` = Quit at rest.
+// One menu row (.qr): icon, label, and the value on the right (children). `arm`: Quit pressed once.
 export component QmRow inherits Rectangle {
     in property <image> icon;
     in property <string> text;
-    in property <bool> hi;
-    in property <bool> open;
     in property <bool> arm;
-    in property <bool> faint;
-    in property <length> row-h: 42px;
-    in property <length> icon-size: 16px;
-    in property <length> font-size: Type.fs2;
-    in property <length> gap: 14px;
-    in property <length> pad: Space.s3;
+    in property <length> row-h: Size.row;
     callback clicked();
     height: root.row-h;
-    border-radius: Radius.md;
-    background: root.arm ? Palette.danger-soft : root.hi ? Palette.surface-3 : transparent;
     accessible-role: button;
     accessible-label: root.text;
     accessible-action-default => {
         root.clicked();
-    }
-    if root.hi || root.arm: Rectangle {
-        x: 0;
-        y: (parent.height - self.height) / 2;
-        width: 2px;
-        height: parent.height - 22px;
-        border-radius: 1px;
-        background: root.arm ? Palette.danger : root.open ? Palette.text-3 : Palette.accent;
     }
     TouchArea {
         clicked => {
@@ -108,351 +38,361 @@ export component QmRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: root.pad;
-        padding-right: root.pad;
-        spacing: root.gap;
+        padding-left: Space.s3;
+        padding-right: Space.s2;
+        spacing: Space.s3;
         CIcon {
             source: root.icon;
-            size: root.icon-size;
-            color: root.arm ? Palette.danger : root.hi ? Palette.text : Palette.text-3;
+            color: root.arm ? Palette.danger : Palette.text-2;
         }
 
         Text {
             text: root.text;
-            font-size: root.font-size;
-            font-weight: Type.w-medium;
-            color: root.arm ? Palette.danger : root.faint ? Palette.text-3 : Palette.text;
+            color: root.arm ? Palette.danger : Palette.text;
             vertical-alignment: center;
             horizontal-stretch: 1;
+            accessible-role: none;
         }
 
         @children
     }
 }
 
-export component QmNote inherits Text {
-    font-size: Type.fs1;
-    color: Palette.text-3;
-    vertical-alignment: center;
+// The hairline between row groups (.sep): full width, 4 px above and below.
+component QmSep inherits Rectangle {
+    height: 9px;
+    Rectangle {
+        x: -Space.s1;
+        y: Space.s1;
+        width: parent.width + 2 * Space.s1;
+        height: 1px;
+        background: Palette.line;
+    }
 }
 
-component QmLine inherits Rectangle {
-    height: 1px;
-    background: Palette.line;
-}
-
+// The small status in the header: lime dot and "Reading", or a grey dot and "Stopped".
 export component QmStatus inherits HorizontalLayout {
     in property <bool> on: true;
-    spacing: 7px;
+    spacing: Space.s2;
     horizontal-stretch: 0;
     VerticalLayout {
         alignment: center;
-        Rectangle {
-            width: 6px;
-            height: 6px;
-            border-radius: 3px;
-            background: root.on ? Palette.accent : Palette.text-3;
+        Dot {
+            size: 8px;
+            tint: root.on ? Palette.live : Palette.text-2;
         }
     }
 
     Text {
         text: root.on ? "Reading" : "Stopped";
-        font-size: Type.fs1;
-        font-weight: Type.w-medium;
+        font-size: Type.fs-small;
         color: Palette.text-2;
         vertical-alignment: center;
     }
 }
 
-// The quick menu panel. All state is plain properties; the overlay window (M4) drives them from the key hook.
+// A slider with its value on the right (.qr .slider): 112 px track, the value in text color.
+component QmSlider inherits HorizontalLayout {
+    in-out property <float> value;
+    in property <string> label;
+    in property <string> shown;
+    callback moved(float);
+    callback let-go(float);
+    spacing: Space.s3;
+    VerticalLayout {
+        alignment: center;
+        Slider {
+            width: 112px;
+            label: root.label;
+            value <=> root.value;
+            changed(v) => {
+                root.moved(v);
+            }
+            released(v) => {
+                root.let-go(v);
+            }
+        }
+    }
+
+    Text {
+        width: 36px;
+        text: root.shown;
+        color: Palette.text;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+// The quick menu panel (.qm): 400 px, opaque, radius 10. All state is plain properties; the overlay window (M4)
+// drives them from the key hook.
 export component QuickMenu inherits Rectangle {
     in property <string> game: "Red Dead Redemption 2";
     in-out property <int> highlight: 0;
     in-out property <bool> stopped: false;
     in-out property <bool> muted: false;
     in-out property <string> voice: "Adam";
+    // the speed as text ("1.1x") and its slider place (0 to 1 over 0.5x to 2.0x)
     in-out property <float> speed: 1.1;
-    in-out property <float> volume: 0.7;
+    in-out property <float> speed-pos: (root.speed - QmSpeed.min) / (QmSpeed.max - QmSpeed.min);
+    in-out property <float> volume: 0.8;
     in-out property <bool> automatic: true;
     in-out property <bool> quit-armed: false;
     in property <bool> voice-open: false;
     callback activate(int);
-    // mouse on the volume slider and the mode buttons (the overlay window saves them)
+    // mouse on the sliders and the mode buttons (the overlay window saves them)
+    callback speed-moved(float);
+    callback speed-let-go(float);
     callback volume-moved(float);
     callback volume-let-go(float);
     callback mode-picked(bool);
-    width: 440px;
-    height: col.preferred-height;
-    border-radius: 14px;
+    // where row `i` starts in the list (rows 44 px, a 9 px line after rows 0, 2 and 6)
+    pure function row-y(i: int) -> length {
+        return Space.s1 + i * Size.row + (i >= 1 ? 9px : 0px) + (i >= 3 ? 9px : 0px) + (i >= 7 ? 9px : 0px);
+    }
+    // the top of the voice list beside the Voice row (the window places it), in panel px
+    out property <length> voice-y: head.height + 1px + root.row-y(3) - Space.s1;
+    width: 400px;
+    height: col.preferred-height + 2px;
+    border-radius: Radius.lg;
     border-width: 1px;
-    border-color: Palette.line-2;
-    background: Palette.panel;
-    drop-shadow-offset-y: Shadow.pop-y;
-    drop-shadow-blur: Shadow.pop-blur;
-    drop-shadow-color: Shadow.pop-color;
+    border-color: Palette.float-line;
+    background: Palette.float;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
     col := VerticalLayout {
-        padding: 1px;
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        // 48 px with the line under it (.qm-h)
+        head := HorizontalLayout {
+            height: 47px;
+            padding-left: Space.s4;
+            padding-right: Space.s4;
+            spacing: Space.s2;
+            Text {
+                text: root.game;
+                font-weight: Type.w-strong;
+                color: Palette.text;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+
+            QmStatus {
+                on: !root.stopped;
+            }
+        }
+
         Rectangle {
-            height: 54px;
-            HorizontalLayout {
-                padding-left: 18px;
-                padding-right: 18px;
-                spacing: Space.s3;
-                Text {
-                    text: root.game;
-                    font-size: 15px;
-                    font-weight: Type.w-semibold;
-                    letter-spacing: Type.ls-menu-title;
-                    color: Palette.text;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                }
-
-                QmStatus {
-                    on: !root.stopped;
-                }
-            }
+            height: 1px;
+            background: Palette.line;
         }
 
-        QmLine { }
-
-        VerticalLayout {
-            padding: 6px;
-            QmRow {
-                icon: Icons.zone;
-                text: "Manage zones";
-                hi: root.highlight == 0 && !root.voice-open;
-                clicked => {
-                    root.activate(0);
-                }
-                CIcon {
-                    source: Icons.chev-right;
-                    size: 14px;
-                }
-            }
-        }
-
-        QmLine { }
-
-        VerticalLayout {
-            padding: 6px;
-            QmRow {
-                icon: root.stopped ? Icons.resume : Icons.stop;
-                text: root.stopped ? "Resume" : "Stop";
-                hi: root.highlight == 1 && !root.voice-open;
-                clicked => {
-                    root.activate(1);
-                }
-                QmNote {
-                    text: "Play / pause";
+        list := Rectangle {
+            height: lay.preferred-height;
+            // the highlight glides to the row the keys are on
+            Rectangle {
+                x: Space.s1;
+                y: root.row-y(root.voice-open ? 3 : root.highlight);
+                width: parent.width - 2 * Space.s1;
+                height: Size.row;
+                border-radius: Radius.md;
+                background: Palette.surface-3;
+                animate y {
+                    duration: Motion.fast;
+                    easing: cubic-bezier(0.16, 1, 0.3, 1);
                 }
             }
 
-            QmRow {
-                icon: Icons.speaker;
-                text: "Mute";
-                hi: root.highlight == 2 && !root.voice-open;
-                clicked => {
-                    root.activate(2);
-                }
-                VerticalLayout {
-                    alignment: center;
-                    Toggle {
-                        track-w: 34px;
-                        on: root.muted;
-                        label: "Mute";
-                        toggled(v) => {
-                            root.activate(2);
-                        }
+            lay := VerticalLayout {
+                padding: Space.s1;
+                QmRow {
+                    icon: Icons.zone;
+                    text: "Edit zones";
+                    clicked => {
+                        root.activate(0);
                     }
-                }
-            }
-        }
-
-        QmLine { }
-
-        VerticalLayout {
-            padding: 6px;
-            QmRow {
-                icon: Icons.audio;
-                text: "Voice";
-                hi: root.highlight == 3 || root.voice-open;
-                open: root.voice-open;
-                clicked => {
-                    root.activate(3);
-                }
-                HorizontalLayout {
-                    spacing: 4px;
-                    Text {
-                        text: root.voice;
-                        font-size: 13px;
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                    }
-
                     CIcon {
                         source: Icons.chev-right;
                         size: 14px;
                     }
                 }
-            }
 
-            QmRow {
-                icon: Icons.speed;
-                text: "Speed";
-                hi: root.highlight == 4 && !root.voice-open;
-                HorizontalLayout {
-                    spacing: 2px;
-                    CIcon {
-                        source: Icons.chev-left;
-                        size: 14px;
-                    }
+                QmSep { }
 
-                    Text {
-                        width: 44px;
-                        text: Math.round(root.speed * 10) / 10 + "x";
-                        font-size: 13px;
-                        font-weight: Type.w-medium;
-                        color: Palette.text;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-
-                    CIcon {
-                        source: Icons.chev-right;
-                        size: 14px;
+                QmRow {
+                    icon: root.stopped ? Icons.resume : Icons.stop;
+                    text: root.stopped ? "Resume" : "Stop";
+                    clicked => {
+                        root.activate(1);
                     }
                 }
-            }
 
-            QmRow {
-                icon: Icons.volume;
-                text: "Volume";
-                hi: root.highlight == 5 && !root.voice-open;
-                HorizontalLayout {
-                    width: 214px;
-                    spacing: Space.s3;
+                QmRow {
+                    icon: @image-url("../icons/mute.svg");
+                    text: "Mute";
+                    clicked => {
+                        root.activate(2);
+                    }
                     VerticalLayout {
                         alignment: center;
-                        horizontal-stretch: 1;
-                        Slider {
-                            knob: 14px;
-                            value <=> root.volume;
-                            changed(v) => {
-                                root.volume-moved(v);
-                            }
-                            released(v) => {
-                                root.volume-let-go(v);
+                        Toggle {
+                            on: root.muted;
+                            label: "Mute";
+                            toggled(v) => {
+                                root.activate(2);
                             }
                         }
                     }
+                }
 
-                    Text {
-                        width: 34px;
-                        text: Math.round(root.volume * 100) + "%";
-                        font-size: Type.fs1;
-                        color: Palette.text-2;
-                        horizontal-alignment: right;
+                QmSep { }
+
+                QmRow {
+                    icon: Icons.k-speaker;
+                    text: "Voice";
+                    clicked => {
+                        root.activate(3);
+                    }
+                    HorizontalLayout {
+                        spacing: Space.s1;
+                        Text {
+                            text: root.voice;
+                            color: Palette.text-2;
+                            vertical-alignment: center;
+                        }
+
+                        CIcon {
+                            source: Icons.chev-right;
+                            size: 14px;
+                        }
+                    }
+                }
+
+                QmRow {
+                    icon: Icons.speed;
+                    text: "Speed";
+                    QmSlider {
+                        label: "Speed";
+                        value <=> root.speed-pos;
+                        shown: QmSpeed.text(root.speed);
+                        moved(v) => {
+                            root.speed-moved(v);
+                        }
+                        let-go(v) => {
+                            root.speed-let-go(v);
+                        }
+                    }
+                }
+
+                QmRow {
+                    icon: Icons.volume;
+                    text: "Volume";
+                    QmSlider {
+                        label: "Volume";
+                        value <=> root.volume;
+                        shown: Math.round(root.volume * 100) + "%";
+                        moved(v) => {
+                            root.volume-moved(v);
+                        }
+                        let-go(v) => {
+                            root.volume-let-go(v);
+                        }
+                    }
+                }
+
+                QmRow {
+                    icon: Icons.zap;
+                    text: "Mode";
+                    VerticalLayout {
+                        alignment: center;
+                        Segmented {
+                            items: ["Automatic", "On key press"];
+                            selected: root.automatic ? 0 : 1;
+                            select(i) => {
+                                root.automatic = i == 0;
+                                root.mode-picked(i == 0);
+                            }
+                        }
+                    }
+                }
+
+                QmSep { }
+
+                QmRow {
+                    icon: Icons.settings;
+                    text: "Settings";
+                    clicked => {
+                        root.activate(7);
+                    }
+                    CIcon {
+                        source: Icons.open;
+                        size: 14px;
+                    }
+                }
+
+                QmRow {
+                    icon: Icons.power;
+                    text: "Quit";
+                    arm: root.quit-armed;
+                    clicked => {
+                        root.activate(8);
+                    }
+                    if root.quit-armed: Text {
+                        text: "Press again to quit";
+                        color: Palette.danger;
                         vertical-alignment: center;
                     }
-                }
-            }
-
-            QmRow {
-                icon: Icons.mode;
-                text: "Mode";
-                hi: root.highlight == 6 && !root.voice-open;
-                VerticalLayout {
-                    alignment: center;
-                    Segmented {
-                        width: 214px;
-                        items: ["Automatic", "On key press"];
-                        selected: root.automatic ? 0 : 1;
-                        accent-on: true;
-                        fill: true;
-                        item-w: (214px - 6px - 2px) / 2;
-                        font-size: 13px;
-                        select(i) => {
-                            root.automatic = i == 0;
-                            root.mode-picked(i == 0);
-                        }
-                    }
-                }
-            }
-        }
-
-        QmLine { }
-
-        VerticalLayout {
-            padding: 6px;
-            QmRow {
-                icon: Icons.settings;
-                text: "Settings";
-                hi: root.highlight == 7 && !root.voice-open;
-                clicked => {
-                    root.activate(7);
-                }
-                CIcon {
-                    source: Icons.open;
-                    size: 14px;
-                }
-            }
-
-            QmRow {
-                icon: Icons.power;
-                text: "Quit";
-                hi: root.highlight == 8 && !root.voice-open && !root.quit-armed;
-                arm: root.quit-armed;
-                faint: !root.quit-armed;
-                clicked => {
-                    root.activate(8);
-                }
-                QmNote {
-                    text: root.quit-armed ? "Press again to quit" : "Press twice";
-                    color: root.quit-armed ? Palette.danger-dim : Palette.text-3;
                 }
             }
         }
     }
 }
 
-// Voice flyout to the right of the Voice row (15-quick-menu-voice).
+// The voice list beside the Voice row (.qv): 248 px, rows 36, a check on the chosen voice, "US · Male" on the
+// right. Up and Down move the highlight; Space plays a sample; Enter chooses (src/overlay/quick_menu.rs).
 export component QmVoices inherits Rectangle {
     in property <[VoiceData]> voices;
     in property <int> chosen: 0;
     in-out property <int> highlight: 1;
     callback choose(int);
-    callback preview(int);
-    width: 270px;
-    height: col.preferred-height;
-    border-radius: 12px;
+    width: 248px;
+    height: lay.preferred-height + 2px;
+    border-radius: Radius.lg;
     border-width: 1px;
-    border-color: Palette.line-2;
-    background: Palette.panel;
-    drop-shadow-offset-y: Shadow.pop-y;
-    drop-shadow-blur: Shadow.pop-blur;
-    drop-shadow-color: Shadow.pop-color;
-    col := VerticalLayout {
-        padding: 7px;
+    border-color: Palette.float-line;
+    background: Palette.float;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    Rectangle {
+        x: 1px + Space.s1;
+        y: 1px + Space.s1 + Math.max(0, root.highlight) * Size.list;
+        width: parent.width - 2px - 2 * Space.s1;
+        height: Size.list;
+        visible: root.highlight >= 0 && root.highlight < root.voices.length;
+        border-radius: Radius.md;
+        background: Palette.surface-3;
+        animate y {
+            duration: Motion.fast;
+            easing: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    }
+
+    lay := VerticalLayout {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        padding: Space.s1;
         for v[i] in root.voices: Rectangle {
-            property <bool> hi: i == root.highlight;
             property <bool> sel: i == root.chosen;
-            height: 36px;
-            border-radius: Radius.md;
-            background: self.hi ? Palette.surface-3 : transparent;
+            height: Size.list;
             accessible-role: list-item;
             accessible-label: v.name;
             accessible-item-selected: self.sel;
             accessible-action-default => {
                 root.choose(i);
-            }
-            if hi: Rectangle {
-                x: 0;
-                y: 9px;
-                width: 2px;
-                height: parent.height - 18px;
-                border-radius: 1px;
-                background: Palette.accent;
             }
             TouchArea {
                 clicked => {
@@ -461,57 +401,31 @@ export component QmVoices inherits Rectangle {
             }
 
             HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 6px;
-                spacing: 10px;
+                padding-left: Space.s3;
+                padding-right: Space.s2;
+                spacing: Space.s3;
                 Rectangle {
                     width: 16px;
                     if sel: CIcon {
                         source: Icons.check;
-                        color: Palette.accent;
+                        color: Palette.text;
                     }
                 }
 
                 Text {
                     text: v.name;
-                    font-size: Type.fs2;
-                    font-weight: Type.w-medium;
-                    color: hi || sel ? Palette.text : Palette.text-2;
+                    color: Palette.text;
                     vertical-alignment: center;
                     horizontal-stretch: 1;
+                    accessible-role: none;
                 }
 
                 Text {
                     text: v.short;
-                    font-size: Type.fs1;
-                    color: Palette.text-3;
+                    font-size: Type.fs-small;
+                    color: Palette.text-2;
                     vertical-alignment: center;
-                }
-
-                VerticalLayout {
-                    alignment: center;
-                    Rectangle {
-                        width: 26px;
-                        height: 26px;
-                        border-radius: 13px;
-                        background: hi ? Palette.surface-2 : transparent;
-                        border-width: hi ? 1px : 0px;
-                        border-color: Palette.line-2;
-                        accessible-role: button;
-                        accessible-label: "Preview " + v.name;
-                        Icon {
-                            source: Icons.play-fill;
-                            width: 12px;
-                            height: 12px;
-                            color: hi ? Palette.text : Palette.text-3;
-                        }
-
-                        TouchArea {
-                            clicked => {
-                                root.preview(i);
-                            }
-                        }
-                    }
+                    accessible-role: none;
                 }
             }
         }

@@ -113,10 +113,13 @@ pub fn all() -> Vec<Screen> {
                 w.set_overlay(OverlayPreview::QuickMenuVoice);
             },
         },
+        // zone edit as it opens: no zone selected, nothing drawn
         Screen {
             name: "16-zone-edit",
             setup: |w| {
                 page(w, Page::Overview);
+                w.set_edit_selected(-1);
+                w.set_edit_draft(false);
                 w.set_overlay(OverlayPreview::ZoneEdit);
             },
         },
@@ -239,6 +242,48 @@ pub fn all() -> Vec<Screen> {
                 w.set_zones_selected(-1);
                 w.set_zones(slint::ModelRc::default());
                 page(w, Page::Zones);
+            },
+        },
+        // zone edit with a box just drawn: its tag, and the kind picker under it (16-zone-edit-new)
+        Screen {
+            name: "16-zone-edit-new",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_edit_selected(-1);
+                w.set_edit_draft_x(930.0);
+                w.set_edit_draft_y(150.0);
+                w.set_edit_draft_w(360.0);
+                w.set_edit_draft_h(112.0);
+                w.set_edit_draft(true);
+                w.set_overlay(OverlayPreview::ZoneEdit);
+            },
+        },
+        // a zone at the top edge, selected: its tag and the picker go under it, and the bar moves to the top
+        // right (16-zone-edit-top). Last, as it changes the zone list.
+        Screen {
+            name: "16-zone-edit-top",
+            setup: |w| {
+                use slint::Model;
+                page(w, Page::Overview);
+                let mut zones: Vec<crate::EditZone> = w.get_edit_zones().iter().collect();
+                zones.push(crate::EditZone {
+                    kind: crate::Kind::Pickups,
+                    x: 560.0,
+                    y: 4.0,
+                    w: 340.0,
+                    h: 46.0,
+                });
+                let rects: Vec<crate::geom::Rect> = zones
+                    .iter()
+                    .map(|z| crate::geom::Rect::new(z.x, z.y, z.w, z.h))
+                    .collect();
+                let clear =
+                    crate::overlay::zone_edit::bar_clear(&rects, WIDTH as f32, HEIGHT as f32);
+                w.set_edit_bar_clear(slint::ModelRc::new(slint::VecModel::from(clear.to_vec())));
+                w.set_edit_selected(zones.len() as i32 - 1);
+                w.set_edit_zones(slint::ModelRc::new(slint::VecModel::from(zones)));
+                w.set_edit_draft(false);
+                w.set_overlay(OverlayPreview::ZoneEdit);
             },
         },
     ]

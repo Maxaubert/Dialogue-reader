@@ -1,19 +1,20 @@
-// 14 game switcher: scrim and a panel under the game button. Ctrl K or the game button opens it, Esc closes it.
-import { Palette, Shadow, Space, Radius, Size, Type, Icons } from "../theme.slint";
+// 14 game switcher (d-black 14-game-switcher): a scrim under the title strip and a panel under the game name.
+// The game name or Ctrl K opens it. Type to search; Up and Down move the highlight (it glides 120 ms); Enter
+// switches; Esc or a click outside closes it. Rust filters the games (`hits`, src/vm/mod.rs).
+// Motion (README, 7 and 8): scrim 0 to 0.6, panel opacity, y -8 to 0 and scale 0.98 to 1, 180 ms ease-out;
+// close 140 ms ease-in.
+import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
 import { GameData } from "../data.slint";
-import { Icon, CIcon, Kbd, Thumb, ITile, SmallLabel } from "../components/base.slint";
+import { CIcon, Icon, Thumb } from "../components/base.slint";
 
+// One game row (.gr): picture, name, and "Reading" or when it was last played on the right.
 component GameItem inherits Rectangle {
     in property <GameData> game;
     in property <bool> current;
     in property <bool> hi;
     callback clicked();
     callback hovered();
-    height: 48px;
-    border-radius: Radius.md;
-    border-width: 1px;
-    border-color: root.hi ? Palette.line-2 : transparent;
-    background: root.hi ? Palette.surface-3 : transparent;
+    height: Size.media;
     accessible-role: list-item;
     accessible-label: root.game.name;
     accessible-item-selected: root.hi;
@@ -32,65 +33,97 @@ component GameItem inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: Space.s3 + 1px;
-        padding-right: Space.s3 + 1px;
+        padding-left: Space.s2;
+        padding-right: Space.s3;
         spacing: Space.s3;
         VerticalLayout {
             alignment: center;
-            Thumb {
-                width: 32px;
-                height: 32px;
-                art: root.game.art;
-                picture: root.game.cover;
-                radius: Radius.sm;
-                behind: root.hi ? Palette.surface-3 : Palette.surface;
+            Rectangle {
+                width: 48px;
+                height: 27px;
+                Thumb {
+                    width: 100%;
+                    height: 100%;
+                    art: root.game.art;
+                    picture: root.game.cover;
+                    radius: Radius.sm;
+                    behind: root.hi ? Palette.surface-3 : Palette.surface-1;
+                }
+
+                Rectangle {
+                    border-radius: Radius.sm;
+                    border-width: 1px;
+                    border-color: Palette.line;
+                }
             }
         }
 
-        VerticalLayout {
-            alignment: center;
+        Text {
+            text: root.game.name;
+            color: Palette.text;
+            vertical-alignment: center;
             horizontal-stretch: 1;
-            Text {
-                text: root.game.name;
-                height: Type.lh2;
-                font-weight: Type.w-medium;
-                color: Palette.text;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: root.game.meta;
-                height: Type.lh1;
-                font-size: Type.fs1;
-                color: Palette.text-3;
-                vertical-alignment: center;
-            }
+            overflow: elide;
+            // the row carries the name (a Text with it would count as the strip's game name)
+            accessible-role: none;
         }
 
-        if root.current: CIcon {
-            source: Icons.check;
-        }
-        if root.hi && !root.current: VerticalLayout {
-            alignment: center;
-            Kbd {
-                text: "Enter";
-                small: true;
-            }
+        Text {
+            text: root.game.meta;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            vertical-alignment: center;
+            accessible-role: none;
         }
     }
 }
 
 export component GameSwitcher inherits Rectangle {
+    in property <bool> open;
     in property <[GameData]> games;
+    // the games shown, as indices into `games` (all of them until a search narrows them)
+    in property <[int]> hits;
     in property <int> current: 0;
+    // the highlighted row: a place in `hits`
     in-out property <int> highlight: 1;
     in-out property <string> query;
     callback close();
+    // a game was picked (its index in `games`)
     callback choose(int);
     callback add-game();
-    // scrim over the whole window; a click outside the panel closes it
+    callback search(string);
+    // the switcher opened: an empty search, the highlight on the first game that is not the current one
+    changed open => {
+        if root.open {
+            root.query = "";
+            root.search("");
+            root.highlight = root.current == 0 && root.games.length > 1 ? 1 : 0;
+        }
+    }
+    public function focus-search() {
+        search.focus();
+    }
+    public function step(d: int) {
+        root.highlight = Math.max(0, Math.min(root.hits.length - 1, root.highlight + d));
+    }
+    public function pick() {
+        if root.highlight >= 0 && root.highlight < root.hits.length {
+            root.choose(root.hits[root.highlight]);
+        }
+    }
+    property <float> t: root.open ? 1 : 0;
+    animate t {
+        duration: Motion.instant ? 0ms : root.open ? Motion.base : Motion.exit;
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    visible: self.t > 0.01;
+
+    // scrim under the title strip; a click on it closes the switcher
     Rectangle {
-        background: Palette.scrim;
+        y: Size.strip;
+        height: parent.height - Size.strip;
+        background: #000000;
+        opacity: 0.6 * root.t;
         TouchArea {
             clicked => {
                 root.close();
@@ -99,39 +132,69 @@ export component GameSwitcher inherits Rectangle {
     }
 
     panel := Rectangle {
-        x: 150px;
-        y: 44px;
-        width: 520px;
-        height: col.preferred-height;
+        x: 12px;
+        y: 44px + (1 - root.t) * -8px;
+        width: 480px;
+        height: col.preferred-height + 2px;
+        opacity: root.t;
+        transform-scale: 0.98 + 0.02 * root.t;
+        transform-origin: { x: self.width * 0.3, y: 0px };
         border-radius: Radius.lg;
         border-width: 1px;
-        border-color: Palette.line-2;
-        background: Palette.surface;
-        drop-shadow-offset-y: Shadow.pop-y;
-        drop-shadow-blur: Shadow.pop-blur;
-        drop-shadow-color: Shadow.pop-color;
+        border-color: Palette.float-line;
+        background: Palette.float;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000099;
         TouchArea { }
 
         col := VerticalLayout {
-            padding: 1px;
-            Rectangle {
-                height: 52px;
-                HorizontalLayout {
-                    padding-left: Space.s4;
-                    padding-right: Space.s4;
-                    spacing: Space.s3;
-                    CIcon {
-                        source: Icons.search;
-                        color: Palette.text;
-                    }
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            // search (.sws): 48 px with the line under it
+            HorizontalLayout {
+                height: Size.media - 1px;
+                padding-left: Space.s4;
+                padding-right: Space.s3;
+                spacing: Space.s3;
+                CIcon {
+                    source: Icons.search;
+                    color: Palette.text-2;
+                }
 
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        if root.query == "": Text {
-                            x: 0;
-                            text: "Search games";
-                            color: Palette.text-3;
-                            vertical-alignment: center;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    if root.query == "": Text {
+                        x: 0;
+                        text: "Search games";
+                        color: Palette.text-2;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                    FocusScope {
+                        // Up, Down, Enter and Esc work while the search field has the keys
+                        capture-key-pressed(e) => {
+                            if !root.open {
+                                return reject;
+                            }
+                            if e.text == Key.UpArrow {
+                                root.step(-1);
+                                return accept;
+                            }
+                            if e.text == Key.DownArrow {
+                                root.step(1);
+                                return accept;
+                            }
+                            if e.text == Key.Return {
+                                root.pick();
+                                return accept;
+                            }
+                            if e.text == Key.Escape {
+                                root.close();
+                                return accept;
+                            }
+                            reject
                         }
                         search := TextInput {
                             text <=> root.query;
@@ -139,74 +202,30 @@ export component GameSwitcher inherits Rectangle {
                             vertical-alignment: center;
                             single-line: true;
                             accessible-label: "Search games";
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        Kbd {
-                            text: "Esc";
-                            small: true;
+                            edited => {
+                                root.search(self.text);
+                                root.highlight = 0;
+                            }
                         }
                     }
                 }
 
-                Rectangle {
-                    y: parent.height - 1px;
-                    height: 1px;
-                    background: Palette.line;
-                }
-            }
-
-            VerticalLayout {
-                padding: Space.s2;
-                HorizontalLayout {
-                    padding-left: Space.s3;
-                    padding-top: Space.s2;
-                    padding-bottom: Space.s1;
-                    SmallLabel {
-                        text: "Running now";
-                    }
-                }
-
-                for g[i] in root.games: VerticalLayout {
-                    if g.running: GameItem {
-                        game: g;
-                        current: i == root.current;
-                        hi: i == root.highlight;
-                        clicked => {
-                            root.choose(i);
-                        }
-                        hovered => {
-                            root.highlight = i;
-                        }
-                    }
-                }
-            }
-
-            VerticalLayout {
-                padding-left: Space.s2;
-                padding-right: Space.s2;
-                padding-bottom: Space.s2;
-                HorizontalLayout {
-                    padding-left: Space.s3;
-                    padding-top: Space.s2;
-                    padding-bottom: Space.s1;
-                    SmallLabel {
-                        text: "Your games";
-                    }
-                }
-
-                for g[i] in root.games: VerticalLayout {
-                    if !g.running: GameItem {
-                        game: g;
-                        current: i == root.current;
-                        hi: i == root.highlight;
-                        clicked => {
-                            root.choose(i);
-                        }
-                        hovered => {
-                            root.highlight = i;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: Size.keycap-sm;
+                        width: ck.preferred-width + 2 * Space.s2 + 2px;
+                        border-radius: Radius.sm;
+                        border-width: 1px;
+                        border-color: Palette.line-2;
+                        background: Palette.surface-2;
+                        ck := Text {
+                            text: "Ctrl K";
+                            font-family: Type.mono;
+                            font-size: Type.fs-small;
+                            font-weight: Type.w-regular;
+                            color: Palette.text;
+                            accessible-role: none;
                         }
                     }
                 }
@@ -217,14 +236,63 @@ export component GameSwitcher inherits Rectangle {
                 background: Palette.line;
             }
 
-            VerticalLayout {
-                padding: Space.s2;
+            // the games (.swl)
+            Rectangle {
+                height: list.preferred-height;
                 Rectangle {
-                    height: 48px;
+                    x: Space.s1;
+                    y: Space.s1 + Math.max(0, root.highlight) * Size.media;
+                    width: parent.width - 2 * Space.s1;
+                    height: Size.media;
+                    visible: root.hits.length > 0;
+                    border-radius: Radius.md;
+                    background: Palette.surface-3;
+                    animate y {
+                        duration: Motion.fast;
+                        easing: cubic-bezier(0.16, 1, 0.3, 1);
+                    }
+                }
+
+                list := VerticalLayout {
+                    padding: Space.s1;
+                    for gi[j] in root.hits: GameItem {
+                        game: root.games[gi];
+                        current: gi == root.current;
+                        hi: j == root.highlight;
+                        clicked => {
+                            root.choose(gi);
+                        }
+                        hovered => {
+                            root.highlight = j;
+                        }
+                    }
+                    if root.hits.length == 0: HorizontalLayout {
+                        height: Size.media;
+                        padding-left: Space.s3;
+                        Text {
+                            text: "No games found.";
+                            color: Palette.text-2;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Palette.line;
+            }
+
+            // Add game (.swf)
+            VerticalLayout {
+                padding: Space.s1;
+                Rectangle {
+                    height: Size.media;
                     border-radius: Radius.md;
                     background: add-touch.has-hover ? Palette.surface-2 : transparent;
                     accessible-role: button;
-                    accessible-label: "Add a game";
+                    accessible-label: "Add game";
+                    accessible-description: "Opens setup";
                     accessible-action-default => {
                         root.add-game();
                     }
@@ -235,89 +303,54 @@ export component GameSwitcher inherits Rectangle {
                     }
 
                     HorizontalLayout {
-                        padding-left: Space.s3 + 1px;
-                        padding-right: Space.s3 + 1px;
+                        padding-left: Space.s2;
+                        padding-right: Space.s3;
                         spacing: Space.s3;
                         VerticalLayout {
                             alignment: center;
-                            ITile {
-                                icon: Icons.plus;
+                            Rectangle {
+                                width: 48px;
+                                height: 27px;
+                                border-radius: Radius.sm;
+                                border-width: 1px;
+                                border-color: Palette.line;
+                                background: Palette.surface-2;
+                                Icon {
+                                    width: Size.icon-lg;
+                                    height: Size.icon-lg;
+                                    source: Icons.plus;
+                                    color: Palette.text-2;
+                                }
                             }
                         }
 
                         Text {
-                            text: "Add a game";
-                            font-weight: Type.w-medium;
-                            color: Palette.text;
+                            text: "Add game";
+                            color: add-touch.has-hover ? Palette.text : Palette.text-2;
                             vertical-alignment: center;
                             horizontal-stretch: 1;
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Kbd {
-                                text: "Ctrl N";
-                                small: true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                height: 40px;
-                Rectangle {
-                    y: 0;
-                    height: 1px;
-                    background: Palette.line;
-                }
-
-                HorizontalLayout {
-                    padding-left: Space.s4;
-                    padding-right: Space.s4;
-                    spacing: Space.s4;
-                    alignment: start;
-                    HorizontalLayout {
-                        spacing: Space.s1;
-                        VerticalLayout {
-                            alignment: center;
-                            Kbd {
-                                text: "↑";
-                                small: true;
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Kbd {
-                                text: "↓";
-                                small: true;
-                            }
-                        }
-
-                        Text {
-                            text: "Move";
-                            font-size: Type.fs1;
-                            color: Palette.text-2;
-                            vertical-alignment: center;
+                            accessible-role: none;
                         }
                     }
 
-                    HorizontalLayout {
-                        spacing: Space.s1;
-                        VerticalLayout {
-                            alignment: center;
-                            Kbd {
-                                text: "Enter";
-                                small: true;
+                    Tooltip {
+                        Rectangle {
+                            border-radius: Radius.md;
+                            border-width: 1px;
+                            border-color: Palette.line-2;
+                            background: Palette.surface-2;
+                            HorizontalLayout {
+                                padding-left: Space.s2;
+                                padding-right: Space.s2;
+                                padding-top: Space.s1;
+                                padding-bottom: Space.s1;
+                                Text {
+                                    text: "Opens setup";
+                                    font-size: Type.fs-small;
+                                    color: Palette.text;
+                                    accessible-role: none;
+                                }
                             }
-                        }
-
-                        Text {
-                            text: "Switch";
-                            font-size: Type.fs1;
-                            color: Palette.text-2;
-                            vertical-alignment: center;
                         }
                     }
                 }
