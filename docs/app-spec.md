@@ -105,8 +105,8 @@ view models and wiring. That keeps the reading path testable without a UI, and t
 - WGC captures the whole window. For a windowed game that includes the title bar and frame, so the screenshot can
   be larger than the client size page 02 shows. Zones are stored in these capture pixels. M4 places overlays by
   the client rect, so it must add the offset of the client area inside the captured window.
-- A minimized window gives no picture. Page 02 and Retake refuse it at once with a plain message instead of
-  waiting for the 3 s capture timeout. The screenshot (Continue, Retake) still runs on the UI thread (up to 3 s,
+- A minimized window gives no picture. Page 02 refuses it at once with a plain message instead of
+  waiting for the 3 s capture timeout. The screenshot (Continue) still runs on the UI thread (up to 3 s,
   plus PNG encoding at Finish); M3b moved only the reader's capture to its own thread. Still open.
 - The window is found again by exe name when the game restarts. `Status(NoWindow)` while it is gone. When the
   game's process cannot be read (it runs as administrator, or anti-cheat protects it), the exe is empty. Such a
@@ -248,8 +248,8 @@ in [overlay-spike.md](overlay-spike.md).
   uses (M4).
 - The quick menu is centered on the game (design rule). Order: Manage zones, Stop (play/pause), Mute, Voice,
   Speed, Volume, Mode, Settings, Quit (press twice). Arrows move and change, Enter selects, Esc closes.
-- Zone edit: drag on empty space adds a zone, click selects, Delete/Backspace or the small x removes, Esc or Done
-  finishes. It draws over a frozen screenshot of the game, so the zones line up even when the game moves.
+- Zone edit: drag on empty space adds a zone, click selects, a handle of the selected zone resizes it (saved on the
+  release; Esc puts it back), Delete/Backspace or the small x removes, Esc or Done finishes. It draws over a frozen screenshot of the game, so the zones line up even when the game moves.
 
 ### 2.8 Profiles and settings on disk
 
@@ -300,7 +300,7 @@ Profile JSON (version field so later changes can migrate):
   numbers stay ("Persona 4" and "Persona 5" stay apart; "HD 1.5" and "HD 2.5" do not). A title that changes its
   shape (for example when paused) still loses its match. A window belongs to the profile that fits it best: a
   profile with a title beats one with the exe only, a longer title beats a shorter one, and on a tie the newest
-  file wins. So one window makes one profile "Running", and Retake uses that same window. Page 02 refuses a window
+  file wins. So one window makes one profile "Running", and the live view and zone edit use that same window. Page 02 refuses a window
   when its best profile matched it by title (the same rule), or, for a profile with the exe only, when its name is
   this window's title apart from counters, and points to the game switcher.
 - `voice.id` is the voice picked on page 05 or in Settings > Voices, with its engine prefix (`kokoro:af_heart`,
@@ -413,7 +413,7 @@ export global Type { out property <length> fs1: 12px; out property <length> fs2:
 | `ZoneRow`, `ZoneList` | `.zrow` (round 4) | icon, name, toggle |
 | `ZoneBox`, `Handle`, `ZoneBadge` | `.zone`, `.handle` | on the stage and in zone edit |
 | `Stage` | `.stage` | 16:9 image with zones on top, maps image px to view px |
-| `ZoneTools`, `KindPicker` | `.ztools` | Select / Draw zone, kind segmented (grey kind icon + name), Retake screenshot |
+| `ZoneTools`, `KindPicker` | `.ztools` | Select / Draw zone, kind segmented (grey kind icon + name); no Retake screenshot since 2026-11-24 |
 | `Waveform`, `PillWave` | `.wave`, `.pill-wave` | bars from a model of heights |
 | `TitleBar`, `Tabs`, `GameButton`, `WinControls` | `.bar`, `.tabs`, `.switcher`, `.winctl` | drag and resize via winit |
 | `StepsBar`, `ObHead`, `ObFoot` | `.steps`, `.ob-*`, `.foot` | onboarding chrome |

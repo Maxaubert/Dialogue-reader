@@ -1,40 +1,38 @@
 // Setup step 1, Pick your game (d-black 01-setup, #step1). The search field, then two panels with the label above
-// each: "Running" (games, with a picture) and "Other" (other windows). The picked row has the surface-3 fill; it
-// glides to a new row in the same panel (360 ms) and fades between the panels (120 ms). A panel with no rows left
+// each: "Running" (games) and "Other" (other windows), each row with its window's own icon. The picked row has the
+// surface-3 fill; it glides to a new row in the same panel (360 ms) and fades between the panels (120 ms). A panel with no rows left
 // hides with its label. There is no Refresh: the list refreshes by itself while this page shows (src/vm).
-import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Art } from "../theme.slint";
+import { SetupPart, SetupStage, SetupZoom } from "setup_part.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
 import { WindowData } from "../data.slint";
-import { Icon, Thumb, TextField, GroupLabel, Panel } from "../components/base.slint";
+import {
+    TextField,
+    GroupLabel,
+    Panel,
+} from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
 
-// The picture of a row (48 x 27): the game art, the exe icon of a real window, or the window icon.
-component RowPic inherits Rectangle {
+// The icon of a row: the exe icon of a real window, 24 px, with no frame around it (Max, 2026-11-24: "no need for
+// boxes, apps have icons already"). A window with no icon (the fake data, a protected game) keeps the room empty,
+// so the names line up.
+component RowIcon inherits Rectangle {
     in property <WindowData> win;
-    in property <bool> game;
-    width: 48px;
-    height: 27px;
-    if root.game && root.win.icon.width == 0 && root.win.art != "": Thumb {
+    width: 24px;
+    height: 24px;
+    if root.win.icon.width > 0: Image {
         width: 100%;
         height: 100%;
-        art: root.win.art;
-        behind: Palette.surface-1;
-    }
-    if root.win.icon.width > 0: Image {
-        width: 20px;
-        height: 20px;
         source: root.win.icon;
         image-fit: contain;
-    }
-    if root.win.icon.width == 0 && (!root.game || root.win.art == ""): Icon {
-        width: Size.icon;
-        height: Size.icon;
-        source: Icons.window;
-    }
-    if root.game: Rectangle {
-        border-radius: Radius.sm;
-        border-width: 1px;
-        border-color: Palette.line;
+        accessible-role: none;
     }
 }
 
@@ -69,9 +67,8 @@ component WinRow inherits Rectangle {
         spacing: Space.s3;
         VerticalLayout {
             alignment: center;
-            RowPic {
+            RowIcon {
                 win: root.win;
-                game: root.game;
             }
         }
 
@@ -140,6 +137,8 @@ component Group inherits VerticalLayout {
 }
 
 export component PickWindowPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in property <[WindowData]> games;
     in property <[WindowData]> others;
     // games are 0 .. games.length - 1, other windows follow
@@ -159,54 +158,63 @@ export component PickWindowPage inherits Rectangle {
         }
     }
 
-    // the page scrolls when the lists are longer than the window
-    flick := Flickable {
-        content-height: col.preferred-height + Space.s7;
-        col := VerticalLayout {
-            x: (flick.width - Size.col) / 2;
-            width: Size.col;
-            padding-top: Space.s7;
-            alignment: start;
-            SetupPart {
-                n: 0;
-                ObHead {
-                    title: "Pick your game";
-                    lead: "Start your game, then pick it.";
+    // The title and the search field stay put while the lists change (search, refresh): the column is placed as
+    // if it were as tall as the tallest step, so the title sits where it sits on Mark where text shows up, and only
+    // the lists grow down. The page scrolls when they are longer than the window.
+    stage := SetupStage {
+        zoom: root.zoom;
+        content-h: SetupZoom.tallest;
+        flick := Flickable {
+            width: stage.vw;
+            height: stage.vh;
+            content-height: stage.top + col.preferred-height + Space.s7;
+            col := VerticalLayout {
+                x: (flick.width - Size.col) / 2;
+                y: stage.top;
+                width: Size.col;
+                height: self.preferred-height;
+                alignment: start;
+                SetupPart {
+                    n: 0;
+                    ObHead {
+                        title: "Pick your game";
+                        lead: "Start your game, then pick it.";
+                    }
                 }
-            }
 
-            Rectangle {
-                height: Space.s5;
-            }
-
-            SetupPart {
-                n: 1;
-                height: Size.ctl;
-                TextField {
-                    icon: Icons.search;
-                    placeholder: "Search windows";
-                    text <=> root.search;
+                Rectangle {
+                    height: Space.s5;
                 }
-            }
 
-            if root.games.length > 0: SetupPart {
-                n: 2;
-                Group {
-                    label: "Running";
-                    rows: root.games;
-                    game: true;
-                    first: 0;
-                    selected <=> root.selected;
+                SetupPart {
+                    n: 1;
+                    height: Size.ctl;
+                    TextField {
+                        icon: Icons.search;
+                        placeholder: "Search windows";
+                        text <=> root.search;
+                    }
                 }
-            }
-            if root.others.length > 0: SetupPart {
-                n: 3;
-                Group {
-                    label: "Other";
-                    rows: root.others;
-                    game: false;
-                    first: root.games.length;
-                    selected <=> root.selected;
+
+                if root.games.length > 0: SetupPart {
+                    n: 2;
+                    Group {
+                        label: "Running";
+                        rows: root.games;
+                        game: true;
+                        first: 0;
+                        selected <=> root.selected;
+                    }
+                }
+                if root.others.length > 0: SetupPart {
+                    n: 3;
+                    Group {
+                        label: "Other";
+                        rows: root.others;
+                        game: false;
+                        first: root.games.length;
+                        selected <=> root.selected;
+                    }
                 }
             }
         }

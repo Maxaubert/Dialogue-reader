@@ -877,6 +877,17 @@ export component Tag inherits Rectangle {
     }
 }
 
+// A resize handle of the selected zone (.zz i): an 8 px white dot with a black ring. The Zones stage and in-game
+// zone edit draw the same one.
+export component ZoneHandle inherits Rectangle {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: Palette.on;
+    border-width: 1.5px;
+    border-color: Palette.on-ink;
+}
+
 // A line of the read list (.lrow): kind icon, the grey speaker and the white line, at most two lines, then
 // cut with "...". `meta` (a time) and `tag` ("off", "repeat") sit at the end. Hover fills the row; with
 // `replay-label` set, a replay button floats over the row end. After Motion.hover-delay on a cut line, the row
@@ -925,137 +936,149 @@ export component ListRow inherits Rectangle {
     }
     // the row's own height (one or two lines); a filtered list sets `height: 0` on the rows it hides
     out property <length> natural-h: max(Size.list, min(measure.preferred-height, 2 * Type.lh-body) + 16px);
-    height: root.natural-h;
-    border-radius: Radius.md;
-    background: root.row-bg;
+    // a new line arriving at the top of the list (20-motion "new line"): 0 to 1, eased. The row's room grows from
+    // 0 to its height, so the rows below move down by its own height; the row fades in from 8 px above. Under
+    // reduce motion only the fade runs.
+    in property <float> arrive: 1;
+    property <float> arrive-m: Motion.reduce ? 1 : root.arrive;
+    // the room the row takes in the list (its height, while it arrives a part of it)
+    out property <length> slot-h: root.natural-h * root.arrive-m;
+    height: root.slot-h;
     z: root.card ? 10 : 0;
-    animate background {
-        duration: Motion.fast;
-        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-    }
-    touch := TouchArea { }
-
-    // the card: the row fill grown to the whole text, under the row content, over the rows below
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: parent.width;
-        height: Math.max(root.height, measure.preferred-height + 16px);
+    body := Rectangle {
+        y: -8px * (1 - root.arrive) * Motion.move;
+        height: root.natural-h;
+        opacity: root.arrive;
         border-radius: Radius.md;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        background: Palette.surface-2;
-        drop-shadow-offset-y: 12px;
-        drop-shadow-blur: 24px;
-        drop-shadow-color: Shadow.pop-color;
-        opacity: root.open ? 1 : 0;
-        visible: self.opacity > 0.01;
-        animate opacity {
+        background: root.row-bg;
+        animate background {
             duration: Motion.fast;
             easing: cubic-bezier(0.2, 0.7, 0.2, 1);
         }
-    }
+        touch := TouchArea { }
 
-    HorizontalLayout {
-        padding-left: Space.s3;
-        padding-right: Space.s2;
-        padding-top: Space.s2;
-        padding-bottom: Space.s2;
-        spacing: Space.s2;
-        VerticalLayout {
-            alignment: start;
-            padding-top: 2px;
-            Icon {
-                source: root.icon;
-                color: root.off ? Palette.text-3 : Palette.text-2;
+        // the card: the row fill grown to the whole text, under the row content, over the rows below
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: Math.max(root.natural-h, measure.preferred-height + 16px);
+            border-radius: Radius.md;
+            border-width: 1px;
+            border-color: Palette.line-2;
+            background: Palette.surface-2;
+            drop-shadow-offset-y: 12px;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: Shadow.pop-color;
+            opacity: root.open ? 1 : 0;
+            visible: self.opacity > 0.01;
+            animate opacity {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
             }
         }
 
-        text-box := Rectangle {
-            horizontal-stretch: 1;
-            min-width: 0px;
-            t := Text {
-                x: 0;
-                y: 0;
-                width: parent.width;
-                height: root.open ? measure.preferred-height : min(self.preferred-height, 2 * Type.lh-body);
-                text: root.full;
-                color: root.text-c;
-                wrap: word-wrap;
-                overflow: elide;
-                max-lines: root.open ? 0 : 2;
-                vertical-alignment: top;
-                line-height-factor: Type.lhf-143;
+        HorizontalLayout {
+            padding-left: Space.s3;
+            padding-right: Space.s2;
+            padding-top: Space.s2;
+            padding-bottom: Space.s2;
+            spacing: Space.s2;
+            VerticalLayout {
+                alignment: start;
+                padding-top: 2px;
+                Icon {
+                    source: root.icon;
+                    color: root.off ? Palette.text-3 : Palette.text-2;
+                }
             }
 
-            // the whole text, never drawn: it tells whether the two lines cut it
-            measure := Text {
-                x: 0;
-                y: 0;
-                width: parent.width;
-                height: 0px;
-                visible: false;
-                text: root.full;
-                wrap: word-wrap;
-                vertical-alignment: top;
-                line-height-factor: Type.lhf-143;
-                accessible-role: none;
-            }
-
-            // the speaker again in grey, on a patch in the row colour that hides the white copy
-            if root.speaker != "": Rectangle {
-                x: 0;
-                y: 0;
-                width: min(sp.preferred-width, parent.width);
-                height: sp.preferred-height;
-                background: root.row-bg;
-                sp := Text {
+            text-box := Rectangle {
+                horizontal-stretch: 1;
+                min-width: 0px;
+                t := Text {
                     x: 0;
                     y: 0;
                     width: parent.width;
+                    height: root.open ? measure.preferred-height : min(self.preferred-height, 2 * Type.lh-body);
+                    text: root.full;
+                    color: root.text-c;
+                    wrap: word-wrap;
                     overflow: elide;
-                    accessible-role: none;
-                    text: root.speaker;
-                    color: root.who-c;
+                    max-lines: root.open ? 0 : 2;
+                    vertical-alignment: top;
                     line-height-factor: Type.lhf-143;
                 }
+
+                // the whole text, never drawn: it tells whether the two lines cut it
+                measure := Text {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    height: 0px;
+                    visible: false;
+                    text: root.full;
+                    wrap: word-wrap;
+                    vertical-alignment: top;
+                    line-height-factor: Type.lhf-143;
+                    accessible-role: none;
+                }
+
+                // the speaker again in grey, on a patch in the row colour that hides the white copy
+                if root.speaker != "": Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: min(sp.preferred-width, parent.width);
+                    height: sp.preferred-height;
+                    background: root.row-bg;
+                    sp := Text {
+                        x: 0;
+                        y: 0;
+                        width: parent.width;
+                        overflow: elide;
+                        accessible-role: none;
+                        text: root.speaker;
+                        color: root.who-c;
+                        line-height-factor: Type.lhf-143;
+                    }
+                }
+            }
+
+            if root.tag != "": VerticalLayout {
+                alignment: start;
+                Tag {
+                    text: root.tag;
+                }
+            }
+            if root.meta != "": Text {
+                text: root.meta;
+                font-size: Type.fs-small;
+                color: Palette.text-2;
+                height: Type.lh-body;
+                vertical-alignment: center;
+                horizontal-stretch: 0;
             }
         }
 
-        if root.tag != "": VerticalLayout {
-            alignment: start;
-            Tag {
-                text: root.tag;
+        if root.replay-label != "": Rectangle {
+            x: parent.width - self.width - Space.s1;
+            y: Space.s1;
+            width: 28px;
+            height: 28px;
+            border-radius: Radius.md;
+            background: Palette.surface-2;
+            opacity: touch.has-hover || rp.has-hover ? 1 : 0;
+            animate opacity {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
             }
-        }
-        if root.meta != "": Text {
-            text: root.meta;
-            font-size: Type.fs-small;
-            color: Palette.text-2;
-            height: Type.lh-body;
-            vertical-alignment: center;
-            horizontal-stretch: 0;
-        }
-    }
-
-    if root.replay-label != "": Rectangle {
-        x: parent.width - self.width - Space.s1;
-        y: Space.s1;
-        width: 28px;
-        height: 28px;
-        border-radius: Radius.md;
-        background: Palette.surface-2;
-        opacity: touch.has-hover || rp.has-hover ? 1 : 0;
-        animate opacity {
-            duration: Motion.fast;
-            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-        }
-        rp := IconButton {
-            small: true;
-            icon: Icons.replay;
-            tip: root.replay-label;
-            clicked => {
-                root.replay();
+            rp := IconButton {
+                small: true;
+                icon: Icons.replay;
+                tip: root.replay-label;
+                clicked => {
+                    root.replay();
+                }
             }
         }
     }

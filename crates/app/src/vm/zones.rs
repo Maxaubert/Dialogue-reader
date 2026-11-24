@@ -275,6 +275,25 @@ impl Editor {
         }
     }
 
+    /// Starts a resize of the selected zone by `handle` (0 top left, clockwise to 7 left), as a press on that
+    /// handle does. Zone edit hit-tests its handles itself. False when no zone is selected.
+    pub fn begin_resize(&mut self, handle: usize) -> bool {
+        self.cancel_drag();
+        let Some(i) = self.selected.filter(|&i| i < self.zones.len()) else {
+            return false;
+        };
+        if handle > 7 {
+            return false;
+        }
+        self.drag = Drag::Resize {
+            i,
+            handle,
+            orig: self.zones[i].rect,
+            before: self.zones.clone(),
+        };
+        true
+    }
+
     /// A drag (draw, move or resize) is going on.
     pub fn dragging(&self) -> bool {
         self.drag != Drag::None
@@ -405,7 +424,7 @@ impl Editor {
 
     /// A new picture of another size (a new screenshot, or the live view of a game that changed size): zones
     /// keep their place on the picture, the undo step too. A drag in the old pixels is cancelled (the live view
-    /// waits for the drag to end, so this happens only on a retake).
+    /// waits for the drag to end, so this happens only on a new screenshot).
     pub fn rescale(&mut self, img_w: f32, img_h: f32) {
         if self.img_w > 0.0 && self.img_h > 0.0 && (img_w, img_h) != (self.img_w, self.img_h) {
             self.cancel_drag();

@@ -12,7 +12,7 @@ import {
     Kinds,
 } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CornerMask, Dot, ZoneOutline } from "base.slint";
+import { Icon, CornerMask, Dot, ZoneOutline, ZoneHandle } from "base.slint";
 
 // The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
 // Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
@@ -131,8 +131,15 @@ export component Stage inherits Rectangle {
     in property <float> tags-o: 1;
     // false while the stage grows or shrinks: its size is told to the live view only once it is still
     in property <bool> settled: true;
+    // the stage is drawn this many times bigger (a setup step in a big window, SetupStage): the live view makes its
+    // frames for the size on screen
+    in property <float> zoom: 1;
+    // false: the picture stays `source` while the game shows live (the old picture under a game switch)
+    in property <bool> follow-live: true;
+    // switch game: the zone boxes and tags of the old game fade out (0 to 1)
+    in property <float> marks-o: 1;
     // real screenshots (contain) follow the live view when there is one
-    property <bool> live: root.contain && LiveView.on;
+    property <bool> live: root.contain && LiveView.on && root.follow-live;
     property <float> pw: root.live ? LiveView.w : root.src-w;
     property <float> ph: root.live ? LiveView.h : root.src-h;
     out property <float> scale: root.contain ? min(root.width / 1px / root.pw, root.height / 1px / root.ph) : max(root.width / 1px / root.pw, root.height / 1px / root.ph);
@@ -150,22 +157,27 @@ export component Stage inherits Rectangle {
     clip: true;
     init => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed width => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed height => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed zoom => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     changed settled => {
         if root.contain && root.settled {
-            LiveView.stage-size(root.width, root.height);
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
         }
     }
     Image {
@@ -185,6 +197,7 @@ export component Stage inherits Rectangle {
         // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
         property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
+        opacity: root.marks-o;
         live: i == root.live-zone && z.on;
         line: self.live ? Palette.live : root.quiet ? #FFFFFF61 : self.sel ? Palette.on : Palette.text;
         x: root.off-x + z.x * root.scale * 1px;
@@ -205,15 +218,9 @@ export component Stage inherits Rectangle {
                 { x: 0, y: 1 },
                 { x: 0.5, y: 1 },
                 { x: 1, y: 1 }
-            ]: Rectangle {
+            ]: ZoneHandle {
                 x: parent.width * p.x - 4px;
                 y: parent.height * p.y - 4px;
-                width: 8px;
-                height: 8px;
-                border-radius: 4px;
-                background: Palette.on;
-                border-width: 1.5px;
-                border-color: Palette.on-ink;
             }
         }
         if !root.interactive && !root.quiet: TouchArea {
@@ -275,7 +282,7 @@ export component Stage inherits Rectangle {
     }
     // Tags go above every zone box, so they are drawn after all boxes. A tag never takes the pointer.
     if root.labels: Rectangle {
-        opacity: root.tags-o;
+        opacity: root.tags-o * root.marks-o;
         for z[i] in root.zones: ZoneTag {
             property <length> bx: root.off-x + z.x * root.scale * 1px;
             property <length> by: root.off-y + z.y * root.scale * 1px;
@@ -326,8 +333,9 @@ export component LiveNote inherits Rectangle {
         }
     }
 }
-// The end of the Zones and step 2 toolbars: "Live" while the game shows live (LiveNote), else the time of the
-// saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the game is closed").
+// The end of the Zones and step 2 toolbars: nothing while the game shows live (no "Live" note, Max 2026-11-24), else
+// the time of the saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the
+// game is closed").
 export component ShotNote inherits HorizontalLayout {
     // real screenshots: the live view and its note can show
     in property <bool> contain;
@@ -336,7 +344,7 @@ export component ShotNote inherits HorizontalLayout {
     property <bool> live: root.contain && LiveView.on;
     spacing: Space.s3;
     horizontal-stretch: 0;
-    if root.contain && LiveView.note != "": VerticalLayout {
+    if root.contain && LiveView.note != "" && !LiveView.note-live: VerticalLayout {
         alignment: center;
         LiveNote { }
     }

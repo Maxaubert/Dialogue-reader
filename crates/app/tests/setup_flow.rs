@@ -143,6 +143,82 @@ fn search_and_other_windows_can_be_picked() {
     assert_eq!(w.get_page(), Page::DrawZones);
 }
 
+/// Max, 2026-11-24: each window row shows its exe icon (24 px, no frame). A window with no icon keeps the room
+/// empty, so the names line up.
+#[test]
+fn page_02_rows_show_the_window_icon() {
+    let (_dir, paths) = temp_paths();
+    let mut d = FakeDesktop::new();
+    d.windows[0].icon = Some(dr_runtime::windows_list::Icon {
+        width: 16,
+        height: 16,
+        rgba: [200, 40, 40, 255].repeat(16 * 16),
+    });
+    let (w, _vm) = real_window(&paths, d);
+    press(&w, "Get started", AccessibleRole::Button);
+    let icon = w.get_games_running().row_data(0).unwrap().icon.size();
+    assert_eq!((icon.width, icon.height), (16, 16));
+    let slots: Vec<ElementHandle> =
+        ElementHandle::find_by_element_type_name(&w, "RowIcon").collect();
+    assert_eq!(slots.len(), 2, "one icon room per row");
+    let images: Vec<ElementHandle> = ElementHandle::find_by_element_type_name(&w, "Image")
+        .filter(|i| {
+            slots
+                .iter()
+                .any(|s| s.absolute_position() == i.absolute_position())
+        })
+        .collect();
+    assert_eq!(images.len(), 1, "only the game has an icon");
+    let (img, slot) = (&images[0], &slots[0]);
+    assert_eq!(
+        img.absolute_position(),
+        slot.absolute_position(),
+        "in the first row"
+    );
+    assert_eq!(img.size(), slint::LogicalSize::new(24.0, 24.0));
+    // the names line up, icon or not
+    let name_x = |label: &str| {
+        ElementHandle::find_by_accessible_label(&w, label)
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+            .unwrap()
+            .absolute_position()
+            .x
+    };
+    assert_eq!(name_x("Test Game"), name_x("Notes"));
+}
+
+/// The title and the search field stay put while the lists change (a search, a window that opens or closes):
+/// only the lists grow and shrink, under them.
+#[test]
+fn page_02_search_field_stays_put_while_the_lists_change() {
+    let (_dir, paths) = temp_paths();
+    let d = FakeDesktop::new();
+    let front = d.front.clone();
+    let (w, _vm) = real_window(&paths, d);
+    press(&w, "Get started", AccessibleRole::Button);
+    let field = |w: &dr_app::MainWindow| {
+        ElementHandle::find_by_accessible_label(w, "Search windows")
+            .next()
+            .expect("search field")
+            .absolute_position()
+    };
+    let at = field(&w);
+    // a search that hides the Running panel
+    w.invoke_windows_search("note".into());
+    assert_eq!(w.get_games_running().row_count(), 0);
+    assert_eq!(field(&w), at);
+    w.invoke_windows_search("".into());
+    // new windows open (the list asks once a second)
+    for i in 0..4 {
+        front
+            .borrow_mut()
+            .push(win(&format!("Tool {i}"), &format!("t{i}.exe"), false));
+    }
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(1100));
+    assert_eq!(w.get_other_windows().row_count(), 5);
+    assert_eq!(field(&w), at);
+}
+
 /// Onboarding up to Finish with one zone drawn.
 fn finish_onboarding(w: &dr_app::MainWindow) {
     press(w, "Get started", AccessibleRole::Button);
@@ -285,12 +361,6 @@ fn an_unreadable_exe_is_matched_by_title_only() {
     d.windows = vec![win("Other", "", false)];
     let (w, _vm) = real_window(&paths, d);
     assert!(!w.get_games().row_data(0).unwrap().running);
-    w.invoke_retake_shot();
-    assert!(
-        w.get_notice().contains("Hidden Game is not running"),
-        "{}",
-        w.get_notice()
-    );
 }
 
 #[test]
@@ -409,4 +479,42 @@ fn broken_profile_is_kept_and_reported() {
     assert_eq!(w.get_page(), Page::Welcome);
     assert!(w.get_notice().contains("old.json"), "{}", w.get_notice());
     assert!(paths.profiles().join("old.json.bad").exists());
+}
+
+/// Max runs the window maximized on a 2560 px screen (2026-11-24): the setup steps are drawn bigger (1.4 times at
+/// 2560 x 1380) and in the middle. A drag on the bigger step 2 picture still lands on the right image pixels.
+#[test]
+fn a_zone_drawn_in_a_big_window_lands_on_the_right_pixels() {
+    let (_dir, paths) = temp_paths();
+    let (w, _vm) = real_window(&paths, FakeDesktop::new());
+    w.window().set_size(slint::LogicalSize::new(2560.0, 1380.0));
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::DrawZones);
+    let st = ElementHandle::find_by_accessible_label(&w, "Screenshot")
+        .next()
+        .expect("the step 2 picture");
+    // the element keeps its 960 x 540 layout size; on screen it is 1.4 times that, in the middle of the window
+    let (pos, size) = (st.absolute_position(), st.size());
+    let (vw, vh) = (size.width * 1.4, size.height * 1.4);
+    assert!((vw - 1344.0).abs() < 1.0, "{size:?}");
+    assert!(
+        (pos.x + vw / 2.0 - 1280.0).abs() < 1.0,
+        "centred: {pos:?} {size:?}"
+    );
+    let scale = (vw / SHOT_W as f32).min(vh / SHOT_H as f32);
+    let s = StageAt {
+        x: pos.x + (vw - SHOT_W as f32 * scale) / 2.0,
+        y: pos.y + (vh - SHOT_H as f32 * scale) / 2.0,
+        scale,
+    };
+    drag(&w, &s, (200.0, 900.0), (1700.0, 1000.0));
+    assert_eq!(w.get_setup_zones().row_count(), 1);
+    let z = w.get_setup_zones().row_data(0).unwrap();
+    let got = [z.x, z.y, z.w, z.h];
+    let want = [200.0, 900.0, 1500.0, 100.0];
+    assert!(
+        got.iter().zip(want).all(|(a, b)| (a - b).abs() < 3.0),
+        "{got:?}"
+    );
 }

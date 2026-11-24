@@ -186,6 +186,11 @@ export component ZoneEditWindow inherits Window {
     callback commit(Kind, length, length, length, length);
     callback set-kind(Kind);
     callback pick(length, length) -> int;
+    callback resize-start(int) -> bool;
+    callback resize-move(length, length);
+    callback resize-end(length, length);
+    callback resize-cancel();
+    in-out property <bool> resizing: false;
     no-frame: true;
     always-on-top: true;
     background: Palette.bg;
@@ -207,6 +212,7 @@ export component ZoneEditWindow inherits Window {
         draft-y <=> root.draft-y;
         draft-w <=> root.draft-w;
         draft-h <=> root.draft-h;
+        resizing <=> root.resizing;
         done => {
             root.done();
         }
@@ -221,6 +227,18 @@ export component ZoneEditWindow inherits Window {
         }
         pick(x, y) => {
             return root.pick(x, y);
+        }
+        resize-start(h) => {
+            return root.resize-start(h);
+        }
+        resize-move(x, y) => {
+            root.resize-move(x, y);
+        }
+        resize-end(x, y) => {
+            root.resize-end(x, y);
+        }
+        resize-cancel => {
+            root.resize-cancel();
         }
     }
 

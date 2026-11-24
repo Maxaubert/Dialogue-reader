@@ -76,6 +76,11 @@ struct Mockup {
     mean: f64,
     /// highest allowed share of cells that differ by more than 32, in percent
     changed: f64,
+    /// a setup step sits in the middle of the window, the shot has it at the top: the page between the title
+    /// strip and the footer is `dy` px lower in the render than in the shot (0: no move)
+    dy: u32,
+    /// the height of the footer at the bottom, which does not move with the page
+    foot: u32,
 }
 
 const fn m(name: &'static str, shot: &'static str, mean: f64, changed: f64) -> Mockup {
@@ -84,28 +89,60 @@ const fn m(name: &'static str, shot: &'static str, mean: f64, changed: f64) -> M
         shot,
         mean,
         changed,
+        dy: 0,
+        foot: 0,
+    }
+}
+
+/// A setup step: its page is `dy` px lower than in the shot, above a `foot` px footer (Welcome has none).
+const fn step(
+    name: &'static str,
+    shot: &'static str,
+    (dy, foot): (u32, u32),
+    mean: f64,
+    changed: f64,
+) -> Mockup {
+    Mockup {
+        name,
+        shot,
+        mean,
+        changed,
+        dy,
+        foot,
     }
 }
 
 /// Every screen with a d-black shot. The limits sit 0.4 above the values measured on 2026-11-24, so a real
 /// change fails and text rendering noise does not. The stages draw the SVG scene, not the shot's bitmap, and the
-/// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher.
+/// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher. Re-measured the same day after
+/// Max's follow-ups: the setup steps (01 to 06, 18-voice-none) sit in the middle of the window now, not at the
+/// top as in the shots, so their page is compared `dy` px lower (the title strip and the footer stay put). The
+/// step 5 summary and the step 1 pictures are gone, and the Zones toolbar has the Overview's margins and no
+/// camera, so those limits are a little higher. Later the same day Max asked for "Edit zones" (Overview) and
+/// "Done" (Zones) as the white primary pill: the Zones shots match better, and the Overview and the switcher
+/// over it (the mockups have a grey "Edit zones") were re-measured.
 const MOCKUPS: [Mockup; 22] = [
-    m("01-welcome", "01-setup-0-welcome", 0.9, 0.6),
-    m("02-pick-window", "01-setup-1-game", 0.8, 0.6),
-    m("03-draw-zones", "01-setup-2-zones", 1.8, 0.7),
-    m("04-read-key-d", "01-setup-3-keys", 0.6, 0.5),
-    m("05-voice", "01-setup-4-voice", 1.7, 0.9),
-    m("18-voice-none", "01-setup-4-voice-none", 0.7, 0.5),
-    m("06-mode", "01-setup-5-mode", 1.0, 0.7),
-    m("10-main-b", "10-overview", 2.3, 2.0),
+    step("01-welcome", "01-setup-0-welcome", (243, 0), 0.8, 0.6),
+    step("02-pick-window", "01-setup-1-game", (15, 72), 1.2, 1.0),
+    step("03-draw-zones", "01-setup-2-zones", (14, 72), 1.9, 0.6),
+    step("04-read-key-d", "01-setup-3-keys", (261, 72), 0.6, 0.4),
+    step("05-voice", "01-setup-4-voice", (92, 72), 1.7, 0.8),
+    step(
+        "18-voice-none",
+        "01-setup-4-voice-none",
+        (250, 72),
+        0.6,
+        0.5,
+    ),
+    step("06-mode", "01-setup-5-mode", (262, 72), 1.0, 1.1),
+    m("10-main-b", "10-overview", 2.9, 2.5),
     m("19-overview-not-running", "10-overview-off", 0.6, 0.5),
-    m("11-zones", "11-zones", 2.8, 1.0),
-    m("11-zones-top", "11-zones-top", 3.0, 0.9),
+    m("11-zones", "11-zones", 3.2, 1.0),
+    m("11-zones-top", "11-zones-top", 3.5, 0.9),
     m("11-zones-empty", "11-zones-empty", 1.6, 0.9),
     m("12-settings", "12-settings", 1.7, 1.3),
     m("13-overlay", "13-pill", 0.5, 0.4),
-    m("14-game-switcher", "14-game-switcher", 1.6, 0.5),
+    m("14-game-switcher", "14-game-switcher", 1.8, 0.9),
     m("15-quick-menu-a", "15-quick-menu", 1.2, 1.1),
     m("15-quick-menu-voice", "15-quick-menu-voice", 1.6, 1.5),
     m("16-zone-edit", "16-zone-edit", 1.0, 0.5),
@@ -137,6 +174,26 @@ fn cells(img: &RgbaImage, (x0, y0, w, h): (u32, u32, u32, u32)) -> Vec<[f64; 3]>
     out
 }
 
+/// The title strip height: it never moves with the page.
+const STRIP: u32 = 40;
+
+/// The shot cut to `h` px, with its page (under the title strip, above a `foot` px footer) moved `dy` px down.
+/// The rows the move uncovers take the page background (the shot's last page row).
+fn moved(shot: &RgbaImage, h: u32, dy: u32, foot: u32) -> RgbaImage {
+    let mut out = image::imageops::crop_imm(shot, 0, 0, shot.width(), h).to_image();
+    if dy == 0 {
+        return out;
+    }
+    let bottom = h - foot;
+    for y in STRIP..bottom {
+        let src = if y >= STRIP + dy { y - dy } else { bottom - 1 };
+        for x in 0..shot.width() {
+            out.put_pixel(x, y, *shot.get_pixel(x, src));
+        }
+    }
+    out
+}
+
 #[test]
 fn screens_match_the_mockup_shots() {
     let files = rendered();
@@ -154,6 +211,7 @@ fn screens_match_the_mockup_shots() {
         // a few shots are taller than the window (a page scrolled in the mockup): compare the window part
         assert_eq!(mock.width(), ours.width(), "{}", mk.name);
         assert!(mock.height() >= ours.height(), "{}", mk.name);
+        let mock = moved(&mock, ours.height(), mk.dy, mk.foot);
         let region = (0, 0, ours.width(), ours.height());
         let (a, b) = (cells(&mock, region), cells(&ours, region));
         let diffs: Vec<f64> = a

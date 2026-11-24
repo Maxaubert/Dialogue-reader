@@ -33,7 +33,6 @@ import {
     ObFoot,
     TitleStrip,
     StripMode,
-    Status,
 } from "components/chrome.slint";
 import { WelcomePage } from "pages/welcome.slint";
 import { PickWindowPage } from "pages/pick_window.slint";
@@ -45,7 +44,7 @@ import { OverviewTab } from "pages/overview.slint";
 import { ZonesTab } from "pages/zones.slint";
 import { SettingsTab } from "pages/settings.slint";
 import { ActivityTab } from "pages/activity.slint";
-import { SetupParts } from "pages/setup_part.slint";
+import { SetupParts, SetupZoom } from "pages/setup_part.slint";
 import { PillPreview } from "overlays/pill.slint";
 import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
@@ -140,6 +139,8 @@ export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
     in-out property <OverlayPreview> overlay: OverlayPreview.none;
     in-out property <bool> switcher-open: false;
+    // the voice picker of the Overview toolbar is open (Esc closes it)
+    in-out property <bool> voice-menu: false;
     // debug: the component sheet over everything (render-screens "00-components", tests/components.rs)
     in property <bool> sheet: false;
     // view models (src/vm): real profiles and windows, or the fake data of the mockups (src/fake.rs)
@@ -189,10 +190,6 @@ export component MainWindow inherits Window {
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
     in-out property <bool> adding-game: false;
     in property <string> version: "";
-    // the game being set up (page 06 summary)
-    in property <string> setup-game: "Red Dead Redemption 2";
-    in property <string> setup-art: "rdr2";
-    in property <image> setup-cover;
     // screenshots: setup (page 03) and the current profile (10, 11). Real ones are shown whole (contain).
     in property <image> setup-shot: Art.scene;
     in property <float> setup-shot-w: 1600;
@@ -215,7 +212,8 @@ export component MainWindow inherits Window {
     in property <ZoneData> draft;
     // a problem said in plain words: in the onboarding footer, or under the title bar. A tab change clears it.
     in-out property <string> notice;
-    // reading (M3b, src/vm/reading.rs): the status, the line being spoken, Pause, key capture
+    // reading (M3b, src/vm/reading.rs): the status, the line being spoken, Pause, key capture. The status is not
+    // drawn in the window (the title strip has no dot since 2026-11-24); Rust and the tests read it.
     in property <string> status-text: "Reading";
     // false: the game is not running (the Overview stage says so, its controls are off)
     in property <bool> game-running: true;
@@ -239,6 +237,9 @@ export component MainWindow inherits Window {
     in property <string> update-note: "up to date";
     in property <bool> show-auto-update: true;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
+    // how much the setup steps and their footer are drawn bigger in a big window (SetupZoom); the page area is the
+    // window under the title strip, above the footer
+    property <float> setup-k: SetupZoom.k(root.width, root.height - Size.strip - SetupZoom.foot, SetupZoom.fit);
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     // a sub-page: it closes with back or Esc, back to the Overview
     property <bool> sub: root.page == Page.zones || root.page == Page.settings || root.page == Page.activity;
@@ -272,12 +273,38 @@ export component MainWindow inherits Window {
     property <float> cross-p: root.crossing ? Math.clamp((animation-tick() - root.switched-at) / Math.max(1ms, Motion.switch-in), 0, 1) : 1;
     property <float> cross-t: 1 - Math.pow(1 - root.cross-p, 4);
     property <float> text-o: root.rolling ? 1 - root.roll-out : root.cross-t;
+    // New lines (20-motion "new line", 180 ms ease-out): Rust says how many rows are new at the top of the
+    // Overview list and of the Activity list (`lines-arrived`). They come in from the clock, as Activity's rows do.
+    // (out: the tests read the last counts; they are kept under instant motion too)
+    out property <int> recent-new: 0;
+    out property <int> log-new: 0;
+    property <bool> arriving: false;
+    property <duration> arrived-at;
+    property <float> arrive-p: root.arriving ? Math.clamp((animation-tick() - root.arrived-at) / Math.max(1ms, Motion.base), 0, 1) : 1;
+    property <float> arrive-e: 1 - Math.pow(1 - root.arrive-p, 3);
+    public function lines-arrived(recent: int, log: int) {
+        root.recent-new = recent;
+        root.log-new = log;
+        if Motion.instant {
+            return;
+        }
+        root.arrived-at = animation-tick();
+        root.arriving = true;
+        arrive-end.running = false;
+        arrive-end.running = true;
+    }
+    arrive-end := Timer {
+        interval: Math.max(1ms, Motion.base);
+        running: false;
+        triggered => {
+            self.running = false;
+            root.arriving = false;
+        }
+    }
     // the last sub-page name: it stays in the strip while it fades out after the sub-page closed
     property <string> sub-name: "Settings";
     // the Zones stage grows from the Overview stage, and shrinks back (set by every move between the two)
     property <bool> grow-zones: false;
-    // the status dot of the title strip
-    property <Status> status: root.status-ok ? Status.reading : root.status-text == "Paused" ? Status.paused : Status.off;
 
     // zone edit (Rust: add, remove, hit test, dim path)
     callback edit-commit(Kind, length, length, length, length);
@@ -311,7 +338,6 @@ export component MainWindow inherits Window {
     callback zone-kind-picked(Kind);
     callback zone-delete();
     callback zone-undo();
-    callback retake-shot();
     // page 02 and the game switcher
     callback windows-refresh();
     callback windows-search(string);
@@ -352,6 +378,7 @@ export component MainWindow inherits Window {
     callback page-shown(Page);
     // one change callback per property in Slint: both callbacks run from here
     changed page => {
+        root.voice-menu = false;
         if root.sub {
             root.sub-name = root.page == Page.zones ? "Zones" : root.page == Page.settings ? "Settings" : "Activity";
         }
@@ -470,9 +497,18 @@ export component MainWindow inherits Window {
             return;
         }
         root.zone-rename-done();
+        root.voice-menu = false;
         root.switcher-open = true;
         root.switcher-opened();
         switcher.focus-search();
+    }
+    // The game name and Ctrl K: open the switcher, or close it when it is open.
+    function toggle-switcher() {
+        if root.switcher-open {
+            root.switcher-open = false;
+        } else {
+            root.open-switcher();
+        }
     }
     // the search field had the keys: they come back to the window
     changed switcher-open => {
@@ -499,9 +535,16 @@ export component MainWindow inherits Window {
         interval: Math.max(1ms, Motion.switch-out);
         running: root.rolling;
         triggered => {
-            root.old-shot = root.shot;
-            root.old-shot-w = root.shot-w;
-            root.old-shot-h = root.shot-h;
+            // the picture on screen now: the last live frame while the game shows live, else the saved shot
+            if root.real-shots && LiveView.on {
+                root.old-shot = LiveView.frame;
+                root.old-shot-w = LiveView.w;
+                root.old-shot-h = LiveView.h;
+            } else {
+                root.old-shot = root.shot;
+                root.old-shot-w = root.shot-w;
+                root.old-shot-h = root.shot-h;
+            }
             root.switched-at = animation-tick();
             root.crossing = true;
             root.rolling = false;
@@ -531,6 +574,10 @@ export component MainWindow inherits Window {
                     return accept;
                 }
             }
+            if root.voice-menu && e.text == Key.Escape {
+                root.voice-menu = false;
+                return accept;
+            }
             if root.overlay == OverlayPreview.pill && e.text == Key.Escape {
                 root.overlay = OverlayPreview.none;
                 return accept;
@@ -554,11 +601,7 @@ export component MainWindow inherits Window {
                 }
             }
             if !root.setup && e.modifiers.control && (e.text == "k" || e.text == "K" || e.text == "\u{b}") {
-                if root.switcher-open {
-                    root.switcher-open = false;
-                } else {
-                    root.open-switcher();
-                }
+                root.toggle-switcher();
                 return accept;
             }
             if root.overlay == OverlayPreview.none && !root.switcher-open && (root.page == Page.draw-zones || root.page == Page.zones) {
@@ -599,17 +642,20 @@ export component MainWindow inherits Window {
                 roll-in: root.cross-t;
                 armed: root.armed;
                 page-name: root.sub-name;
-                status: root.status;
-                status-tip: root.status-text;
                 show-gear: true;
+                // the name opens the switcher and closes it again (as Ctrl K)
                 game-clicked => {
-                    root.open-switcher();
+                    root.toggle-switcher();
                 }
                 back => {
                     root.close-sub();
                 }
                 gear => {
                     root.go(Page.settings);
+                }
+                // a press on the empty strip is a click outside the voice list too
+                pressed => {
+                    root.voice-menu = false;
                 }
             }
 
@@ -628,9 +674,8 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 vertical-stretch: 1;
-                // switch game: the texts of a sub-page fade out and in (the Overview fades its own texts and keeps
-                // its picture); page containers never fade
-                opacity: root.page == Page.overview ? 1 : root.text-o;
+                // switch game: each page fades only what belongs to the game (`text-o`) and crossfades its picture
+                // (`pic-t` over `old-shot`); the page itself never fades, so there is no dark dip
                 welcome-slot := PageSlot {
                     name: "Welcome page";
                     shown: root.page == Page.welcome;
@@ -653,6 +698,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if pick-slot.alive: PickWindowPage {
+                        zoom: root.setup-k;
                         games: root.games-running;
                         others: root.other-windows;
                         selected <=> root.picked-window;
@@ -671,6 +717,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if draw-slot.alive: DrawZonesPage {
+                        zoom: root.setup-k;
                         zones <=> root.setup-zones;
                         selected <=> root.setup-selected;
                         draw <=> root.setup-draw;
@@ -704,9 +751,6 @@ export component MainWindow inherits Window {
                         kind-picked(k) => {
                             root.zone-kind-picked(k);
                         }
-                        retake => {
-                            root.retake-shot();
-                        }
                         delete-zone => {
                             root.zone-delete();
                         }
@@ -719,6 +763,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if keys-slot.alive: KeysPage {
+                        zoom: root.setup-k;
                         read-key: root.read-key;
                         menu-key: root.menu-key;
                         capturing: root.capturing-key;
@@ -734,6 +779,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if voice-slot.alive: VoicePage {
+                        zoom: root.setup-k;
                         voices: root.voices;
                         engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
                         selected <=> root.picked-voice;
@@ -769,16 +815,8 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if mode-slot.alive: ModePage {
+                        zoom: root.setup-k;
                         automatic <=> root.automatic;
-                        game: root.setup-game;
-                        art: root.setup-art;
-                        cover: root.setup-cover;
-                        zone-count: root.setup-zones.length;
-                        read-key: root.read-key;
-                        menu-key: root.menu-key;
-                        voice: root.voices.length > 0 ? root.voices[root.picked-voice].name : "";
-                        speed: root.voice-speed;
-                        has-voice: root.voices.length > 0;
                     }
                 }
 
@@ -806,6 +844,8 @@ export component MainWindow inherits Window {
                         zones <=> root.zones;
                         kinds: root.zone-kinds;
                         recent: root.recent;
+                        fresh: root.arriving ? root.recent-new : 0;
+                        arrive: root.arrive-e;
                         automatic <=> root.automatic;
                         read-key: root.read-key;
                         voice: root.voice-label;
@@ -832,10 +872,13 @@ export component MainWindow inherits Window {
                         recent-replay(i) => {
                             root.recent-replay(i);
                         }
-                        // the voice and key buttons open their part of Settings
-                        voice-clicked => {
-                            root.go(Page.settings);
-                            settings.jump(3);
+                        // the voice button opens a voice picker in place; the key button opens its part of Settings
+                        voices: root.voices;
+                        game-voice: root.game-voice;
+                        voice-open <=> root.voice-menu;
+                        voice-picked(i) => {
+                            root.game-voice = i;
+                            root.game-voice-picked(i);
                         }
                         key-clicked => {
                             root.go(Page.settings);
@@ -861,6 +904,11 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     if zones-slot.alive: ZonesTab {
                         grow: zones-slot.grow ? zones-slot.t : 1;
+                        text-o: root.text-o;
+                        pic-t: root.crossing ? root.cross-t : 1;
+                        old-shot: root.old-shot;
+                        old-w: root.old-shot-w;
+                        old-h: root.old-shot-h;
                         zones <=> root.zones;
                         selected <=> root.zones-selected;
                         draw <=> root.zones-draw;
@@ -878,9 +926,6 @@ export component MainWindow inherits Window {
                         }
                         kind-picked(k) => {
                             root.zone-kind-picked(k);
-                        }
-                        retake => {
-                            root.retake-shot();
                         }
                         delete-zone(i) => {
                             root.zone-delete();
@@ -900,6 +945,9 @@ export component MainWindow inherits Window {
                     rise: true;
                     if activity-slot.alive: ActivityTab {
                         log: root.log;
+                        text-o: root.text-o;
+                        fresh: root.arriving ? root.log-new : 0;
+                        arrive: root.arrive-e;
                         back => {
                             root.close-sub();
                         }
@@ -919,6 +967,7 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     // Settings stays alive so settings-jump can reach it.
                     settings := SettingsTab {
+                        text-o: root.text-o;
                         read-key: root.read-key;
                         menu-key: root.menu-key;
                         capturing: root.capturing-key;
@@ -978,7 +1027,7 @@ export component MainWindow inherits Window {
             // the setup footer: there on every setup step, faded out on Welcome
             // room for the setup footer (drawn below, outside the layout, so it can fade out after Finish)
             if root.setup: Rectangle {
-                height: 72px;
+                height: SetupZoom.foot;
             }
         }
 
@@ -987,7 +1036,7 @@ export component MainWindow inherits Window {
         foot-host := Rectangle {
             property <bool> on: root.setup && root.page != Page.welcome;
             y: parent.height - self.height;
-            height: 72px;
+            height: SetupZoom.foot;
             opacity: self.on ? 1 : 0;
             visible: self.opacity > 0.01;
             animate opacity {
@@ -995,17 +1044,27 @@ export component MainWindow inherits Window {
                 delay: root.armed && foot-host.on ? Motion.push-gap : 0ms;
                 easing: foot-host.on ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
             }
-            foot := ObFoot {
-                // after Finish the footer keeps step 5 and "Finish" while it fades out
-                step: root.setup ? root.step : 5;
-                notice: root.setup ? root.notice : "";
-                primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
-                primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
-                back => {
-                    root.back();
-                }
-                next => {
-                    root.next();
+            // drawn as big as the steps (setup-k), in the 960 px column of the page; the 72 px room stays (the
+            // buttons and the dots still fit in it at 1.4)
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: parent.width / root.setup-k;
+                height: SetupZoom.foot;
+                transform-origin: { x: self.width / 2, y: self.height / 2 };
+                transform-scale: root.setup-k;
+                foot := ObFoot {
+                    // after Finish the footer keeps step 5 and "Finish" while it fades out
+                    step: root.setup ? root.step : 5;
+                    notice: root.setup ? root.notice : "";
+                    primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
+                    primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
+                    back => {
+                        root.back();
+                    }
+                    next => {
+                        root.next();
+                    }
                 }
             }
 

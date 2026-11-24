@@ -220,7 +220,8 @@ release point first. Now:
 ## Live view (added 2026-11-22)
 
 Max asked for a live view of the game in the zone editor. The stages of 03, 10 (Overview) and 11 (Zones) now
-show the game live while it runs; "Retake screenshot" still updates the saved still.
+show the game live while it runs. The saved still is updated at setup and by the in-game zone edit (there is no
+"Retake screenshot" button since 2026-11-24).
 
 - **Capture** (`dr_runtime::live`): one Windows Graphics Capture session on the game window (the window picked
   on 02, or a running window of the current profile), frames at most every 66 ms (about 15 fps:
@@ -347,7 +348,7 @@ page) and page 11 (Zones) at 225 % and 150 %.
   held while one is open (not the user's Pause). The pill shows while the game is read (Reading or Paused) and is
   in front, at Settings > In-game overlay > Position (kept for this session; saving it is M5).
 - Zone edit covers what the capture covers (the DWM frame bounds; the title bar too, for a game with one), shows a
-  frozen screenshot (also saved as the profile's picture, as Retake does) and edits the Zones tab's zones: every
+  frozen screenshot (also saved as the profile's picture) and edits the Zones tab's zones: every
   change is saved and sent to the reader at once.
 - Closing the main window quits the app (the overlays would otherwise keep it running with no window; the tray is
   M5).

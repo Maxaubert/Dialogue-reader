@@ -166,6 +166,9 @@ fn the_game_is_read_and_its_line_shows_and_is_logged() {
     assert!(a.until(WAIT, |a| a.w.get_live_zone() == 0));
     assert!(a.until(WAIT, |a| a.log().first().is_some_and(|l| l == LINE)));
     assert!(a.recent().is_empty(), "{:?}", a.recent());
+    // the new row slides in at the top of Activity (the Overview list has no new row: the line is in Now)
+    assert_eq!(a.w.get_log_new(), 1);
+    assert_eq!(a.w.get_recent_new(), 0);
     let log = dr_runtime::activity::Log::new(a.paths.activity_log("test-game"));
     let saved = log.last(10);
     assert_eq!(saved.len(), 1, "{saved:?}");

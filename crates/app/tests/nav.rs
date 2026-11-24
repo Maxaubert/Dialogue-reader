@@ -408,6 +408,49 @@ fn motion_gear_then_ctrl_k() {
     assert_eq!(pages(&w), ["Settings page"]);
 }
 
+/// Seen 2026-11-24: with motion on, after a push to Settings, Activity or Zones, Ctrl K opened the switcher but
+/// typing, Down and Enter did nothing (the search field did not get the keys). They must work after any push.
+#[test]
+fn motion_ctrl_k_after_a_push_types_in_the_search() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    settle();
+    for open in ["Settings", "Show all", "Edit zones"] {
+        w.set_current_game(0);
+        press(&w, open, AccessibleRole::Button);
+        settle();
+        assert_ne!(w.get_page(), Page::Overview, "{open}");
+        ctrl_k(&w);
+        assert!(w.get_switcher_open(), "{open}");
+        wait(200);
+        let hits = |w: &MainWindow| w.get_switcher_hits().iter().collect::<Vec<i32>>();
+        assert_eq!(hits(&w), [0, 1, 2, 3], "{open}: every game at first");
+        for c in ["S", "a", "t"] {
+            key(&w, c);
+        }
+        assert_eq!(hits(&w), [1], "{open}: typing narrows the games");
+        key(&w, Key::Escape);
+        assert!(!w.get_switcher_open(), "{open}: Esc closes");
+        assert_ne!(
+            w.get_page(),
+            Page::Overview,
+            "{open}: Esc closes the switcher only"
+        );
+        wait(200);
+        // opened again: the highlight starts on the second game, Down moves it to the third, Enter picks it
+        ctrl_k(&w);
+        wait(200);
+        key(&w, Key::DownArrow);
+        key(&w, Key::Return);
+        assert!(!w.get_switcher_open(), "{open}: Enter picks");
+        settle();
+        assert_eq!(w.get_current_game(), 2, "{open}: Down then Enter");
+        key(&w, Key::Escape);
+        settle();
+        assert_eq!(w.get_page(), Page::Overview, "{open}");
+    }
+}
+
 #[test]
 fn motion_switch_game_rolls_the_name_in_240_ms() {
     let w = window_with(true);
@@ -739,4 +782,488 @@ fn activity_filter_keeps_only_its_rows_and_closes_the_gaps() {
         text_ys(&w, "Dutch: We ride at first light. Nobody stays behind."),
         [top + 72.0]
     );
+}
+
+/// A real left click in the middle of the element with this label and role.
+fn click(w: &MainWindow, label: &str, role: AccessibleRole) {
+    let e = ElementHandle::find_by_accessible_label(w, label)
+        .find(|e| e.accessible_role() == Some(role))
+        .unwrap_or_else(|| panic!("no {role:?} labelled {label:?}"));
+    let (p, s) = (e.absolute_position(), e.size());
+    let at = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    let win = w.window();
+    win.dispatch_event(WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerExited);
+}
+
+/// Max, 2026-11-24: a click on the game name while the switcher is open closes it (it opened it before, and a
+/// second click did nothing). Ctrl K toggles the same way, also after the name opened it.
+#[test]
+fn the_game_name_and_ctrl_k_toggle_the_switcher() {
+    let w = window();
+    w.set_page(Page::Overview);
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(w.get_switcher_open());
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(
+        !w.get_switcher_open(),
+        "a second click on the name closes it"
+    );
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(w.get_switcher_open());
+    ctrl_k(&w);
+    assert!(!w.get_switcher_open(), "Ctrl K closes what the name opened");
+    ctrl_k(&w);
+    assert!(w.get_switcher_open());
+    click(&w, "Switch game", AccessibleRole::Button);
+    assert!(!w.get_switcher_open(), "the name closes what Ctrl K opened");
+}
+
+/// Max, 2026-11-24: "Edit zones" on the Overview and "Done" on Zones are the same kind of button at the same
+/// place, so they swap in place.
+#[test]
+fn edit_zones_and_done_swap_in_place() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let rect = |w: &MainWindow, label: &str| {
+        let e = ElementHandle::find_by_accessible_label(w, label)
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+            .unwrap_or_else(|| panic!("no button {label:?}"));
+        let (p, s) = (e.absolute_position(), e.size());
+        (p.x, p.y, s.width, s.height)
+    };
+    let edit = rect(&w, "Edit zones");
+    // no pencil icon button is left under the picture
+    let edit_buttons = ElementHandle::find_by_accessible_label(&w, "Edit zones")
+        .filter(|e| e.accessible_role() == Some(AccessibleRole::Button))
+        .map(|e| {
+            let p = e.absolute_position();
+            (p.x as i32, p.y as i32)
+        })
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(edit_buttons.len(), 1, "{edit_buttons:?}");
+    press(&w, "Edit zones", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Zones);
+    let done = rect(&w, "Done");
+    // the same right edge, top and height (the widths follow the words)
+    assert!(
+        (edit.0 + edit.2 - (done.0 + done.2)).abs() < 0.5,
+        "{edit:?} {done:?}"
+    );
+    assert!((edit.1 - done.1).abs() < 0.5, "{edit:?} {done:?}");
+    assert!((edit.3 - done.3).abs() < 0.5, "{edit:?} {done:?}");
+    press(&w, "Done", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Overview);
+}
+
+/// Max, 2026-11-24: the title strip has no status dot (it had a "Reading" tip).
+#[test]
+fn the_title_strip_has_no_status_dot() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let strip_items: Vec<String> = ElementQuery::from_root(&w)
+        .match_descendants()
+        .find_all()
+        .into_iter()
+        .filter(|e| e.absolute_position().y < 40.0 && e.accessible_role().is_some())
+        .filter_map(|e| e.accessible_label().map(|l| l.to_string()))
+        .collect();
+    assert!(
+        !strip_items.iter().any(|l| l == "Reading" || l == "Status"),
+        "{strip_items:?}"
+    );
+}
+
+/// The lowest opacity each of these elements had while the game switched (240 ms, in 10 ms steps), and whether
+/// two game pictures (the old one under the new one) showed at some point.
+struct SwitchTrace {
+    lowest: Vec<f32>,
+    two_pictures: bool,
+}
+
+fn opacity_of(w: &MainWindow, find: Find) -> f32 {
+    find(w).map_or(1.0, |e| e.computed_opacity())
+}
+
+fn pictures(w: &MainWindow) -> usize {
+    ElementHandle::find_by_accessible_label(w, "Game picture")
+        .filter(|e| e.size().width > 0.0)
+        .count()
+}
+
+/// Finds one element of the window (or none).
+type Find<'a> = &'a dyn Fn(&MainWindow) -> Option<ElementHandle>;
+
+/// Switches to the third game from the page shown (Ctrl K, a click on it) and traces `parts` over the 240 ms.
+fn trace_switch(w: &MainWindow, parts: &[Find]) -> SwitchTrace {
+    // from the first game
+    w.set_current_game(0);
+    let before = w.get_current_game();
+    ctrl_k(w);
+    assert!(w.get_switcher_open(), "Ctrl K opens the switcher");
+    // a click on the third game. Seen 2026-11-24, also before this branch: after a page push with motion on,
+    // Ctrl K opens the switcher but typing, Down and Enter do nothing (the search field does not keep the keys).
+    wait(200);
+    let row = ElementHandle::find_by_element_type_name(w, "GameItem")
+        .nth(2)
+        .expect("the third game");
+    let (p, sz) = (row.absolute_position(), row.size());
+    let at = slint::LogicalPosition::new(p.x + sz.width / 2.0, p.y + sz.height / 2.0);
+    w.window()
+        .dispatch_event(WindowEvent::PointerMoved { position: at });
+    w.window().dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    w.window().dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    w.window().dispatch_event(WindowEvent::PointerExited);
+    let mut t = SwitchTrace {
+        lowest: vec![1.0; parts.len()],
+        two_pictures: false,
+    };
+    for _ in 0..26 {
+        wait(10);
+        for (i, f) in parts.iter().enumerate() {
+            t.lowest[i] = t.lowest[i].min(opacity_of(w, f));
+        }
+        t.two_pictures |= pictures(w) == 2;
+    }
+    assert_ne!(w.get_current_game(), before, "the game changed");
+    settle();
+    t
+}
+
+fn by_label(
+    label: &'static str,
+    role: AccessibleRole,
+) -> impl Fn(&MainWindow) -> Option<ElementHandle> {
+    move |w| {
+        ElementHandle::find_by_accessible_label(w, label)
+            .find(|e| e.accessible_role() == Some(role))
+    }
+}
+
+fn by_type(name: &'static str) -> impl Fn(&MainWindow) -> Option<ElementHandle> {
+    move |w| ElementHandle::find_by_element_type_name(w, name).next()
+}
+
+/// Max, 2026-11-24: Settings, Zones and Activity follow a game switch as the Overview does. Only what belongs to
+/// the game fades out and in; the page stays, and the Zones picture crossfades (no dark dip).
+#[test]
+fn motion_switch_game_crossfades_settings_zones_and_activity() {
+    switch_crossfades(false);
+}
+
+/// The same under reduce motion: the fades are 80 ms, and still only the game's parts fade.
+#[test]
+fn motion_switch_game_crossfades_under_reduce_motion() {
+    switch_crossfades(true);
+}
+
+fn switch_crossfades(reduce: bool) {
+    {
+        let w = window_motion(true, reduce);
+        w.set_page(Page::Overview);
+
+        press(&w, "Settings", AccessibleRole::Button);
+        settle();
+        let still = by_label("Start with Windows", AccessibleRole::Checkbox);
+        let voice = by_label("Narrator", AccessibleRole::Combobox);
+        let t = trace_switch(&w, &[&still, &voice]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "Settings stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the game's voice fades (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(opacity_of(&w, &voice) > 0.99);
+        key(&w, Key::Escape);
+        settle();
+
+        press(&w, "Edit zones", AccessibleRole::Button);
+        settle();
+        assert_eq!(pictures(&w), 1);
+        let draw = by_label("Draw zone", AccessibleRole::Button);
+        let tag = by_type("ZoneTag");
+        let t = trace_switch(&w, &[&draw, &tag]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "the Zones toolbar stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the zones fade (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.two_pictures,
+            "the old picture lies under the new one (reduce {reduce})"
+        );
+        assert_eq!(
+            pictures(&w),
+            1,
+            "the old picture is gone once the new one is in"
+        );
+        assert!(opacity_of(&w, &tag) > 0.99);
+        press(&w, "Done", AccessibleRole::Button);
+        settle();
+
+        press(&w, "Show all", AccessibleRole::Button);
+        settle();
+        let today = by_label("Today", AccessibleRole::Text);
+        let row = by_type("ListRow");
+        let t = trace_switch(&w, &[&today, &row]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "\"Today\" stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the list fades (reduce {reduce}): {:?}",
+            t.lowest
+        );
+    }
+    dr_app::set_reduce_motion(None);
+}
+
+/// Puts a new line on top of the Overview read list and says so, as the view model does when a line is read.
+fn new_line(w: &MainWindow) -> String {
+    let mut rows: Vec<dr_app::LineData> = w.get_recent().iter().collect();
+    rows.insert(
+        0,
+        dr_app::LineData {
+            time: "21:31".into(),
+            kind: dr_app::Kind::Dialogue,
+            who: "Sadie:".into(),
+            line: "Let us get to work.".into(),
+            skip: "".into(),
+        },
+    );
+    w.set_recent(slint::ModelRc::new(slint::VecModel::from(rows)));
+    w.invoke_lines_arrived(1, 0);
+    "Sadie: Let us get to work.".into()
+}
+
+/// The text of a list row, and the top of the row after it.
+fn row_text(w: &MainWindow, label: &str) -> ElementHandle {
+    ElementHandle::find_by_accessible_label(w, label)
+        .find(|e| e.accessible_role() == Some(AccessibleRole::Text))
+        .unwrap_or_else(|| panic!("no row {label:?}"))
+}
+
+fn list_rows(w: &MainWindow) -> Vec<(f32, f32)> {
+    ElementHandle::find_by_element_type_name(w, "ListRow")
+        .map(|r| (r.absolute_position().y, r.size().height))
+        .collect()
+}
+
+/// 20-motion "new line": the new row fades in from 8 px above in 180 ms (ease-out), and the rows below move down
+/// by its height, smoothly.
+#[test]
+fn motion_a_new_line_slides_in_and_the_rows_below_move_down() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    settle();
+    let before = list_rows(&w);
+    let label = new_line(&w);
+    wait(10);
+    let early = list_rows(&w);
+    let (o0, y0) = (
+        row_text(&w, &label).computed_opacity(),
+        row_text(&w, &label).absolute_position().y,
+    );
+    assert!(o0 < 0.4, "{o0}");
+    // the old first row has hardly moved yet
+    assert!(
+        early[1].0 - before[0].0 < 0.4 * early[1].1,
+        "{before:?} {early:?}"
+    );
+    wait(80);
+    let mid = list_rows(&w);
+    assert!(
+        mid[1].0 > early[1].0 + 4.0,
+        "the rows below move down: {early:?} {mid:?}"
+    );
+    assert!(row_text(&w, &label).computed_opacity() > o0);
+    wait(150);
+    let end = list_rows(&w);
+    let t_end = row_text(&w, &label);
+    assert!(t_end.computed_opacity() > 0.99);
+    // the old first row moved down by the new row's own height
+    assert!(
+        (end[1].0 - (before[0].0 + end[0].1)).abs() < 1.0,
+        "{before:?} {end:?}"
+    );
+    // the new row came from above: it ends lower than it started
+    assert!(t_end.absolute_position().y > y0 + 2.0);
+}
+
+/// Under reduce motion the new row only fades (80 ms); nothing moves.
+#[test]
+fn motion_a_new_line_only_fades_under_reduce_motion() {
+    let w = window_motion(true, true);
+    w.set_page(Page::Overview);
+    settle();
+    let label = new_line(&w);
+    wait(10);
+    let early = list_rows(&w);
+    let (o0, y0) = (
+        row_text(&w, &label).computed_opacity(),
+        row_text(&w, &label).absolute_position().y,
+    );
+    assert!(o0 < 0.6, "{o0}");
+    wait(100);
+    let end = list_rows(&w);
+    let t_end = row_text(&w, &label);
+    assert!(t_end.computed_opacity() > 0.99);
+    assert_eq!(early, end, "nothing moves");
+    assert_eq!(y0, t_end.absolute_position().y);
+    dr_app::set_reduce_motion(None);
+}
+
+/// The same on Activity: the new row's room grows, and the rows below move down by its height.
+#[test]
+fn motion_a_new_line_slides_into_activity() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    press(&w, "Show all", AccessibleRole::Button);
+    settle();
+    let before = list_rows(&w);
+    let mut rows: Vec<dr_app::LineData> = w.get_log().iter().collect();
+    rows.insert(
+        0,
+        dr_app::LineData {
+            time: "21:31".into(),
+            kind: dr_app::Kind::Dialogue,
+            who: "Sadie:".into(),
+            line: "Let us get to work.".into(),
+            skip: "".into(),
+        },
+    );
+    w.set_log(slint::ModelRc::new(slint::VecModel::from(rows)));
+    w.invoke_lines_arrived(0, 1);
+    wait(10);
+    let early = list_rows(&w);
+    assert!(
+        early[0].1 < 0.4 * before[0].1,
+        "the new row starts small: {early:?}"
+    );
+    wait(80);
+    let mid = list_rows(&w);
+    assert!(mid[0].1 > early[0].1, "{early:?} {mid:?}");
+    assert!(
+        mid[1].0 > early[1].0 + 4.0,
+        "the rows below move down: {early:?} {mid:?}"
+    );
+    wait(150);
+    let end = list_rows(&w);
+    assert!(
+        (end[1].0 - (before[0].0 + end[0].1)).abs() < 1.0,
+        "{before:?} {end:?}"
+    );
+    let label = "Sadie: Let us get to work.";
+    assert!(row_text(&w, label).computed_opacity() > 0.99);
+}
+
+/// The Overview voice list opens on the game's voice: with more voices than fit, it scrolls so the checked row
+/// shows, and the last row it shows is cut in half, so the list says it goes on.
+#[test]
+fn the_voice_list_opens_on_the_current_voice() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let n = w.get_voices().row_count();
+    assert!(n > 8, "the fake list has more voices than fit ({n})");
+    let last = w.get_voices().row_data(n - 1).unwrap().name;
+    w.set_game_voice(n as i32 - 1);
+    w.set_voice_menu(true);
+    let list = ElementHandle::find_by_accessible_label(&w, "Voices")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+        .expect("the voice list");
+    let (lp, ls) = (list.absolute_position(), list.size());
+    let rows: Vec<ElementHandle> = ElementHandle::find_by_accessible_label(&w, &last)
+        .filter(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+        .collect();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].accessible_item_selected(), Some(true));
+    let (rp, rs) = (rows[0].absolute_position(), rows[0].size());
+    assert!(
+        rp.y >= lp.y && rp.y + rs.height <= lp.y + ls.height,
+        "the checked row {rp:?} {rs:?} is in the list {lp:?} {ls:?}"
+    );
+    // 7 and a half rows show (plus the list's 4 px padding and 1 px border on each side)
+    let row_h = rs.height;
+    assert!(
+        (ls.height - (7.5 * row_h + 10.0)).abs() < 0.5,
+        "{} rows show",
+        (ls.height - 10.0) / row_h
+    );
+    // the first voice opens at the top
+    w.set_voice_menu(false);
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Voices")
+            .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+            .is_none(),
+        "closed"
+    );
+    w.set_game_voice(0);
+    w.set_voice_menu(true);
+    let first = w.get_voices().row_data(0).unwrap().name;
+    let top = ElementHandle::find_by_accessible_label(&w, &first)
+        .find(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+        .expect("first voice");
+    let list = ElementHandle::find_by_accessible_label(&w, "Voices")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+        .unwrap();
+    assert_eq!(top.absolute_position().y, list.absolute_position().y + 5.0);
+}
+
+/// Clicks at a point of the window (logical px), as the mouse does.
+fn click_at(w: &MainWindow, x: f32, y: f32) {
+    let at = slint::LogicalPosition::new(x, y);
+    let win = w.window();
+    win.dispatch_event(WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerExited);
+}
+
+/// On Max's maximized window (1707 x 912) setup is drawn 1.4 times bigger, the footer too. A click lands where
+/// the bigger button and card are drawn (the points are read off a Skia render of this size), not where they
+/// would be at 1x.
+#[test]
+fn clicks_land_on_the_bigger_setup() {
+    let w = window();
+    w.window().set_size(slint::LogicalSize::new(1707.0, 912.0));
+    w.set_page(Page::Mode);
+    assert!(w.get_automatic());
+    // the "On key press" card: at 1x its column ends at x 1333, so x 1450 is only on the bigger card
+    click_at(&w, 1450.0, 480.0);
+    assert!(!w.get_automatic(), "the click picked On key press");
+    // "Continue" on step 1: at 1x the button ends at x 1333, the bigger one spans about x 1365 to 1524
+    w.set_page(Page::PickWindow);
+    click_at(&w, 1500.0, 878.0);
+    assert_eq!(w.get_page(), Page::DrawZones);
 }

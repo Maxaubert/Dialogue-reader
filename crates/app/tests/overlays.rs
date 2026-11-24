@@ -67,6 +67,11 @@ fn app() -> App {
 
 /// The app on a game whose zones show `line` (or nothing).
 fn app_reading(line: Option<&'static str>) -> App {
+    app_on(line, FakeDesktop::new())
+}
+
+/// `app_reading` on this fake desktop.
+fn app_on(line: Option<&'static str>, desktop: FakeDesktop) -> App {
     let (dir, paths) = temp_paths();
     let mut p = Profile::new("test-game", "Test Game", "TestGame.exe");
     p.zones.push(ZoneCfg {
@@ -80,7 +85,7 @@ fn app_reading(line: Option<&'static str>) -> App {
     profile::save(&paths, &p).unwrap();
     let voices = fake_voices();
     let speech = voices.speech.as_ref().unwrap().sender();
-    let (w, vm) = real_window_with(&paths, FakeDesktop::new(), voices);
+    let (w, vm) = real_window_with(&paths, desktop, voices);
     let parts = Parts {
         ocr: Arc::new(move |_lang: &str| Ok(Box::new(Text(line)) as Box<dyn Ocr>)),
         source: Arc::new(|_hwnd| Ok((Box::new(Still(false, 0.0)) as Box<dyn FrameSource>, None))),
@@ -404,6 +409,219 @@ fn zone_edit_saves_a_new_zone_and_the_reader_uses_it_at_once() {
     assert_eq!(a.hook(), Overlay::None);
     assert!(!a.held());
     assert!(a.pill_shown());
+}
+
+/// The live view of the game failed: zone edit saves a new screenshot of the game as its picture, and the
+/// Overview and Zones keep the failure note and show the time of the new screenshot.
+#[test]
+fn a_zone_edit_shot_keeps_the_live_failure_note_and_shows_its_time() {
+    use dr_app::LiveView;
+    use slint::ComponentHandle;
+    let d = FakeDesktop::new();
+    d.live.fail.set(true);
+    let a = app_on(None, d);
+    a.vm.borrow_mut().live_tick();
+    let note = |a: &App| a.w.global::<LiveView>().get_note().to_string();
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
+    let png = a.paths.profile_png("test-game");
+    let before = std::fs::metadata(&png).and_then(|m| m.modified()).ok();
+    a.key(Action::Menu);
+    a.nav(Nav::Enter);
+    assert_eq!(a.shown(), Overlay::Zones);
+    // the new screenshot is saved
+    assert_eq!(a.w.get_notice(), "");
+    let after = std::fs::metadata(&png).and_then(|m| m.modified()).ok();
+    assert!(after.is_some() && after != before, "{before:?} {after:?}");
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
+    // "21:30": the time of the new screenshot (TEXT.md)
+    let t = a.w.get_shot_time();
+    let b = t.as_bytes();
+    assert!(
+        b.len() == 5
+            && b.iter().enumerate().all(|(i, c)| if i == 2 {
+                *c == b':'
+            } else {
+                c.is_ascii_digit()
+            }),
+        "{t}"
+    );
+    a.nav(Nav::Esc);
+    a.w.set_page(Page::Zones);
+    a.vm.borrow_mut().live_tick();
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
+}
+
+/// Zone edit with one new zone drawn at (100, 50) 300 x 40 and selected (fake game: 1920 x 1080 at 100 %, so window
+/// px are capture px).
+fn zone_edit_with_a_box() -> (App, dr_app::ZoneEditWindow) {
+    let a = app();
+    a.key(Action::Menu);
+    a.nav(Nav::Enter);
+    assert_eq!(a.shown(), Overlay::Zones);
+    let z = a.vm.borrow().overlays().unwrap().zones.clone_strong();
+    z.invoke_commit(UiKind::Speaker, 100.0, 50.0, 300.0, 40.0);
+    assert_eq!(z.get_selected(), 1);
+    (a, z)
+}
+
+fn edit_rect(z: &dr_app::ZoneEditWindow, i: usize) -> [f32; 4] {
+    use slint::Model;
+    let r = z.get_zones().row_data(i).unwrap();
+    [r.x, r.y, r.w, r.h]
+}
+
+/// Max, 2026-11-24: the selected zone in zone edit has resize handles, as on Zones. A drag of a corner resizes it;
+/// it is saved on the release and the reader uses it at once.
+#[test]
+fn zone_edit_resizes_the_selected_zone_by_a_corner() {
+    let (a, z) = zone_edit_with_a_box();
+    // the bottom right handle (4) follows the pointer; nothing is saved before the release
+    assert!(z.invoke_resize_start(4));
+    z.invoke_resize_move(500.0, 150.0);
+    assert_eq!(edit_rect(&z, 1), [100.0, 50.0, 400.0, 100.0]);
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 300.0, 40.0]);
+    z.invoke_resize_end(500.0, 150.0);
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 400.0, 100.0]);
+    let zones = a.vm.borrow().runtime().unwrap().zones();
+    assert!(
+        zones
+            .iter()
+            .any(|z| z.rect == Rect::new(100.0, 50.0, 400.0, 100.0)),
+        "{zones:?}"
+    );
+    // the top left handle (0) past the other corner: the zone keeps its smallest size
+    assert!(z.invoke_resize_start(0));
+    z.invoke_resize_end(900.0, 900.0);
+    let [x, y, w, h] = a.saved().zones[1].rect;
+    assert_eq!((x + w, y + h), (500.0, 150.0), "the other corner stays");
+    assert!(
+        w >= dr_app::geom::MIN_W - 0.01 && h >= dr_app::geom::MIN_H - 0.01,
+        "{w} x {h}"
+    );
+    // no zone selected: nothing to resize
+    assert_eq!(z.invoke_pick(5.0, 5.0), -1);
+    assert!(!z.invoke_resize_start(4));
+}
+
+/// Esc during a resize puts the zone back and keeps zone edit open; the next Esc finishes.
+#[test]
+fn esc_during_a_zone_edit_resize_puts_the_zone_back() {
+    let (a, z) = zone_edit_with_a_box();
+    assert!(z.invoke_resize_start(4));
+    z.set_resizing(true);
+    z.invoke_resize_move(700.0, 300.0);
+    assert_eq!(edit_rect(&z, 1), [100.0, 50.0, 600.0, 250.0]);
+    // Delete does not remove a zone being resized
+    a.nav(Nav::Delete);
+    use slint::Model;
+    assert_eq!(z.get_zones().row_count(), 2);
+    a.nav(Nav::Esc);
+    assert_eq!(a.shown(), Overlay::Zones, "zone edit stays open");
+    assert!(!z.get_resizing());
+    assert_eq!(edit_rect(&z, 1), [100.0, 50.0, 300.0, 40.0]);
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 300.0, 40.0]);
+    // a late release changes nothing
+    z.invoke_resize_end(700.0, 300.0);
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 300.0, 40.0]);
+    a.nav(Nav::Esc);
+    assert_eq!(a.shown(), Overlay::None);
+}
+
+/// The handles take real pointer events: a press on the bottom right handle, a move and a release resize the zone.
+/// A right press during the drag cancels it, and a press away from the handles still draws.
+#[test]
+fn zone_edit_handles_take_the_pointer() {
+    use slint::LogicalPosition;
+    use slint::platform::{PointerEventButton, WindowEvent};
+    let (a, z) = zone_edit_with_a_box();
+    let win = z.window();
+    let at = |x: f32, y: f32| LogicalPosition::new(x, y);
+    let press = |p, b| {
+        win.dispatch_event(WindowEvent::PointerPressed {
+            position: p,
+            button: b,
+        })
+    };
+    let release = |p, b| {
+        win.dispatch_event(WindowEvent::PointerReleased {
+            position: p,
+            button: b,
+        })
+    };
+    let mv = |p| win.dispatch_event(WindowEvent::PointerMoved { position: p });
+    // the box ends at (400, 90)
+    mv(at(401.0, 91.0));
+    press(at(401.0, 91.0), PointerEventButton::Left);
+    assert!(z.get_resizing());
+    mv(at(450.0, 120.0));
+    assert_eq!(edit_rect(&z, 1), [100.0, 50.0, 350.0, 70.0]);
+    release(at(450.0, 120.0), PointerEventButton::Left);
+    assert!(!z.get_resizing());
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 350.0, 70.0]);
+    assert_eq!(z.get_selected(), 1, "still selected");
+    // a right press during the drag puts it back
+    press(at(450.0, 120.0), PointerEventButton::Left);
+    assert!(z.get_resizing());
+    mv(at(600.0, 200.0));
+    press(at(600.0, 200.0), PointerEventButton::Right);
+    assert!(!z.get_resizing());
+    assert_eq!(edit_rect(&z, 1), [100.0, 50.0, 350.0, 70.0]);
+    release(at(600.0, 200.0), PointerEventButton::Left);
+    assert_eq!(a.saved().zones[1].rect, [100.0, 50.0, 350.0, 70.0]);
+    // a press away from the handles still draws a new box
+    mv(at(800.0, 400.0));
+    press(at(800.0, 400.0), PointerEventButton::Left);
+    assert!(!z.get_resizing());
+    mv(at(900.0, 480.0));
+    release(at(900.0, 480.0), PointerEventButton::Left);
+    assert!(z.get_draft());
+}
+
+/// Where Done is in zone edit (the bar's place).
+fn done_at(z: &dr_app::ZoneEditWindow) -> (i32, i32) {
+    slint::platform::update_timers_and_animations();
+    let d = i_slint_backend_testing::ElementHandle::find_by_accessible_label(z, "Done")
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button))
+        .expect("Done");
+    let p = d.absolute_position();
+    (p.x.round() as i32, p.y.round() as i32)
+}
+
+/// Max, 2026-11-24: the zone edit bar jumped back and forth while a zone sat at the edge of its home spot. It now
+/// leaves a place when the selection comes within 8 px, and comes back only when the selection is 24 px clear.
+#[test]
+fn the_zone_edit_bar_does_not_jump_at_the_edge_of_home() {
+    let a = app();
+    a.key(Action::Menu);
+    a.nav(Nav::Enter);
+    let z = a.vm.borrow().overlays().unwrap().zones.clone_strong();
+    // a box under the middle of the bar's home (top centre, y 24 to 72), its tag above it
+    z.invoke_commit(UiKind::Speaker, 800.0, 200.0, 300.0, 40.0);
+    let home = done_at(&z);
+    let mut places = vec![home];
+    let mut step = |y: f32| {
+        z.invoke_resize_move(900.0, y);
+        let at = done_at(&z);
+        if places.last() != Some(&at) {
+            places.push(at);
+        }
+    };
+    // the top edge goes up 1 px at a time until the tag is under the bar, and back down
+    assert!(z.invoke_resize_start(1));
+    for y in (90..=200).rev() {
+        step(y as f32);
+    }
+    // a box that sits at the edge (moving by a few px) does not move the bar
+    for y in [110, 112, 109, 113, 110, 114, 108] {
+        step(y as f32);
+    }
+    for y in 90..=200 {
+        step(y as f32);
+    }
+    z.invoke_resize_end(900.0, 200.0);
+    assert_eq!(places.len(), 3, "out once and home once: {places:?}");
+    assert_ne!(places[1], home);
+    assert_eq!(places[2], home);
 }
 
 #[test]
