@@ -23,6 +23,7 @@ import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
 import { ZoneEdit } from "overlays/zone_edit.slint";
 import { LiveView } from "components/stage.slint";
+import { ComponentSheet } from "components/sheet.slint";
 import { PillWindow, QuickMenuWindow, ZoneEditWindow } from "overlays/windows.slint";
 import { Tray } from "tray.slint";
 
@@ -77,6 +78,8 @@ export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
     in-out property <OverlayPreview> overlay: OverlayPreview.none;
     in-out property <bool> switcher-open: false;
+    // debug: the component sheet over everything (render-screens "00-components", tests/components.rs)
+    in property <bool> sheet: false;
     // view models (src/vm): real profiles and windows, or the fake data of the mockups (src/fake.rs)
     in-out property <[WindowData]> games-running;
     in-out property <[WindowData]> other-windows;
@@ -281,16 +284,21 @@ export component MainWindow inherits Window {
 
     // Every move between pages in the UI goes through go (forward) or go-back, so the push knows its direction.
     // `page` itself changes at once: the tests, the live view and Rust read it right away.
+    // A notice stays through setup moves (Finish can end with one); a move from a main page clears it.
     function go(p: Page) {
         root.zone-rename-done();
-        root.notice = "";
+        if !root.setup {
+            root.notice = "";
+        }
         root.fwd = true;
         root.armed = true;
         root.page = p;
     }
     function go-back(p: Page) {
         root.zone-rename-done();
-        root.notice = "";
+        if !root.setup {
+            root.notice = "";
+        }
         root.fwd = false;
         root.armed = true;
         root.page = p;
@@ -850,6 +858,8 @@ export component MainWindow inherits Window {
                 if root.page == Page.welcome: TouchArea { }
             }
         }
+
+        if root.sheet: ComponentSheet { }
 
         switcher := GameSwitcher {
             visible: root.switcher-open;

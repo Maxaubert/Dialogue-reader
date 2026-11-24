@@ -22,6 +22,7 @@ pub struct Screen {
 }
 
 fn page(w: &MainWindow, p: Page) {
+    w.set_sheet(false);
     w.set_overlay(OverlayPreview::None);
     w.set_switcher_open(false);
     w.invoke_settings_close_voice_list();
@@ -122,6 +123,14 @@ pub fn all() -> Vec<Screen> {
         Screen {
             name: "17-activity",
             setup: |w| page(w, Page::Activity),
+        },
+        // every shared part in its states (ui/components/sheet.slint), to compare with the d-black token sheet
+        Screen {
+            name: "00-components",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_sheet(true);
+            },
         },
         // review aids (M3a, no mockup): the Settings voice picker open (sample voices, the list scrolls), what pages
         // 05 and Settings > Voices show when Kokoro's files are missing, and what 05, 06 and Settings > Voices show

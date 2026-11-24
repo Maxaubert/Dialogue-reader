@@ -1,7 +1,7 @@
 // The game picture with zones on top (.stage, .zone, .ztag, .handle), the zone list row and the zone tools.
 import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, Toggle, CornerMask, Dot } from "base.slint";
+import { Icon, CIcon, Button, Toggle, CornerMask, Dot, ZoneOutline } from "base.slint";
 
 // The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
 // Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
@@ -83,19 +83,19 @@ export component Stage inherits Rectangle {
         accessible-label: "Game picture";
     }
 
-    for z[i] in root.zones: Rectangle {
-        // Zone kinds carry no color (Max, 2026-11-22): every zone is grey, the selected one uses the accent.
+    for z[i] in root.zones: ZoneOutline {
+        // Zone kinds carry no color (Max, 2026-11-22). d-black: a light outline with a black keyline, so it holds
+        // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
         property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
-        property <color> line: self.sel ? Palette.accent : Palette.text-2;
+        line: self.sel ? Palette.on : Palette.text;
         x: root.off-x + z.x * root.scale * 1px;
         y: root.off-y + z.y * root.scale * 1px;
         width: z.w * root.scale * 1px;
         height: z.h * root.scale * 1px;
-        border-radius: Radius.xs;
-        border-width: self.sel ? 2px : 1.5px;
-        // off zones are drawn at 45 %
-        border-color: z.on ? self.line : self.line.with-alpha(0.45);
+        selected: self.sel;
+        dim: !z.on;
+        line-w: self.sel ? 2px : 1.5px;
         background: z.on ? self.zf : self.zf.with-alpha(0.063);
         if self.sel: Rectangle {
             for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
@@ -106,7 +106,7 @@ export component Stage inherits Rectangle {
                 border-radius: 2px;
                 background: Palette.knob;
                 border-width: 1.5px;
-                border-color: line;
+                border-color: Palette.on-ink;
             }
         }
         if !root.interactive: TouchArea {
@@ -115,14 +115,13 @@ export component Stage inherits Rectangle {
             }
         }
     }
-    if root.drafting: Rectangle {
+    // the box being drawn, with the same keyline
+    if root.drafting: ZoneOutline {
         x: root.off-x + root.draft.x * root.scale * 1px;
         y: root.off-y + root.draft.y * root.scale * 1px;
         width: root.draft.w * root.scale * 1px;
         height: root.draft.h * root.scale * 1px;
-        border-radius: Radius.xs;
-        border-width: 1.5px;
-        border-color: Palette.edit-draft-line;
+        line: Palette.edit-draft-line;
         background: Palette.edit-draft-fill;
     }
     // A left drag draws, moves or resizes. The release of ANY button ends a TouchArea's mouse grab, and its

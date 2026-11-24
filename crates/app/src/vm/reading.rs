@@ -155,14 +155,17 @@ fn kind_of(name: &str) -> Kind {
 /// first line of a two-line row (ui/components/base.slint, ListRow).
 pub const SPEAKER_MAX: usize = 20;
 
-/// The speaker name as a list row shows it: at most [`SPEAKER_MAX`] characters, then "...".
+/// The speaker part of a row as a list row shows it ("Arthur:"): a name of at most [`SPEAKER_MAX`] characters,
+/// then "...", and the colon it came with.
 pub fn short_speaker(who: &str) -> String {
     let who = who.trim();
-    if who.chars().count() <= SPEAKER_MAX {
+    let name = who.trim_end_matches(':').trim_end();
+    if name.chars().count() <= SPEAKER_MAX {
         return who.to_string();
     }
-    let cut: String = who.chars().take(SPEAKER_MAX).collect();
-    format!("{}...", cut.trim_end())
+    let cut: String = name.chars().take(SPEAKER_MAX).collect();
+    let colon = if who.ends_with(':') { ":" } else { "" };
+    format!("{}...{colon}", cut.trim_end())
 }
 
 /// A log line as a Recent or activity row.
@@ -778,10 +781,13 @@ mod tests {
 
     #[test]
     fn long_speaker_names_are_cut() {
-        assert_eq!(short_speaker("Arthur"), "Arthur");
+        assert_eq!(short_speaker("Arthur:"), "Arthur:");
+        assert_eq!(short_speaker(""), "");
+        let max = format!("{}:", "x".repeat(SPEAKER_MAX));
+        assert_eq!(short_speaker(&max), max);
         assert_eq!(
-            short_speaker(&"x".repeat(SPEAKER_MAX)),
-            "x".repeat(SPEAKER_MAX)
+            short_speaker("Third Officer of the Royal Guard:"),
+            "Third Officer of the...:"
         );
         assert_eq!(
             short_speaker("Third Officer of the Royal Guard"),

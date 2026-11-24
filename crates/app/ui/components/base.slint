@@ -676,13 +676,14 @@ export component SettingRow inherits Rectangle {
     in property <string> sub;
     in property <bool> first: false;
     in property <bool> off: false;
-    min-height: Size.row;
+    // 44 px, or more when the label has a second line; it never stretches
+    height: max(Size.row, row-lay.preferred-height);
     if !root.first: Rectangle {
         y: 0;
         height: 1px;
         background: Palette.line;
     }
-    HorizontalLayout {
+    row-lay := HorizontalLayout {
         padding-left: Space.s4;
         padding-right: Space.s3;
         padding-top: Space.s1;
@@ -1072,12 +1073,14 @@ export component Tag inherits Rectangle {
 // cut with "...". `meta` (a time) and `tag` ("off", "repeat") sit at the end. Hover fills the row; with
 // `replay-label` set, a replay button floats over the row end. A cut line shows its full text in a card over
 // the rows below after Motion.hover-delay. The accessible label is the full "Speaker: line".
-// Rust caps the speaker name so it fits on line 1 (vm::reading::short_speaker).
+// `speaker` comes with its colon, as the view model gives it in LineData.who ("Arthur:"). Rust caps the name so
+// it fits on line 1 (vm::reading::short_speaker).
 // Put rows in a `for` with no layout clip below them, so the card can lie over the next rows.
 export component ListRow inherits Rectangle {
     in property <image> icon;
     // the icon's tooltip (the kind name on Activity rows); empty: none
     in property <string> icon-tip;
+    // the speaker with its colon ("Arthur:"), or empty
     in property <string> speaker;
     in property <string> line;
     // dimmed row (a kind that is off, a skipped line)
@@ -1089,7 +1092,7 @@ export component ListRow inherits Rectangle {
     // the row colour at rest (the panel it sits on)
     in property <color> rest-bg: transparent;
     callback replay();
-    property <string> full: root.speaker == "" ? root.line : root.speaker + ": " + root.line;
+    property <string> full: root.speaker == "" ? root.line : root.speaker + " " + root.line;
     property <color> text-c: root.off ? Palette.text-3 : Palette.text;
     property <color> who-c: root.off ? Palette.text-3 : Palette.text-2;
     // the hover colour, shared by the row and the patch under the grey speaker name
@@ -1097,7 +1100,6 @@ export component ListRow inherits Rectangle {
     // the text is cut when the whole text needs more than two lines
     property <bool> cut: measure.preferred-height > t.height + 1px;
     property <bool> card: touch.has-hover && root.cut;
-    min-height: Size.list;
     height: max(Size.list, t.height + 16px);
     border-radius: Radius.md;
     background: root.row-bg;
@@ -1167,7 +1169,7 @@ export component ListRow inherits Rectangle {
                     width: parent.width;
                     overflow: elide;
                     accessible-role: none;
-                    text: root.speaker + ":";
+                    text: root.speaker;
                     color: root.who-c;
                     line-height-factor: Type.lhf-143;
                 }
