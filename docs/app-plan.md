@@ -823,12 +823,16 @@ Max runs the window maximized on a 2560 px screen at 150 % (about 1707 x 912 log
 differs from the d-black mockups:
 
 1. Welcome and every setup step sit in the middle of the window, on both axes, at every size (the mockups put
-   them at the top). In a window wider than 1440 px they are drawn bigger: 1 at 1440 px wide, then with the width,
-   at most 1.4, and never more than lets the tallest step (step 2, 664 px) fit in the height. All steps 1 to 5 and
-   the footer use the same factor, so nothing changes size between steps; Welcome fits its own content
-   (`ui/pages/setup_part.slint`, `SetupZoom`, `SetupStage`). About 1.16 on Max's screen, 1.4 at 2560 x 1380.
-   The software renderer (render-screens) cannot scale: its PNGs show the steps in the middle but not bigger.
-   `examples/snapshot.rs` takes a window size now (`... 1 2560x1380`) to see the real look on Skia.
+   them at the top). Step 1 is placed as if it were as tall as step 2, so its title and search field stay put
+   while the lists change. In a window wider than 1440 px the steps are drawn bigger: 1 at 1440 px wide, 1.4 from
+   1707 px wide (Max's window), and never more than lets 512 px of step fit in the height with 16 px above and
+   under it. All steps 1 to 5 and the footer (Back, the dots, Continue) use the same factor, so nothing changes
+   size between steps; Welcome fits its own content (`ui/pages/setup_part.slint`, `SetupZoom`, `SetupStage`,
+   app.slint `setup-k`). Step 2 makes its picture smaller (still 16:9, in the middle of the column) when the
+   window is short: on Max's window it is about 1033 x 581 px, a little smaller than at 1.16. The software
+   renderer (render-screens) cannot scale: its PNGs show the steps in the middle but not bigger. The mockup test
+   compares their page `dy` px lower than the shot (tests/screens.rs). `examples/snapshot.rs` takes a window size
+   now (`... 1 2560x1380`) to see the real look on Skia.
 2. Step 1: each row shows its window's own exe icon (24 px), with no frame and no game picture. A window with no
    icon (a protected game, the fake data) leaves the room empty, so the names line up.
 3. Step 5: no summary line under the two cards ("5 zones · Mouse 4 · Adam 1.1x").
@@ -840,9 +844,10 @@ differs from the d-black mockups:
    button under the picture is gone; a click on the picture still opens Zones. The Zones toolbar has the
    Overview's 24 px margins now (the picture keeps 32 px).
 6. The game name in the title strip closes the switcher when it is open (as Ctrl K).
-7. The Voice button of the Overview toolbar opens a voice list under it (the game's voice has a check; eight rows
-   show, the rest scroll; "No voices found." when there is none). A pick sets and saves the game's voice; Esc or a
-   click outside closes it. It used to open Settings.
+7. The Voice button of the Overview toolbar opens a voice list under it (the game's voice has a check; up to eight
+   rows show; with more, seven and a half show and the list opens scrolled to the game's voice; "No voices
+   found." when there is none). A pick sets and saves the game's voice; Esc or a click outside closes it. It used
+   to open Settings.
 8. The title strip has no status dot. "Reading" and "Paused" still show elsewhere (the in-game pill, the Pause or
    Resume button, the switcher row); "Game not running." is on the Overview stage. "Stopped" and "Cannot read" were
    only in the dot's tip and are not shown in the window now.

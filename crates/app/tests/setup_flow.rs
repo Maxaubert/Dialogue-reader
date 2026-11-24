@@ -143,6 +143,82 @@ fn search_and_other_windows_can_be_picked() {
     assert_eq!(w.get_page(), Page::DrawZones);
 }
 
+/// Max, 2026-11-24: each window row shows its exe icon (24 px, no frame). A window with no icon keeps the room
+/// empty, so the names line up.
+#[test]
+fn page_02_rows_show_the_window_icon() {
+    let (_dir, paths) = temp_paths();
+    let mut d = FakeDesktop::new();
+    d.windows[0].icon = Some(dr_runtime::windows_list::Icon {
+        width: 16,
+        height: 16,
+        rgba: [200, 40, 40, 255].repeat(16 * 16),
+    });
+    let (w, _vm) = real_window(&paths, d);
+    press(&w, "Get started", AccessibleRole::Button);
+    let icon = w.get_games_running().row_data(0).unwrap().icon.size();
+    assert_eq!((icon.width, icon.height), (16, 16));
+    let slots: Vec<ElementHandle> =
+        ElementHandle::find_by_element_type_name(&w, "RowIcon").collect();
+    assert_eq!(slots.len(), 2, "one icon room per row");
+    let images: Vec<ElementHandle> = ElementHandle::find_by_element_type_name(&w, "Image")
+        .filter(|i| {
+            slots
+                .iter()
+                .any(|s| s.absolute_position() == i.absolute_position())
+        })
+        .collect();
+    assert_eq!(images.len(), 1, "only the game has an icon");
+    let (img, slot) = (&images[0], &slots[0]);
+    assert_eq!(
+        img.absolute_position(),
+        slot.absolute_position(),
+        "in the first row"
+    );
+    assert_eq!(img.size(), slint::LogicalSize::new(24.0, 24.0));
+    // the names line up, icon or not
+    let name_x = |label: &str| {
+        ElementHandle::find_by_accessible_label(&w, label)
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+            .unwrap()
+            .absolute_position()
+            .x
+    };
+    assert_eq!(name_x("Test Game"), name_x("Notes"));
+}
+
+/// The title and the search field stay put while the lists change (a search, a window that opens or closes):
+/// only the lists grow and shrink, under them.
+#[test]
+fn page_02_search_field_stays_put_while_the_lists_change() {
+    let (_dir, paths) = temp_paths();
+    let d = FakeDesktop::new();
+    let front = d.front.clone();
+    let (w, _vm) = real_window(&paths, d);
+    press(&w, "Get started", AccessibleRole::Button);
+    let field = |w: &dr_app::MainWindow| {
+        ElementHandle::find_by_accessible_label(w, "Search windows")
+            .next()
+            .expect("search field")
+            .absolute_position()
+    };
+    let at = field(&w);
+    // a search that hides the Running panel
+    w.invoke_windows_search("note".into());
+    assert_eq!(w.get_games_running().row_count(), 0);
+    assert_eq!(field(&w), at);
+    w.invoke_windows_search("".into());
+    // new windows open (the list asks once a second)
+    for i in 0..4 {
+        front
+            .borrow_mut()
+            .push(win(&format!("Tool {i}"), &format!("t{i}.exe"), false));
+    }
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(1100));
+    assert_eq!(w.get_other_windows().row_count(), 5);
+    assert_eq!(field(&w), at);
+}
+
 /// Onboarding up to Finish with one zone drawn.
 fn finish_onboarding(w: &dr_app::MainWindow) {
     press(w, "Get started", AccessibleRole::Button);

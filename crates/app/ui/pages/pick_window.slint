@@ -2,7 +2,7 @@
 // each: "Running" (games) and "Other" (other windows), each row with its window's own icon. The picked row has the
 // surface-3 fill; it glides to a new row in the same panel (360 ms) and fades between the panels (120 ms). A panel with no rows left
 // hides with its label. There is no Refresh: the list refreshes by itself while this page shows (src/vm).
-import { SetupPart, SetupStage } from "setup_part.slint";
+import { SetupPart, SetupStage, SetupZoom } from "setup_part.slint";
 import {
     Palette,
     Space,
@@ -137,6 +137,8 @@ component Group inherits VerticalLayout {
 }
 
 export component PickWindowPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in property <[WindowData]> games;
     in property <[WindowData]> others;
     // games are 0 .. games.length - 1, other windows follow
@@ -156,9 +158,12 @@ export component PickWindowPage inherits Rectangle {
         }
     }
 
-    // the lists in the middle of the page; the page scrolls when they are longer than the window
+    // The title and the search field stay put while the lists change (search, refresh): the column is placed as
+    // if it were as tall as the tallest step, so the title sits where it sits on Mark where text shows up, and only
+    // the lists grow down. The page scrolls when they are longer than the window.
     stage := SetupStage {
-        content-h: col.preferred-height;
+        zoom: root.zoom;
+        content-h: SetupZoom.tallest;
         flick := Flickable {
             width: stage.vw;
             height: stage.vh;

@@ -76,8 +76,11 @@ component ModeCard inherits Rectangle {
 }
 
 export component ModePage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in-out property <bool> automatic: true;
     stage := SetupStage {
+        zoom: root.zoom;
         content-h: body.preferred-height;
         body := VerticalLayout {
             x: (stage.vw - Size.col) / 2;

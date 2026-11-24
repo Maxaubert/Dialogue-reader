@@ -100,6 +100,8 @@ component VoiceRow inherits Rectangle {
 }
 
 export component VoicePage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in property <[VoiceData]> voices;
     in-out property <int> selected: 0;
     in-out property <float> speed: 0.4;
@@ -124,6 +126,7 @@ export component VoicePage inherits Rectangle {
     property <length> list-y: 16px + head.preferred-height + Space.s5 + Type.lh-small + Space.s2;
     property <length> list-max: Math.max(3 * Size.list, stage.vh - root.list-y - 16px - 2 * Space.s1 - 2px);
     stage := SetupStage {
+        zoom: root.zoom;
         content-h: body.preferred-height;
         body := VerticalLayout {
             x: (stage.vw - Size.col) / 2;

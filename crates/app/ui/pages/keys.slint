@@ -55,11 +55,14 @@ export component KeysCard inherits VerticalLayout {
 }
 
 export component KeysPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in property <string> read-key: "Mouse 4";
     in property <string> menu-key: "F7";
     in property <int> capturing: -1;
     callback change(int);
     stage := SetupStage {
+        zoom: root.zoom;
         content-h: body.preferred-height;
         body := VerticalLayout {
             x: (stage.vw - Size.col) / 2;

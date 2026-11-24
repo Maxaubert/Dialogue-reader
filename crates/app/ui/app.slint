@@ -237,6 +237,9 @@ export component MainWindow inherits Window {
     in property <string> update-note: "up to date";
     in property <bool> show-auto-update: true;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
+    // how much the setup steps and their footer are drawn bigger in a big window (SetupZoom); the page area is the
+    // window under the title strip, above the footer
+    property <float> setup-k: SetupZoom.k(root.width, root.height - Size.strip - SetupZoom.foot, SetupZoom.fit);
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
     // a sub-page: it closes with back or Esc, back to the Overview
     property <bool> sub: root.page == Page.zones || root.page == Page.settings || root.page == Page.activity;
@@ -695,6 +698,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if pick-slot.alive: PickWindowPage {
+                        zoom: root.setup-k;
                         games: root.games-running;
                         others: root.other-windows;
                         selected <=> root.picked-window;
@@ -713,6 +717,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if draw-slot.alive: DrawZonesPage {
+                        zoom: root.setup-k;
                         zones <=> root.setup-zones;
                         selected <=> root.setup-selected;
                         draw <=> root.setup-draw;
@@ -758,6 +763,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if keys-slot.alive: KeysPage {
+                        zoom: root.setup-k;
                         read-key: root.read-key;
                         menu-key: root.menu-key;
                         capturing: root.capturing-key;
@@ -773,6 +779,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if voice-slot.alive: VoicePage {
+                        zoom: root.setup-k;
                         voices: root.voices;
                         engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
                         selected <=> root.picked-voice;
@@ -808,6 +815,7 @@ export component MainWindow inherits Window {
                     fwd: root.fwd;
                     armed: root.armed;
                     if mode-slot.alive: ModePage {
+                        zoom: root.setup-k;
                         automatic <=> root.automatic;
                     }
                 }
@@ -1019,7 +1027,7 @@ export component MainWindow inherits Window {
             // the setup footer: there on every setup step, faded out on Welcome
             // room for the setup footer (drawn below, outside the layout, so it can fade out after Finish)
             if root.setup: Rectangle {
-                height: 72px;
+                height: SetupZoom.foot;
             }
         }
 
@@ -1028,7 +1036,7 @@ export component MainWindow inherits Window {
         foot-host := Rectangle {
             property <bool> on: root.setup && root.page != Page.welcome;
             y: parent.height - self.height;
-            height: 72px;
+            height: SetupZoom.foot;
             opacity: self.on ? 1 : 0;
             visible: self.opacity > 0.01;
             animate opacity {
@@ -1036,19 +1044,27 @@ export component MainWindow inherits Window {
                 delay: root.armed && foot-host.on ? Motion.push-gap : 0ms;
                 easing: foot-host.on ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
             }
-            foot := ObFoot {
-                // after Finish the footer keeps step 5 and "Finish" while it fades out
-                step: root.setup ? root.step : 5;
-                // as wide as the steps (the page area is the window under the strip, above the footer)
-                column: Size.col * SetupZoom.k(root.width, root.height - Size.strip - 72px, SetupZoom.tallest);
-                notice: root.setup ? root.notice : "";
-                primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
-                primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
-                back => {
-                    root.back();
-                }
-                next => {
-                    root.next();
+            // drawn as big as the steps (setup-k), in the 960 px column of the page; the 72 px room stays (the
+            // buttons and the dots still fit in it at 1.4)
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: parent.width / root.setup-k;
+                height: SetupZoom.foot;
+                transform-origin: { x: self.width / 2, y: self.height / 2 };
+                transform-scale: root.setup-k;
+                foot := ObFoot {
+                    // after Finish the footer keeps step 5 and "Finish" while it fades out
+                    step: root.setup ? root.step : 5;
+                    notice: root.setup ? root.notice : "";
+                    primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
+                    primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
+                    back => {
+                        root.back();
+                    }
+                    next => {
+                        root.next();
+                    }
                 }
             }
 

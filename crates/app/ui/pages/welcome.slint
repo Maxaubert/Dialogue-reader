@@ -2,7 +2,7 @@
 // window (SetupStage). Left: the title, one line, the three steps as a numbered list, Get started and Import
 // settings. Right: a small picture of a game with its zones (the dialogue zone live, in lime) and the status pill
 // "Arthur".
-import { SetupPart, SetupStage } from "setup_part.slint";
+import { SetupPart, SetupStage, SetupZoom } from "setup_part.slint";
 import {
     Palette,
     Space,
@@ -90,7 +90,7 @@ export component WelcomePage inherits Rectangle {
     ];
     stage := SetupStage {
         // there is no footer on Welcome: the middle is the middle of the window
-        below: 72px;
+        below: SetupZoom.foot;
         content-h: body.preferred-height;
         fit-h: body.preferred-height;
         body := HorizontalLayout {

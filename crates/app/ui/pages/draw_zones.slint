@@ -160,6 +160,8 @@ export component KindSeg inherits Rectangle {
 }
 
 export component DrawZonesPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
     in-out property <[ZoneData]> zones;
     // nothing is selected when the step opens (the trash is off until a zone is picked or drawn)
     in-out property <int> selected: -1;
@@ -185,6 +187,7 @@ export component DrawZonesPage inherits Rectangle {
     // the column top: title and lead, the toolbar
     property <length> head-h: head.preferred-height + Space.s5 + Size.ctl + Space.s3;
     stage := SetupStage {
+        zoom: root.zoom;
         content-h: root.head-h + Size.col * 9 / 16;
         VerticalLayout {
             x: (stage.vw - Size.col) / 2;
@@ -251,16 +254,17 @@ export component DrawZonesPage inherits Rectangle {
             }
         }
 
-        // 960 x 540, smaller when the window is short (16 px stay above the footer)
-    pic := SetupPart {
+        // 960 x 540, smaller when the window is short (16 px stay above the footer): then it keeps 16:9 and sits in
+        // the middle of the column
+        pic := SetupPart {
             n: 2;
-            x: (stage.vw - Size.col) / 2;
-            y: stage.top + root.head-h;
-            width: Size.col;
             height: Math.max(160px, Math.min(Size.col * 9 / 16, stage.vh - stage.top - root.head-h - 16px));
+            width: self.height * 16 / 9;
+            x: (stage.vw - self.width) / 2;
+            y: stage.top + root.head-h;
             Stage {
-            // the live frames are made for the size the stage is drawn at
-            zoom: stage.k;
+                // the live frames are made for the size the stage is drawn at
+                zoom: stage.k;
                 source: root.shot;
                 src-w: root.shot-w;
                 src-h: root.shot-h;
@@ -284,7 +288,7 @@ export component DrawZonesPage inherits Rectangle {
             }
 
             // no zone yet: what to do, in the middle of the picture
-        if root.zones.length == 0 && !root.drafting: Rectangle {
+            if root.zones.length == 0 && !root.drafting: Rectangle {
                 width: hint.preferred-width + 2 * Space.s4;
                 height: hint.preferred-height + 2 * Space.s2;
                 border-radius: Radius.lg;
