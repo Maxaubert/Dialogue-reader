@@ -1,24 +1,53 @@
 // 13 in-game status pill (d-black 13-pill): the status dot and the speaker's name, on a floating panel.
-import { Palette, Render, Space, Radius, Type, Motion, Art } from "../theme.slint";
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Type,
+    Motion,
+    Art,
+} from "../theme.slint";
 import { Dot } from "../components/base.slint";
 
 // The small in-game pill (13), also on the review preview. Lime dot while reading, grey otherwise. The name
 // shows while a line is spoken (if "Show speaker name" is on) and stays 600 ms after it, so it does not flicker
-// between two lines.
+// between two lines. A new speaker during the hold only crossfades the name (out 60 ms, in 120 ms).
 export component OverlayPill inherits Rectangle {
     in property <string> speaker: "Arthur";
     in property <bool> ok: true;
     // a line is being spoken; the pill draws no wave, the view model and its tests use it
     in property <bool> speaking: true;
     property <string> name: root.speaker;
+    // the name fades out before it changes to the next one
+    property <bool> fading: false;
+    property <string> next;
     changed speaker => {
         if root.speaker != "" || Motion.instant {
             hold.running = false;
-            root.name = root.speaker;
+            if !Motion.instant && root.name != "" && root.speaker != "" && root.speaker != root.name {
+                root.next = root.speaker;
+                root.fading = true;
+                swap.running = true;
+            } else {
+                swap.running = false;
+                root.fading = false;
+                root.name = root.speaker;
+            }
         } else {
             hold.running = true;
         }
     }
+    swap := Timer {
+        interval: Math.max(1ms, Motion.d(60ms));
+        running: false;
+        triggered => {
+            self.running = false;
+            root.name = root.next;
+            root.fading = false;
+        }
+    }
+
     hold := Timer {
         interval: 600ms;
         running: false;
@@ -55,6 +84,11 @@ export component OverlayPill inherits Rectangle {
 
         if root.name != "": Text {
             text: root.name;
+            opacity: root.fading ? 0 : 1;
+            animate opacity {
+                duration: root.fading ? Motion.d(60ms) : Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
             font-size: Type.fs-body;
             color: Palette.text;
             vertical-alignment: center;

@@ -1,14 +1,114 @@
 // The Overview (d-black 10-overview): a toolbar on black, the game picture in a letterbox frame with the zone chips
 // under it, and the Now panel (the line being read, then the read list) on the right.
 // Page coordinates: the title strip is above the page, so the toolbar sits 12 px down and the frame 60 px down.
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData, LineData } from "../data.slint";
-import { Button, BtnKind, IconButton, OptButton, ZoneChip, ListRow, Panel, Wave } from "../components/base.slint";
+import {
+    Button,
+    BtnKind,
+    IconButton,
+    OptButton,
+    ZoneChip,
+    ListRow,
+    Panel,
+    Wave,
+} from "../components/base.slint";
 import { Stage, LiveNote, LiveView } from "../components/stage.slint";
+
+// Where the Overview stage sits in a page `w` x `h` (the frame left of the Now panel, the 16:9 stage centred in it).
+// The Zones page grows its stage from this rectangle (README motion table, 11-zones 4).
+export global OverviewRect {
+    out property <length> panel-w: 320px;
+    out property <length> frame-y: 60px;
+    public pure function frame-w(w: length) -> length {
+        return w - 2 * Size.page-x - Space.s4 - self.panel-w;
+    }
+    public pure function frame-h(h: length) -> length {
+        return h - self.frame-y - Space.s2 - Size.row - Size.page-x;
+    }
+    public pure function stage-w(w: length, h: length) -> length {
+        return Math.min(self.frame-w(w), self.frame-h(h) * 16 / 9);
+    }
+    public pure function x(w: length, h: length) -> length {
+        return Size.page-x + (self.frame-w(w) - self.stage-w(w, h)) / 2;
+    }
+    public pure function y(w: length, h: length) -> length {
+        return self.frame-y + (self.frame-h(h) - self.stage-w(w, h) * 9 / 16) / 2;
+    }
+}
+
+// One part of the Overview that comes in at Finish (README motion table, 01-setup 3): 80 ms after the setup starts
+// to go, the parts 40 ms apart (stage, top controls, Now panel, zone strip), 320 ms ease-out-strong. The stage
+// also scales 0.98 to 1. The fade is worked out from the clock, as the page is made in the frame that first draws
+// it (see setup_part.slint). `also` multiplies the opacity (the text fade of switch game).
+component FinishPart inherits Rectangle {
+    in property <int> n;
+    in property <bool> run;
+    in property <bool> scale: false;
+    in property <float> also: 1;
+    property <duration> born;
+    property <bool> done: Motion.instant || !root.run;
+    init => {
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.push-gap + root.n * Motion.stagger + Motion.morph-in);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - Motion.push-gap - root.n * Motion.stagger) / Math.max(1ms, Motion.morph-in), 0, 1);
+    property <float> e: 1 - Math.pow(1 - root.p, 4);
+    opacity: root.e * root.also;
+    transform-scale: root.scale ? 1 - 0.02 * (1 - root.e) * Motion.move : 1;
+    @children
+}
 
 // The Now panel waveform (.wave): 28 lime bars, flat and grey while paused.
 component NowWave inherits Wave {
-    bars: [6, 10, 16, 9, 20, 13, 7, 15, 22, 12, 8, 17, 11, 19, 9, 6, 13, 18, 10, 7, 14, 20, 12, 8, 5, 11, 16, 9];
+    bars: [
+        6,
+        10,
+        16,
+        9,
+        20,
+        13,
+        7,
+        15,
+        22,
+        12,
+        8,
+        17,
+        11,
+        19,
+        9,
+        6,
+        13,
+        18,
+        10,
+        7,
+        14,
+        20,
+        12,
+        8,
+        5,
+        11,
+        16,
+        9
+    ];
     bar-w: 2px;
     gap: 3px;
     height: 24px;
@@ -24,6 +124,15 @@ export component OverviewTab inherits Rectangle {
     in property <bool> running: true;
     // the zone of the line being spoken: its outline is lime (-1: none)
     in property <int> live-zone: -1;
+    // Finish was pressed: the parts come in one after the other (FinishPart)
+    in property <bool> finish: false;
+    // switch game (app.slint): the texts fade out and in (`text-o`); the new picture fades in (`pic-t`, 0 to 1)
+    // over the old one (`old-shot`), so the picture never dips to black
+    in property <float> text-o: 1;
+    in property <float> pic-t: 1;
+    in property <image> old-shot;
+    in property <float> old-w: 1600;
+    in property <float> old-h: 900;
     in-out property <bool> automatic: true;
     in property <string> voice: "Adam";
     in property <string> read-key: "Mouse 4";
@@ -49,328 +158,364 @@ export component OverviewTab inherits Rectangle {
     in property <float> shot-h: 900;
     in property <bool> contain: false;
 
-    // the frame (left of the Now panel) and the 16:9 stage centred in it
-    property <length> panel-w: 320px;
+    // the frame (left of the Now panel) and the 16:9 stage centred in it (OverviewRect)
+    property <length> panel-w: OverviewRect.panel-w;
     property <length> frame-x: Size.page-x;
-    property <length> frame-y: 60px;
-    property <length> frame-w: root.width - 2 * Size.page-x - Space.s4 - root.panel-w;
-    property <length> frame-h: root.height - root.frame-y - Space.s2 - Size.row - Size.page-x;
-    property <length> stage-w: min(root.frame-w, root.frame-h * 16 / 9);
+    property <length> frame-y: OverviewRect.frame-y;
+    property <length> frame-w: OverviewRect.frame-w(root.width);
+    property <length> frame-h: OverviewRect.frame-h(root.height);
+    property <length> stage-w: OverviewRect.stage-w(root.width, root.height);
     property <length> stage-h: root.stage-w * 9 / 16;
 
     // the toolbar (.ov-tb)
-    HorizontalLayout {
+    FinishPart {
+        n: 1;
+        run: root.finish;
+        also: root.text-o;
         x: Size.page-x;
         y: 12px;
         width: root.width - 2 * Size.page-x;
         height: Size.ctl;
-        spacing: Space.s2;
-        Button {
-            kind: BtnKind.primary;
-            text: "Read now";
-            icon: Icons.play-fill;
-            icon-size: 14px;
-            enabled: root.running;
-            clicked => {
-                root.read-now();
-            }
-        }
-
-        Button {
-            kind: BtnKind.ghost;
-            text: root.paused ? "Resume" : "Pause";
-            icon: root.paused ? Icons.play : Icons.pause;
-            icon-size: 14px;
-            enabled: root.running;
-            clicked => {
-                root.pause();
-            }
-        }
-
-        Rectangle {
-            horizontal-stretch: 1;
-        }
-
-        OptButton {
-            icon: Icons.zap;
-            text: root.automatic ? "Automatic" : "On key press";
-            label: "Mode";
-            clicked => {
-                root.automatic = !root.automatic;
-                root.mode-changed(root.automatic);
-            }
-        }
-
-        OptButton {
-            icon: Icons.volume;
-            text: root.voice;
-            label: "Voice";
-            clicked => {
-                root.voice-clicked();
-            }
-        }
-
-        OptButton {
-            icon: @image-url("../icons/keyboard.svg");
-            text: root.read-key;
-            label: "Read key";
-            clicked => {
-                root.key-clicked();
-            }
-        }
-    }
-
-    // the letterbox frame (.frame)
-    Rectangle {
-        x: root.frame-x;
-        y: root.frame-y;
-        width: root.frame-w;
-        height: root.frame-h;
-        border-radius: Radius.lg;
-        background: Palette.surface-1;
-        border-width: 1px;
-        border-color: Palette.line;
-    }
-
-    // the game picture (.stage): a click opens Zones, like the pencil
-    if root.running: Rectangle {
-        x: root.frame-x + (root.frame-w - root.stage-w) / 2;
-        y: root.frame-y + (root.frame-h - root.stage-h) / 2;
-        width: root.stage-w;
-        height: root.stage-h;
-        Stage {
-            source: root.shot;
-            src-w: root.shot-w;
-            src-h: root.shot-h;
-            contain: root.contain;
-            zones: root.zones;
-            labels: false;
-            quiet: true;
-            live-zone: root.live-zone;
-            radius: Radius.lg;
-            behind: Palette.surface-1;
-        }
-
-        stage-touch := TouchArea {
-            mouse-cursor: pointer;
-            clicked => {
-                root.edit-zones();
-            }
-        }
-
-        Rectangle {
-            border-radius: Radius.lg;
-            border-width: 1px;
-            border-color: stage-touch.has-hover ? Palette.line-2 : Palette.line;
-            animate border-color {
-                duration: Motion.fast;
-                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-            }
-        }
-    }
-
-    // not running: one line and one button in the middle of the frame (rule 4.1.7)
-    if !root.running: VerticalLayout {
-        x: root.frame-x;
-        y: root.frame-y;
-        width: root.frame-w;
-        height: root.frame-h;
-        alignment: center;
-        spacing: Space.s3;
-        Text {
-            text: "Game not running.";
-            color: Palette.text-2;
-            horizontal-alignment: center;
-        }
-
         HorizontalLayout {
-            alignment: center;
+            spacing: Space.s2;
             Button {
-                text: "Switch game";
+                kind: BtnKind.primary;
+                text: "Read now";
+                icon: Icons.play-fill;
+                icon-size: 14px;
+                enabled: root.running;
                 clicked => {
-                    root.switch-game();
+                    root.read-now();
+                }
+            }
+
+            Button {
+                kind: BtnKind.ghost;
+                text: root.paused ? "Resume" : "Pause";
+                icon: root.paused ? Icons.play : Icons.pause;
+                icon-size: 14px;
+                enabled: root.running;
+                clicked => {
+                    root.pause();
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            OptButton {
+                icon: Icons.zap;
+                text: root.automatic ? "Automatic" : "On key press";
+                label: "Mode";
+                clicked => {
+                    root.automatic = !root.automatic;
+                    root.mode-changed(root.automatic);
+                }
+            }
+
+            OptButton {
+                icon: Icons.volume;
+                text: root.voice;
+                label: "Voice";
+                clicked => {
+                    root.voice-clicked();
+                }
+            }
+
+            OptButton {
+                icon: @image-url("../icons/keyboard.svg");
+                text: root.read-key;
+                label: "Read key";
+                clicked => {
+                    root.key-clicked();
                 }
             }
         }
     }
 
-    // why the saved screenshot shows (not "Live": TEXT.md drops it here), never on the picture: in the frame under
+    // the stage part: the frame, the picture (or the not-running line) and the note under it
+    FinishPart {
+        n: 0;
+        run: root.finish;
+        scale: true;
+        transform-origin: { x: root.frame-x + root.frame-w / 2, y: root.frame-y + root.frame-h / 2 };
+    // the letterbox frame (.frame)
+    Rectangle {
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            border-radius: Radius.lg;
+            background: Palette.surface-1;
+            border-width: 1px;
+            border-color: Palette.line;
+        }
+
+        // the game picture (.stage): a click opens Zones, like the pencil
+    if root.running: Rectangle {
+            x: root.frame-x + (root.frame-w - root.stage-w) / 2;
+            y: root.frame-y + (root.frame-h - root.stage-h) / 2;
+            width: root.stage-w;
+            height: root.stage-h;
+        // switch game: the old picture stays under the new one while it fades in
+        if root.pic-t < 1: Stage {
+                source: root.old-shot;
+                src-w: root.old-w;
+                src-h: root.old-h;
+                contain: root.contain;
+                labels: false;
+                quiet: true;
+                radius: Radius.lg;
+                behind: Palette.surface-1;
+            }
+            Stage {
+                opacity: root.pic-t;
+                source: root.shot;
+                src-w: root.shot-w;
+                src-h: root.shot-h;
+                contain: root.contain;
+                zones: root.zones;
+                labels: false;
+                quiet: true;
+                live-zone: root.live-zone;
+                radius: Radius.lg;
+                behind: Palette.surface-1;
+            }
+
+            stage-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.edit-zones();
+                }
+            }
+
+            Rectangle {
+                border-radius: Radius.lg;
+                border-width: 1px;
+                border-color: stage-touch.has-hover ? Palette.line-2 : Palette.line;
+                animate border-color {
+                    duration: Motion.fast;
+                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+                }
+            }
+        }
+
+        // not running: one line and one button in the middle of the frame (rule 4.1.7)
+    if !root.running: VerticalLayout {
+            opacity: root.text-o;
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            alignment: center;
+            spacing: Space.s3;
+            Text {
+                text: "Game not running.";
+                color: Palette.text-2;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                Button {
+                    text: "Switch game";
+                    clicked => {
+                        root.switch-game();
+                    }
+                }
+            }
+        }
+
+        // why the saved screenshot shows (not "Live": TEXT.md drops it here), never on the picture: in the frame under
     // it, or, when the frame has no band under the picture (a wide window), at the end of the zone chip row
     if root.running && root.contain && LiveView.note != "" && !LiveView.note-live: LiveNote {
-        property <bool> in-band: (root.frame-h - root.stage-h) / 2 >= 30px;
-        x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - Size.ctl - Space.s4 - self.width;
-        y: self.in-band ? root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2 : root.frame-y + root.frame-h + Space.s2 + (Size.row - self.height) / 2;
+            opacity: root.text-o;
+            property <bool> in-band: (root.frame-h - root.stage-h) / 2 >= 30px;
+            x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - Size.ctl - Space.s4 - self.width;
+            y: self.in-band ? root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2 : root.frame-y + root.frame-h + Space.s2 + (Size.row - self.height) / 2;
+        }
     }
 
     // the zone chips (.zs) and the pencil
-    HorizontalLayout {
+    FinishPart {
+        n: 3;
+        run: root.finish;
+        also: root.text-o;
         x: root.frame-x;
         y: root.frame-y + root.frame-h + Space.s2;
         width: root.frame-w;
         height: Size.row;
-        spacing: Space.s1;
-        for k in root.kinds: VerticalLayout {
-            alignment: center;
-            ZoneChip {
-                kind: k.kind;
-                on: k.on;
-                enabled: root.running;
-                toggled(v) => {
-                    root.kind-toggle(k.kind, v);
+        HorizontalLayout {
+            spacing: Space.s1;
+            for k in root.kinds: VerticalLayout {
+                alignment: center;
+                ZoneChip {
+                    kind: k.kind;
+                    on: k.on;
+                    enabled: root.running;
+                    toggled(v) => {
+                        root.kind-toggle(k.kind, v);
+                    }
                 }
             }
-        }
-        Rectangle {
-            horizontal-stretch: 1;
-        }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
 
-        VerticalLayout {
-            alignment: center;
-            IconButton {
-                icon: Icons.pencil;
-                tip: "Edit zones";
-                enabled: root.running;
-                clicked => {
-                    root.edit-zones();
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: Icons.pencil;
+                    tip: "Edit zones";
+                    enabled: root.running;
+                    clicked => {
+                        root.edit-zones();
+                    }
                 }
             }
         }
     }
 
     // the Now panel (.panel.now)
-    Panel {
+    FinishPart {
+        n: 2;
+        run: root.finish;
+        also: root.text-o;
         x: root.frame-x + root.frame-w + Space.s4;
         y: root.frame-y;
         width: root.panel-w;
         height: root.height - root.frame-y - Size.page-x;
-        clip: true;
+        Panel {
+            clip: true;
         // nothing read at all: one grey line in the middle
         if root.now-line == "" && root.recent.length == 0: Text {
-            text: "Nothing read yet.";
-            color: Palette.text-2;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-        if root.now-line != "" || root.recent.length > 0: VerticalLayout {
-            padding: 1px;
+                text: "Nothing read yet.";
+                color: Palette.text-2;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if root.now-line != "" || root.recent.length > 0: VerticalLayout {
+                padding: 1px;
             // the line being read (.np): the speaker, the line at 20 px, then the waveform, Replay and Stop
             if root.now-line != "": VerticalLayout {
-                padding-left: Space.s4 - 1px;
-                padding-right: Space.s4 - 1px;
-                padding-top: Space.s4 - 1px;
-                padding-bottom: Space.s3;
-                spacing: Space.s2;
-                min-height: 186px - 1px;
-                vertical-stretch: 0;
-                if root.now-who != "": Text {
-                    text: root.now-who;
-                    font-size: Type.fs-small;
-                    color: Palette.text-2;
-                    height: Type.lh-small;
-                }
-                Text {
-                    text: root.now-line;
-                    font-size: Type.fs-hero;
-                    font-weight: Type.w-hero;
-                    line-height-factor: Type.lhf-140;
-                    letter-spacing: -0.1px;
-                    color: Palette.text;
-                    wrap: word-wrap;
-                }
-
-                Rectangle {
-                    vertical-stretch: 1;
-                }
-
-                HorizontalLayout {
-                    padding-top: Space.s2;
-                    spacing: Space.s1;
-                    height: 28px + Space.s2;
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        NowWave {
-                            played: root.paused ? 0 : 999;
-                        }
+                    padding-left: Space.s4 - 1px;
+                    padding-right: Space.s4 - 1px;
+                    padding-top: Space.s4 - 1px;
+                    padding-bottom: Space.s3;
+                    spacing: Space.s2;
+                    min-height: 186px - 1px;
+                    vertical-stretch: 0;
+                    if root.now-who != "": Text {
+                        text: root.now-who;
+                        font-size: Type.fs-small;
+                        color: Palette.text-2;
+                        height: Type.lh-small;
+                    }
+                    Text {
+                        text: root.now-line;
+                        font-size: Type.fs-hero;
+                        font-weight: Type.w-hero;
+                        line-height-factor: Type.lhf-140;
+                        letter-spacing: -0.1px;
+                        color: Palette.text;
+                        wrap: word-wrap;
                     }
 
-                    IconButton {
-                        small: true;
-                        icon: Icons.replay;
-                        tip: "Replay";
-                        clicked => {
-                            root.replay();
-                        }
+                    Rectangle {
+                        vertical-stretch: 1;
                     }
 
-                    IconButton {
-                        small: true;
-                        icon: Icons.stop;
-                        tip: "Stop";
-                        clicked => {
-                            root.stop();
+                    HorizontalLayout {
+                        padding-top: Space.s2;
+                        spacing: Space.s1;
+                        height: 28px + Space.s2;
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            NowWave {
+                                played: root.paused ? 0 : 999;
+                            }
                         }
-                    }
-                }
-            }
-            if root.now-line == "": Rectangle {
-                height: 186px - 1px;
-                Text {
-                    text: "Nothing read yet.";
-                    color: Palette.text-2;
-                }
-            }
-            // the read list (.list): rows of one or two lines; the panel shows as many as fit
-            Rectangle {
-                vertical-stretch: 1;
-                clip: true;
-                Rectangle {
-                    y: 0;
-                    height: 1px;
-                    background: Palette.line;
-                }
 
-                // a Flickable that does not scroll: the rows do not make the panel taller. Only whole rows show.
-                list := Flickable {
-                    interactive: false;
-                    content-height: rows.preferred-height;
-                    rows := VerticalLayout {
-                        padding: Space.s1;
-                        padding-top: Space.s1 + 1px;
-                        alignment: start;
-                        for r[i] in root.recent: ListRow {
-                            icon: Kinds.icon(r.kind);
-                            speaker: r.who;
-                            line: r.line;
-                            off: r.skip != "";
-                            tag: r.skip;
-                            replay-label: r.skip == "" ? "Replay" : "";
-                            rest-bg: Palette.surface-1;
-                            visible: self.y + self.height <= list.height;
-                            replay => {
-                                root.recent-replay(i);
+                        IconButton {
+                            small: true;
+                            icon: Icons.replay;
+                            tip: "Replay";
+                            clicked => {
+                                root.replay();
+                            }
+                        }
+
+                        IconButton {
+                            small: true;
+                            icon: Icons.stop;
+                            tip: "Stop";
+                            clicked => {
+                                root.stop();
                             }
                         }
                     }
                 }
-            }
-
-            // Show all (.foot)
+                if root.now-line == "": Rectangle {
+                    height: 186px - 1px;
+                    Text {
+                        text: "Nothing read yet.";
+                        color: Palette.text-2;
+                    }
+                }
+            // the read list (.list): rows of one or two lines; the panel shows as many as fit
             Rectangle {
-                height: Size.row;
-                Rectangle {
-                    y: 0;
-                    height: 1px;
-                    background: Palette.line;
+                    vertical-stretch: 1;
+                    clip: true;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    // a Flickable that does not scroll: the rows do not make the panel taller. Only whole rows show.
+                list := Flickable {
+                        interactive: false;
+                        content-height: rows.preferred-height;
+                        rows := VerticalLayout {
+                            padding: Space.s1;
+                            padding-top: Space.s1 + 1px;
+                            alignment: start;
+                            for r[i] in root.recent: ListRow {
+                                icon: Kinds.icon(r.kind);
+                                speaker: r.who;
+                                line: r.line;
+                                off: r.skip != "";
+                                tag: r.skip;
+                                replay-label: r.skip == "" ? "Replay" : "";
+                                rest-bg: Palette.surface-1;
+                                visible: self.y + self.height <= list.height;
+                                replay => {
+                                    root.recent-replay(i);
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Button {
-                    kind: BtnKind.ghost;
-                    text: "Show all";
-                    trail: Icons.chev-right;
-                    fg: Palette.text-2;
-                    clicked => {
-                        root.show-all();
+                // Show all (.foot)
+            Rectangle {
+                    height: Size.row;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    Button {
+                        kind: BtnKind.ghost;
+                        text: "Show all";
+                        trail: Icons.chev-right;
+                        fg: Palette.text-2;
+                        clicked => {
+                            root.show-all();
+                        }
                     }
                 }
             }

@@ -11,21 +11,18 @@ use crate::geom::{self, Rect};
 use crate::vm::zones::EdZone;
 use crate::{EditZone, GameData, Kind, LineData, MainWindow, VoiceData, WindowData, ZoneData};
 
-/// Zones of the fake scene (1600 x 900 image px): kind, name, x1, y1, x2, y2.
+/// Zones of the fake scene (1600 x 900 image px): kind, name, x1, y1, x2, y2. The UI shows kind names only
+/// (TEXT.md); the names are the kind names too.
 pub const ZONES: [(Kind, &str, f32, f32, f32, f32); 5] = [
-    (Kind::Speaker, "Speaker name", 712.0, 754.0, 888.0, 798.0),
-    (Kind::Dialogue, "Subtitles", 360.0, 800.0, 1240.0, 850.0),
-    (Kind::Pickups, "Item pickups", 88.0, 48.0, 378.0, 132.0),
-    (
-        Kind::Prompts,
-        "Button prompts",
-        1228.0,
-        690.0,
-        1512.0,
-        758.0,
-    ),
-    (Kind::Ignore, "Minimap", 112.0, 682.0, 288.0, 858.0),
+    (Kind::Speaker, "Speaker", 712.0, 754.0, 888.0, 798.0),
+    (Kind::Dialogue, "Dialogue", 360.0, 800.0, 1240.0, 850.0),
+    (Kind::Pickups, "Pickups", 88.0, 48.0, 378.0, 132.0),
+    (Kind::Prompts, "Prompts", 1228.0, 690.0, 1512.0, 758.0),
+    (Kind::Ignore, "Ignore", 112.0, 682.0, 288.0, 858.0),
 ];
+
+/// The zone of the line in Now on the fake Overview (its outline is lime): the dialogue zone.
+pub const LIVE_ZONE: i32 = 1;
 
 /// Zone edit frame: the scene at 1440 x 900 is cropped by 80 px on each side; zones keep 12 px from the edge.
 const FRAME_W: f32 = 1440.0;
@@ -236,9 +233,11 @@ pub fn fill(w: &MainWindow) {
     w.set_voices(model(voices()));
     w.set_menu_voices(model(menu_voices()));
     let log = log();
+    // the read list leaves out the line in Now (the first one), as the real list does
     w.set_recent(model(
-        log[..crate::vm::reading::RECENT.min(log.len())].to_vec(),
+        log[1..(crate::vm::reading::RECENT + 1).min(log.len())].to_vec(),
     ));
+    w.set_live_zone(LIVE_ZONE);
     w.set_log(model(log));
     w.set_edit_zones(model(edit_zones()));
     w.set_version(env!("CARGO_PKG_VERSION").into());

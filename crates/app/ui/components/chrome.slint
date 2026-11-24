@@ -1,9 +1,24 @@
 // Window chrome: the title strip (no nav bar), the window controls, the setup footer and the setup heading.
-import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
-import { Icon, CIcon, Button, BtnKind, IconButton, StatusDot, Status } from "base.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
+import {
+    Icon,
+    CIcon,
+    Button,
+    BtnKind,
+    IconButton,
+    StatusDot,
+    Status,
+} from "base.slint";
 
 export { Status }
-
 export global Chrome {
     callback minimize();
     callback maximize();
@@ -149,6 +164,28 @@ component LeadButton inherits Rectangle {
 // What the strip lead shows: the brand (setup), the game name (Overview) or back plus the page name (sub-pages).
 export enum StripMode { setup, main, sub }
 
+// A part of the strip tail (the status dot, the gear) that fades in when it comes (Finish, or a sub-page closed):
+// 160 ms after an 80 ms wait, as the lead swap. The fade is worked out from the clock, as the part is made in the
+// frame that first draws it (see pages/setup_part.slint). With `run` false (the launch) it shows at once.
+component TailPart inherits Rectangle {
+    in property <bool> run;
+    property <duration> born;
+    property <bool> done: Motion.instant || !root.run;
+    init => {
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.swap-out + Motion.swap-in);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    opacity: root.done ? 1 : Math.clamp((animation-tick() - root.born - Motion.swap-out) / Math.max(1ms, Motion.swap-in), 0, 1);
+    @children
+}
+
 // One lead part. It fades out in 80 ms, and the next one fades in 160 ms after that (brief 3.1, sequential).
 // While it is not shown it takes no clicks and is not in the accessibility tree.
 component LeadPart inherits Rectangle {
@@ -171,8 +208,12 @@ export component TitleStrip inherits Rectangle {
     in property <StripMode> mode: StripMode.main;
     // the game name as shown (app.slint holds the old name while it rolls out)
     in property <string> game;
-    // the game name rolls out (up 8 px and fades) while this is true, and back in after it
+    // switch game: the old name rolls out (up 8 px and fades, 100 ms) while `rolling`; then the new one rolls in
+    // from 8 px below as `roll-in` goes from 0 to 1 (140 ms, app.slint)
     in property <bool> rolling: false;
+    in property <float> roll-in: 1;
+    // a move was made in the UI: the dot and the gear fade in when they come (not at launch)
+    in property <bool> armed: false;
     // the sub-page name next to the back chevron ("Settings", "Zones", "Activity")
     in property <string> page-name;
     in property <Status> status: Status.reading;
@@ -220,23 +261,25 @@ export component TitleStrip inherits Rectangle {
                         spacing: Space.s2;
                         Rectangle {
                             width: name.preferred-width;
+                            // 0 to 1 while the old name goes out (ease-in); it jumps back to 0 for the new name
+                            property <float> out: root.rolling ? 1 : 0;
+                            animate out {
+                                duration: root.rolling ? Motion.switch-out : 0ms;
+                                easing: cubic-bezier(0.4, 0, 1, 1);
+                            }
                             name := Text {
-                                y: root.rolling ? -8px : 0px;
+                                y: (root.rolling ? -8px * parent.out : 8px * (1 - root.roll-in)) * Motion.move;
                                 height: parent.height;
                                 text: root.game;
                                 font-weight: Type.w-strong;
                                 color: Palette.text;
                                 vertical-alignment: center;
-                                opacity: root.rolling ? 0 : 1;
-                                animate opacity, y {
-                                    duration: root.rolling ? Motion.switch-out : Motion.switch-in;
-                                    easing: root.rolling ? cubic-bezier(0.4, 0, 1, 1) : cubic-bezier(0.16, 1, 0.3, 1);
-                                }
+                                opacity: root.rolling ? 1 - parent.out : root.roll-in;
                             }
                         }
 
                         CIcon {
-                            source: Icons.chev-down-sm;
+                            source: Icons.chev-down;
                             size: 14px;
                         }
                     }
@@ -272,21 +315,26 @@ export component TitleStrip inherits Rectangle {
             }
         }
 
-        if root.mode != StripMode.setup: StatusDot {
-            status: root.status;
-            tip: root.status-tip;
+        if root.mode != StripMode.setup: TailPart {
+            run: root.armed;
+            width: 40px;
+            height: Size.strip;
+            StatusDot {
+                status: root.status;
+                tip: root.status-tip;
+            }
         }
-        if root.mode == StripMode.main && root.show-gear: HorizontalLayout {
-            padding-left: Space.s1;
-            padding-right: Space.s1;
-            VerticalLayout {
-                alignment: center;
-                IconButton {
-                    icon: Icons.settings;
-                    tip: "Settings";
-                    clicked => {
-                        root.gear();
-                    }
+        if root.mode == StripMode.main && root.show-gear: TailPart {
+            run: root.armed;
+            width: Size.ctl + 2 * Space.s1;
+            height: Size.strip;
+            IconButton {
+                x: Space.s1;
+                y: (Size.strip - Size.ctl) / 2;
+                icon: Icons.settings;
+                tip: "Settings";
+                clicked => {
+                    root.gear();
                 }
             }
         }
@@ -306,11 +354,12 @@ export component ObFoot inherits Rectangle {
     callback back();
     callback next();
     height: 72px;
+    // the buttons sit 16 px down in the 72 px footer (.obf .btn), the dots 28 px down
     HorizontalLayout {
         x: (parent.width - Size.col) / 2;
         width: Size.col;
-        padding-top: 20px;
-        padding-bottom: 20px;
+        padding-top: Space.s4;
+        padding-bottom: Space.s5;
         Button {
             text: "Back";
             icon: Icons.chev-left;
@@ -348,7 +397,7 @@ export component ObFoot inherits Rectangle {
     // the step dots, centred in the window
     if root.notice == "": HorizontalLayout {
         x: (parent.width - self.preferred-width) / 2;
-        y: (parent.height - 8px) / 2;
+        y: 28px;
         width: self.preferred-width;
         height: 8px;
         spacing: Space.s2;
@@ -365,14 +414,15 @@ export component ObFoot inherits Rectangle {
     }
 }
 
-// Title and lead at the same spot on every setup step: 26 px title, 14 px grey lead.
+// Title and lead at the same spot on every setup step: 26 px title on a 32 px line (.col h1), 14 px grey lead
+// 4 px under it.
 export component ObHead inherits VerticalLayout {
     in property <string> title;
     in property <string> lead;
     spacing: Space.s1;
     Text {
         text: root.title;
-        height: Type.lh-title;
+        height: 32px;
         font-size: Type.fs-title;
         font-weight: Type.w-title;
         letter-spacing: Type.ls-title;

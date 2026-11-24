@@ -2,7 +2,18 @@
 // Delete zone; Retake screenshot and the live note on the right), then the picture with the zones, 960 x 540.
 // Dragging on empty picture always draws; "Draw zone" also draws over another zone (src/vm/zones.rs).
 import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData } from "../data.slint";
 import { CIcon, IconButton } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
@@ -229,17 +240,18 @@ export component DrawZonesPage inherits Rectangle {
                     horizontal-stretch: 1;
                 }
 
-                ShotNote {
-                    contain: root.contain;
-                    time: root.shot-time;
-                }
-
                 IconButton {
                     icon: Icons.camera;
                     tip: "Retake screenshot";
                     clicked => {
                         root.retake();
                     }
+                }
+
+                ShotNote {
+                    contain: root.contain;
+                    time: root.shot-time;
+                    padding-right: Space.s2;
                 }
             }
         }

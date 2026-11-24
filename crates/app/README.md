@@ -43,11 +43,11 @@ is in [docs/app-plan.md](../../docs/app-plan.md) and the design in [docs/app-spe
   `start-error.log` in the same folder; `renderer.log` says when skia-opengl could not be selected.
 - `--version` attaches to the console of the terminal that started it, so it prints there although the exe is a
   windows-subsystem app. Without `APPDATA` the app shows the sample data with a notice that nothing can be saved.
-- `tests/screens.rs` also compares every render with its mockup shot in `design/mockups/c-midnight/shots/`. Both
-  pictures are averaged over 10 x 10 px cells; the mean difference and the share of cells that move by more than
-  32 must stay under a limit per screen. Screens that differ by design compare only a region (14: the switcher
-  panel; 06 and 12: above the changed rows). It catches moved, missing or recolored blocks. It does not catch text
-  weight or a 1 to 2 px shift, so the side-by-side review stays.
+- `tests/screens.rs` also compares 22 renders with their d-black shots in `design/mockups/d-black/shots/` (the
+  pairs are in the test, for example `10-main-b` with `10-overview.png`). Both pictures are averaged over 10 x 10 px
+  cells; the mean difference and the share of cells that move by more than 32 must stay under a limit per screen.
+  It catches moved, missing or recolored blocks. It does not catch text weight or a 1 to 2 px shift, so the
+  side-by-side review stays.
 
 ## Layout
 
@@ -81,7 +81,7 @@ ui/overlays/             pill, game_switcher, quick_menu (menu + voice flyout), 
                          menu over the game and its two other states), zone_edit, windows (the M4 overlay windows:
                          PillWindow, QuickMenuWindow, ZoneEditWindow; no popups)
 ui/fonts/                Geist 1.800 and Geist Mono 1.701 variable fonts (SIL OFL, see OFL.txt)
-ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/c-midnight/_build.py
+ui/icons/, ui/art/       written by tools/export_icons.py from design/mockups/d-black/_build.py
 tests/                   nav.rs, zones.rs, zone_cancel.rs, live_view.rs, setup_flow.rs, voices.rs, reading.rs,
                          overlays.rs (testing backend), quick_menu.rs, place.rs (pure), overlay_win.rs (hidden
                          desktop), screens.rs (renders, compares with the mockups), common/ (fake desktop with a

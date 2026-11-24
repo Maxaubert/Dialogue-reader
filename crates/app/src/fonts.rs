@@ -8,12 +8,17 @@
 //! Motion: headless tests and screen renders have no running clock, so animations there would stop at their
 //! first frame. They call [`set_instant_motion`] first; every window made after that on the thread animates
 //! nothing.
+//!
+//! Reduce motion: when "Show animations in Windows" is off (`SPI_GETCLIENTAREAANIMATION`), movement and scale
+//! jump and fades take 80 ms (`Motion.reduce`). Instant motion wins over it, and tests set it with
+//! [`set_reduce_motion`] so they never read the PC's own setting.
 
 use std::cell::Cell;
 use std::path::PathBuf;
 
 thread_local! {
     static INSTANT: Cell<bool> = const { Cell::new(false) };
+    static REDUCE: Cell<Option<bool>> = const { Cell::new(None) };
 }
 
 /// Every window made after this on this thread has instant motion (or real motion again with `false`).
@@ -24,6 +29,47 @@ pub fn set_instant_motion(on: bool) {
 /// Whether windows made now on this thread get instant motion.
 pub fn instant_motion() -> bool {
     INSTANT.with(Cell::get)
+}
+
+/// Every window made after this on this thread has reduce motion on or off (`Some`), or follows Windows (`None`).
+pub fn set_reduce_motion(on: Option<bool>) {
+    REDUCE.with(|r| r.set(on));
+}
+
+/// Whether windows made now on this thread get reduce motion: never with instant motion; else the setting of
+/// [`set_reduce_motion`], else Windows' own.
+pub fn reduce_motion() -> bool {
+    if instant_motion() {
+        return false;
+    }
+    REDUCE
+        .with(Cell::get)
+        .unwrap_or_else(windows_animations_off)
+}
+
+/// "Show animations in Windows" is off.
+#[cfg(windows)]
+pub fn windows_animations_off() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW,
+    };
+    use windows::core::BOOL;
+    let mut on = BOOL(1);
+    // SAFETY: SPI_GETCLIENTAREAANIMATION writes one BOOL to the pointer, which lives for the call.
+    let ok = unsafe {
+        SystemParametersInfoW(
+            SPI_GETCLIENTAREAANIMATION,
+            0,
+            Some(std::ptr::from_mut(&mut on).cast()),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    };
+    ok.is_ok() && !on.as_bool()
+}
+
+#[cfg(not(windows))]
+pub fn windows_animations_off() -> bool {
+    false
 }
 
 /// The font families for `Type`.
@@ -89,8 +135,9 @@ macro_rules! style_window {
         t.set_font(f.font.into());
         t.set_mono(f.mono.into());
         t.set_natural(f.natural);
-        $w.global::<$crate::Motion>()
-            .set_instant($crate::fonts::instant_motion());
+        let m = $w.global::<$crate::Motion>();
+        m.set_instant($crate::fonts::instant_motion());
+        m.set_reduce($crate::fonts::reduce_motion());
     }};
 }
 pub(crate) use style_window;

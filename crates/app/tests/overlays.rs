@@ -530,8 +530,10 @@ fn a_hide_waits_for_the_fade_and_a_new_show_keeps_the_window() {
     // the testing backend for this thread, then overlay windows with the real motion
     let _a = app();
     dr_app::set_instant_motion(false);
+    dr_app::set_reduce_motion(Some(false));
     let mut o = Overlays::new(false).expect("overlay windows");
     dr_app::set_instant_motion(true);
+    dr_app::set_reduce_motion(None);
     let g = GameWin::fake(1920, 1080);
     let shown = |w: &slint::Window| w.is_visible();
     o.pill_on(true, Some(&g), PillAt::TopRight);

@@ -8,7 +8,19 @@
 // Motion (README, 11): shade 180 ms; outlines and tags 180 ms after 60 ms; bar 180 ms, y -8 to 0; all ease-out.
 // Picker: opacity and scale 0.96 to 1, 140 ms. Bar moving: out 140 ms ease-in, in at the new place 180 ms
 // ease-out, y 8 px. Out: 140 ms ease-in.
-import { Palette, Render, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { EditZone } from "../data.slint";
 import { Icon, CIcon, Button, BtnKind, Tip } from "../components/base.slint";
 
@@ -295,23 +307,23 @@ export component ZoneEdit inherits Rectangle {
     // fades: the shade, then the zones 60 ms later, and the bar
     property <float> t: root.open ? 1 : 0;
     animate t {
-        duration: Motion.instant ? 0ms : root.open ? 180ms : 140ms;
+        duration: Motion.d(root.open ? 180ms : 140ms);
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     property <float> zt: root.open ? 1 : 0;
     animate zt {
-        duration: Motion.instant ? 0ms : root.open ? 180ms : 140ms;
-        delay: Motion.instant || !root.open ? 0ms : 60ms;
+        duration: Motion.d(root.open ? 180ms : 140ms);
+        delay: root.open ? Motion.wait(60ms) : 0ms;
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     property <float> bt: root.open && !root.bar-moving ? 1 : 0;
     animate bt {
-        duration: Motion.instant ? 0ms : root.open && !root.bar-moving ? 180ms : 140ms;
+        duration: Motion.d(root.open && !root.bar-moving ? 180ms : 140ms);
         easing: root.open && !root.bar-moving ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     property <float> pt: root.open && root.has-sel ? 1 : 0;
     animate pt {
-        duration: Motion.instant ? 0ms : 140ms;
+        duration: Motion.d(140ms);
         easing: root.open && root.has-sel ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
 
@@ -404,7 +416,7 @@ export component ZoneEdit inherits Rectangle {
         kind: root.sel-kind;
         opacity: root.pt;
         visible: root.pt > 0.01;
-        transform-scale: 0.96 + 0.04 * root.pt;
+        transform-scale: 1 - 0.04 * (1 - root.pt) * Motion.move;
         transform-origin: { x: 0px, y: root.pick-up ? self.height : 0px };
         picked(k) => {
             if root.draft {
@@ -420,7 +432,7 @@ export component ZoneEdit inherits Rectangle {
     bar := Rectangle {
         property <length> way: root.bar-at == 1 ? 8px : -8px;
         x: root.bar-x(root.bar-at);
-        y: root.bar-y(root.bar-at) + (1 - root.bt) * self.way;
+        y: root.bar-y(root.bar-at) + (1 - root.bt) * self.way * Motion.move;
         width: bar-lay.preferred-width;
         height: 48px;
         opacity: root.bt;

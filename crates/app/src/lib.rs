@@ -22,7 +22,7 @@ pub mod vm;
 /// The workspace version (Cargo.toml `[workspace.package]`): `--version`, Settings > Updates, the installer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub use fonts::set_instant_motion;
+pub use fonts::{set_instant_motion, set_reduce_motion};
 
 /// The main window with the fake data of the mockups (render-screens and the screen and nav tests).
 pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {

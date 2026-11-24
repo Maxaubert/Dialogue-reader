@@ -9,6 +9,8 @@ import { Motion } from "../theme.slint";
 export global SetupParts {
     // true after the first page move in the UI (app.slint `go`, `go-back`)
     in-out property <bool> armed: false;
+    // the direction of the last move: forward parts fade in over 260 ms, back parts over 200 ms (the back push)
+    in-out property <bool> fwd: true;
 }
 
 export component SetupPart inherits Rectangle {
@@ -16,13 +18,16 @@ export component SetupPart inherits Rectangle {
     in property <int> n: 0;
     property <duration> wait: Motion.push-gap + Math.min(root.n, 5) * Motion.stagger;
     property <duration> born;
+    // the fade time, fixed when the part is made (the direction of the move that made it)
+    property <duration> len: Motion.push-in;
     // the fade is over (or there is none): the clock is no longer read, so nothing redraws for it
     property <bool> done: Motion.instant || !SetupParts.armed;
     init => {
         root.born = animation-tick();
+        root.len = SetupParts.fwd ? Motion.push-in : Motion.back-in;
     }
     Timer {
-        interval: root.wait + Motion.push-in;
+        interval: Math.max(1ms, root.wait + root.len);
         running: !root.done;
         triggered => {
             root.done = true;
@@ -30,7 +35,7 @@ export component SetupPart inherits Rectangle {
     }
 
     // 0 to 1 over the fade, eased out (close to the mockup's ease-out-strong)
-    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - root.wait) / Math.max(1ms, Motion.push-in), 0, 1);
+    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - root.wait) / Math.max(1ms, root.len), 0, 1);
     opacity: 1 - Math.pow(1 - root.p, 4);
     @children
 }

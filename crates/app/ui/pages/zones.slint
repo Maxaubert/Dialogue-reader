@@ -2,11 +2,23 @@
 // and Done on the right), then the picture with the zones as large as the page allows. Dragging on empty picture
 // always draws; "Draw zone" also draws over another zone (src/vm/zones.rs). Each zone has a tag with its kind
 // name above it, under it when there is no room above, and inside it when there is no room under it either.
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData } from "../data.slint";
 import { Button, BtnKind, Icon, IconButton } from "../components/base.slint";
 import { Stage, ShotNote } from "../components/stage.slint";
 import { DrawToggle, KindSeg } from "draw_zones.slint";
+import { OverviewRect } from "overview.slint";
 
 export component ZonesTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
@@ -28,6 +40,10 @@ export component ZonesTab inherits Rectangle {
     callback retake();
     // "Done": back to the Overview (app.slint)
     callback done();
+    // the stage grow from the Overview (README motion table, 11-zones 4): 0 at the Overview stage, 1 here. The
+    // toolbar and the tags fade in 120 ms into the 300 ms grow, over the last 180 ms.
+    in property <float> grow: 1;
+    property <float> tools: Math.clamp((root.grow - 0.4) / 0.6, 0, 1);
 
     // the toolbar (.zn-tb) and the picture under it, 32 px from the sides
     property <length> pad: 32px;
@@ -35,74 +51,84 @@ export component ZonesTab inherits Rectangle {
     property <length> sw: max(160px, min(root.width - 2 * root.pad, (root.height - root.top - Space.s4) * 16 / 9));
     property <length> sh: root.sw * 9 / 16;
 
-    HorizontalLayout {
+    Rectangle {
         x: root.pad;
         y: 12px;
         width: root.width - 2 * root.pad;
         height: Size.ctl;
-        spacing: Space.s2;
-        DrawToggle {
-            on <=> root.draw;
-        }
+        opacity: root.tools;
+        HorizontalLayout {
+            spacing: Space.s2;
+            DrawToggle {
+                on <=> root.draw;
+            }
 
-        Rectangle {
-            width: 1px + 2 * Space.s1;
             Rectangle {
-                width: 1px;
-                height: 20px;
-                background: Palette.line;
+                width: 1px + 2 * Space.s1;
+                Rectangle {
+                    width: 1px;
+                    height: 20px;
+                    background: Palette.line;
+                }
             }
-        }
 
-        KindSeg {
-            kind: root.kind;
-            picked(k) => {
-                root.kind-picked(k);
+            KindSeg {
+                kind: root.kind;
+                picked(k) => {
+                    root.kind-picked(k);
+                }
             }
-        }
 
-        IconButton {
-            icon: Icons.trash;
-            tip: "Delete zone";
-            enabled: root.selected >= 0 && root.selected < root.zones.length;
-            clicked => {
-                root.delete-zone(root.selected);
+            IconButton {
+                icon: Icons.trash;
+                tip: "Delete zone";
+                enabled: root.selected >= 0 && root.selected < root.zones.length;
+                clicked => {
+                    root.delete-zone(root.selected);
+                }
             }
-        }
 
-        Rectangle {
-            horizontal-stretch: 1;
-        }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
 
-        // "Live", or the screenshot's time (src/vm/live.rs)
+            IconButton {
+                icon: Icons.camera;
+                tip: "Retake screenshot";
+                clicked => {
+                    root.retake();
+                }
+            }
+
+            // "Live", or the screenshot's time (src/vm/live.rs)
         ShotNote {
-            contain: root.contain;
-            time: root.shot-time;
-        }
-
-        IconButton {
-            icon: Icons.camera;
-            tip: "Retake screenshot";
-            clicked => {
-                root.retake();
+                contain: root.contain;
+                time: root.shot-time;
+                padding-right: Space.s2;
             }
-        }
 
-        Button {
-            kind: BtnKind.primary;
-            text: "Done";
-            clicked => {
-                root.done();
+            Button {
+                kind: BtnKind.primary;
+                text: "Done";
+                clicked => {
+                    root.done();
+                }
             }
         }
     }
 
+    // the Overview stage rectangle, where the grow starts
+    property <length> ox: OverviewRect.x(root.width, root.height);
+    property <length> oy: OverviewRect.y(root.width, root.height);
+    property <length> ow: OverviewRect.stage-w(root.width, root.height);
     pic := Rectangle {
-        x: (root.width - root.sw) / 2;
-        y: root.top;
-        width: root.sw;
-        height: root.sh;
+        x: root.ox + ((root.width - root.sw) / 2 - root.ox) * root.grow;
+        y: root.oy + (root.top - root.oy) * root.grow;
+        width: root.ow + (root.sw - root.ow) * root.grow;
+        height: self.width * 9 / 16;
         st := Stage {
+            settled: root.grow >= 1;
+            tags-o: root.tools;
             source: root.shot;
             src-w: root.shot-w;
             src-h: root.shot-h;
@@ -127,6 +153,7 @@ export component ZonesTab inherits Rectangle {
 
         // no zone yet: what to do, in the middle of the picture
         if root.zones.length == 0 && !root.drafting: Rectangle {
+            opacity: root.tools;
             width: hint.preferred-width + 2 * Space.s4;
             height: hint.preferred-height + 2 * Space.s2;
             border-radius: Radius.lg;

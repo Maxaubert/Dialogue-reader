@@ -2,9 +2,26 @@
 // ("Play a sample"); the picked voice has the surface-3 fill, which glides (360 ms). With no voice: "No voices
 // found." and Add voices. Right: "Sound" with Speed and Volume.
 import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Speeds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Speeds,
+} from "../theme.slint";
 import { VoiceData } from "../data.slint";
-import { Button, IconButton, Slider, Wave, GroupLabel, Panel, SettingRow } from "../components/base.slint";
+import {
+    Button,
+    IconButton,
+    Slider,
+    Wave,
+    GroupLabel,
+    Panel,
+    SettingRow,
+} from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
 
 component VoiceRow inherits Rectangle {
@@ -227,10 +244,10 @@ export component VoicePage inherits Rectangle {
                                     }
                                 }
 
+                                // .slider .val: 36 px, 12 px after the track (the row spaces its controls 8 px, so the box is 4 px wider)
                                 Text {
-                                    width: 32px;
+                                    width: 40px;
                                     text: Speeds.text(Speeds.of(root.speed));
-                                    font-size: Type.fs-small;
                                     color: Palette.text-2;
                                     horizontal-alignment: right;
                                     vertical-alignment: center;
@@ -252,9 +269,8 @@ export component VoicePage inherits Rectangle {
                                 }
 
                                 Text {
-                                    width: 32px;
+                                    width: 40px;
                                     text: Math.round(root.volume * 100) + "%";
-                                    font-size: Type.fs-small;
                                     color: Palette.text-2;
                                     horizontal-alignment: right;
                                     vertical-alignment: center;

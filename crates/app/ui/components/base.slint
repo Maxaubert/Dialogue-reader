@@ -1,7 +1,20 @@
 // Shared building blocks of the d-black design (design/mockups/d-black/tokens.css: .btn, .iconbtn, .toggle, .seg,
 // .slider, .kbd, .panel, .srow, .lrow, .tag, .zi, .sdot, .tip, .wave).
 // Every pressable item scales to 0.97 on press. Hover and press colours fade 120 ms (Motion.fast).
-import { Palette, Render, Shadow, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Render,
+    Shadow,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 
 export component Icon inherits Image {
     in property <color> color: Palette.text-2;
@@ -309,9 +322,11 @@ export component Button inherits Rectangle {
             root.clicked();
         }
     }
+    // the primary pill: 16 px inside its 1 px border (CSS border-box), so 17 px from its edge
+    property <length> inset: root.kind == BtnKind.primary ? root.pad-x + 1px : root.pad-x - 1px;
     HorizontalLayout {
-        padding-left: root.icon-only ? 0px : root.pad-x - 1px;
-        padding-right: root.icon-only ? 0px : root.pad-x - 1px;
+        padding-left: root.icon-only ? 0px : root.inset;
+        padding-right: root.icon-only ? 0px : root.inset;
         spacing: Space.s2;
         alignment: root.icon-only ? LayoutAlignment.center : root.align;
         if root.icon.width > 0: CIcon {
@@ -448,8 +463,9 @@ export component OptButton inherits Rectangle {
             color: root.enabled ? Palette.text : Palette.text-off;
             vertical-alignment: center;
         }
+
         if root.chevron: CIcon {
-            source: Icons.chev-down-sm;
+            source: Icons.chev-down;
             size: 14px;
         }
     }
@@ -530,6 +546,8 @@ export component Segmented inherits Rectangle {
     in property <bool> fill: false;
     // fixed item width (equal items); 0 = size to the label
     in property <length> item-w: 0px;
+    // a tooltip per item (same order as `items`); empty or missing: none
+    in property <[string]> tips;
     callback select(int);
     height: root.item-h + 8px;
     horizontal-stretch: root.fill ? 1 : 0;
@@ -573,6 +591,12 @@ export component Segmented inherits Rectangle {
             seg-touch := TouchArea {
                 clicked => {
                     root.select(i);
+                }
+            }
+
+            if i < root.tips.length && root.tips[i] != "": Tooltip {
+                TipBody {
+                    text: root.tips[i];
                 }
             }
         }
@@ -769,6 +793,7 @@ export component CardHead inherits Rectangle {
             vertical-alignment: center;
             horizontal-stretch: 0;
         }
+
         if root.count != "": VerticalLayout {
             alignment: center;
             Count {
@@ -1251,7 +1276,6 @@ export component ListRow inherits Rectangle {
             }
         }
     }
-
 }
 
 // A zone chip of the Overview strip (.zi): one per kind. On: white text; off: text-2 and a struck icon.

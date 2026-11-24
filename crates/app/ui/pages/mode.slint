@@ -1,7 +1,16 @@
 // Setup step 5, How should it read? (d-black 01-setup, #step5): two cards, the picked one with the white border and
 // the surface-2 fill, then one summary line ("5 zones · Mouse 4 · Adam 1.1x") that follows what was picked.
 import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Speeds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Speeds,
+} from "../theme.slint";
 import { CIcon } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
 
@@ -33,11 +42,15 @@ component ModeCard inherits Rectangle {
         }
     }
 
+    // .mc: 20 px padding inside the 1 px border, the icon 12 px over the title; 120 px tall
     lay := VerticalLayout {
-        padding: Space.s5 - 4px + 1px;
+        padding-left: 17px;
+        padding-right: 17px;
+        padding-top: 18px;
+        padding-bottom: 17px;
         spacing: Space.s1;
         HorizontalLayout {
-            padding-bottom: Space.s3 - Space.s1;
+            padding-bottom: 11px;
             alignment: start;
             CIcon {
                 source: root.icon;

@@ -184,25 +184,47 @@ export global Shadow {
 export global Motion {
     // true: every animation is instant (headless tests and screen renders, where time does not run)
     in-out property <bool> instant: false;
-    out property <duration> fast: self.instant ? 0ms : 120ms;
-    out property <duration> base: self.instant ? 0ms : 180ms;
-    out property <duration> page: self.instant ? 0ms : 260ms;
-    out property <duration> exit: self.instant ? 0ms : 140ms;
-    out property <duration> stagger: self.instant ? 0ms : 40ms;
-    out property <duration> glide: self.instant ? 0ms : 360ms;
+    // Windows "Show animations in Windows" is off (Rust reads SPI_GETCLIENTAREAANIMATION, src/fonts.rs): movement
+    // and scale jump, fades take 80 ms, delays and staggers are dropped. `instant` wins over it.
+    in-out property <bool> reduce: false;
+    // 1, or 0 under reduce motion: every moving offset and scale step is multiplied by it
+    out property <float> move: self.reduce ? 0 : 1;
+    // a fade or move of `ms`: 0 when instant, 80 ms under reduce motion
+    public pure function d(ms: duration) -> duration {
+        return self.instant ? 0ms : self.reduce ? 80ms : ms;
+    }
+    // a wait (delay, stagger) of `ms`: 0 when instant or under reduce motion
+    public pure function wait(ms: duration) -> duration {
+        return self.instant || self.reduce ? 0ms : ms;
+    }
+    out property <duration> fast: self.d(120ms);
+    out property <duration> base: self.d(180ms);
+    out property <duration> page: self.d(260ms);
+    out property <duration> exit: self.d(140ms);
+    out property <duration> stagger: self.wait(40ms);
+    // a highlight that glides is a move: it jumps under reduce motion
+    out property <duration> glide: self.instant || self.reduce ? 0ms : 360ms;
     // page push: forward out 100 then in 260 after 80; back out 120 then in 200 after 80
-    out property <duration> push-out: self.instant ? 0ms : 100ms;
-    out property <duration> push-in: self.instant ? 0ms : 260ms;
-    out property <duration> back-out: self.instant ? 0ms : 120ms;
-    out property <duration> back-in: self.instant ? 0ms : 200ms;
-    out property <duration> push-gap: self.instant ? 0ms : 80ms;
+    out property <duration> push-out: self.d(100ms);
+    out property <duration> push-in: self.d(260ms);
+    out property <duration> back-out: self.d(120ms);
+    out property <duration> back-in: self.d(200ms);
+    out property <duration> push-gap: self.wait(80ms);
+    // Finish: the Overview comes in over 320 ms (opacity and scale)
+    out property <duration> morph-in: self.d(320ms);
     // switch game: 240 ms in all, out 100 then in 140
-    out property <duration> switch-out: self.instant ? 0ms : 100ms;
-    out property <duration> switch-in: self.instant ? 0ms : 140ms;
+    out property <duration> switch-out: self.d(100ms);
+    out property <duration> switch-in: self.d(140ms);
     // title strip swap: out 80, in 160 after 80
-    out property <duration> swap-out: self.instant ? 0ms : 80ms;
-    out property <duration> swap-in: self.instant ? 0ms : 160ms;
-    // hover delay of the tips and of the full-row hover card
+    out property <duration> swap-out: self.d(80ms);
+    out property <duration> swap-in: self.d(160ms);
+    // stage grow into Zones (300) and the toolbar and tags after it (180 after 120)
+    out property <duration> grow: self.d(300ms);
+    out property <duration> grow-tools: self.d(180ms);
+    out property <duration> grow-tools-wait: self.wait(120ms);
+    // Activity rows: 30 ms apart (rows after the 6th share its delay)
+    out property <duration> row-stagger: self.wait(30ms);
+    // hover delay of the tips and of the full-row hover card (not motion: reduce motion keeps it)
     out property <duration> hover-delay: self.instant ? 0ms : 200ms;
     // press scale of every pressable item
     out property <float> press: 0.97;

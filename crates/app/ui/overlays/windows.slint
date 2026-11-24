@@ -36,13 +36,13 @@ export component PillWindow inherits Window {
     height: 48px;
     property <float> t: root.open ? 1 : 0;
     animate t {
-        duration: Motion.instant ? 0ms : root.open ? 180ms : 200ms;
+        duration: Motion.d(root.open ? 180ms : 200ms);
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     pill := OverlayPill {
         x: root.align == 0 ? root.width - root.pad - self.width : (root.width - self.width) / 2;
         // it rises 6 px while it shows; it only fades while it hides
-        y: root.pad + (root.open ? (1 - root.t) * 6px : 0px);
+        y: root.pad + (root.open ? (1 - root.t) * 6px * Motion.move : 0px);
         opacity: root.t;
         speaker: root.speaker;
         ok: root.ok;
@@ -99,12 +99,12 @@ export component QuickMenuWindow inherits Window {
     height: root.margin * 2 + max(menu.height, menu.voice-y + voices.height);
     property <float> t: root.open ? 1 : 0;
     animate t {
-        duration: Motion.instant ? 0ms : root.open ? 160ms : 120ms;
+        duration: Motion.d(root.open ? 160ms : 120ms);
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     property <float> v: root.open && root.voice-open ? 1 : 0;
     animate v {
-        duration: Motion.instant ? 0ms : root.open && root.voice-open ? 160ms : 120ms;
+        duration: Motion.d(root.open && root.voice-open ? 160ms : 120ms);
         easing: cubic-bezier(0.2, 0.7, 0.2, 1);
     }
     TouchArea {
@@ -117,7 +117,7 @@ export component QuickMenuWindow inherits Window {
         x: root.margin + root.side;
         y: root.margin;
         opacity: root.t;
-        transform-scale: 0.97 + 0.03 * root.t;
+        transform-scale: 1 - 0.03 * (1 - root.t) * Motion.move;
         transform-origin: { x: self.width / 2, y: 0px };
         game: root.game;
         highlight: root.highlight;
@@ -151,7 +151,7 @@ export component QuickMenuWindow inherits Window {
     }
 
     voices := QmVoices {
-        x: menu.x + menu.width + 8px - (1 - root.v) * 8px;
+        x: menu.x + menu.width + 8px - (1 - root.v) * 8px * Motion.move;
         y: menu.y + menu.voice-y;
         opacity: root.v;
         visible: root.v > 0.01;

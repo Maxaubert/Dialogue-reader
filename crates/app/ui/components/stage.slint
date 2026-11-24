@@ -1,5 +1,16 @@
 // The game picture with zones on top (.stage, .zone, .ztag, .handle) and the live note.
-import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData } from "../data.slint";
 import { Icon, CornerMask, Dot, ZoneOutline } from "base.slint";
 
@@ -116,6 +127,10 @@ export component Stage inherits Rectangle {
     in property <bool> round-top: true;
     in property <bool> round-bottom: true;
     in property <color> behind: Palette.bg;
+    // the tags fade with the Zones tools while the stage grows (0 to 1)
+    in property <float> tags-o: 1;
+    // false while the stage grows or shrinks: its size is told to the live view only once it is still
+    in property <bool> settled: true;
     // real screenshots (contain) follow the live view when there is one
     property <bool> live: root.contain && LiveView.on;
     property <float> pw: root.live ? LiveView.w : root.src-w;
@@ -134,17 +149,22 @@ export component Stage inherits Rectangle {
     border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
     clip: true;
     init => {
-        if root.contain {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
     changed width => {
-        if root.contain {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
     changed height => {
-        if root.contain {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width, root.height);
+        }
+    }
+    changed settled => {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
@@ -176,7 +196,16 @@ export component Stage inherits Rectangle {
         line-w: self.live || self.sel ? 2px : root.quiet ? 1px : 1.5px;
         background: root.quiet ? transparent : z.on ? self.zf : self.zf.with-alpha(0.063);
         if self.sel: Rectangle {
-            for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
+            for p in [
+                { x: 0, y: 0 },
+                { x: 0.5, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+                { x: 0, y: 1 },
+                { x: 0.5, y: 1 },
+                { x: 1, y: 1 }
+            ]: Rectangle {
                 x: parent.width * p.x - 4px;
                 y: parent.height * p.y - 4px;
                 width: 8px;
@@ -246,6 +275,7 @@ export component Stage inherits Rectangle {
     }
     // Tags go above every zone box, so they are drawn after all boxes. A tag never takes the pointer.
     if root.labels: Rectangle {
+        opacity: root.tags-o;
         for z[i] in root.zones: ZoneTag {
             property <length> bx: root.off-x + z.x * root.scale * 1px;
             property <length> by: root.off-y + z.y * root.scale * 1px;
@@ -305,7 +335,6 @@ export component ShotNote inherits HorizontalLayout {
     in property <string> time;
     property <bool> live: root.contain && LiveView.on;
     spacing: Space.s3;
-    padding-right: Space.s2;
     horizontal-stretch: 0;
     if root.contain && LiveView.note != "": VerticalLayout {
         alignment: center;
@@ -313,7 +342,6 @@ export component ShotNote inherits HorizontalLayout {
     }
     if !root.live && root.time != "": Text {
         text: root.time;
-        font-size: Type.fs-small;
         color: Palette.text-2;
         vertical-alignment: center;
         accessible-role: text;

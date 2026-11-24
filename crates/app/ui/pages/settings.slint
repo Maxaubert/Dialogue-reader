@@ -1,8 +1,25 @@
 // Settings (d-black 12-settings): one 640 px column, no side list. Group labels above panels of 44 px rows:
 // Startup, In-game overlay, Keys, Voice and App. The Startup and In-game overlay rows are saved
 // (src/vm/prefs.rs); the voice, speed and volume are the current game's (saved in its profile).
-import { Palette, Space, Radius, Size, Type, Icons, Speeds } from "../theme.slint";
-import { Button, IconButton, Toggle, Segmented, Slider, Panel, GroupLabel, SettingRow } from "../components/base.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Icons,
+    Speeds,
+} from "../theme.slint";
+import {
+    Button,
+    IconButton,
+    Toggle,
+    Segmented,
+    Slider,
+    Panel,
+    GroupLabel,
+    SettingRow,
+} from "../components/base.slint";
 import { VoiceData } from "../data.slint";
 import { KeysCard } from "keys.slint";
 
@@ -272,7 +289,7 @@ export component SettingsTab inherits Rectangle {
                                         VerticalLayout {
                                             alignment: center;
                                             Image {
-                                                source: Icons.chev-down-sm;
+                                                source: Icons.chev-down;
                                                 width: 14px;
                                                 height: 14px;
                                                 colorize: Palette.text-2;

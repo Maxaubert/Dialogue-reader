@@ -3,9 +3,25 @@
 // name is its tooltip), the line, an "off" or "repeat" tag for a skipped line and the time; replay covers the time
 // on hover. The rows fade in 30 ms apart; rows after the 6th share the 6th row's delay. Empty: "Nothing read yet."
 // and Read now.
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Kind, Kinds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { LineData } from "../data.slint";
-import { Button, BtnKind, ListRow, Panel, Segmented } from "../components/base.slint";
+import {
+    Button,
+    BtnKind,
+    ListRow,
+    Panel,
+    Segmented,
+} from "../components/base.slint";
 
 export component ActivityTab inherits Rectangle {
     in property <[LineData]> log;
@@ -23,12 +39,13 @@ export component ActivityTab inherits Rectangle {
         root.born = animation-tick();
     }
     Timer {
-        interval: Motion.push-gap + 5 * 30ms + Motion.page;
+        interval: Math.max(1ms, Motion.push-gap + 5 * Motion.row-stagger + Motion.page);
         running: !root.done;
         triggered => {
             root.done = true;
         }
     }
+
     property <length> col-w: 720px;
 
     Flickable {
@@ -36,10 +53,11 @@ export component ActivityTab inherits Rectangle {
         col := VerticalLayout {
             x: (parent.width - root.col-w) / 2;
             width: root.col-w;
-            padding-top: Space.s4 + Space.s2;
+            padding-top: Space.s4 + Space.s3;
             padding-bottom: Space.s7;
             alignment: start;
             spacing: Space.s2;
+            // the filter is not there while nothing has been read (17-activity-empty)
             HorizontalLayout {
                 padding-left: Space.s1;
                 height: 28px;
@@ -51,11 +69,12 @@ export component ActivityTab inherits Rectangle {
                     horizontal-stretch: 1;
                 }
 
-                Segmented {
+                if root.log.length > 0: Segmented {
                     items: ["All", "Read", "Skipped"];
+                    tips: ["", "", "Kinds that are off, and repeats"];
                     selected: root.filter;
                     item-h: 22px;
-                    item-pad: 10px;
+                    item-pad: 12px;
                     select(i) => {
                         root.filter = i;
                     }
@@ -104,7 +123,7 @@ export component ActivityTab inherits Rectangle {
                         height: self.shown ? self.natural-h : 0px;
                         visible: self.shown;
                         // 0 to 1 over 260 ms, 80 ms after the push starts, 30 ms per row up to the 6th; eased out
-                        opacity: root.done ? 1 : 1 - Math.pow(1 - Math.clamp((animation-tick() - root.born - Motion.push-gap - min(i, 5) * 30ms) / Math.max(1ms, Motion.page), 0, 1), 4);
+                        opacity: root.done ? 1 : 1 - Math.pow(1 - Math.clamp((animation-tick() - root.born - Motion.push-gap - min(i, 5) * Motion.row-stagger) / Math.max(1ms, Motion.page), 0, 1), 4);
                         replay => {
                             root.replay(i);
                         }

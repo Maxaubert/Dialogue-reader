@@ -437,6 +437,8 @@ mod imp {
             }
         };
         dr_app::set_instant_motion(false);
+        // the fade timings below are the full ones, whatever the PC's animation setting
+        dr_app::set_reduce_motion(Some(false));
         let o2 = match Overlays::new(true) {
             Ok(o) => Rc::new(RefCell::new(o)),
             Err(e) => {

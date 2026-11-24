@@ -3,7 +3,15 @@
 // switches; Esc or a click outside closes it. Rust filters the games (`hits`, src/vm/mod.rs).
 // Motion (README, 7 and 8): scrim 0 to 0.6, panel opacity, y -8 to 0 and scale 0.98 to 1, 180 ms ease-out;
 // close 140 ms ease-in.
-import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
 import { GameData } from "../data.slint";
 import { CIcon, Icon, Thumb } from "../components/base.slint";
 
@@ -87,6 +95,8 @@ export component GameSwitcher inherits Rectangle {
     // the highlighted row: a place in `hits`
     in-out property <int> highlight: 1;
     in-out property <string> query;
+    // the highlight moved with the mouse: it glides 360 ms (keys: 120 ms)
+    property <bool> by-mouse: false;
     callback close();
     // a game was picked (its index in `games`)
     callback choose(int);
@@ -104,6 +114,7 @@ export component GameSwitcher inherits Rectangle {
         search.focus();
     }
     public function step(d: int) {
+        root.by-mouse = false;
         root.highlight = Math.max(0, Math.min(root.hits.length - 1, root.highlight + d));
     }
     public function pick() {
@@ -113,7 +124,7 @@ export component GameSwitcher inherits Rectangle {
     }
     property <float> t: root.open ? 1 : 0;
     animate t {
-        duration: Motion.instant ? 0ms : root.open ? Motion.base : Motion.exit;
+        duration: root.open ? Motion.base : Motion.exit;
         easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
     }
     visible: self.t > 0.01;
@@ -133,11 +144,11 @@ export component GameSwitcher inherits Rectangle {
 
     panel := Rectangle {
         x: 12px;
-        y: 44px + (1 - root.t) * -8px;
+        y: 44px + (1 - root.t) * -8px * Motion.move;
         width: 480px;
         height: col.preferred-height + 2px;
         opacity: root.t;
-        transform-scale: 0.98 + 0.02 * root.t;
+        transform-scale: 1 - 0.02 * (1 - root.t) * Motion.move;
         transform-origin: { x: self.width * 0.3, y: 0px };
         border-radius: Radius.lg;
         border-width: 1px;
@@ -248,7 +259,7 @@ export component GameSwitcher inherits Rectangle {
                     border-radius: Radius.md;
                     background: Palette.surface-3;
                     animate y {
-                        duration: Motion.fast;
+                        duration: root.by-mouse ? Motion.glide : Motion.fast;
                         easing: cubic-bezier(0.16, 1, 0.3, 1);
                     }
                 }
@@ -263,6 +274,7 @@ export component GameSwitcher inherits Rectangle {
                             root.choose(gi);
                         }
                         hovered => {
+                            root.by-mouse = true;
                             root.highlight = j;
                         }
                     }

@@ -13,8 +13,14 @@ use slint::{ComponentHandle, Model, SharedString};
 
 /// The main window with the fake data. `motion`: the real page push (the clock moves only in `wait`).
 fn window_with(motion: bool) -> MainWindow {
+    window_motion(motion, false)
+}
+
+/// The main window with the real motion (or none), and reduce motion on or off (never the PC's own setting).
+fn window_motion(motion: bool, reduce: bool) -> MainWindow {
     i_slint_backend_testing::init_no_event_loop();
     dr_app::set_instant_motion(!motion);
+    dr_app::set_reduce_motion(Some(reduce));
     let w = dr_app::build_main_window().expect("window");
     w.window().set_size(slint::LogicalSize::new(1440.0, 900.0));
     w.show().expect("show");
@@ -409,11 +415,10 @@ fn motion_switch_game_rolls_the_name_in_240_ms() {
     press(&w, "Switch game", AccessibleRole::Button);
     key(&w, Key::DownArrow);
     key(&w, Key::Return);
-    // the game changes at once; the strip shows the old name while it rolls out
-    assert_eq!(w.get_current_game(), 2);
+    // the game changes once the old name has rolled out (100 ms); then the new name rolls in (140 ms)
     let name = |w: &MainWindow| {
         let g = w.get_games();
-        g.row_data(w.get_current_game() as usize).unwrap().name
+        g.row_data(2).unwrap().name
     };
     let shown = |w: &MainWindow, n: &str| {
         ElementHandle::find_by_accessible_label(w, n)
@@ -424,7 +429,111 @@ fn motion_switch_game_rolls_the_name_in_240_ms() {
     // the strip still shows the old name: the new one is not there yet
     let during = shown(&w, &new);
     wait(240);
+    assert_eq!(w.get_current_game(), 2);
     assert_eq!(shown(&w, &new), during + 1, "the new name rolled in");
+}
+
+/// The size of the Zones page picture (the stage that takes the pointer).
+fn zones_stage(w: &MainWindow) -> (f32, f32) {
+    let s = ElementHandle::find_by_accessible_label(w, "Screenshot")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::Image))
+        .expect("the Zones picture")
+        .size();
+    (s.width, s.height)
+}
+
+#[test]
+fn motion_the_stage_grows_into_zones_and_shrinks_back() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    // the Overview stage at 1440 x 900 is 1056 px wide; the Zones stage 1376 px
+    press(&w, "Edit zones", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Zones);
+    wait(60);
+    let (mid, h) = zones_stage(&w);
+    assert!(
+        mid > 1060.0 && mid < 1370.0,
+        "60 ms in, the stage grows: {mid}"
+    );
+    assert!(
+        (h - mid * 9.0 / 16.0).abs() < 1.5,
+        "it stays 16:9: {mid} x {h}"
+    );
+    settle();
+    assert!(
+        (zones_stage(&w).0 - 1376.0).abs() < 1.0,
+        "{:?}",
+        zones_stage(&w)
+    );
+    assert_eq!(pages(&w), ["Zones page"]);
+    // Done: it shrinks back to the Overview stage
+    press(&w, "Done", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Overview);
+    wait(60);
+    let (back, _) = zones_stage(&w);
+    assert!(
+        back > 1060.0 && back < 1370.0,
+        "60 ms in, the stage shrinks: {back}"
+    );
+    settle();
+    assert_eq!(pages(&w), ["Overview page"]);
+}
+
+#[test]
+fn motion_switch_game_keeps_the_old_picture_under_the_new_one() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    let pictures = |w: &MainWindow| {
+        ElementHandle::find_by_accessible_label(w, "Game picture")
+            .filter(|e| e.size().width > 0.0)
+            .count()
+    };
+    assert_eq!(pictures(&w), 1);
+    let before = w.get_current_game();
+    press(&w, "Switch game", AccessibleRole::Button);
+    key(&w, Key::DownArrow);
+    key(&w, Key::Return);
+    // for 100 ms the old game stays (its name and texts go out; its picture stays)
+    assert_eq!(w.get_current_game(), before);
+    wait(50);
+    assert_eq!(w.get_current_game(), before);
+    assert_eq!(pictures(&w), 1);
+    // then the game changes, and the new picture fades in over the old one: no dark dip
+    wait(70);
+    assert_ne!(w.get_current_game(), before);
+    assert_eq!(pictures(&w), 2, "the old picture lies under the new one");
+    wait(200);
+    assert_eq!(
+        pictures(&w),
+        1,
+        "the old picture is gone once the new one is in"
+    );
+}
+
+#[test]
+fn motion_reduce_motion_fades_without_moving() {
+    let w = window_motion(true, true);
+    w.set_page(Page::Overview);
+    press(&w, "Settings", AccessibleRole::Button);
+    let toggle = |w: &MainWindow| {
+        ElementHandle::find_by_accessible_label(w, "Start with Windows")
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Checkbox))
+            .expect("the Start with Windows switch")
+            .absolute_position()
+    };
+    // 40 ms in: Settings is already in its place (no slide), only fading; no 80 ms wait
+    wait(40);
+    let mid = toggle(&w);
+    // fades take 80 ms: the Overview is gone at 100 ms
+    wait(60);
+    assert_eq!(pages(&w), ["Settings page"]);
+    let end = toggle(&w);
+    assert_eq!(
+        (mid.x, mid.y),
+        (end.x, end.y),
+        "nothing moves under reduce motion"
+    );
+    dr_app::set_reduce_motion(None);
 }
 
 #[test]
