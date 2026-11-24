@@ -1138,3 +1138,55 @@ fn motion_a_new_line_slides_into_activity() {
     let label = "Sadie: Let us get to work.";
     assert!(row_text(&w, label).computed_opacity() > 0.99);
 }
+
+/// The Overview voice list opens on the game's voice: with more voices than fit, it scrolls so the checked row
+/// shows, and the last row it shows is cut in half, so the list says it goes on.
+#[test]
+fn the_voice_list_opens_on_the_current_voice() {
+    let w = window();
+    w.set_page(Page::Overview);
+    let n = w.get_voices().row_count();
+    assert!(n > 8, "the fake list has more voices than fit ({n})");
+    let last = w.get_voices().row_data(n - 1).unwrap().name;
+    w.set_game_voice(n as i32 - 1);
+    w.set_voice_menu(true);
+    let list = ElementHandle::find_by_accessible_label(&w, "Voices")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+        .expect("the voice list");
+    let (lp, ls) = (list.absolute_position(), list.size());
+    let rows: Vec<ElementHandle> = ElementHandle::find_by_accessible_label(&w, &last)
+        .filter(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+        .collect();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].accessible_item_selected(), Some(true));
+    let (rp, rs) = (rows[0].absolute_position(), rows[0].size());
+    assert!(
+        rp.y >= lp.y && rp.y + rs.height <= lp.y + ls.height,
+        "the checked row {rp:?} {rs:?} is in the list {lp:?} {ls:?}"
+    );
+    // 7 and a half rows show (plus the list's 4 px padding and 1 px border on each side)
+    let row_h = rs.height;
+    assert!(
+        (ls.height - (7.5 * row_h + 10.0)).abs() < 0.5,
+        "{} rows show",
+        (ls.height - 10.0) / row_h
+    );
+    // the first voice opens at the top
+    w.set_voice_menu(false);
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Voices")
+            .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+            .is_none(),
+        "closed"
+    );
+    w.set_game_voice(0);
+    w.set_voice_menu(true);
+    let first = w.get_voices().row_data(0).unwrap().name;
+    let top = ElementHandle::find_by_accessible_label(&w, &first)
+        .find(|e| e.accessible_role() == Some(AccessibleRole::ListItem))
+        .expect("first voice");
+    let list = ElementHandle::find_by_accessible_label(&w, "Voices")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::List))
+        .unwrap();
+    assert_eq!(top.absolute_position().y, list.absolute_position().y + 5.0);
+}

@@ -67,6 +67,11 @@ fn app() -> App {
 
 /// The app on a game whose zones show `line` (or nothing).
 fn app_reading(line: Option<&'static str>) -> App {
+    app_on(line, FakeDesktop::new())
+}
+
+/// `app_reading` on this fake desktop.
+fn app_on(line: Option<&'static str>, desktop: FakeDesktop) -> App {
     let (dir, paths) = temp_paths();
     let mut p = Profile::new("test-game", "Test Game", "TestGame.exe");
     p.zones.push(ZoneCfg {
@@ -80,7 +85,7 @@ fn app_reading(line: Option<&'static str>) -> App {
     profile::save(&paths, &p).unwrap();
     let voices = fake_voices();
     let speech = voices.speech.as_ref().unwrap().sender();
-    let (w, vm) = real_window_with(&paths, FakeDesktop::new(), voices);
+    let (w, vm) = real_window_with(&paths, desktop, voices);
     let parts = Parts {
         ocr: Arc::new(move |_lang: &str| Ok(Box::new(Text(line)) as Box<dyn Ocr>)),
         source: Arc::new(|_hwnd| Ok((Box::new(Still(false, 0.0)) as Box<dyn FrameSource>, None))),
@@ -404,6 +409,46 @@ fn zone_edit_saves_a_new_zone_and_the_reader_uses_it_at_once() {
     assert_eq!(a.hook(), Overlay::None);
     assert!(!a.held());
     assert!(a.pill_shown());
+}
+
+/// The live view of the game failed: zone edit saves a new screenshot of the game as its picture, and the
+/// Overview and Zones keep the failure note and show the time of the new screenshot.
+#[test]
+fn a_zone_edit_shot_keeps_the_live_failure_note_and_shows_its_time() {
+    use dr_app::LiveView;
+    use slint::ComponentHandle;
+    let d = FakeDesktop::new();
+    d.live.fail.set(true);
+    let a = app_on(None, d);
+    a.vm.borrow_mut().live_tick();
+    let note = |a: &App| a.w.global::<LiveView>().get_note().to_string();
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
+    let png = a.paths.profile_png("test-game");
+    let before = std::fs::metadata(&png).and_then(|m| m.modified()).ok();
+    a.key(Action::Menu);
+    a.nav(Nav::Enter);
+    assert_eq!(a.shown(), Overlay::Zones);
+    // the new screenshot is saved
+    assert_eq!(a.w.get_notice(), "");
+    let after = std::fs::metadata(&png).and_then(|m| m.modified()).ok();
+    assert!(after.is_some() && after != before, "{before:?} {after:?}");
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
+    // "21:30": the time of the new screenshot (TEXT.md)
+    let t = a.w.get_shot_time();
+    let b = t.as_bytes();
+    assert!(
+        b.len() == 5
+            && b.iter().enumerate().all(|(i, c)| if i == 2 {
+                *c == b':'
+            } else {
+                c.is_ascii_digit()
+            }),
+        "{t}"
+    );
+    a.nav(Nav::Esc);
+    a.w.set_page(Page::Zones);
+    a.vm.borrow_mut().live_tick();
+    assert_eq!(note(&a), dr_app::vm::NOTE_FAILED);
 }
 
 /// Zone edit with one new zone drawn at (100, 50) 300 x 40 and selected (fake game: 1920 x 1080 at 100 %, so window

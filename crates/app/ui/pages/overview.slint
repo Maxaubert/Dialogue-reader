@@ -122,9 +122,14 @@ component VoiceMenu inherits Rectangle {
     in property <[VoiceData]> voices;
     in property <int> current;
     callback picked(int);
-    property <int> rows: Math.max(1, Math.min(root.voices.length, 8));
+    // up to 8 rows show; with more, 7 and a half show, so the cut row says the list goes on
+    property <length> list-h: root.voices.length > 8 ? 7.5 * Size.list : Math.max(1, root.voices.length) * Size.list;
     width: 280px;
-    height: root.rows * Size.list + 2 * Space.s1 + 2px;
+    height: root.list-h + 2 * Space.s1 + 2px;
+    // the list opens on the current voice: scrolled so its row is in the middle when it is below the first rows
+    init => {
+        flick.content-y = -Math.clamp((root.current + 0.5) * Size.list - root.list-h / 2, 0, Math.max(0px, root.voices.length * Size.list - root.list-h));
+    }
     border-radius: Radius.lg;
     border-width: 1px;
     border-color: Palette.float-line;
@@ -143,11 +148,11 @@ component VoiceMenu inherits Rectangle {
         color: Palette.text-2;
         vertical-alignment: center;
     }
-    Flickable {
+    flick := Flickable {
         x: Space.s1 + 1px;
         y: Space.s1 + 1px;
         width: parent.width - 2 * Space.s1 - 2px;
-        height: root.rows * Size.list;
+        height: root.list-h;
         content-height: root.voices.length * Size.list;
         VerticalLayout {
             alignment: start;
@@ -441,7 +446,7 @@ export component OverviewTab inherits Rectangle {
     if root.running && root.contain && LiveView.note != "" && !LiveView.note-live: LiveNote {
             opacity: root.text-o;
             property <bool> in-band: (root.frame-h - root.stage-h) / 2 >= 30px;
-            x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - Size.ctl - Space.s4 - self.width;
+            x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - self.width;
             y: self.in-band ? root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2 : root.frame-y + root.frame-h + Space.s2 + (Size.row - self.height) / 2;
         }
     }
