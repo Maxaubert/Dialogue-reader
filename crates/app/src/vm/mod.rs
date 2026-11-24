@@ -221,7 +221,6 @@ fn push_voice_list(w: &MainWindow, v: &Voices) {
     w.set_voices(ModelRc::new(VecModel::from(v.rows())));
     w.set_voices_problem(v.problem_text().into());
     w.set_voices_desc(v.desc().into());
-    w.set_kokoro_desc(v.kokoro_desc().into());
 }
 
 /// Slint kind from a profile kind, and back.
@@ -421,6 +420,21 @@ fn zone_row(z: &EdZone) -> ZoneData {
     }
 }
 
+/// The Overview zone chips: one per kind that has a zone, in the order Speaker, Dialogue, Pickups, Prompts
+/// (Ignore zones are not listed). A chip is on while any zone of its kind is on.
+fn kind_chips(zones: &[EdZone]) -> Vec<ZoneData> {
+    use dr_runtime::Kind as K;
+    [K::Speaker, K::Dialogue, K::Notification, K::Prompt]
+        .into_iter()
+        .filter(|&k| zones.iter().any(|z| z.kind == k))
+        .map(|k| ZoneData {
+            kind: ui_kind(k),
+            on: zones.iter().any(|z| z.kind == k && z.on),
+            ..ZoneData::default()
+        })
+        .collect()
+}
+
 /// Zones from a profile, in pixels of a `w` x `h` screenshot.
 pub fn ed_zones(p: &Profile, w: u32, h: u32) -> Vec<EdZone> {
     p.zones
@@ -516,6 +530,10 @@ pub struct Vm {
     shown_games: Vec<usize>,
     shown_others: Vec<usize>,
     search: String,
+    /// Page 02 has no Refresh button: while it shows it asks once a second, the quick list (no icons) is read on
+    /// another thread, and only a list that changed is read again in full ([`Vm::auto_refresh_windows`]).
+    pick_looking: bool,
+    pick_found: std::sync::Arc<std::sync::Mutex<Option<Vec<WinInfo>>>>,
     /// Page 03: the window being set up, its screenshot, its zones.
     setup_win: Option<WinInfo>,
     setup_shot: Option<Shot>,
@@ -549,6 +567,8 @@ pub struct Vm {
     prefs: dr_runtime::settings::Settings,
     /// settings.json must not be written (newer format, or a broken file that could not be moved aside).
     prefs_read_only: bool,
+    /// What the game switcher searches for (its rows are the games whose name holds it).
+    switcher_query: String,
 }
 
 pub type Shared = Rc<RefCell<Vm>>;
@@ -565,6 +585,8 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         shown_games: Vec::new(),
         shown_others: Vec::new(),
         search: String::new(),
+        pick_looking: false,
+        pick_found: Default::default(),
         setup_win: None,
         setup_shot: None,
         setup: fake_setup(),
@@ -586,14 +608,15 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
         muted: false,
         prefs: dr_runtime::settings::Settings::default(),
         prefs_read_only: false,
+        switcher_query: String::new(),
     };
     w.set_setup_zones(ModelRc::from(vm.setup_zones.clone()));
     w.set_zones(ModelRc::from(vm.zones.clone()));
     w.set_games_running(ModelRc::from(vm.games_running.clone()));
     w.set_other_windows(ModelRc::from(vm.other_windows.clone()));
     w.set_games(ModelRc::from(vm.game_rows.clone()));
-    // the fake (mockup) state: zone 1 selected on 03 and 11, as the mockups show
-    vm.setup.select(Some(1));
+    // the fake (mockup) state: no zone selected on 03, zone 1 selected on 11, as the mockups show
+    vm.setup.select(None);
     vm.setup.kind = dr_runtime::Kind::Dialogue;
     vm.main.select(Some(1));
     vm.main.draw = false;
@@ -604,6 +627,7 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             vm.games_running.set_vec(crate::fake::windows().0);
             vm.other_windows.set_vec(crate::fake::windows().1);
             vm.game_rows.set_vec(crate::fake::games());
+            vm.push_switcher_hits();
         }
         Source::Real {
             paths,
@@ -619,10 +643,9 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             w.set_test_played(0);
             w.set_test_time("0:00".into());
             w.set_picked_voice(0);
-            w.set_voice_speed(0.5);
+            w.set_voice_speed(voices::slider_of_speed(1.0));
             w.set_voice_label(vm.voices.label("").into());
             w.set_real_shots(true);
-            w.set_extra_zones(ModelRc::default());
             vm.reading_models(w);
             w.set_now_who("".into());
             w.set_now_line("".into());
@@ -707,22 +730,30 @@ impl Vm {
         self.games.iter().map(|g| &g.profile).collect()
     }
 
+    /// The switcher's rows: the games whose name holds what was typed (any case), all of them for an empty search.
+    fn push_switcher_hits(&self) {
+        let Some(w) = self.win() else { return };
+        let names: Vec<SharedString> = (0..self.game_rows.row_count())
+            .filter_map(|i| self.game_rows.row_data(i).map(|g| g.name))
+            .collect();
+        let hits = switcher_hits(&names, &self.switcher_query);
+        w.set_switcher_hits(ModelRc::new(VecModel::from(hits)));
+    }
+
     fn push_games(&self) {
         let on = running(&self.profiles(), &self.windows);
         let rows = self
             .games
             .iter()
             .zip(on)
-            .map(|(g, is_running)| {
-                let n = g.profile.zones.len();
+            .enumerate()
+            .map(|(i, (g, is_running))| {
+                // TEXT.md: "Reading" or when it was last played. Profiles do not keep when a game was last
+                // played, so only the game being read says something.
+                let reading = is_running && self.current == Some(i) && self.is_reading();
                 GameData {
                     name: g.profile.name.as_str().into(),
-                    meta: format!(
-                        "{} · {n} zone{}",
-                        if is_running { "Running" } else { "Not running" },
-                        if n == 1 { "" } else { "s" }
-                    )
-                    .into(),
+                    meta: if reading { "Reading" } else { "" }.into(),
                     art: SharedString::default(),
                     running: is_running,
                     cover: g.cover.clone().unwrap_or_default(),
@@ -730,6 +761,7 @@ impl Vm {
             })
             .collect();
         sync(&self.game_rows, rows);
+        self.push_switcher_hits();
         if let (Some(w), Some(i)) = (self.win(), self.current) {
             w.set_current_game(i as i32);
         }
@@ -782,7 +814,6 @@ impl Vm {
             );
             w.set_shot_w(sw as f32);
             w.set_shot_h(sh as f32);
-            w.set_shot_info(format!("Screenshot · {sw} × {sh} · Fit to window").into());
         }
         self.push_profile_settings();
         self.push_games();
@@ -1038,6 +1069,43 @@ impl Vm {
         self.push_games();
     }
 
+    /// Page 02, once a second: looks for windows that opened, closed or changed, and lists them again when there
+    /// are any. The window picked before stays picked ([`Vm::refresh_windows`]).
+    fn auto_refresh_windows(&mut self) {
+        if self.real.is_none() {
+            return;
+        }
+        if !self.pick_looking {
+            self.pick_looking = true;
+            let exes = self.profile_exes();
+            let found = self.pick_found.clone();
+            if let Some(real) = &self.real {
+                real.desktop.windows_quick_then(
+                    exes,
+                    Box::new(move |list| {
+                        if let Ok(mut f) = found.lock() {
+                            *f = Some(list);
+                        }
+                    }),
+                );
+            }
+        }
+        // the answer: now (the fake desktop) or at a later tick (the real one reads it on another thread)
+        let Some(list) = self.pick_found.lock().ok().and_then(|mut f| f.take()) else {
+            return;
+        };
+        self.pick_looking = false;
+        let key = |w: &WinInfo| (w.hwnd, w.title.clone(), w.exe.clone(), w.game, w.minimized);
+        let same = list.len() == self.windows.len()
+            && list
+                .iter()
+                .zip(&self.windows)
+                .all(|(a, b)| key(a) == key(b));
+        if !same {
+            self.refresh_windows();
+        }
+    }
+
     /// Fills the page 02 lists. `before` (the window picked before) stays picked when it is still listed.
     fn apply_search(&mut self, before: Option<WinKey>) {
         let q = self.search.trim().to_lowercase();
@@ -1114,7 +1182,7 @@ impl Vm {
         }
         let Some(w) = self.win() else { return false };
         let Some(win) = self.picked(w.get_picked_window()).cloned() else {
-            self.notice("Pick a window first. Start your game, then press Refresh.");
+            self.notice("Pick a window first. Start your game, then pick it.");
             return false;
         };
         // spec 2.8: several games can share an exe (told apart by the window title), but one window has one profile
@@ -1140,6 +1208,7 @@ impl Vm {
                 w.set_setup_shot(img.clone());
                 w.set_setup_shot_w(shot.width as f32);
                 w.set_setup_shot_h(shot.height as f32);
+                w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
                 w.set_setup_game(win.title.as_str().into());
                 w.set_setup_cover(img);
                 self.setup_shot = Some(shot);
@@ -1308,6 +1377,7 @@ impl Vm {
                         w.set_setup_shot(img.clone());
                         w.set_setup_shot_w(shot.width as f32);
                         w.set_setup_shot_h(shot.height as f32);
+                        w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
                         w.set_setup_cover(img);
                     }
                     self.setup_shot = Some(shot);
@@ -1362,8 +1432,8 @@ impl Vm {
         }
         self.games[i].cover = Some(cover_of(shot));
         self.games[i].shot_size = Some((shot.width, shot.height));
-        // the line under the stage on 11 keeps the live view note ("Live", or why the saved screenshot shows)
-        self.push_shot_info();
+        // the Zones toolbar shows the new screenshot's time while the game is not live
+        self.push_shot_time();
         self.save_main();
         self.push_main();
         Ok(())
@@ -1429,6 +1499,7 @@ impl Vm {
     fn push_main(&self) {
         sync(&self.zones, self.main.zones.iter().map(zone_row).collect());
         if let Some(w) = self.win() {
+            w.set_zone_kinds(ModelRc::new(VecModel::from(kind_chips(&self.main.zones))));
             w.set_zones_selected(self.main.selected.map_or(-1, |i| i as i32));
             if w.get_page() != Page::DrawZones {
                 self.push_tools(&w, &self.main);
@@ -1568,6 +1639,14 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.after(page, changed);
     });
     let v = vm.clone();
+    w.on_kind_toggle(move |k, on| {
+        // the chips are on the Overview: they change the current game's zones
+        let mut vm = v.borrow_mut();
+        vm.commit_rename();
+        let changed = vm.main.set_kind_on(disk_kind(k), on);
+        vm.after(Page::Overview, changed);
+    });
+    let v = vm.clone();
     let weak = w.as_weak();
     w.on_zone_rename(move |i, name| {
         let Some(w) = weak.upgrade() else { return };
@@ -1617,7 +1696,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.retake(w.get_page() == Page::DrawZones);
     });
     let v = vm.clone();
-    w.on_windows_refresh(move || v.borrow_mut().refresh_windows());
+    w.on_windows_refresh(move || {
+        // the page's timer can fire while another callback holds the view model: the next tick tries again
+        if let Ok(mut vm) = v.try_borrow_mut() {
+            vm.auto_refresh_windows();
+        }
+    });
     let v = vm.clone();
     w.on_windows_search(move |q| {
         let mut vm = v.borrow_mut();
@@ -1639,6 +1723,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
     });
     let v = vm.clone();
     w.on_switcher_opened(move || v.borrow_mut().load_covers());
+    let v = vm.clone();
+    w.on_switcher_search(move |q| {
+        let mut vm = v.borrow_mut();
+        vm.switcher_query = q.to_string();
+        vm.push_switcher_hits();
+    });
     let v = vm.clone();
     w.on_mode_changed(move |a| v.borrow_mut().set_mode(a));
     let v = vm.clone();
@@ -1691,6 +1781,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
     let v = vm.clone();
     w.on_recent_replay(move |i| {
         if let Ok(i) = usize::try_from(i) {
+            v.borrow().replay_recent(i);
+        }
+    });
+    let v = vm.clone();
+    w.on_log_replay(move |i| {
+        if let Ok(i) = usize::try_from(i) {
             v.borrow().replay_row(i);
         }
     });
@@ -1712,7 +1808,7 @@ fn wire(w: &MainWindow, vm: &Shared) {
         vm.setup_win = None;
         vm.setup_shot = None;
         vm.refresh_windows();
-        w.set_setup_draw(true);
+        w.set_setup_draw(false);
         w.set_notice("".into());
         if vm.real.is_some() {
             w.set_adding_game(true);
@@ -1736,6 +1832,17 @@ fn wire(w: &MainWindow, vm: &Shared) {
             }
         }
     });
+}
+
+/// The games (indices into `names`) whose name holds `query`, case ignored. An empty search keeps them all.
+pub fn switcher_hits(names: &[SharedString], query: &str) -> Vec<i32> {
+    let q = query.trim().to_lowercase();
+    names
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| q.is_empty() || n.to_lowercase().contains(&q))
+        .map(|(i, _)| i as i32)
+        .collect()
 }
 
 #[cfg(test)]

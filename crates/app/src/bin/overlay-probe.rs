@@ -7,7 +7,10 @@
 //!   activates itself.
 //! - `probe --out <file> [--renderer <name>]`: selects the winit backend with the overlay hook as `main.rs` does,
 //!   makes `dr_app::overlay::Overlays` and shows the pill, the quick menu and zone edit over the game through the
-//!   app's own code, then writes what it measured as `key=value` lines.
+//!   app's own code, then writes what it measured as `key=value` lines. These first checks use instant motion,
+//!   so each window is drawn in full at once. A second set of windows with the real motion then fades each one
+//!   out: while it fades it must stay visible with its styles, take no focus, and the pill must stay
+//!   click-through; after the fade it must be hidden.
 //!
 //! How focus is measured: on a desktop that is not the input desktop `GetForegroundWindow` is always NULL, so a
 //! thread-wide `WH_CALLWNDPROC` hook counts `WM_ACTIVATE` and `WM_SETFOCUS` for every window of the UI thread. A
@@ -424,7 +427,19 @@ mod imp {
         let spy = unsafe {
             SetWindowsHookExW(WH_CALLWNDPROC, Some(spy_proc), None, GetCurrentThreadId())
         };
+        // the first set draws in full at once; the second fades as in the app
+        dr_app::set_instant_motion(true);
         let o = match Overlays::new(true) {
+            Ok(o) => Rc::new(RefCell::new(o)),
+            Err(e) => {
+                let _ = std::fs::write(out, format!("error=overlays: {e}\n"));
+                return 2;
+            }
+        };
+        dr_app::set_instant_motion(false);
+        // the fade timings below are the full ones, whatever the PC's animation setting
+        dr_app::set_reduce_motion(Some(false));
+        let o2 = match Overlays::new(true) {
             Ok(o) => Rc::new(RefCell::new(o)),
             Err(e) => {
                 let _ = std::fs::write(out, format!("error=overlays: {e}\n"));
@@ -465,11 +480,14 @@ mod imp {
                         // renderer output: see-through margin, drawn pill (at the right end, 8 px in)
                         r.put("pill.corner_alpha", alpha_at(o.pill.window(), 0.0, 0.0));
                         r.put("pill.body_alpha", alpha_at(o.pill.window(), 0.9, 0.5));
+                        // the shadow fits in the window: nothing is drawn on its bottom edge
+                        r.put("pill.edge_alpha", alpha_at(o.pill.window(), 0.9, 1.0));
                     }
                     1 => {
                         check(&mut r, "menu", o.menu.window(), win::Kind::Menu, game);
                         r.put("menu.corner_alpha", alpha_at(o.menu.window(), 0.0, 0.0));
                         r.put("menu.card_alpha", alpha_at(o.menu.window(), 0.5, 0.3));
+                        r.put("menu.edge_alpha", alpha_at(o.menu.window(), 0.5, 0.0));
                     }
                     _ => check(&mut r, "zone", o.zones.window(), win::Kind::Zone, game),
                 });
@@ -538,6 +556,91 @@ mod imp {
                 });
             }
         };
+        // fades: show one window of the second set, then hide it, look at it while it fades and after
+        let fade_show = |which: u8| {
+            let o2 = o2.clone();
+            move || {
+                let mut o = o2.borrow_mut();
+                let Some(mut g) = win::game_win(game.0 as isize) else {
+                    return;
+                };
+                g.front = true;
+                match which {
+                    0 => o.pill_on(true, Some(&g), PillAt::TopRight),
+                    1 => {
+                        if o.menu_on(&g) {
+                            o.shown = dr_runtime::keys::Overlay::Menu;
+                        }
+                    }
+                    _ => {
+                        o.zones_on(&g);
+                    }
+                }
+            }
+        };
+        let fade_hide = |which: u8| {
+            let (o2, report) = (o2.clone(), report.clone());
+            move || {
+                let mut r = report.borrow_mut();
+                let mut o = o2.borrow_mut();
+                let Some(g) = win::game_win(game.0 as isize) else {
+                    return;
+                };
+                let (key, kind) = match which {
+                    0 => ("pillfade", win::Kind::Pill),
+                    1 => ("menufade", win::Kind::Menu),
+                    _ => ("zonefade", win::Kind::Zone),
+                };
+                // the fade in has ended: the window is drawn in full
+                match which {
+                    0 => r.put("pillfade.shown_alpha", alpha_at(o.pill.window(), 0.9, 0.5)),
+                    1 => r.put("menufade.shown_alpha", alpha_at(o.menu.window(), 0.5, 0.3)),
+                    _ => {}
+                }
+                match which {
+                    0 => o.pill_on(false, Some(&g), PillAt::TopRight),
+                    1 => {
+                        o.menu_off();
+                        o.shown = dr_runtime::keys::Overlay::None;
+                    }
+                    _ => o.zones_off(),
+                }
+                let w = match which {
+                    0 => o.pill.window(),
+                    1 => o.menu.window(),
+                    _ => o.zones.window(),
+                };
+                check(&mut r, &format!("{key}.fading"), w, kind, game);
+            }
+        };
+        let fade_mid = |which: u8| {
+            let (o2, report) = (o2.clone(), report.clone());
+            move || {
+                let mut r = report.borrow_mut();
+                let o = o2.borrow();
+                let (key, w, kind) = match which {
+                    0 => ("pillfade", o.pill.window(), win::Kind::Pill),
+                    1 => ("menufade", o.menu.window(), win::Kind::Menu),
+                    _ => ("zonefade", o.zones.window(), win::Kind::Zone),
+                };
+                check(&mut r, &format!("{key}.mid"), w, kind, game);
+            }
+        };
+        let fade_after = |which: u8| {
+            let (o2, report) = (o2.clone(), report.clone());
+            move || {
+                let mut r = report.borrow_mut();
+                let o = o2.borrow();
+                let (key, w) = match which {
+                    0 => ("pillfade", o.pill.window()),
+                    1 => ("menufade", o.menu.window()),
+                    _ => ("zonefade", o.zones.window()),
+                };
+                let visible =
+                    win::hwnd_of(w).is_some_and(|h| unsafe { IsWindowVisible(h).as_bool() });
+                r.put(&format!("{key}.after_visible"), visible);
+            }
+        };
         // the positive control: a plain window of this thread shown last does activate here
         let control: Rc<RefCell<Option<dr_app::MainWindow>>> = Rc::new(RefCell::new(None));
         let control_step = {
@@ -580,11 +683,21 @@ mod imp {
         };
         slint::Timer::single_shot(Duration::from_millis(400), step);
         slint::Timer::single_shot(Duration::from_millis(1200), again);
-        slint::Timer::single_shot(Duration::from_millis(2000), control_step);
-        slint::Timer::single_shot(Duration::from_millis(3200), control_check);
-        slint::Timer::single_shot(Duration::from_millis(3600), done);
+        // each fade: shown, 300 ms later hidden (the fade starts), 40 ms into it and 400 ms after it
+        for which in 0..3u8 {
+            let t = 2000 + 800 * which as u64;
+            slint::Timer::single_shot(Duration::from_millis(t), fade_show(which));
+            slint::Timer::single_shot(Duration::from_millis(t + 300), fade_hide(which));
+            slint::Timer::single_shot(Duration::from_millis(t + 340), fade_mid(which));
+            slint::Timer::single_shot(Duration::from_millis(t + 700), fade_after(which));
+        }
+        // the control last: once it is active it sits over the game, so it would spoil the hit tests above
+        slint::Timer::single_shot(Duration::from_millis(4600), control_step);
+        slint::Timer::single_shot(Duration::from_millis(5800), control_check);
+        slint::Timer::single_shot(Duration::from_millis(6200), done);
         let _ = slint::run_event_loop_until_quit();
         drop(control);
+        drop(o2);
         0
     }
 

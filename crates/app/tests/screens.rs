@@ -23,7 +23,7 @@ fn rendered() -> &'static Vec<PathBuf> {
 }
 
 fn shots_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design/mockups/c-midnight/shots")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design/mockups/d-black/shots")
 }
 
 #[test]
@@ -66,63 +66,53 @@ fn screen_names_match_the_mockups() {
     }
 }
 
-/// How closely one screen must match its mockup shot.
+/// How closely one screen must match its d-black mockup shot.
 struct Mockup {
+    /// the render (`src/screens.rs`)
     name: &'static str,
+    /// the shot in design/mockups/d-black/shots
+    shot: &'static str,
     /// highest allowed mean cell difference (0 to 255)
     mean: f64,
     /// highest allowed share of cells that differ by more than 32, in percent
     changed: f64,
-    /// part of the picture to compare (x, y, w, h); None = all of it
-    region: Option<(u32, u32, u32, u32)>,
 }
 
-const fn m(name: &'static str, mean: f64, changed: f64) -> Mockup {
+const fn m(name: &'static str, shot: &'static str, mean: f64, changed: f64) -> Mockup {
     Mockup {
         name,
+        shot,
         mean,
         changed,
-        region: None,
     }
 }
 
-/// Every approved mockup. The limits sit a little above today's values (measured 2026-11-22), so a real change
-/// fails and text rendering noise does not. Wider limits have a reason next to them.
-const MOCKUPS: [Mockup; 14] = [
-    m("01-welcome", 1.6, 0.6),
-    m("02-pick-window", 1.3, 0.5),
-    m("03-draw-zones", 1.6, 0.6),
-    m("04-read-key-d", 1.0, 0.4),
-    m("05-voice", 1.3, 0.6),
-    // the summary has one more row than the mockup (Quick menu key): compare down to the Read key row
-    Mockup {
-        name: "06-mode",
-        mean: 1.6,
-        changed: 0.7,
-        region: Some((0, 0, 1440, 590)),
-    },
-    m("10-main-b", 1.5, 0.6),
-    m("11-zones", 1.4, 0.5),
-    // Keys (two rows) replaces the mockup's Shortcuts section (four rows): compare above that section.
-    // The side list also says "Keys" where the mockup says "Shortcuts".
-    Mockup {
-        name: "12-settings",
-        mean: 1.6,
-        changed: 1.0,
-        region: Some((0, 0, 1440, 530)),
-    },
-    m("13-overlay", 0.6, 0.2),
-    // the page behind the switcher is 10-main-b, not the older main page of the mockup: compare the panel only
-    Mockup {
-        name: "14-game-switcher",
-        mean: 1.8,
-        changed: 0.8,
-        region: Some((150, 44, 520, 482)),
-    },
-    // the software renderer draws no shadows; the panels' wide soft shadows show in the mockups
-    m("15-quick-menu-a", 3.0, 2.6),
-    m("15-quick-menu-voice", 2.8, 2.5),
-    m("16-zone-edit", 2.0, 0.4),
+/// Every screen with a d-black shot. The limits sit 0.4 above the values measured on 2026-11-24, so a real
+/// change fails and text rendering noise does not. The stages draw the SVG scene, not the shot's bitmap, and the
+/// fake read list has other lines than the mockup, so 03, 10 and 11 sit higher.
+const MOCKUPS: [Mockup; 22] = [
+    m("01-welcome", "01-setup-0-welcome", 0.9, 0.6),
+    m("02-pick-window", "01-setup-1-game", 0.8, 0.6),
+    m("03-draw-zones", "01-setup-2-zones", 1.8, 0.7),
+    m("04-read-key-d", "01-setup-3-keys", 0.6, 0.5),
+    m("05-voice", "01-setup-4-voice", 1.7, 0.9),
+    m("18-voice-none", "01-setup-4-voice-none", 0.7, 0.5),
+    m("06-mode", "01-setup-5-mode", 1.0, 0.7),
+    m("10-main-b", "10-overview", 2.3, 2.0),
+    m("19-overview-not-running", "10-overview-off", 0.6, 0.5),
+    m("11-zones", "11-zones", 2.8, 1.0),
+    m("11-zones-top", "11-zones-top", 3.0, 0.9),
+    m("11-zones-empty", "11-zones-empty", 1.6, 0.9),
+    m("12-settings", "12-settings", 1.7, 1.3),
+    m("13-overlay", "13-pill", 0.5, 0.4),
+    m("14-game-switcher", "14-game-switcher", 1.6, 0.5),
+    m("15-quick-menu-a", "15-quick-menu", 1.2, 1.1),
+    m("15-quick-menu-voice", "15-quick-menu-voice", 1.6, 1.5),
+    m("16-zone-edit", "16-zone-edit", 1.0, 0.5),
+    m("16-zone-edit-new", "16-zone-edit-new", 1.3, 0.7),
+    m("16-zone-edit-top", "16-zone-edit-top", 1.3, 0.7),
+    m("17-activity", "17-activity", 1.6, 0.7),
+    m("17-activity-empty", "17-activity-empty", 0.6, 0.6),
 ];
 
 const CELL: u32 = 10;
@@ -152,7 +142,7 @@ fn screens_match_the_mockup_shots() {
     let files = rendered();
     let mut failures = Vec::new();
     for mk in &MOCKUPS {
-        let shot = shots_dir().join(format!("{}.png", mk.name));
+        let shot = shots_dir().join(format!("{}.png", mk.shot));
         let mock = image::open(&shot)
             .unwrap_or_else(|e| panic!("mockup shot {}: {e}", shot.display()))
             .to_rgba8();
@@ -161,8 +151,10 @@ fn screens_match_the_mockup_shots() {
             .find(|f| f.file_stem().is_some_and(|s| s == mk.name))
             .expect("render");
         let ours = image::open(path).expect("png").to_rgba8();
-        assert_eq!(mock.dimensions(), ours.dimensions(), "{}", mk.name);
-        let region = mk.region.unwrap_or((0, 0, mock.width(), mock.height()));
+        // a few shots are taller than the window (a page scrolled in the mockup): compare the window part
+        assert_eq!(mock.width(), ours.width(), "{}", mk.name);
+        assert!(mock.height() >= ours.height(), "{}", mk.name);
+        let region = (0, 0, ours.width(), ours.height());
         let (a, b) = (cells(&mock, region), cells(&ours, region));
         let diffs: Vec<f64> = a
             .iter()

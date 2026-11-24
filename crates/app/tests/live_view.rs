@@ -40,8 +40,9 @@ fn near(a: [f32; 4], b: [f32; 4]) -> bool {
     a.iter().zip(b).all(|(x, y)| (x - y).abs() < 2.0)
 }
 
-/// The live view note shows `note`, under the game picture: it never overlaps it (Max, 2026-11-23: the chip
-/// covered the top right corner of the picture, where a zone may be).
+/// The live view note shows `note`, next to the game picture: it never overlaps it (Max, 2026-11-23: the chip
+/// covered the top right corner of the picture, where a zone may be). On the Overview it sits under the picture;
+/// on Zones and setup step 2 it is in the toolbar just above it (d-black).
 fn note_under_the_picture(w: &MainWindow, note: &str) {
     use i_slint_backend_testing::ElementHandle;
     let chip = ElementHandle::find_by_accessible_label(w, "Live view")
@@ -68,12 +69,14 @@ fn note_under_the_picture(w: &MainWindow, note: &str) {
             "the note {cp:?} {cs:?} is on the picture {pp:?} {ps:?}"
         );
     }
-    // just under the picture (on Overview below the zone strip), inside the window
-    let below = pics.iter().any(|p| {
+    // just under the picture (on Overview below the zone strip) or in the toolbar just above it
+    let close = pics.iter().any(|p| {
         let (pp, ps) = (p.absolute_position(), p.size());
-        cp.y >= pp.y + ps.height && cp.y - (pp.y + ps.height) < 80.0
+        let under = cp.y >= pp.y + ps.height && cp.y - (pp.y + ps.height) < 80.0;
+        let above = cp.y + cs.height <= pp.y && pp.y - (cp.y + cs.height) < 80.0;
+        under || above
     });
-    assert!(below, "the note {cp:?} is not under the picture");
+    assert!(close, "the note {cp:?} is not next to the picture");
     let win = w.window().size();
     let k = w.window().scale_factor();
     assert!(
@@ -124,6 +127,16 @@ impl Setup {
     fn note(&self) -> String {
         self.w.global::<LiveView>().get_note().into()
     }
+    /// The Zones toolbar shows the saved screenshot's time ("21:30", TEXT.md) while the game is not live.
+    fn shows_shot_time(&self) -> bool {
+        let t = self.w.get_shot_time();
+        let b = t.as_bytes();
+        b.len() == 5
+            && b[2] == b':'
+            && b.iter()
+                .enumerate()
+                .all(|(i, c)| i == 2 || c.is_ascii_digit())
+    }
 }
 
 #[test]
@@ -140,20 +153,27 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     assert!(s.on());
     assert!(s.vm.borrow().live_showing());
     assert_eq!(s.note(), NOTE_LIVE);
-    // the "Live" note: small, under the game picture
-    note_under_the_picture(&s.w, NOTE_LIVE);
+    // d-black (TEXT.md): the Overview has no "Live" note; only a reason why the saved screenshot shows is there
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(&s.w, "Live view")
+            .next()
+            .is_none(),
+        "no Live note on the Overview"
+    );
     let g = s.w.global::<LiveView>();
     assert_eq!(g.get_frame().size().width, 640);
     assert_eq!((g.get_w(), g.get_h()), (SHOT_W as f32, SHOT_H as f32));
 
     // Zones keeps the same session
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!((s.live.starts.get(), s.live.stops.get()), (1, 0));
-    assert_eq!(s.w.get_shot_info(), "Live · 1920 × 1080 · Fit to window");
+    // live: no screenshot time, the note says "Live"
+    assert_eq!(s.w.get_shot_time(), "");
+    assert_eq!(s.note(), NOTE_LIVE);
 
     // Settings has no stage: it stops, and the saved screenshot is back
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     assert_eq!(s.live.stops.get(), 1);
     assert!(!s.vm.borrow().live_running());
@@ -164,24 +184,21 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     s.arrived();
     assert!(!s.on());
 
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.live.starts.get(), 2);
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Screenshot · 1920 × 1080 · Fit to window"
-    );
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]
 fn the_page_change_alone_starts_it() {
     // no tick by hand: the `changed page` callback runs the check
     let s = open();
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     slint::platform::update_timers_and_animations();
     s.tick();
     assert!(!s.vm.borrow().live_running());
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     slint::platform::update_timers_and_animations();
     assert!(s.vm.borrow().live_running());
 }
@@ -209,7 +226,7 @@ fn a_hidden_or_minimized_app_stops_it() {
 #[test]
 fn zones_follow_a_game_that_changed_size() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     // the game now runs at 3840 x 2160: zones keep their place on the picture, in its pixels
     s.live.frame(3840, 2160, 1280, 720);
@@ -219,12 +236,14 @@ fn zones_follow_a_game_that_changed_size() {
         "{:?}",
         rect(&s.w, 0)
     );
-    assert_eq!(s.w.get_shot_info(), "Live · 3840 × 2160 · Fit to window");
+    assert_eq!(s.w.get_shot_time(), "");
+    let g = s.w.global::<LiveView>();
+    assert_eq!((g.get_w(), g.get_h()), (3840.0, 2160.0));
     // the size change alone is not saved
     assert_eq!(on_disk(&s.paths).zones[0].base, [SHOT_W, SHOT_H]);
 
     // a drag on the live picture: stage coordinates map to capture pixels
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, 3840.0, 2160.0);
     drag(&s.w, &st, (200.0, 200.0), (1000.0, 600.0));
     assert_eq!(s.w.get_zones().row_count(), 2);
@@ -237,9 +256,9 @@ fn zones_follow_a_game_that_changed_size() {
     );
 
     // the live view stops: back to the saved 1920 x 1080 screenshot, zones with it
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     assert!(
         near(rect(&s.w, 0), [200.0, 900.0, 1500.0, 100.0]),
         "{:?}",
@@ -255,11 +274,11 @@ fn zones_follow_a_game_that_changed_size() {
 #[test]
 fn a_size_change_waits_for_the_end_of_a_drag() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, SHOT_W as f32, SHOT_H as f32);
     let win = s.w.window();
     use slint::platform::{PointerEventButton, WindowEvent};
@@ -296,11 +315,11 @@ fn a_size_change_waits_for_the_end_of_a_drag() {
 #[test]
 fn a_size_change_during_a_cancelled_drag_shows_after_the_cancel() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
-    press(&s.w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&s.w, true);
     let st = stage(&s.w, SHOT_W as f32, SHOT_H as f32);
     let win = s.w.window();
     use slint::platform::{PointerEventButton, WindowEvent};
@@ -328,9 +347,9 @@ fn a_minimized_game_shows_the_saved_screenshot_with_a_note() {
     assert_eq!(s.note(), NOTE_MINIMIZED);
     // restored: the next try (a few seconds later) starts it; a page change tries at once
     s.live.minimized.set(false);
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     assert_eq!(s.note(), "", "no note until a frame comes");
@@ -339,7 +358,7 @@ fn a_minimized_game_shows_the_saved_screenshot_with_a_note() {
 #[test]
 fn a_closed_game_shows_the_saved_screenshot_with_a_note() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(3840, 2160, 1280, 720);
     s.arrived();
@@ -355,16 +374,13 @@ fn a_closed_game_shows_the_saved_screenshot_with_a_note() {
         near(rect(&s.w, 0), [200.0, 900.0, 1500.0, 100.0]),
         "zones back on the screenshot"
     );
-    // page 11 has the note in its line under the stage
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Saved screenshot · the game is closed · 1920 × 1080 · Fit to window"
-    );
+    // page 11 has the note and the screenshot's time in its toolbar
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 
     // not running when the page opens
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.note(), NOTE_CLOSED);
@@ -378,13 +394,13 @@ fn a_capture_that_fails_shows_the_saved_screenshot_with_a_note() {
     assert_eq!(s.note(), NOTE_FAILED);
     assert!(!s.on());
     // page 11 has the note in its line under the stage, and a new screenshot keeps it there
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.note(), NOTE_FAILED);
     s.w.invoke_retake_shot();
     assert_eq!(s.w.get_notice(), "", "the retake worked");
-    let info = s.w.get_shot_info();
-    assert!(info.starts_with(NOTE_FAILED), "{info}");
+    assert_eq!(s.note(), NOTE_FAILED);
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]
@@ -410,9 +426,9 @@ fn an_end_while_the_game_is_still_open_is_a_failure_not_a_close() {
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.note(), NOTE_FAILED);
     // a page change tries at once, and a frame brings the live picture back
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Overview", AccessibleRole::Tab);
+    go_overview(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
@@ -436,16 +452,16 @@ fn the_game_window_is_searched_off_the_ui_thread() {
     assert_eq!(*s.live.title.borrow(), "Test Game");
 
     // an answer for the page before is not used
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.live.searches.borrow().len(), 1);
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     s.live.answer();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running(), "the old answer is dropped");
     assert_eq!(s.live.searches.borrow().len(), 1, "a new search runs");
@@ -454,10 +470,10 @@ fn the_game_window_is_searched_off_the_ui_thread() {
     assert!(s.vm.borrow().live_running());
 
     // a closed game: the answer has no window, and the note says so
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     s.live.closed.set(true);
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.answer();
     s.tick();
@@ -468,7 +484,7 @@ fn the_game_window_is_searched_off_the_ui_thread() {
 #[test]
 fn the_frames_fit_the_stage() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     // the stage reported its size when it was built (logical px times the scale factor, 1 here)
     let st = i_slint_backend_testing::ElementHandle::find_by_accessible_label(&s.w, "Screenshot")
         .next()
@@ -539,7 +555,7 @@ fn setup_page_shows_the_picked_window_live() {
 #[test]
 fn a_game_minimized_while_live_shows_the_saved_screenshot_until_it_is_back() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -572,13 +588,10 @@ fn a_note_that_the_saved_screenshot_shows_is_under_the_picture_too() {
     assert_eq!(s.note(), NOTE_MINIMIZED);
     note_under_the_picture(&s.w, NOTE_MINIMIZED);
     // page 11: in the line under the stage
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.note(), NOTE_MINIMIZED);
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Saved screenshot · the game is minimized · 1920 × 1080 · Fit to window"
-    );
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]
@@ -616,7 +629,7 @@ fn overview_pauses_while_the_app_has_no_focus_and_keeps_the_last_frame() {
 #[test]
 fn zones_keep_running_without_focus_but_overview_does_not() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -624,12 +637,12 @@ fn zones_keep_running_without_focus_but_overview_does_not() {
     s.tick();
     assert!(s.vm.borrow().live_running(), "page 11 runs without focus");
     // to Overview while the app has no focus (the tab is pressed by the test): it pauses there
-    press(&s.w, "Overview", AccessibleRole::Tab);
+    go_overview(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert!(s.on(), "the last frame stays");
     // back to Zones: it runs again
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     dr_app::focus_gained(&s.vm);

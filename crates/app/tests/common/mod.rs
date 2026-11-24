@@ -299,6 +299,8 @@ pub fn real_window_with(
     if !INIT.with(|i| i.replace(true)) {
         i_slint_backend_testing::init_no_event_loop();
     }
+    // the clock stands still in the testing backend: pages and controls change at once
+    dr_app::set_instant_motion(true);
     let (w, vm) = dr_app::build_window(Source::Real {
         paths: paths.clone(),
         desktop: Box::new(desktop),
@@ -319,6 +321,42 @@ pub fn press(w: &MainWindow, label: &str, role: AccessibleRole) {
         .first()
         .unwrap_or_else(|| panic!("no {role:?} labelled {label:?}"));
     e.invoke_accessible_default_action();
+}
+
+/// The Overview, from a sub-page (Zones, Settings, Activity) through the back chevron of the title strip.
+pub fn go_overview(w: &MainWindow) {
+    use dr_app::Page;
+    if matches!(w.get_page(), Page::Zones | Page::Settings | Page::Activity) {
+        press(w, "Back", AccessibleRole::Button);
+    }
+    assert_eq!(w.get_page(), Page::Overview);
+}
+
+/// Picks the zone tool: "Draw zone" on (draws, also over a zone) or off (a drag on a zone moves it). "Draw zone"
+/// is a button that stays on, so it is pressed only when it must change (pages 03 and 11).
+pub fn draw_tool(w: &MainWindow, on: bool) {
+    let now = if w.get_page() == dr_app::Page::DrawZones {
+        w.get_setup_draw()
+    } else {
+        w.get_zones_draw()
+    };
+    if now != on {
+        press(w, "Draw zone", AccessibleRole::Button);
+    }
+}
+
+/// Zones, the way a user gets there: the Overview, then the pencil ("Edit zones").
+pub fn go_zones(w: &MainWindow) {
+    go_overview(w);
+    press(w, "Edit zones", AccessibleRole::Button);
+    assert_eq!(w.get_page(), dr_app::Page::Zones);
+}
+
+/// Settings, the way a user gets there: the Overview, then the gear of the title strip.
+pub fn go_settings(w: &MainWindow) {
+    go_overview(w);
+    press(w, "Settings", AccessibleRole::Button);
+    assert_eq!(w.get_page(), dr_app::Page::Settings);
 }
 
 pub fn key(w: &MainWindow, text: impl Into<SharedString>) {

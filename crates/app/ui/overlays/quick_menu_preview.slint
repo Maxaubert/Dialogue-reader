@@ -1,132 +1,15 @@
-// Review-only previews of the quick menu inside the main window (15-quick-menu-a, 15-quick-menu-voice):
-// the game picture, the menu centered on it, the key hints, and the two other menu states beside it.
-// The real overlay window (M4) imports quick_menu.slint only.
-import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art } from "../theme.slint";
+// Review preview of the quick menu inside the main window (15-quick-menu, 15-quick-menu-voice): the game picture
+// with the menu on it, where the mockup puts it. The real overlay window (M4) imports quick_menu.slint only.
+import { Render, Art } from "../theme.slint";
 import { VoiceData } from "../data.slint";
-import { QuickMenu, QmHints, QmRow, QmStatus, QmVoices, QmNote } from "quick_menu.slint";
+import { QuickMenu, QmVoices, QmSpeed } from "quick_menu.slint";
 
-// The two other states, drawn small beside the menu in the 15-quick-menu-a preview.
-export component QmStates inherits VerticalLayout {
-    in property <string> game: "Red Dead Redemption 2";
-    width: 260px;
-    spacing: 10px;
-    Text {
-        text: "WHEN STOPPED";
-        font-size: 11px;
-        font-weight: Type.w-semibold;
-        letter-spacing: Type.ls-caps;
-        color: Palette.text-3;
-        height: 16px;
-        x: 2px;
-    }
-
-    Rectangle {
-        height: mini.preferred-height;
-        border-radius: 12px;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        background: Palette.panel;
-        drop-shadow-offset-y: Shadow.pop-y;
-        drop-shadow-blur: Shadow.pop-blur;
-        drop-shadow-color: Shadow.pop-color;
-        mini := VerticalLayout {
-            padding: 1px;
-            Rectangle {
-                height: 40px;
-                HorizontalLayout {
-                    padding-left: 14px;
-                    padding-right: 14px;
-                    spacing: 10px;
-                    Text {
-                        text: root.game;
-                        font-size: 13px;
-                        font-weight: Type.w-semibold;
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                    }
-
-                    QmStatus {
-                        on: false;
-                    }
-                }
-
-                Rectangle {
-                    y: parent.height - 1px;
-                    height: 1px;
-                    background: Palette.line;
-                }
-            }
-
-            VerticalLayout {
-                padding: 5px;
-                QmRow {
-                    icon: Icons.resume;
-                    text: "Resume";
-                    hi: true;
-                    row-h: 38px;
-                    icon-size: 15px;
-                    font-size: 13px;
-                    gap: 12px;
-                    pad: 10px;
-                    QmNote {
-                        text: "Play / pause";
-                    }
-                }
-            }
-        }
-    }
-
-    // 18 px above the second label (CSS: 10 px gap + 8 px margin)
-    VerticalLayout {
-        padding-top: 8px;
-        Text {
-            text: "AFTER ONE PRESS ON QUIT";
-            font-size: 11px;
-            font-weight: Type.w-semibold;
-            letter-spacing: Type.ls-caps;
-            color: Palette.text-3;
-            height: 16px;
-        }
-    }
-
-    Rectangle {
-        height: 50px;
-        border-radius: 12px;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        background: Palette.panel;
-        drop-shadow-offset-y: Shadow.pop-y;
-        drop-shadow-blur: Shadow.pop-blur;
-        drop-shadow-color: Shadow.pop-color;
-        VerticalLayout {
-            padding: 6px;
-            QmRow {
-                icon: Icons.power;
-                text: "Quit";
-                arm: true;
-                row-h: 38px;
-                icon-size: 15px;
-                font-size: 13px;
-                gap: 12px;
-                pad: 10px;
-                QmNote {
-                    text: "Press again to quit";
-                    color: Palette.danger-dim;
-                }
-            }
-        }
-    }
-}
-
-// Preview inside the main window: the game, the menu centered on it, hints under it.
 export component QuickMenuPreview inherits Rectangle {
     in property <[VoiceData]> voices;
     in-out property <bool> voice-open: false;
     in-out property <int> highlight: 0;
     in-out property <int> voice-index: 0;
-    in-out property <int> voice-hi: 1;
-    in property <bool> show-states: true;
+    in-out property <int> voice-hi: 0;
     in-out property <bool> stopped: false;
     in-out property <bool> quit-armed: false;
     callback close();
@@ -161,7 +44,8 @@ export component QuickMenuPreview inherits Rectangle {
             if root.highlight == 3 {
                 root.voice-open = true;
             } else if root.highlight == 4 {
-                menu.speed = Math.min(2.0, menu.speed + 0.1);
+                menu.speed = Math.min(QmSpeed.max, Math.round(menu.speed * 10 + 1) / 10);
+                menu.speed-pos = (menu.speed - QmSpeed.min) / (QmSpeed.max - QmSpeed.min);
             } else if root.highlight == 5 {
                 menu.volume = Math.min(1.0, menu.volume + 0.05);
             } else if root.highlight == 6 {
@@ -169,7 +53,8 @@ export component QuickMenuPreview inherits Rectangle {
             }
         } else if k == Key.LeftArrow {
             if root.highlight == 4 {
-                menu.speed = Math.max(0.5, menu.speed - 0.1);
+                menu.speed = Math.max(QmSpeed.min, Math.round(menu.speed * 10 - 1) / 10);
+                menu.speed-pos = (menu.speed - QmSpeed.min) / (QmSpeed.max - QmSpeed.min);
             } else if root.highlight == 5 {
                 menu.volume = Math.max(0.0, menu.volume - 0.05);
             } else if root.highlight == 6 {
@@ -184,6 +69,7 @@ export component QuickMenuPreview inherits Rectangle {
     }
     function run(i: int) {
         root.highlight = i;
+        root.quit-armed = i == 8 && !root.quit-armed;
         if i == 0 {
             root.manage-zones();
         } else if i == 1 {
@@ -194,12 +80,8 @@ export component QuickMenuPreview inherits Rectangle {
             root.voice-open = true;
         } else if i == 7 {
             root.open-settings();
-        } else if i == 8 {
-            if root.quit-armed {
-                root.quit();
-            } else {
-                root.quit-armed = true;
-            }
+        } else if i == 8 && !root.quit-armed {
+            root.quit();
         }
     }
     Image {
@@ -209,53 +91,28 @@ export component QuickMenuPreview inherits Rectangle {
         image-fit: cover;
     }
 
-    VerticalLayout {
-        alignment: center;
-        spacing: 14px;
-        HorizontalLayout {
-            alignment: center;
-            menu := QuickMenu {
-                highlight: root.highlight;
-                voice-open: root.voice-open;
-                voice: root.voices.length > 0 ? root.voices[root.voice-index].name : "";
-                stopped: root.stopped;
-                quit-armed: root.quit-armed;
-                activate(i) => {
-                    root.run(i);
-                }
-                if root.show-states && !root.voice-open: QmStates {
-                    x: parent.width + 28px;
-                    y: 0;
-                }
-                if root.voice-open: QmVoices {
-                    x: parent.width + 8px;
-                    y: 208px;
-                    voices: root.voices;
-                    chosen: root.voice-index;
-                    highlight <=> root.voice-hi;
-                    choose(i) => {
-                        root.voice-index = i;
-                        root.voice-open = false;
-                    }
-                }
-            }
+    menu := QuickMenu {
+        x: (parent.width - self.width) / 2;
+        y: 150px;
+        highlight: root.highlight;
+        voice-open: root.voice-open;
+        voice: root.voices.length > 0 ? root.voices[root.voice-index].name : "";
+        stopped: root.stopped;
+        quit-armed: root.quit-armed;
+        activate(i) => {
+            root.run(i);
         }
+    }
 
-        HorizontalLayout {
-            alignment: center;
-            QmHints {
-                hints: root.voice-open ? [
-                    { key: "↑↓", text: "Move" },
-                    { key: "Space", text: "Preview" },
-                    { key: "Enter", text: "Choose" },
-                    { key: "←", text: "Back" },
-                ] : [
-                    { key: "↑↓", text: "Move" },
-                    { key: "←→", text: "Change" },
-                    { key: "Enter", text: "Select" },
-                    { key: "Esc", text: "Close" },
-                ];
-            }
+    if root.voice-open: QmVoices {
+        x: menu.x + menu.width + 8px;
+        y: menu.y + menu.voice-y;
+        voices: root.voices;
+        chosen: root.voice-index;
+        highlight <=> root.voice-hi;
+        choose(i) => {
+            root.voice-index = i;
+            root.voice-open = false;
         }
     }
 }

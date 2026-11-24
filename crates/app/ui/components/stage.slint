@@ -1,7 +1,18 @@
-// The game picture with zones on top (.stage, .zone, .ztag, .handle), the zone list row and the zone tools.
-import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+// The game picture with zones on top (.stage, .zone, .ztag, .handle) and the live note.
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, Toggle, CornerMask, Dot } from "base.slint";
+import { Icon, CornerMask, Dot, ZoneOutline } from "base.slint";
 
 // The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
 // Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
@@ -19,6 +30,79 @@ export global LiveView {
     callback arrived();
 }
 
+// The tag of a zone (.ztag): kind icon and name, and the small "off" pill for an off zone. The selected zone's
+// tag is white with a black keyline. Stage places it (above the box, under it, or inside it).
+export component ZoneTag inherits Rectangle {
+    in property <Kind> kind;
+    in property <bool> on: true;
+    in property <bool> selected: false;
+    property <color> fg: root.selected ? Palette.on-ink : root.on ? Palette.text : Palette.text-2;
+    width: lay.preferred-width;
+    height: 24px;
+    border-radius: Radius.sm;
+    background: root.selected ? Palette.on : Palette.surface-1;
+    border-width: 1px;
+    border-color: root.selected ? Palette.on : Palette.float-line;
+    if root.selected: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+    lay := HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: root.on ? Space.s2 : 3px;
+        spacing: Space.s1;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Kinds.icon(root.kind);
+                width: 13px;
+                height: 13px;
+                color: root.selected ? Palette.on-ink : Palette.text-2;
+            }
+        }
+
+        Text {
+            text: Kinds.name(root.kind);
+            font-size: Type.fs-small;
+            color: root.fg;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        if !root.on: VerticalLayout {
+            alignment: center;
+            padding-left: Space.s1;
+            Rectangle {
+                height: 18px;
+                width: off.preferred-width + 2 * Space.s2;
+                border-radius: Radius.pill;
+                border-width: 1px;
+                border-color: root.selected ? #00000059 : Palette.line-2;
+                off := Text {
+                    text: "off";
+                    font-size: Type.fs-small;
+                    color: root.selected ? Palette.on-ink : Palette.text-2;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}
+
+// Where a zone's tag goes (README "Notes for the Slint port", tested in Rust as geom::tag_place): 0 above the box
+// (24 px tag, 4 px gap), 1 under it when there is no room above, 2 inside it at the top left when there is no
+// room under it either.
+export global TagPlace {
+    public pure function of(box-y: length, box-h: length, stage-h: length) -> int {
+        return box-y >= 28px ? 0 : box-y + box-h + 28px <= stage-h ? 1 : 2;
+    }
+}
+
 // Maps image pixels (src-w x src-h, shown with "cover", or "contain" for real screenshots) to view pixels.
 // Rust has the same math in geom.rs. With `interactive`, presses, drags and releases go to `pointer` in image
 // pixels (src/vm/zones.rs draws, selects, moves and resizes).
@@ -34,11 +118,19 @@ export component Stage inherits Rectangle {
     in property <ZoneData> draft;
     in property <[ZoneData]> zones;
     in property <bool> labels: true;
+    // the Overview (.zo): thin outlines only (white 38 %, 1 px, no fill); a click goes to the page, not a zone
+    in property <bool> quiet: false;
     in property <int> selected: -1;
+    // the zone of the line being spoken (its outline is lime and 2 px); -1: none
+    in property <int> live-zone: -1;
     in property <length> radius: Radius.md;
     in property <bool> round-top: true;
     in property <bool> round-bottom: true;
     in property <color> behind: Palette.bg;
+    // the tags fade with the Zones tools while the stage grows (0 to 1)
+    in property <float> tags-o: 1;
+    // false while the stage grows or shrinks: its size is told to the live view only once it is still
+    in property <bool> settled: true;
     // real screenshots (contain) follow the live view when there is one
     property <bool> live: root.contain && LiveView.on;
     property <float> pw: root.live ? LiveView.w : root.src-w;
@@ -49,7 +141,7 @@ export component Stage inherits Rectangle {
     callback zone-clicked(int);
     // 0 press, 1 move, 2 release; x and y in image px; scale = view px per image px
     callback pointer(int, float, float, float);
-    background: Palette.stage-bg;
+    background: Palette.surface-1;
     // The real window clips to these corners. Software renders cannot, so the CornerMask below paints them.
     border-top-left-radius: root.round-top ? root.radius : 0px;
     border-top-right-radius: root.round-top ? root.radius : 0px;
@@ -57,17 +149,22 @@ export component Stage inherits Rectangle {
     border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
     clip: true;
     init => {
-        if root.contain {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
     changed width => {
-        if root.contain {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
     changed height => {
-        if root.contain {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width, root.height);
+        }
+    }
+    changed settled => {
+        if root.contain && root.settled {
             LiveView.stage-size(root.width, root.height);
         }
     }
@@ -83,46 +180,55 @@ export component Stage inherits Rectangle {
         accessible-label: "Game picture";
     }
 
-    for z[i] in root.zones: Rectangle {
-        // Zone kinds carry no color (Max, 2026-11-22): every zone is grey, the selected one uses the accent.
+    for z[i] in root.zones: ZoneOutline {
+        // Zone kinds carry no color (Max, 2026-11-22). d-black: a light outline with a black keyline, so it holds
+        // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
         property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
-        property <color> line: self.sel ? Palette.accent : Palette.text-2;
+        live: i == root.live-zone && z.on;
+        line: self.live ? Palette.live : root.quiet ? #FFFFFF61 : self.sel ? Palette.on : Palette.text;
         x: root.off-x + z.x * root.scale * 1px;
         y: root.off-y + z.y * root.scale * 1px;
         width: z.w * root.scale * 1px;
         height: z.h * root.scale * 1px;
-        border-radius: Radius.xs;
-        border-width: self.sel ? 2px : 1.5px;
-        // off zones are drawn at 45 %
-        border-color: z.on ? self.line : self.line.with-alpha(0.45);
-        background: z.on ? self.zf : self.zf.with-alpha(0.063);
+        selected: self.sel;
+        dim: !z.on;
+        line-w: self.live || self.sel ? 2px : root.quiet ? 1px : 1.5px;
+        background: root.quiet ? transparent : z.on ? self.zf : self.zf.with-alpha(0.063);
         if self.sel: Rectangle {
-            for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }]: Rectangle {
+            for p in [
+                { x: 0, y: 0 },
+                { x: 0.5, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+                { x: 0, y: 1 },
+                { x: 0.5, y: 1 },
+                { x: 1, y: 1 }
+            ]: Rectangle {
                 x: parent.width * p.x - 4px;
                 y: parent.height * p.y - 4px;
                 width: 8px;
                 height: 8px;
-                border-radius: 2px;
-                background: Palette.knob;
+                border-radius: 4px;
+                background: Palette.on;
                 border-width: 1.5px;
-                border-color: line;
+                border-color: Palette.on-ink;
             }
         }
-        if !root.interactive: TouchArea {
+        if !root.interactive && !root.quiet: TouchArea {
             clicked => {
                 root.zone-clicked(i);
             }
         }
     }
-    if root.drafting: Rectangle {
+    // the box being drawn, with the same keyline
+    if root.drafting: ZoneOutline {
         x: root.off-x + root.draft.x * root.scale * 1px;
         y: root.off-y + root.draft.y * root.scale * 1px;
         width: root.draft.w * root.scale * 1px;
         height: root.draft.h * root.scale * 1px;
-        border-radius: Radius.xs;
-        border-width: 1.5px;
-        border-color: Palette.edit-draft-line;
+        line: Palette.edit-draft-line;
         background: Palette.edit-draft-fill;
     }
     // A left drag draws, moves or resizes. The release of ANY button ends a TouchArea's mouse grab, and its
@@ -167,35 +273,19 @@ export component Stage inherits Rectangle {
             }
         }
     }
-    // Tags go above every zone box, so they are drawn after all boxes.
+    // Tags go above every zone box, so they are drawn after all boxes. A tag never takes the pointer.
     if root.labels: Rectangle {
-        for z[i] in root.zones: Rectangle {
-            property <color> zc: Palette.text-2;
-            x: root.off-x + z.x * root.scale * 1px - 1.5px;
-            y: root.off-y + z.y * root.scale * 1px - self.height - Space.s1;
-            height: 20px;
-            width: tag.preferred-width;
-            border-radius: Radius.xs;
-            background: self.zc;
-            // an off zone is drawn at 45 %, tag text included (CSS .zone.off { opacity: 0.45 })
-            opacity: z.on ? 1 : 0.45;
-            tag := HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                spacing: Space.s1;
-                if z.kind == Kind.ignore: CIcon {
-                    source: Icons.ban-sm;
-                    size: Size.icon-sm;
-                    color: Palette.on-tag;
-                }
-                Text {
-                    text: Kinds.name(z.kind) + (z.on ? "" : " · off");
-                    font-size: Type.fs1;
-                    font-weight: Type.w-semibold;
-                    color: Palette.on-tag;
-                    vertical-alignment: center;
-                }
-            }
+        opacity: root.tags-o;
+        for z[i] in root.zones: ZoneTag {
+            property <length> bx: root.off-x + z.x * root.scale * 1px;
+            property <length> by: root.off-y + z.y * root.scale * 1px;
+            property <length> bh: z.h * root.scale * 1px;
+            property <int> place: TagPlace.of(self.by, self.bh, root.height);
+            kind: z.kind;
+            on: z.on;
+            selected: i == root.selected;
+            x: self.bx + (self.place == 2 ? 4px : -1px);
+            y: self.place == 0 ? self.by - 28px : self.place == 1 ? self.by + self.bh + 4px : self.by + 4px;
         }
     }
     if Render.software: CornerMask {
@@ -224,234 +314,38 @@ export component LiveNote inherits Rectangle {
             alignment: center;
             Dot {
                 size: 6px;
-                tint: Palette.ok;
+                tint: Palette.live;
             }
         }
         Text {
             text: LiveView.note;
-            font-size: Type.fs1;
+            font-size: Type.fs-small;
             font-weight: LiveView.note-live ? Type.w-medium : Type.w-regular;
-            color: LiveView.note-live ? Palette.ok : Palette.text-3;
+            color: LiveView.note-live ? Palette.text-2 : Palette.text-3;
             vertical-alignment: center;
         }
     }
 }
-
-// Zone list row (round 4): grey kind icon, name, toggle. With `editable`, the name of the selected row is a
-// text field (rename).
-export component ZoneRow inherits Rectangle {
-    in property <ZoneData> zone;
-    in property <bool> selected;
-    in property <bool> first;
-    in property <bool> editable: false;
-    callback renamed(string);
-    // true when Enter ended it (the window then takes the keys again)
-    callback rename-done(bool);
-    in property <length> pad-x: Space.s5;
-    in property <length> row-h: Size.row;
-    callback toggled(bool);
-    callback clicked();
-    height: root.row-h;
-    background: root.selected ? Palette.surface-2 : transparent;
-    if !root.first: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-    TouchArea {
-        clicked => {
-            root.clicked();
-        }
-    }
-
-    HorizontalLayout {
-        padding-left: root.pad-x;
-        padding-right: root.pad-x;
-        spacing: Space.s3;
-        CIcon {
-            source: Kinds.icon(root.zone.kind);
-            color: root.selected ? Palette.text : Palette.text-2;
-        }
-
-        if !(root.editable && root.selected): Text {
-            text: root.zone.name;
-            horizontal-stretch: 1;
-            font-weight: Type.w-medium;
-            overflow: elide;
-            vertical-alignment: center;
-            color: root.zone.on ? Palette.text : Palette.text-2;
-        }
-        if root.editable && root.selected: TextInput {
-            text: root.zone.name;
-            horizontal-stretch: 1;
-            font-weight: Type.w-medium;
-            vertical-alignment: center;
-            single-line: true;
-            color: root.zone.on ? Palette.text : Palette.text-2;
-            selection-background-color: Palette.accent-soft;
-            accessible-label: "Zone name";
-            // the typed text waits in Rust; Enter or leaving the field saves it as one change (one undo step)
-            edited => {
-                root.renamed(self.text);
-            }
-            accepted => {
-                root.rename-done(true);
-            }
-            changed has-focus => {
-                if !self.has-focus {
-                    root.rename-done(false);
-                }
-            }
-            // follow the model when it changes from outside (undo), since typing breaks the text binding
-            property <string> model-name: root.zone.name;
-            changed model-name => {
-                self.text = self.model-name;
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Toggle {
-                on: root.zone.on;
-                label: root.zone.name;
-                toggled(v) => {
-                    root.toggled(v);
-                }
-            }
-        }
-    }
-}
-
-// Kind picker (.seg in .ztools): the grey kind line icons. The kind has no color (Max, 2026-11-22).
-export component KindPicker inherits Rectangle {
-    in property <Kind> kind: Kind.dialogue;
-    callback picked(Kind);
-    height: 32px;
-    border-radius: Radius.md;
-    background: Palette.surface-2;
-    border-width: 1px;
-    border-color: Palette.line-2;
-    HorizontalLayout {
-        padding: 3px;
-        spacing: 2px;
-        for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
-            border-radius: Radius.sm;
-            background: k == root.kind ? Palette.surface-3 : transparent;
-            accessible-role: tab;
-            accessible-label: Kinds.name(k);
-            accessible-item-selected: k == root.kind;
-            accessible-action-default => {
-                root.picked(k);
-            }
-            HorizontalLayout {
-                padding-left: Space.s3;
-                padding-right: Space.s3;
-                spacing: Space.s2;
-                CIcon {
-                    source: Kinds.icon(k);
-                    color: k == root.kind ? Palette.text : Palette.text-2;
-                }
-
-                Text {
-                    text: Kinds.name(k);
-                    font-weight: Type.w-medium;
-                    vertical-alignment: center;
-                    color: k == root.kind ? Palette.text : Palette.text-2;
-                }
-            }
-
-            TouchArea {
-                clicked => {
-                    root.picked(k);
-                }
-            }
-        }
-    }
-}
-
-// Select / Draw zone, kind picker, Retake screenshot.
-export component ZoneTools inherits HorizontalLayout {
-    in-out property <bool> draw: true;
-    in property <Kind> kind: Kind.dialogue;
-    callback kind-picked(Kind);
-    callback retake();
+// The end of the Zones and step 2 toolbars: "Live" while the game shows live (LiveNote), else the time of the
+// saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the game is closed").
+export component ShotNote inherits HorizontalLayout {
+    // real screenshots: the live view and its note can show
+    in property <bool> contain;
+    // "21:30"; empty: none
+    in property <string> time;
+    property <bool> live: root.contain && LiveView.on;
     spacing: Space.s3;
-    alignment: stretch;
-    Rectangle {
-        height: 32px;
-        horizontal-stretch: 0;
-        border-radius: Radius.md;
-        background: Palette.surface-2;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        HorizontalLayout {
-            padding: 3px;
-            spacing: 2px;
-            for t[i] in [{ label: "Select", icon: Icons.pointer }, { label: "Draw zone", icon: Icons.plus }]: Rectangle {
-                property <bool> on: (i == 1) == root.draw;
-                border-radius: Radius.sm;
-                background: self.on ? Palette.surface-3 : transparent;
-                accessible-role: tab;
-                accessible-label: t.label;
-                accessible-item-selected: self.on;
-                accessible-action-default => {
-                    root.draw = i == 1;
-                }
-                HorizontalLayout {
-                    padding-left: Space.s3;
-                    padding-right: Space.s3;
-                    spacing: Space.s2;
-                    CIcon {
-                        source: t.icon;
-                        color: on ? Palette.text : Palette.text-2;
-                    }
-
-                    Text {
-                        text: t.label;
-                        font-weight: Type.w-medium;
-                        vertical-alignment: center;
-                        color: on ? Palette.text : Palette.text-2;
-                    }
-                }
-
-                TouchArea {
-                    clicked => {
-                        root.draw = i == 1;
-                    }
-                }
-            }
-        }
+    horizontal-stretch: 0;
+    if root.contain && LiveView.note != "": VerticalLayout {
+        alignment: center;
+        LiveNote { }
     }
-
-    HorizontalLayout {
-        padding-left: Space.s2;
-        horizontal-stretch: 0;
-        Text {
-            text: "Kind";
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
-            color: Palette.text-3;
-            vertical-alignment: center;
-        }
-    }
-
-    KindPicker {
-        horizontal-stretch: 0;
-        kind: root.kind;
-        picked(k) => {
-            root.kind-picked(k);
-        }
-    }
-
-    Rectangle {
-        horizontal-stretch: 1;
-    }
-
-    Button {
-        text: "Retake screenshot";
-        icon: Icons.camera;
-        clicked => {
-            root.retake();
-        }
+    if !root.live && root.time != "": Text {
+        text: root.time;
+        color: Palette.text-2;
+        vertical-alignment: center;
+        accessible-role: text;
+        accessible-label: "Screenshot time";
+        accessible-value: root.time;
     }
 }

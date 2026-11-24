@@ -316,13 +316,19 @@ fn nothing_is_picked_when_no_game_runs() {
     assert_eq!(w.get_picked_window(), -1);
     press(&w, "Continue", AccessibleRole::Button);
     assert!(w.get_notice().contains("Pick a window first"));
-    // a picked window stays picked through Refresh, also when a new window opens in front of it
+    // the list refreshes by itself (no Refresh button): a picked window stays picked, also when a new window
+    // opens in front of it
     press(&w, "Notes", AccessibleRole::Button);
     assert_eq!(w.get_picked_window(), 0);
     front
         .borrow_mut()
         .push(win("Calculator", "calc.exe", false));
-    press(&w, "Refresh", AccessibleRole::Button);
+    assert_eq!(
+        w.get_other_windows().row_count(),
+        1,
+        "not before the page asks"
+    );
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(1100));
     assert_eq!(w.get_other_windows().row_count(), 2);
     let picked = w.get_picked_window();
     assert_eq!(picked, 1);
@@ -336,7 +342,7 @@ fn nothing_is_picked_when_no_game_runs() {
 }
 
 #[test]
-fn page_02_wraps_games_and_scrolls_a_long_list() {
+fn page_02_lists_games_and_scrolls_a_long_list() {
     let (_dir, paths) = temp_paths();
     let mut d = FakeDesktop::new();
     d.windows = (1..=5)
@@ -353,10 +359,10 @@ fn page_02_wraps_games_and_scrolls_a_long_list() {
             .unwrap_or_else(|| panic!("no row {label}"))
             .absolute_position()
     };
-    // three games to a row: game 4 starts a second row under game 1
+    // one 48 px row per game, one under the other
     let (g1, g3, g4) = (at("Game 1"), at("Game 3"), at("Game 4"));
-    assert_eq!(g1.y, g3.y);
-    assert!(g4.y > g1.y && (g4.x - g1.x).abs() < 1.0, "{g1:?} {g4:?}");
+    assert!((g3.y - g1.y - 96.0).abs() < 1.0, "{g1:?} {g3:?}");
+    assert!(g4.y > g3.y && (g4.x - g1.x).abs() < 1.0, "{g1:?} {g4:?}");
     // the last rows are below the window (the testing backend finds only rows on screen); a wheel turn
     // scrolls them into view
     let shown = |label: &str| {
@@ -380,12 +386,13 @@ fn page_02_wraps_games_and_scrolls_a_long_list() {
 fn voice_speed_and_volume_are_saved() {
     let (_dir, paths) = temp_paths();
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
+    // 0.6 of the 0.5x to 2.0x track is 1.4x
     w.set_voice_speed(0.6);
     w.set_voice_volume(0.5);
     w.set_picked_voice(1);
     finish_onboarding(&w);
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
-    assert!((p.voice.speed - 1.2).abs() < 1e-4, "{}", p.voice.speed);
+    assert!((p.voice.speed - 1.4).abs() < 1e-4, "{}", p.voice.speed);
     assert!((p.voice.volume - 0.5).abs() < 1e-4);
     assert_eq!(
         (p.voice.engine.as_str(), p.voice.id.as_str()),

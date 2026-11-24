@@ -50,7 +50,7 @@ pub fn save_path(owner: Option<isize>, suggested: &str) -> Option<PathBuf> {
         let opts = d.GetOptions().ok()?;
         d.SetOptions(opts | FOS_OVERWRITEPROMPT | FOS_PATHMUSTEXIST)
             .ok()?;
-        d.SetTitle(w!("Export this game")).ok()?;
+        d.SetTitle(w!("Export game profile")).ok()?;
         run(&d.cast().ok()?, owner)
     }
 }
@@ -65,7 +65,7 @@ pub fn open_path(owner: Option<isize>) -> Option<PathBuf> {
         let opts = d.GetOptions().ok()?;
         d.SetOptions(opts | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST)
             .ok()?;
-        d.SetTitle(w!("Import a game")).ok()?;
+        d.SetTitle(w!("Import game profile")).ok()?;
         run(&d.cast().ok()?, owner)
     }
 }

@@ -1,56 +1,108 @@
-// 13 in-game status pill: dot, speaker, small live waveform.
-import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art } from "../theme.slint";
-import { Dot, PillWave } from "../components/base.slint";
+// 13 in-game status pill (d-black 13-pill): the status dot and the speaker's name, on a floating panel.
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Type,
+    Motion,
+    Art,
+} from "../theme.slint";
+import { Dot } from "../components/base.slint";
 
-// The small in-game pill (13), reused on the welcome preview.
+// The small in-game pill (13), also on the review preview. Lime dot while reading, grey otherwise. The name
+// shows while a line is spoken (if "Show speaker name" is on) and stays 600 ms after it, so it does not flicker
+// between two lines. A new speaker during the hold only crossfades the name (out 60 ms, in 120 ms).
 export component OverlayPill inherits Rectangle {
     in property <string> speaker: "Arthur";
-    // the overlay window (M4): green dot while reading, grey otherwise; the wave is lit while a line is spoken
     in property <bool> ok: true;
+    // a line is being spoken; the pill draws no wave, the view model and its tests use it
     in property <bool> speaking: true;
+    property <string> name: root.speaker;
+    // the name fades out before it changes to the next one
+    property <bool> fading: false;
+    property <string> next;
+    changed speaker => {
+        if root.speaker != "" || Motion.instant {
+            hold.running = false;
+            if !Motion.instant && root.name != "" && root.speaker != "" && root.speaker != root.name {
+                root.next = root.speaker;
+                root.fading = true;
+                swap.running = true;
+            } else {
+                swap.running = false;
+                root.fading = false;
+                root.name = root.speaker;
+            }
+        } else {
+            hold.running = true;
+        }
+    }
+    swap := Timer {
+        interval: Math.max(1ms, Motion.d(60ms));
+        running: false;
+        triggered => {
+            self.running = false;
+            root.name = root.next;
+            root.fading = false;
+        }
+    }
+
+    hold := Timer {
+        interval: 600ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.name = "";
+        }
+    }
+
     height: 32px;
     width: row.preferred-width;
-    border-radius: 16px;
-    background: Palette.pill-bg;
+    border-radius: Radius.pill;
+    background: Palette.float;
     border-width: 1px;
-    border-color: Palette.pill-line;
-    drop-shadow-offset-y: Shadow.low-y;
-    drop-shadow-blur: Shadow.low-blur;
-    drop-shadow-color: Shadow.low-color;
+    border-color: Palette.float-line;
+    // a smaller shadow than the mockup's (0 12 24): the pill window has an 8 px margin, and a shadow that reaches
+    // past it would be cut off at the window's edge
+    drop-shadow-offset-y: 2px;
+    drop-shadow-blur: 4px;
+    drop-shadow-color: #00000099;
+    accessible-role: text;
+    accessible-label: root.name != "" ? root.name : root.ok ? "Reading" : "Paused";
     row := HorizontalLayout {
-        padding-left: Space.s3 + 1px;
-        padding-right: Space.s3 + 1px;
+        padding-left: Space.s3;
+        padding-right: Space.s3;
         spacing: Space.s2;
         VerticalLayout {
             alignment: center;
             Dot {
-                size: 6px;
-                tint: root.ok ? Palette.ok : Palette.text-3;
+                size: 8px;
+                tint: root.ok ? Palette.live : Palette.text-2;
             }
         }
 
-        if root.speaker != "": Text {
-            text: root.speaker;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
+        if root.name != "": Text {
+            text: root.name;
+            opacity: root.fading ? 0 : 1;
+            animate opacity {
+                duration: root.fading ? Motion.d(60ms) : Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+            font-size: Type.fs-body;
             color: Palette.text;
             vertical-alignment: center;
             max-width: 200px;
             overflow: elide;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            PillWave {
-                played: root.speaking ? 999 : 0;
-            }
+            accessible-role: none;
         }
     }
 }
 
-
-// Preview of the pill over the game (13-overlay). The real pill is a click-through overlay window (M4).
+// Preview of the pill over the game (13-pill). The real pill is a click-through overlay window (M4).
 export component PillPreview inherits Rectangle {
+    // bottom center instead of top right (13-pill-bottom)
+    in property <bool> bottom: false;
     Image {
         width: 100%;
         height: 100%;
@@ -59,7 +111,7 @@ export component PillPreview inherits Rectangle {
     }
 
     OverlayPill {
-        x: parent.width - self.width - 24px;
-        y: 24px;
+        x: root.bottom ? (parent.width - self.width) / 2 : parent.width - self.width - 24px;
+        y: root.bottom ? parent.height - self.height - 24px : 24px;
     }
 }

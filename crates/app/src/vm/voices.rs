@@ -171,33 +171,22 @@ impl Voices {
             .unwrap_or_default()
     }
 
-    /// "Kokoro · Heart" or "Windows · David" for a saved id (see [`Voices::index_of`]); "No voice" when there is
-    /// none.
+    /// The voice name for the Overview ("Heart", "David") of a saved id (see [`Voices::index_of`]); "No voice" when
+    /// there is none.
     pub fn label(&self, id: &str) -> String {
         match self.list.get(self.index_of(id)) {
-            Some(v) => format!("{} · {}", engine_label(v.engine), v.name),
+            Some(v) => v.name.clone(),
             None => "No voice".into(),
         }
     }
 
-    /// The Settings line under "Kokoro", in the approved mockup's form ("Installed · 11 voices · 312 MB"): the
-    /// voice count and the size of the model and voice files (rounded to whole MB).
-    pub fn kokoro_desc(&self) -> String {
-        if self.kokoro {
-            let mb =
-                (dr_tts::kokoro::MODEL_SIZE + dr_tts::kokoro::VOICES_SIZE + 500_000) / 1_000_000;
-            format!("Installed · {} voices · {mb} MB", self.list.len())
-        } else {
-            "Not found · Windows voices speak instead".into()
-        }
-    }
-
-    /// The Settings line under "Windows voices".
+    /// The Settings "Voices" row: how many voices each engine has ("Kokoro 11 · Windows 11"). Kokoro is left out
+    /// when its files are missing.
     pub fn desc(&self) -> String {
-        match self.windows_count {
-            0 => "Built into Windows · none installed".into(),
-            1 => "Built into Windows · 1 voice".into(),
-            n => format!("Built into Windows · {n} voices"),
+        match (self.kokoro, self.windows_count) {
+            (true, n) => format!("Kokoro {} · Windows {n}", self.list.len()),
+            (false, 0) => NO_VOICE.into(),
+            (false, n) => format!("Windows {n}"),
         }
     }
 
@@ -218,8 +207,8 @@ impl Voices {
     }
 }
 
-/// Page 05 with no voice at all: no Kokoro files and no Windows voice.
-pub const NO_VOICE: &str = "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice.";
+/// No voice at all (no Kokoro files and no Windows voice): page 05 says this with Add voices under it (TEXT.md).
+pub const NO_VOICE: &str = "No voices found.";
 
 /// The notice when the voice test did not play (the raw error goes to the log).
 pub fn error_text(kind: ErrorKind) -> &'static str {
@@ -304,13 +293,15 @@ pub fn bars_played(pos_ms: f64, len_ms: f64) -> i32 {
     ((pos_ms / len_ms).clamp(0.0, 1.0) * WAVE_BARS as f64).round() as i32
 }
 
-/// Profile speed (0.5 to 2) from a page-05 slider (0 to 1 for 0x to 2x), and back.
+/// Profile speed from a speed slider (0 to 1 over the app's range, 0.5x to 2.0x, as in the quick menu), in
+/// tenths ("1.1x"), and back. So 1.1x sits at 40% of the track and no part of it is dead.
 pub fn speed_of_slider(v: f32) -> f32 {
-    (v * 2.0).clamp(dr_tts::SPEED_MIN, dr_tts::SPEED_MAX)
+    let s = dr_tts::SPEED_MIN + v.clamp(0.0, 1.0) * (dr_tts::SPEED_MAX - dr_tts::SPEED_MIN);
+    (s * 10.0).round() / 10.0
 }
 
 pub fn slider_of_speed(s: f32) -> f32 {
-    (s / 2.0).clamp(0.0, 1.0)
+    ((s - dr_tts::SPEED_MIN) / (dr_tts::SPEED_MAX - dr_tts::SPEED_MIN)).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -346,21 +337,18 @@ mod tests {
         assert_eq!(row(&v("c", "X", "de-DE", None)).desc.as_str(), "de-DE");
         // ids carry the engine; an old id without it is a Windows id
         assert_eq!(vs.list[1].id, "win:b");
-        assert_eq!(vs.label("win:b"), "Windows · Hazel");
+        assert_eq!(vs.label("win:b"), "Hazel");
         assert_eq!(vs.index_of("b"), 1);
         // empty or uninstalled id: the first voice, also for speaking
-        assert_eq!(vs.label(""), "Windows · David");
+        assert_eq!(vs.label(""), "David");
         assert_eq!(vs.effective("gone"), "win:a");
-        assert_eq!(vs.desc(), "Built into Windows · 2 voices");
-        assert_eq!(vs.kokoro_desc(), "Not found · Windows voices speak instead");
+        assert_eq!(vs.desc(), "Windows 2");
         assert_eq!(vs.problem_text(), "");
         let none = Voices::none();
         assert_eq!(none.label("a"), "No voice");
         assert_eq!(none.effective("a"), "");
-        assert_eq!(
-            none.problem_text(),
-            "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice."
-        );
+        assert_eq!(none.problem_text(), "No voices found.");
+        assert_eq!(none.desc(), "No voices found.");
         // a raw Windows error stays out of the page
         let failed = Voices {
             problem: Some("Windows voices: Class not registered".into()),
@@ -388,10 +376,10 @@ mod tests {
             ["kokoro:af_heart", "kokoro:am_adam", "kokoro:bm_george"]
         );
         // a new game speaks with Heart; an old Windows id that is not in the list too
-        assert_eq!(vs.label(""), "Kokoro · Heart");
+        assert_eq!(vs.label(""), "Heart");
         assert_eq!(vs.effective(""), "kokoro:af_heart");
         assert_eq!(vs.effective("a"), "kokoro:af_heart");
-        assert_eq!(vs.label("kokoro:am_adam"), "Kokoro · Adam");
+        assert_eq!(vs.label("kokoro:am_adam"), "Adam");
         let r = row(&vs.list[2]);
         assert_eq!(
             (
@@ -402,8 +390,7 @@ mod tests {
             ),
             ("George", "British English · Male", "UK · Male", "Kokoro")
         );
-        assert_eq!(vs.kokoro_desc(), "Installed · 3 voices · 354 MB");
-        assert_eq!(vs.desc(), "Built into Windows · 2 voices");
+        assert_eq!(vs.desc(), "Kokoro 3 · Windows 2");
         assert_eq!(
             error_text(ErrorKind::Engine),
             "The voice could not speak the sample."
@@ -426,15 +413,15 @@ mod tests {
         assert!(!vs.check_kokoro());
         watch.set(LoadState::Ready);
         assert!(!vs.check_kokoro());
-        assert_eq!(vs.label(""), "Kokoro · Heart");
+        assert_eq!(vs.label(""), "Heart");
         // failed: the Windows voices, once
         watch.set(LoadState::Failed("onnxruntime.dll is too old".into()));
         assert!(vs.check_kokoro());
         assert!(!vs.check_kokoro());
         assert!(!vs.kokoro);
-        assert_eq!(vs.label(""), "Windows · David");
+        assert_eq!(vs.label(""), "David");
         assert_eq!(vs.effective("kokoro:af_heart"), "win:a");
-        assert_eq!(vs.kokoro_desc(), "Not found · Windows voices speak instead");
+        assert_eq!(vs.desc(), "Windows 2");
         let log = std::fs::read_to_string(dir.path().join("speech.log")).unwrap();
         assert!(log.contains("too old"), "{log}");
     }
@@ -445,8 +432,12 @@ mod tests {
         assert_eq!(time_text(0.0, 61_000.0), "0:00 / 1:01");
         assert_eq!(bars_played(500.0, 1000.0), 17);
         assert_eq!(bars_played(5.0, 0.0), 0);
-        assert_eq!(speed_of_slider(0.55), 1.1);
-        assert_eq!(speed_of_slider(0.1), 0.5);
-        assert_eq!(slider_of_speed(1.1), 0.55);
+        assert_eq!(speed_of_slider(0.4), 1.1);
+        assert_eq!(speed_of_slider(0.0), 0.5);
+        assert_eq!(speed_of_slider(1.0), 2.0);
+        // every part of the track changes the speed: no dead quarter at the left
+        assert_eq!(speed_of_slider(0.1), 0.7);
+        assert!((slider_of_speed(1.1) - 0.4).abs() < 1e-6);
+        assert_eq!(slider_of_speed(0.2), 0.0);
     }
 }

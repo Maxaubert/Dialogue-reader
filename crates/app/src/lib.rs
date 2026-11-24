@@ -9,6 +9,7 @@ pub mod crash;
 #[cfg(windows)]
 pub mod dialogs;
 pub mod fake;
+pub mod fonts;
 pub mod geom;
 pub mod overlay;
 pub mod screens;
@@ -21,6 +22,8 @@ pub mod vm;
 /// The workspace version (Cargo.toml `[workspace.package]`): `--version`, Settings > Updates, the installer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub use fonts::{set_instant_motion, set_reduce_motion};
+
 /// The main window with the fake data of the mockups (render-screens and the screen and nav tests).
 pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
     build_window(vm::Source::Fake).map(|(w, _)| w)
@@ -30,6 +33,8 @@ pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
 /// window (the callbacks hold it too).
 pub fn build_window(source: vm::Source) -> Result<(MainWindow, vm::Shared), slint::PlatformError> {
     let w = MainWindow::new()?;
+    // the font of this PC, and instant motion in headless tests and renders (src/fonts.rs)
+    fonts::style_window!(w);
     let vm = vm::install(&w, source);
     wire(&w, &vm);
     Ok((w, vm))
@@ -84,7 +89,7 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
 /// The app window lost the focus (Alt+Tab, a UAC prompt): the left release of a zone drag may never come. The
 /// stage lets go of the mouse (a pointer exit) and the drag is cancelled, as a right click does: the zone goes
 /// back, a zone being drawn is dropped. Overview pauses its live view (the game is in front, src/vm/live.rs).
-/// Key capture ends as Cancel does (Max, 2026-11-23): a key pressed in the game is not taken.
+/// Key capture ends as Esc does (Max, 2026-11-23): a key pressed in the game is not taken.
 /// Public for the tests (the testing backend has no winit events).
 pub fn focus_lost(w: &MainWindow, vm: &vm::Shared) {
     use slint::platform::WindowEvent;

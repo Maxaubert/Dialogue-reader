@@ -1,34 +1,36 @@
-"""Export icons and fake game art from the Midnight mockups for the Slint UI.
+"""Export icons and fake game art from the d-black mockups for the Slint UI.
 
-Reads design/mockups/c-midnight/_build.py, runs it with its output folder pointed at a temp folder
-(so the mockups are not touched), and writes:
+Reads design/mockups/d-black/_build.py, runs it with its output folder pointed at a temp folder
+(so the mockups are not touched), and writes the icons it has (older icons from c-midnight that d-black does not
+draw stay as they are):
 
 - ui/icons/<name>.svg      line icons, stroke drawn for 16 px (1.5 px on screen)
 - ui/icons/<name>-sm.svg   the same icon, stroke drawn for 12 px (2 px on screen, as in tokens.css)
 - ui/icons/<name>-lg.svg   the same icon, stroke drawn for 22 px (1.5 px on screen)
-- ui/icons/<name>-fill.svg filled form (play triangles)
+- ui/icons/<name>-fill.svg filled form (play, stop)
 - ui/icons/logo.svg        the app logo
 - ui/art/<game>.svg        game thumbnails (160 x 90)
-- ui/art/scene.svg         the fake game screenshot (1600 x 900)
-- ui/art/scene-1440.png    that scene drawn by headless Edge at 1440 x 900 ("cover", as in the mockups), for the
-                           full-window overlay previews. Skipped with a note when Edge is not installed.
+- ui/art/scene.svg         the fake game screenshot (1600 x 900, d-black SCENE_RDR: neutral greys, Segoe UI)
+- ui/art/scene-1440.png    with --png only: that scene drawn by headless Edge at 1440 x 900 ("cover", as in the
+                           mockups), for the full-window overlay previews. Skipped with a note when Edge is missing.
 
 All icons are white. Slint draws them with `colorize`, so one file serves every color.
 
-Run from anywhere: python -I crates/app/tools/export_icons.py
+Run from anywhere: python -I crates/app/tools/export_icons.py [--png]
 """
 
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.path.dirname(HERE)
 REPO = os.path.dirname(os.path.dirname(APP))
-BUILD = os.path.join(REPO, "design", "mockups", "c-midnight", "_build.py")
+BUILD = os.path.join(REPO, "design", "mockups", "d-black", "_build.py")
 
 
 def load_build():
@@ -97,22 +99,24 @@ def main():
             with open(os.path.join(icons, f"{name}{suffix}.svg"), "w", encoding="utf-8") as f:
                 f.write(icon_svg(body, stroke))
         n += 1
-    for name in ("play", "r8-play", "stop", "pause"):
+    for name in ("play", "stop"):
         with open(os.path.join(icons, f"{name}-fill.svg"), "w", encoding="utf-8") as f:
             f.write(fill_svg(ns["P"][name]))
-    logo = ns["LOGO"].replace("{s}", "24").replace('style="flex:none;display:block"',
-                                                   'xmlns="http://www.w3.org/2000/svg"')
+    logo = (ns["LOGO"].replace('width="20" height="20"', 'width="24" height="24"')
+            .replace(' aria-hidden="true" style="display:block"', ' xmlns="http://www.w3.org/2000/svg"'))
     with open(os.path.join(icons, "logo.svg"), "w", encoding="utf-8") as f:
         f.write(logo + "\n")
     for g, (defs, body) in ns["ART"].items():
         with open(os.path.join(art, f"{g}.svg"), "w", encoding="utf-8") as f:
             f.write('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 160 90">'
                     f'<defs>{defs}</defs>{body}</svg>\n')
-    scene = ns["SCENE"].replace('class="scene" ', 'xmlns="http://www.w3.org/2000/svg" width="1600" height="900" ')
+    scene = ns["SCENE_RDR"].replace('class="scene" ',
+                                    'xmlns="http://www.w3.org/2000/svg" width="1600" height="900" ')
     scene = scene.replace(' aria-hidden="true"', "")
     with open(os.path.join(art, "scene.svg"), "w", encoding="utf-8") as f:
         f.write(scene + "\n")
-    render_scene_png(os.path.join(art, "scene.svg"), os.path.join(art, "scene-1440.png"))
+    if "--png" in sys.argv:
+        render_scene_png(os.path.join(art, "scene.svg"), os.path.join(art, "scene-1440.png"))
     print(f"{n} icons, {len(ns['ART'])} thumbnails and the scene written to {APP}\\ui")
 
 

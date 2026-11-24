@@ -9,6 +9,11 @@
 //! - Only `main.rs` makes them with `win32` (after the winit backend is selected with `win::attributes_hook`), so
 //!   no test or headless render shows a window on the desktop. `render-screens` keeps the previews in the main
 //!   window (13, 15, 16), which use the same components.
+//! - Show and hide fade (README motion table, 9 to 11). Each window has an `open` property: true fades it in, false
+//!   fades it out. The state here (`shown`, `pill_shown`) changes at once; only the Win32 hide waits until the fade
+//!   ends ([`Fade`]). While it fades out the window keeps its overlay styles (the pill stays click-through, none
+//!   takes focus) and the menu and zone edit take no clicks. With instant motion (tests, renders) the hide is at
+//!   once, as the testing backend runs no timers.
 
 pub mod place;
 pub mod quick_menu;
@@ -16,7 +21,9 @@ pub mod quick_menu;
 pub mod win;
 pub mod zone_edit;
 
+use std::cell::Cell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use dr_runtime::keys::Overlay;
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, VecModel};
@@ -49,6 +56,48 @@ pub struct Overlays {
     pub last_error: Option<String>,
     /// The app is quitting: nothing shows any more.
     pub closed: bool,
+    /// The delayed hides of the pill, the menu and zone edit.
+    fade: [Fade; 3],
+    /// Instant motion (tests, renders): hide at once.
+    instant: bool,
+}
+
+/// How long each window takes to fade out (README motion table): the pill 200 ms, the menu 120 ms, zone edit
+/// 140 ms. The hide waits a little longer, so the last frame is drawn.
+pub const PILL_OUT: Duration = Duration::from_millis(200);
+pub const MENU_OUT: Duration = Duration::from_millis(120);
+pub const ZONE_OUT: Duration = Duration::from_millis(140);
+const HIDE_SLACK: Duration = Duration::from_millis(30);
+
+/// The delayed hide of one window. Each show or hide counts up `turn`; a timer hides the window only when no
+/// show or other hide came after it, so a window shown again while it fades stays.
+#[derive(Default, Clone)]
+struct Fade {
+    turn: Rc<Cell<u64>>,
+}
+
+impl Fade {
+    /// A show: a pending hide is void.
+    fn cancel(&self) {
+        self.turn.set(self.turn.get() + 1);
+    }
+
+    /// Hides `c` after `after`, unless a show or hide comes first. `instant`: at once.
+    fn hide_later<C: ComponentHandle + 'static>(&self, c: &C, after: Duration, instant: bool) {
+        self.cancel();
+        if instant {
+            let _ = c.hide();
+            return;
+        }
+        let (turn, mine, weak) = (self.turn.clone(), self.turn.get(), c.as_weak());
+        slint::Timer::single_shot(after + HIDE_SLACK, move || {
+            if turn.get() == mine
+                && let Some(c) = weak.upgrade()
+            {
+                let _ = c.hide();
+            }
+        });
+    }
 }
 
 impl Overlays {
@@ -83,6 +132,9 @@ impl Overlays {
                 "overlay windows not made".into(),
             ));
         };
+        crate::fonts::style_window!(pill);
+        crate::fonts::style_window!(menu);
+        crate::fonts::style_window!(zones);
         let voices = Rc::new(VecModel::default());
         let edit_zones = Rc::new(VecModel::default());
         menu.set_voices(ModelRc::from(voices.clone()));
@@ -104,6 +156,8 @@ impl Overlays {
             menu_at: None,
             last_error: None,
             closed: false,
+            fade: Default::default(),
+            instant: crate::fonts::instant_motion(),
         })
     }
 
@@ -148,7 +202,8 @@ impl Overlays {
         let on = on && at != PillAt::Off && g.is_some();
         if !on {
             if self.pill_shown {
-                let _ = self.pill.hide();
+                self.pill.set_open(false);
+                self.fade[0].hide_later(&self.pill, PILL_OUT, self.instant);
                 self.pill_shown = false;
             }
             return;
@@ -162,9 +217,11 @@ impl Overlays {
             self.pill
                 .window()
                 .set_position(PhysicalPosition::new(pos.0, pos.1));
+            self.fade[0].cancel();
             if !self.show(Kind::Pill) {
                 return;
             }
+            self.pill.set_open(true);
             self.pill_shown = true;
             self.pill_at = None;
         }
@@ -191,9 +248,11 @@ impl Overlays {
             self.menu
                 .window()
                 .set_position(PhysicalPosition::new(p.0, p.1));
+            self.fade[1].cancel();
             if !self.show(Kind::Menu) {
                 return false;
             }
+            self.menu.set_open(true);
             self.menu_at = None;
         }
         // its size at this monitor's scale is known after show
@@ -207,8 +266,12 @@ impl Overlays {
         true
     }
 
+    /// Fades the menu out; its window hides when the fade ends.
     pub fn menu_off(&mut self) {
-        let _ = self.menu.hide();
+        if self.menu.get_open() {
+            self.menu.set_open(false);
+            self.fade[1].hide_later(&self.menu, MENU_OUT, self.instant);
+        }
     }
 
     /// Shows zone edit over what the capture covers.
@@ -217,9 +280,11 @@ impl Overlays {
         let w = self.zones.window();
         w.set_position(PhysicalPosition::new(r.x, r.y));
         w.set_size(PhysicalSize::new(r.w.max(1) as u32, r.h.max(1) as u32));
+        self.fade[2].cancel();
         if !self.show(Kind::Zone) {
             return false;
         }
+        self.zones.set_open(true);
         // a move to another monitor may have changed the size: set it again
         let w = self.zones.window();
         w.set_position(PhysicalPosition::new(r.x, r.y));
@@ -227,9 +292,13 @@ impl Overlays {
         true
     }
 
+    /// Fades zone edit out; its window hides when the fade ends.
     pub fn zones_off(&mut self) {
         self.zones.set_draft(false);
-        let _ = self.zones.hide();
+        if self.zones.get_open() {
+            self.zones.set_open(false);
+            self.fade[2].hide_later(&self.zones, ZONE_OUT, self.instant);
+        }
     }
 
     /// The scale of the zone edit window (its monitor's), once shown.
@@ -240,6 +309,12 @@ impl Overlays {
     /// Hides every overlay for good (the app quits).
     pub fn hide_all(&mut self) {
         self.closed = true;
+        for f in &self.fade {
+            f.cancel();
+        }
+        self.pill.set_open(false);
+        self.menu.set_open(false);
+        self.zones.set_open(false);
         let _ = self.pill.hide();
         let _ = self.menu.hide();
         let _ = self.zones.hide();

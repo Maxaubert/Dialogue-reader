@@ -30,15 +30,6 @@ fn voices(scale: f64) -> (Voices, FakeTts, NullSink) {
     (v, tts, sink)
 }
 
-/// The button labelled `label` can be pressed.
-fn enabled(w: &dr_app::MainWindow, label: &str) -> bool {
-    ElementHandle::find_by_accessible_label(w, label)
-        .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
-        .unwrap_or_else(|| panic!("no button labelled {label:?}"))
-        .accessible_enabled()
-        != Some(false)
-}
-
 /// Lets the Slint change handlers run (`changed page`), as the event loop does.
 fn settle() {
     slint::platform::update_timers_and_animations();
@@ -66,14 +57,16 @@ fn page_05_lists_the_voices_and_plays_a_sample_with_the_page_settings() {
         ("American English · Female", "US · Female")
     );
     assert_eq!(w.get_voices_problem(), "");
-    assert_eq!(w.get_voices_desc(), "Built into Windows · 2 voices");
+    assert_eq!(w.get_voices_desc(), "Windows 2");
     assert!(!w.get_voice_testing(), "nothing plays at the start");
 
     w.set_page(Page::Voice);
-    w.set_picked_voice(1);
-    w.set_voice_speed(0.75);
+    // two thirds of the 0.5x to 2.0x track is 1.5x
+    w.set_voice_speed(2.0 / 3.0);
     w.set_voice_volume(0.4);
-    press(&w, "Play sample", AccessibleRole::Button);
+    // the play button of the Zira row picks Zira and plays her sample
+    press(&w, "Play a sample of Zira", AccessibleRole::Button);
+    assert_eq!(w.get_picked_voice(), 1);
     assert!(w.get_voice_testing());
     wait_test_end(&vm);
     assert!(!w.get_voice_testing());
@@ -92,7 +85,7 @@ fn stop_ends_the_sample() {
     let (vs, _, _) = voices(1.0);
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     std::thread::sleep(Duration::from_millis(200));
     assert!(vm.borrow_mut().poll_test());
     assert!(
@@ -112,16 +105,22 @@ fn with_no_voice_installed_the_pages_say_so_and_finish_still_saves() {
     let opened = desktop.opened_settings.clone();
     let (w, _vm) = real_window_with(&paths, desktop, Voices::none());
     assert_eq!(w.get_voices().row_count(), 0);
-    assert_eq!(w.get_voices_desc(), "Built into Windows · none installed");
-    assert_eq!(
-        w.get_voices_problem(),
-        "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice."
-    );
+    // one form everywhere (TEXT.md: "No voices found." plus Add voices)
+    assert_eq!(w.get_voices_desc(), "No voices found.");
+    assert_eq!(w.get_voices_problem(), "No voices found.");
     assert_eq!(w.get_voice_label(), "No voice");
     w.set_page(Page::Voice);
-    // nothing to play: the button is off
-    assert!(!enabled(&w, "Play sample"));
-    press(&w, "Play sample", AccessibleRole::Button);
+    // nothing to play: no play button, the page says so
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Play a sample of David")
+            .next()
+            .is_none()
+    );
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "No voices found.")
+            .next()
+            .is_some()
+    );
     assert!(!w.get_voice_testing());
     assert_eq!(w.get_notice(), "");
     press(&w, "Add voices", AccessibleRole::Button);
@@ -155,15 +154,15 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
         press(&w, "Continue", AccessibleRole::Button);
     }
     press(&w, "Finish", AccessibleRole::Button);
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voice_label(), "David");
     assert_eq!(w.get_game_voice(), 0);
 
     w.set_page(Page::Settings);
     w.invoke_game_voice_picked(1);
-    w.set_game_speed(0.75);
+    w.set_game_speed(2.0 / 3.0);
     w.set_game_volume(0.3);
     w.invoke_game_voice_changed();
-    assert_eq!(w.get_voice_label(), "Windows · Zira");
+    assert_eq!(w.get_voice_label(), "Zira");
     // a moving slider is not saved on every step; letting it go saves
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
     assert!((p.voice.volume - 0.8).abs() < 1e-4, "{}", p.voice.volume);
@@ -175,7 +174,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
 
     // Test in Settings speaks with the game's voice (the list scrolls to Voices first: hidden rows are not found)
     w.invoke_settings_jump(3);
-    press(&w, "Test the voice", AccessibleRole::Button);
+    press(&w, "Play a sample", AccessibleRole::Button);
     wait_test_end(&vm);
     let call = tts.calls().pop().unwrap();
     assert_eq!((call.voice.as_str(), call.speed), ("fake-zira", 1.5));
@@ -187,7 +186,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_page(), Page::Overview);
     assert_eq!(w.get_game_voice(), 1);
-    assert!((w.get_game_speed() - 0.75).abs() < 1e-4);
+    assert!((w.get_game_speed() - 2.0 / 3.0).abs() < 1e-4);
     assert!((w.get_game_volume() - 0.3).abs() < 1e-4);
 }
 
@@ -200,7 +199,7 @@ fn a_saved_voice_that_is_gone_falls_back_to_the_first() {
     let (vs, _, _) = voices(0.0);
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_game_voice(), 0);
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voice_label(), "David");
 }
 
 #[test]
@@ -213,7 +212,7 @@ fn an_old_windows_id_without_a_prefix_still_picks_its_voice() {
     let (vs, _, _) = voices(0.0);
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_game_voice(), 1);
-    assert_eq!(w.get_voice_label(), "Windows · Zira");
+    assert_eq!(w.get_voice_label(), "Zira");
 }
 
 /// A finished game, its window and view model, on fake voices whose engine takes `delay` to make a sound.
@@ -239,7 +238,7 @@ fn leaving_the_page_stops_the_sample_and_saves_moved_sliders() {
     settle();
     w.set_page(Page::Voice);
     settle();
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     assert!(vm.borrow_mut().poll_test());
     w.set_page(Page::Keys);
     settle();
@@ -266,9 +265,9 @@ fn a_quick_stop_and_play_follows_the_second_sample() {
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     tts.set_delay(Duration::from_millis(300));
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     press(&w, "Stop", AccessibleRole::Button);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     // the first sample is cut while it is made; the second one is made after it
     std::thread::sleep(Duration::from_millis(400));
     assert!(vm.borrow_mut().poll_test(), "the second sample still plays");
@@ -287,7 +286,7 @@ fn a_failed_test_says_why_in_plain_words() {
         "Windows voices: speak: The system cannot find the file specified.",
     ));
     w.set_page(Page::Voice);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     wait_test_end(&vm);
     assert!(!w.get_voice_testing());
     assert_eq!(w.get_notice(), "The voice could not speak the sample.");
@@ -300,7 +299,7 @@ fn the_page_05_volume_slider_changes_a_playing_sample() {
     let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     w.set_page(Page::Voice);
     w.set_voice_volume(0.4);
-    press(&w, "Play sample", AccessibleRole::Button);
+    press(&w, "Play a sample of David", AccessibleRole::Button);
     let end = Instant::now() + Duration::from_secs(5);
     while sink.played().is_empty() {
         assert!(Instant::now() < end);
@@ -332,17 +331,14 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
         w.get_voices().iter().map(|v| v.name.to_string()).collect()
     };
     assert_eq!(names(&w), ["Heart", "Adam"]);
-    assert!(w.get_kokoro_desc().starts_with("Installed · 2 voices"));
-    assert_eq!(w.get_voice_label(), "Kokoro · Heart");
+    assert_eq!(w.get_voices_desc(), "Kokoro 2 · Windows 2");
+    assert_eq!(w.get_voice_label(), "Heart");
 
     // the model fails on its own thread; the next page change shows the Windows voices
     watch.set(LoadState::Failed("onnxruntime.dll is too old".into()));
     w.set_page(Page::Voice);
     settle();
     assert_eq!(names(&w), ["David", "Zira"]);
-    assert_eq!(
-        w.get_kokoro_desc(),
-        "Not found · Windows voices speak instead"
-    );
-    assert_eq!(w.get_voice_label(), "Windows · David");
+    assert_eq!(w.get_voices_desc(), "Windows 2");
+    assert_eq!(w.get_voice_label(), "David");
 }

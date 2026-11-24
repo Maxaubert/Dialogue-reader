@@ -361,6 +361,18 @@ impl Editor {
         }
     }
 
+    /// Switches every zone of `kind` on or off (a zone chip on the Overview). One change, one undo step.
+    pub fn set_kind_on(&mut self, kind: Kind, on: bool) -> bool {
+        if !self.zones.iter().any(|z| z.kind == kind && z.on != on) {
+            return false;
+        }
+        self.undo = Some(self.snapshot());
+        for z in self.zones.iter_mut().filter(|z| z.kind == kind) {
+            z.on = on;
+        }
+        true
+    }
+
     pub fn rename(&mut self, i: usize, name: &str) -> bool {
         let name = name.trim();
         if i >= self.zones.len() || name.is_empty() || self.zones[i].name == name {
@@ -455,6 +467,19 @@ mod tests {
             1920.0,
             1080.0,
         )
+    }
+
+    #[test]
+    fn a_kind_chip_switches_all_its_zones_in_one_undo_step() {
+        let mut e = ed();
+        e.zones[1].kind = Kind::Dialogue;
+        assert!(e.set_kind_on(Kind::Dialogue, false));
+        assert!(e.zones.iter().all(|z| !z.on));
+        // nothing to change: no change, and the undo step stays
+        assert!(!e.set_kind_on(Kind::Dialogue, false));
+        assert!(!e.set_kind_on(Kind::Speaker, true));
+        assert!(e.undo());
+        assert!(e.zones.iter().all(|z| z.on));
     }
 
     #[test]

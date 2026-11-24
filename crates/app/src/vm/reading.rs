@@ -13,9 +13,10 @@
 //!   five, "Show all" the newest [`KEEP`].
 //! - A game change stops the reader and the speech of the game before; what it read or queued is logged under it
 //!   (a speech mark tells when its last events came).
-//! - Key capture ("Change" on the keys page and in Settings): the runtime installs the hooks while it is open; the
-//!   next key or mouse button (not left or right click) becomes the key. Esc, "Cancel" or the app window losing
-//!   the focus ends it. Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are never taken (`dr_runtime::keys`).
+//! - Key capture (a click on a keycap, on the keys page and in Settings): the runtime installs the hooks while it is
+//!   open; the next key or mouse button (not left or right click) becomes the key. Esc, a second click on the
+//!   keycap or the app window losing the focus ends it. Alt+Tab, Alt+Esc, Ctrl+Esc and Win combos are never taken
+//!   (`dr_runtime::keys`).
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -39,12 +40,12 @@ pub const TICK: Duration = Duration::from_millis(100);
 const SEARCH: Duration = Duration::from_secs(1);
 /// Lines kept for "Show all".
 pub const KEEP: usize = 200;
-/// Rows of Recent on Overview.
-pub const RECENT: usize = 5;
+/// Rows of the read list on the Overview (the panel shows as many as fit).
+pub const RECENT: usize = 16;
 
 pub const STATUS_READING: &str = "Reading";
 pub const STATUS_PAUSED: &str = "Paused";
-pub const STATUS_NO_WINDOW: &str = "Not running";
+pub const STATUS_NO_WINDOW: &str = "Game not running";
 pub const STATUS_STOPPED: &str = "Stopped";
 pub const STATUS_ERROR: &str = "Cannot read";
 
@@ -73,6 +74,9 @@ pub struct ReadState {
     entries: Vec<Entry>,
     /// The item that started to play last (a later Cut of it was spoken already).
     started: Option<Item>,
+    /// The log line shown in Now (its time and text): the Overview read list leaves it out, so it is not shown
+    /// twice. It stays in the Activity list.
+    now: Option<(u64, String)>,
     /// Key capture: 0 the read key, 1 the quick menu key.
     capture: Option<i32>,
     lookup: u64,
@@ -98,6 +102,7 @@ impl Default for ReadState {
             marks: 0,
             entries: Vec::new(),
             started: None,
+            now: None,
             capture: None,
             lookup: 0,
             looking: false,
@@ -151,14 +156,47 @@ fn kind_of(name: &str) -> Kind {
     }
 }
 
+/// Speaker names longer than this are cut with "..." in the list rows, so the grey name always fits on the
+/// first line of a two-line row (ui/components/base.slint, ListRow).
+pub const SPEAKER_MAX: usize = 20;
+
+/// The speaker part of a row as a list row shows it ("Arthur:"): a name of at most [`SPEAKER_MAX`] characters,
+/// then "...", and the colon it came with.
+pub fn short_speaker(who: &str) -> String {
+    let who = who.trim();
+    let name = who.trim_end_matches(':').trim_end();
+    if name.chars().count() <= SPEAKER_MAX {
+        return who.to_string();
+    }
+    let cut: String = name.chars().take(SPEAKER_MAX).collect();
+    let colon = if who.ends_with(':') { ":" } else { "" };
+    format!("{}...{colon}", cut.trim_end())
+}
+
 /// A log line as a Recent or activity row.
 pub fn row(e: &Entry) -> LineData {
     LineData {
-        time: activity::local_time(e.t).into(),
+        time: short_time(&activity::local_time(e.t)).into(),
         kind: kind_of(&e.kind),
-        who: e.who.as_str().into(),
+        who: short_speaker(&e.who).into(),
         line: e.text.as_str().into(),
-        skip: e.skip.map_or("", Skip::text).into(),
+        skip: e.skip.map_or("", skip_tag).into(),
+    }
+}
+
+/// "21:42" of "21:42:18": the list rows show hours and minutes.
+fn short_time(t: &str) -> &str {
+    t.get(..5).unwrap_or(t)
+}
+
+/// The small tag of a skipped row (TEXT.md: "off" and "repeat"; the other three are new words).
+pub fn skip_tag(s: Skip) -> &'static str {
+    match s {
+        Skip::PromptsOff => "off",
+        Skip::AlreadyRead => "repeat",
+        Skip::TooOld => "late",
+        Skip::VoiceError => "error",
+        Skip::Stopped => "stopped",
     }
 }
 
@@ -200,9 +238,10 @@ pub fn entry_of(item: &Item, skip: Option<Skip>) -> Entry {
 }
 
 /// The line being spoken: (speaker part, line).
+/// The speaker (no colon: it sits on its own line over the line) and the line of the Now panel.
 fn now_of(item: &Item) -> (String, String) {
     let e = entry_of(item, None);
-    (e.who, e.text)
+    (e.who.trim_end_matches(':').to_string(), e.text)
 }
 
 /// Builds the runtime into the view model and starts its timer. Only `main.rs` passes a real one.
@@ -273,10 +312,12 @@ impl Vm {
         self.reading.game = id;
         // `started` stays: the Cut of a line that played when the game changed comes later, and must not be
         // logged as "Stopped" (a stale item never matches a new one: its queue time differs)
+        self.reading.now = None;
         self.push_log();
         if let Some(w) = self.win() {
             w.set_now_who("".into());
             w.set_now_line("".into());
+            w.set_live_zone(-1);
         }
         let cfg = game.map(|g| RunCfg::of(&g.profile));
         // a window search still running is for the game before
@@ -383,20 +424,42 @@ impl Vm {
             let old = !self.reading.older.is_empty();
             let line = match e {
                 speech::Ev::Started { item, .. } => {
+                    let e = (!item.replay).then(|| entry_of(&item, None));
                     if !old && let Some(w) = self.win() {
                         let (who, line) = now_of(&item);
                         w.set_now_who(who.into());
                         w.set_now_line(line.into());
+                        w.set_live_zone(self.live_zone_of(&item));
+                        // the line in Now leaves the list: a new line (logged below), or a replayed one (its newest
+                        // row in the log); the line Now showed before comes back into the list
+                        match &e {
+                            Some(e) => self.reading.now = Some((e.t, e.text.clone())),
+                            None => {
+                                let text = entry_of(&item, None).text;
+                                self.reading.now = self
+                                    .reading
+                                    .entries
+                                    .iter()
+                                    .rev()
+                                    .find(|x| x.text == text)
+                                    .map(|x| (x.t, x.text.clone()));
+                                self.push_log();
+                            }
+                        }
                     }
-                    let e = (!item.replay).then(|| entry_of(&item, None));
                     self.reading.started = Some(item);
                     e
                 }
                 // cut before it was heard: say so in the log
-                speech::Ev::Cut { item, .. } => (!item.replay
-                    && self.reading.started.as_ref() != Some(&item))
-                .then(|| entry_of(&item, Some(Skip::Stopped))),
+                speech::Ev::Cut { item, .. } => {
+                    let heard = self.reading.started.as_ref() == Some(&item);
+                    if heard {
+                        self.live_zone_off();
+                    }
+                    (!item.replay && !heard).then(|| entry_of(&item, Some(Skip::Stopped)))
+                }
                 speech::Ev::Cleared(item) => {
+                    self.live_zone_off();
                     (!item.replay).then(|| entry_of(&item, Some(Skip::Stopped)))
                 }
                 speech::Ev::Dropped(item) => {
@@ -410,7 +473,10 @@ impl Vm {
                     (!item.replay && self.reading.started.as_ref() != Some(&item))
                         .then(|| entry_of(&item, Some(Skip::VoiceError)))
                 }
-                speech::Ev::Finished { .. } => None,
+                speech::Ev::Finished { .. } => {
+                    self.live_zone_off();
+                    None
+                }
                 speech::Ev::Mark(m) => {
                     while self.reading.older.front().is_some_and(|(id, _)| *id <= m) {
                         self.reading.older.pop_front();
@@ -454,14 +520,46 @@ impl Vm {
         self.push_log();
     }
 
-    /// Recent (newest five) and the activity list (newest first).
+    /// The Overview read list (newest first, without the line in Now) and the activity list (newest first).
     fn push_log(&self) {
         let rows: Vec<LineData> = self.reading.entries.iter().rev().map(row).collect();
-        super::sync(
-            &self.reading.recent,
-            rows.iter().take(RECENT).cloned().collect(),
-        );
+        let recent = self.recent_rows().map(|i| rows[i].clone()).collect();
+        super::sync(&self.reading.recent, recent);
         super::sync(&self.reading.all, rows);
+    }
+
+    /// The rows of the Overview read list, as indices into the activity list (newest first). The line in Now is
+    /// left out.
+    fn recent_rows(&self) -> impl Iterator<Item = usize> + '_ {
+        let now = self.reading.now.as_ref();
+        self.reading
+            .entries
+            .iter()
+            .rev()
+            .enumerate()
+            .filter(move |(_, e)| now.is_none_or(|(t, text)| e.t != *t || e.text != *text))
+            .map(|(i, _)| i)
+            .take(RECENT)
+    }
+
+    /// The zone of the line being spoken, as an index into the current game's zones (-1: none).
+    fn live_zone_of(&self, item: &Item) -> i32 {
+        let zone = entry_of(item, None).zone;
+        if zone.is_empty() {
+            return -1;
+        }
+        self.main
+            .zones
+            .iter()
+            .position(|z| z.name == zone)
+            .map_or(-1, |i| i as i32)
+    }
+
+    /// The line stopped: no zone is lime any more.
+    fn live_zone_off(&self) {
+        if let Some(w) = self.win() {
+            w.set_live_zone(-1);
+        }
     }
 
     pub fn runtime_event(&mut self, e: Ev) {
@@ -575,6 +673,14 @@ impl Vm {
         w.set_status_text(text.into());
         w.set_status_ok(st == Status::Reading);
         w.set_paused(rt.is_paused());
+        w.set_game_running(st != Status::NoWindow);
+        // the switcher row of the game says "Reading" only while it is read
+        self.push_games();
+    }
+
+    /// The current game is being read (not paused, not waiting for its window).
+    pub(super) fn is_reading(&self) -> bool {
+        matches!(self.reading.status, Some((Status::Reading, false)))
     }
 
     /// "Read now" on Overview.
@@ -626,7 +732,14 @@ impl Vm {
         }
     }
 
-    /// The replay button of a Recent row (newest first): spoken next, as a replay (no new log line). What plays
+    /// The replay button of an Overview read list row (newest first, without the line in Now).
+    pub fn replay_recent(&self, i: usize) {
+        if let Some(j) = self.recent_rows().nth(i) {
+            self.replay_row(j);
+        }
+    }
+
+    /// The replay button of an Activity row (newest first): spoken next, as a replay (no new log line). What plays
     /// now and the lines that wait go on.
     pub fn replay_row(&self, i: usize) {
         let Some(e) = self.reading.entries.iter().rev().nth(i) else {
@@ -635,7 +748,7 @@ impl Vm {
         self.speech_cmd(speech::Cmd::ReplayLines(lines_of(e)));
     }
 
-    /// "Change" on a key row: starts key capture for it (0 read key, 1 quick menu key), or ends it ("Cancel").
+    /// A click on a keycap: starts key capture for it (0 read key, 1 quick menu key), or ends it (a second click).
     pub fn key_change(&mut self, which: i32) {
         if self.reading.capture == Some(which) {
             self.end_capture();
@@ -656,7 +769,7 @@ impl Vm {
         }
         if let Some(w) = self.win() {
             w.set_capturing_key(-1);
-            // the refusal of a click (the click on Cancel, for one) is not news any more
+            // the refusal of a click (the click on the keycap, for one) is not news any more
             if w.get_notice().as_str() == NOTE_CLICK {
                 w.set_notice("".into());
             }
@@ -696,7 +809,7 @@ impl Vm {
                 };
                 if other.as_str() == text {
                     let msg = if which == 0 {
-                        "That key is already the quick menu key. Press another one."
+                        "That key is already the menu key. Press another one."
                     } else {
                         "That key is already the read key. Press another one."
                     };
@@ -731,7 +844,7 @@ impl Vm {
         }
     }
 
-    /// Ends key capture as Esc or "Cancel" does: the key stays as it was. Also when the app window loses the
+    /// Ends key capture as Esc or a second click on the keycap does: the key stays as it was. Also when the app window loses the
     /// focus (`crate::focus_lost`): Alt+Tab, Win or a click in the game must not leave capture open.
     pub fn cancel_capture(&mut self) {
         if self.reading.capture.is_some() {
@@ -761,6 +874,22 @@ mod tests {
     use super::*;
     use dr_core::ZoneKind;
     use dr_runtime::speech::Line;
+
+    #[test]
+    fn long_speaker_names_are_cut() {
+        assert_eq!(short_speaker("Arthur:"), "Arthur:");
+        assert_eq!(short_speaker(""), "");
+        let max = format!("{}:", "x".repeat(SPEAKER_MAX));
+        assert_eq!(short_speaker(&max), max);
+        assert_eq!(
+            short_speaker("Third Officer of the Royal Guard:"),
+            "Third Officer of the...:"
+        );
+        assert_eq!(
+            short_speaker("Third Officer of the Royal Guard"),
+            "Third Officer of the..."
+        );
+    }
 
     fn item(lines: Vec<Line>) -> Item {
         let text = lines
@@ -825,7 +954,7 @@ mod tests {
             )
         });
         assert_eq!(r.kind, Kind::Prompts);
-        assert_eq!(r.skip.as_str(), "Prompts off");
+        assert_eq!(r.skip.as_str(), "off");
         assert_eq!(r.who.as_str(), "");
         assert_eq!(who_of("Dutch:"), "Dutch:");
         assert_eq!(who_of("  "), "");

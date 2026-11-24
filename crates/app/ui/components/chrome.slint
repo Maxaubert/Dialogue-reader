@@ -1,7 +1,24 @@
-// Window chrome: title bars, onboarding steps and footer, main-window tabs and game button.
-import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
-import { Icon, CIcon, Kbd, Button, BtnKind, Thumb, StatusChip, VSep } from "base.slint";
+// Window chrome: the title strip (no nav bar), the window controls, the setup footer and the setup heading.
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
+import {
+    Icon,
+    CIcon,
+    Button,
+    BtnKind,
+    IconButton,
+    StatusDot,
+    Status,
+} from "base.slint";
 
+export { Status }
 export global Chrome {
     callback minimize();
     callback maximize();
@@ -15,7 +32,11 @@ component WinButton inherits Rectangle {
     in property <bool> danger;
     callback clicked();
     width: 46px;
-    background: touch.has-hover ? (root.danger ? Palette.win-close : Palette.surface-2) : transparent;
+    background: touch.has-hover ? (root.danger ? Palette.close-hover : Palette.surface-2) : transparent;
+    animate background {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
     accessible-role: button;
     accessible-label: root.label;
     accessible-action-default => {
@@ -23,7 +44,9 @@ component WinButton inherits Rectangle {
     }
     Icon {
         source: root.icon;
-        color: touch.has-hover ? Palette.text : Palette.text-3;
+        width: 15px;
+        height: 15px;
+        color: touch.has-hover ? (root.danger ? #FFFFFF : Palette.text) : Palette.text-2;
     }
 
     touch := TouchArea {
@@ -34,7 +57,6 @@ component WinButton inherits Rectangle {
 }
 
 export component WinControls inherits HorizontalLayout {
-    padding-left: Space.s2;
     WinButton {
         icon: Icons.minus;
         label: "Minimize";
@@ -61,30 +83,146 @@ export component WinControls inherits HorizontalLayout {
     }
 }
 
+// The app name with its logo: the strip lead in setup.
 export component Brand inherits HorizontalLayout {
     spacing: Space.s2;
-    padding-right: Space.s4;
+    padding-left: Space.s4;
     VerticalLayout {
         alignment: center;
         Image {
             source: Icons.logo;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
         }
     }
 
     Text {
         text: "DialogReader";
-        font-size: Type.fs2;
-        font-weight: Type.w-semibold;
+        font-weight: Type.w-strong;
         color: Palette.text;
         vertical-alignment: center;
     }
 }
 
-// Title bar frame: 52 px, bottom line, drag area behind the content.
-export component Bar inherits Rectangle {
-    height: Size.bar;
+// A pressable item of the strip lead (.gname, .back): 32 px, a surface-2 fill on hover, scale on press.
+component LeadButton inherits Rectangle {
+    in property <string> label;
+    in property <string> tip;
+    in property <bool> enabled: true;
+    callback clicked();
+    y: (Size.strip - Size.ctl) / 2;
+    height: Size.ctl;
+    width: lay.preferred-width;
+    border-radius: Radius.md;
+    background: touch.has-hover ? Palette.surface-2 : transparent;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    lay := HorizontalLayout {
+        @children
+    }
+
+    if root.tip != "" && root.enabled: Tooltip {
+        Rectangle {
+            border-radius: Radius.md;
+            border-width: 1px;
+            border-color: Palette.line-2;
+            background: Palette.surface-2;
+            HorizontalLayout {
+                padding-left: Space.s2;
+                padding-right: Space.s2;
+                padding-top: Space.s1;
+                padding-bottom: Space.s1;
+                Text {
+                    text: root.tip;
+                    font-size: Type.fs-small;
+                    color: Palette.text;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}
+
+// What the strip lead shows: the brand (setup), the game name (Overview) or back plus the page name (sub-pages).
+export enum StripMode { setup, main, sub }
+
+// A part of the strip tail (the status dot, the gear) that fades in when it comes (Finish, or a sub-page closed):
+// 160 ms after an 80 ms wait, as the lead swap. The fade is worked out from the clock, as the part is made in the
+// frame that first draws it (see pages/setup_part.slint). With `run` false (the launch) it shows at once.
+component TailPart inherits Rectangle {
+    in property <bool> run;
+    property <duration> born;
+    property <bool> done: Motion.instant || !root.run;
+    init => {
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.swap-out + Motion.swap-in);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    opacity: root.done ? 1 : Math.clamp((animation-tick() - root.born - Motion.swap-out) / Math.max(1ms, Motion.swap-in), 0, 1);
+    @children
+}
+
+// One lead part. It fades out in 80 ms, and the next one fades in 160 ms after that (brief 3.1, sequential).
+// While it is not shown it takes no clicks and is not in the accessibility tree.
+component LeadPart inherits Rectangle {
+    in property <bool> shown;
+    opacity: root.shown ? 1 : 0;
+    visible: self.opacity > 0.01;
+    animate opacity {
+        duration: root.shown ? Motion.swap-in : Motion.swap-out;
+        delay: root.shown ? Motion.swap-out : 0ms;
+        easing: root.shown ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    @children
+    if !root.shown: TouchArea { }
+}
+
+// The title strip (40 px, no line under it). Left: the brand, the game name (click or Ctrl K opens the switcher)
+// or back plus the page name. Right: the status dot with its tip, the gear (Overview only) and the window
+// controls. Empty space drags the window; a double click maximizes it.
+export component TitleStrip inherits Rectangle {
+    in property <StripMode> mode: StripMode.main;
+    // the game name as shown (app.slint holds the old name while it rolls out)
+    in property <string> game;
+    // switch game: the old name rolls out (up 8 px and fades, 100 ms) while `rolling`; then the new one rolls in
+    // from 8 px below as `roll-in` goes from 0 to 1 (140 ms, app.slint)
+    in property <bool> rolling: false;
+    in property <float> roll-in: 1;
+    // a move was made in the UI: the dot and the gear fade in when they come (not at launch)
+    in property <bool> armed: false;
+    // the sub-page name next to the back chevron ("Settings", "Zones", "Activity")
+    in property <string> page-name;
+    in property <Status> status: Status.reading;
+    in property <string> status-tip: "Reading";
+    in property <bool> show-gear: true;
+    callback game-clicked();
+    callback back();
+    callback gear();
+    height: Size.strip;
     background: Palette.bg;
     TouchArea {
         moved => {
@@ -97,388 +235,205 @@ export component Bar inherits Rectangle {
         }
     }
 
-    Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
-        background: Palette.line;
-    }
-
-    @children
-}
-
-component Step inherits HorizontalLayout {
-    in property <int> n;
-    in property <int> cur;
-    in property <string> label;
-    spacing: Space.s2;
-    VerticalLayout {
-        alignment: center;
-        Rectangle {
-        width: 20px;
-        height: 20px;
-        border-radius: 10px;
-        border-width: 1px;
-        border-color: root.n < root.cur ? Palette.surface-3 : root.n == root.cur ? Palette.accent : Palette.line-2;
-        background: root.n < root.cur ? Palette.surface-3 : root.n == root.cur ? Palette.accent : transparent;
-        if root.n < root.cur: Icon {
-            source: Icons.check-sm;
-            width: Size.icon-sm;
-            height: Size.icon-sm;
-            color: Palette.text;
-        }
-        if root.n >= root.cur: Text {
-            text: root.n;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
-            color: root.n == root.cur ? Palette.on-accent : Palette.text-3;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-    }
-    }
-
-    Text {
-        text: root.label;
-        font-weight: Type.w-medium;
-        font-size: Type.fs2;
-        vertical-alignment: center;
-        color: root.n < root.cur ? Palette.text-2 : root.n == root.cur ? Palette.text : Palette.text-3;
-    }
-}
-
-component StepSep inherits Rectangle {
-    width: 24px;
-    height: 1px;
-    background: Palette.line-2;
-}
-
-// Onboarding title bar. step 0 = welcome (brand only), 1..5 = setup steps.
-export component ObBar inherits Bar {
-    in property <int> step: 0;
     HorizontalLayout {
-        padding-left: Space.s4;
-        Brand { }
-
         Rectangle {
             horizontal-stretch: 1;
+            LeadPart {
+                shown: root.mode == StripMode.setup;
+                Brand {
+                    height: Size.strip;
+                }
+            }
+
+            LeadPart {
+                shown: root.mode == StripMode.main;
+                LeadButton {
+                    x: Space.s2;
+                    label: "Switch game";
+                    tip: "Switch game";
+                    enabled: root.mode == StripMode.main;
+                    clicked => {
+                        root.game-clicked();
+                    }
+                    HorizontalLayout {
+                        padding-left: Space.s2;
+                        padding-right: Space.s2;
+                        spacing: Space.s2;
+                        Rectangle {
+                            width: name.preferred-width;
+                            // 0 to 1 while the old name goes out (ease-in); it jumps back to 0 for the new name
+                            property <float> out: root.rolling ? 1 : 0;
+                            animate out {
+                                duration: root.rolling ? Motion.switch-out : 0ms;
+                                easing: cubic-bezier(0.4, 0, 1, 1);
+                            }
+                            name := Text {
+                                y: (root.rolling ? -8px * parent.out : 8px * (1 - root.roll-in)) * Motion.move;
+                                height: parent.height;
+                                text: root.game;
+                                font-weight: Type.w-strong;
+                                color: Palette.text;
+                                vertical-alignment: center;
+                                opacity: root.rolling ? 1 - parent.out : root.roll-in;
+                            }
+                        }
+
+                        CIcon {
+                            source: Icons.chev-down;
+                            size: 14px;
+                        }
+                    }
+                }
+            }
+
+            LeadPart {
+                shown: root.mode == StripMode.sub;
+                LeadButton {
+                    x: Space.s2;
+                    label: "Back";
+                    tip: "Back (Esc)";
+                    enabled: root.mode == StripMode.sub;
+                    clicked => {
+                        root.back();
+                    }
+                    HorizontalLayout {
+                        padding-left: Space.s1;
+                        padding-right: Space.s2;
+                        spacing: Space.s1;
+                        CIcon {
+                            source: Icons.chev-left;
+                        }
+
+                        Text {
+                            text: root.page-name;
+                            font-weight: Type.w-strong;
+                            color: Palette.text;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
         }
 
+        if root.mode != StripMode.setup: TailPart {
+            run: root.armed;
+            width: 40px;
+            height: Size.strip;
+            StatusDot {
+                status: root.status;
+                tip: root.status-tip;
+            }
+        }
+        if root.mode == StripMode.main && root.show-gear: TailPart {
+            run: root.armed;
+            width: Size.ctl + 2 * Space.s1;
+            height: Size.strip;
+            IconButton {
+                x: Space.s1;
+                y: (Size.strip - Size.ctl) / 2;
+                icon: Icons.settings;
+                tip: "Settings";
+                clicked => {
+                    root.gear();
+                }
+            }
+        }
         WinControls { }
-    }
-
-    if root.step > 0: HorizontalLayout {
-        x: (parent.width - self.preferred-width) / 2;
-        width: self.preferred-width;
-        spacing: Space.s3;
-        Step {
-            n: 1;
-            cur: root.step;
-            label: "Game";
-        }
-
-        VerticalLayout {
-            alignment: center;
-            StepSep { }
-        }
-
-        Step {
-            n: 2;
-            cur: root.step;
-            label: "Zones";
-        }
-
-        VerticalLayout {
-            alignment: center;
-            StepSep { }
-        }
-
-        Step {
-            n: 3;
-            cur: root.step;
-            label: "Keys";
-        }
-
-        VerticalLayout {
-            alignment: center;
-            StepSep { }
-        }
-
-        Step {
-            n: 4;
-            cur: root.step;
-            label: "Voice";
-        }
-
-        VerticalLayout {
-            alignment: center;
-            StepSep { }
-        }
-
-        Step {
-            n: 5;
-            cur: root.step;
-            label: "Mode";
-        }
     }
 }
 
-// Onboarding footer: Back on the left, the main action on the right, in the 960 px column.
+// Setup footer: Back on the left, the step dots in the middle, the main action (white pill) on the right, in the
+// 960 px column. The active dot is 20 px wide (260 ms).
 export component ObFoot inherits Rectangle {
     in property <string> primary: "Continue";
     in property <image> primary-icon: Icons.arrow-right;
+    // 1 to 5
+    in property <int> step: 1;
     // a problem with this step, said in plain words (no screenshot, could not save)
     in property <string> notice;
     callback back();
     callback next();
     height: 72px;
-    Rectangle {
-        y: 0;
-        height: 1px;
-        background: Palette.line;
-    }
-
+    // the buttons sit 16 px down in the 72 px footer (.obf .btn), the dots 28 px down
     HorizontalLayout {
         x: (parent.width - Size.col) / 2;
         width: Size.col;
-        alignment: space-between;
-        padding-top: 16px;
-        padding-bottom: 16px;
+        padding-top: Space.s4;
+        padding-bottom: Space.s5;
         Button {
             text: "Back";
-            icon: Icons.arrow-left;
-            large: true;
+            icon: Icons.chev-left;
+            kind: BtnKind.ghost;
+            pad-x: Space.s1;
             clicked => {
                 root.back();
             }
         }
 
-        if root.notice != "": Text {
-            text: root.notice;
+        Rectangle {
             horizontal-stretch: 1;
-            horizontal-alignment: right;
-            vertical-alignment: center;
-            overflow: elide;
-            color: Palette.danger;
+            if root.notice != "": Text {
+                x: Space.s4;
+                width: parent.width - 2 * Space.s4;
+                height: parent.height;
+                text: root.notice;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+                color: Palette.danger;
+            }
         }
 
         Button {
             text: root.primary;
             trail: root.primary-icon;
             kind: BtnKind.primary;
-            large: true;
             clicked => {
                 root.next();
             }
         }
     }
+
+    // the step dots, centred in the window
+    if root.notice == "": HorizontalLayout {
+        x: (parent.width - self.preferred-width) / 2;
+        y: 28px;
+        width: self.preferred-width;
+        height: 8px;
+        spacing: Space.s2;
+        for i in 5: Rectangle {
+            width: i + 1 == root.step ? 20px : 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: i + 1 == root.step ? Palette.text : Palette.text-off;
+            animate width, background {
+                duration: Motion.slide(260ms);
+                easing: cubic-bezier(0.16, 1, 0.3, 1);
+            }
+        }
+    }
 }
 
-// Title and lead at the same spot on every onboarding step.
+// Title and lead at the same spot on every setup step: 26 px title on a 32 px line (.col h1), 14 px grey lead
+// 4 px under it.
 export component ObHead inherits VerticalLayout {
     in property <string> title;
     in property <string> lead;
-    spacing: Space.s2;
+    spacing: Space.s1;
     Text {
         text: root.title;
-        height: 37px;
-        font-size: Type.fs5;
-        font-weight: Type.w-semibold;
-        letter-spacing: Type.ls-display;
+        height: 32px;
+        font-size: Type.fs-title;
+        font-weight: Type.w-title;
+        letter-spacing: Type.ls-title;
         color: Palette.text;
         vertical-alignment: center;
     }
 
     if root.lead != "": Text {
         text: root.lead;
-        height: 23px;
-        font-size: Type.fs3;
+        height: Type.lh-body;
         color: Palette.text-2;
         vertical-alignment: center;
-    }
-}
-
-// The game button in the main title bar (.switcher).
-export component GameButton inherits Rectangle {
-    in property <string> name: "Red Dead Redemption 2";
-    in property <string> art: "rdr2";
-    in property <image> cover;
-    callback clicked();
-    height: Size.ctl;
-    border-radius: Radius.md;
-    border-width: 1px;
-    border-color: Palette.line-2;
-    background: touch.has-hover ? Palette.surface-2 : Palette.surface;
-    accessible-role: button;
-    accessible-label: "Switch game";
-    accessible-action-default => {
-        root.clicked();
-    }
-    HorizontalLayout {
-        padding-left: 5px;
-        padding-right: 5px;
-        spacing: Space.s2;
-        alignment: start;
-        VerticalLayout {
-            alignment: center;
-            Thumb {
-                width: 24px;
-                height: 24px;
-                art: root.art;
-                picture: root.cover;
-                radius: Radius.xs;
-                behind: Palette.surface;
-            }
-        }
-
-        Text {
-            text: root.name;
-            font-weight: Type.w-medium;
-            color: Palette.text;
-            vertical-alignment: center;
-        }
-
-        CIcon {
-            source: Icons.chev-down;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Kbd {
-                text: "Ctrl K";
-                small: true;
-            }
-        }
-    }
-
-    touch := TouchArea {
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
-export component Tab inherits Rectangle {
-    in property <string> text;
-    in property <image> icon;
-    in property <bool> on;
-    callback clicked();
-    horizontal-stretch: 0;
-    accessible-role: tab;
-    accessible-label: root.text;
-    accessible-item-selected: root.on;
-    accessible-action-default => {
-        root.clicked();
-    }
-    HorizontalLayout {
-        padding-left: Space.s3;
-        padding-right: Space.s3;
-        spacing: Space.s2;
-        CIcon {
-            source: root.icon;
-            color: root.on ? Palette.text : Palette.text-3;
-        }
-
-        Text {
-            text: root.text;
-            font-weight: Type.w-medium;
-            color: root.on || touch.has-hover ? Palette.text : Palette.text-2;
-            vertical-alignment: center;
-        }
-    }
-
-    if root.on: Rectangle {
-        x: Space.s3;
-        width: parent.width - 2 * Space.s3;
-        y: parent.height - 2px;
-        height: 2px;
-        border-radius: 1px;
-        background: Palette.accent;
-    }
-    touch := TouchArea {
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
-// Main window title bar: brand, game button, tabs, status, window controls.
-export component MainBar inherits Bar {
-    in property <int> tab: 0;
-    in property <string> game: "Red Dead Redemption 2";
-    in property <string> art: "rdr2";
-    in property <image> cover;
-    in property <string> status: "Reading";
-    in property <bool> status-ok: true;
-    callback tab-clicked(int);
-    callback game-clicked();
-    HorizontalLayout {
-        padding-left: Space.s4;
-        Brand { }
-
-        VerticalLayout {
-            alignment: center;
-            GameButton {
-                name: root.game;
-                art: root.art;
-                cover: root.cover;
-                clicked => {
-                    root.game-clicked();
-                }
-            }
-        }
-
-        HorizontalLayout {
-            padding-left: Space.s4;
-            padding-right: Space.s4;
-            VerticalLayout {
-                alignment: center;
-                VSep { }
-            }
-        }
-
-        Tab {
-            text: "Overview";
-            icon: Icons.grid;
-            on: root.tab == 0;
-            clicked => {
-                root.tab-clicked(0);
-            }
-        }
-
-        Tab {
-            text: "Zones";
-            icon: Icons.zone;
-            on: root.tab == 1;
-            clicked => {
-                root.tab-clicked(1);
-            }
-        }
-
-        Tab {
-            text: "Settings";
-            icon: Icons.settings;
-            on: root.tab == 2;
-            clicked => {
-                root.tab-clicked(2);
-            }
-        }
-
-        Rectangle {
-            horizontal-stretch: 1;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            StatusChip {
-                text: root.status;
-                ok: root.status-ok;
-            }
-        }
-
-        Rectangle {
-            width: Space.s3;
-        }
-
-        WinControls { }
     }
 }

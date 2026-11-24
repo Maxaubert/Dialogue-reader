@@ -1,219 +1,180 @@
-// 01 welcome.
-import { Palette, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
-import { Icon, Button, BtnKind, Card, Chip, Dot, PillWave } from "../components/base.slint";
+// Setup step 0, Welcome (d-black 01-setup, #step0): top-aligned in the 960 px column like the steps. Left: the title,
+// one line, the three steps as a numbered list, Get started and Import settings. Right: a small picture of a game
+// with its zones (the dialogue zone live, in lime) and the status pill "Arthur".
+import { SetupPart } from "setup_part.slint";
+import { Palette, Space, Radius, Size, Type, Icons, Art, Kind } from "../theme.slint";
+import { Button, BtnKind, Dot, ZoneOutline } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
 import { Stage } from "../components/stage.slint";
 import { ZoneData } from "../data.slint";
-import { OverlayPill } from "../overlays/pill.slint";
 
 component StepItem inherits HorizontalLayout {
     in property <string> n;
-    in property <string> title;
-    in property <string> desc;
+    in property <string> text;
     spacing: Space.s3;
-    VerticalLayout {
-        alignment: start;
-        Rectangle {
-            width: 24px;
-            height: 24px;
-            border-radius: 12px;
-            background: Palette.surface-3;
-            Text {
-                text: root.n;
-                font-size: Type.fs1;
-                font-weight: Type.w-semibold;
-                color: Palette.text;
-            }
+    height: 24px;
+    Rectangle {
+        width: 24px;
+        height: 24px;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Palette.line-2;
+        Text {
+            text: root.n;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            accessible-role: none;
         }
     }
 
-    VerticalLayout {
-        Text {
-            text: root.title;
-            height: Type.lh2;
-            font-weight: Type.w-medium;
-            color: Palette.text;
-            vertical-alignment: center;
+    Text {
+        text: root.text;
+        color: Palette.text;
+        vertical-alignment: center;
+    }
+}
+
+// The small in-game pill of the picture (.wl-pill): lime dot and the speaker.
+component ArtPill inherits Rectangle {
+    width: lay.preferred-width;
+    height: 28px;
+    border-radius: 14px;
+    background: Palette.float;
+    border-width: 1px;
+    border-color: Palette.float-line;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    lay := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: Space.s3;
+        spacing: Space.s2;
+        VerticalLayout {
+            alignment: center;
+            Dot {
+                tint: Palette.live;
+            }
         }
 
         Text {
-            text: root.desc;
-            height: Type.lh2;
-            color: Palette.text-2;
+            text: "Arthur";
+            font-size: Type.fs-small;
+            color: Palette.text;
             vertical-alignment: center;
         }
     }
 }
 
 export component WelcomePage inherits Rectangle {
+    // kept for app.slint; the picture always shows the sample zones below
     in property <[ZoneData]> zones;
     callback get-started();
     callback import-settings();
+    // the zones of the sample picture (1600 x 900 image px), all on
+    property <[ZoneData]> art-zones: [
+        { name: "Speaker", kind: Kind.speaker, on: true, x: 712, y: 754, w: 176, h: 44 },
+        { name: "Dialogue", kind: Kind.dialogue, on: true, x: 360, y: 800, w: 880, h: 50 },
+        { name: "Pickups", kind: Kind.pickups, on: true, x: 88, y: 48, w: 290, h: 84 },
+        { name: "Prompts", kind: Kind.prompts, on: true, x: 1228, y: 690, w: 284, h: 68 },
+        { name: "Ignore", kind: Kind.ignore, on: true, x: 112, y: 682, w: 176, h: 176 },
+    ];
     HorizontalLayout {
         x: (parent.width - Size.col) / 2;
+        y: Space.s7;
         width: Size.col;
-        spacing: Space.s7;
+        height: self.preferred-height;
+        spacing: 64px;
         alignment: start;
         VerticalLayout {
             width: 400px;
-            alignment: center;
-            Text {
-                text: "Hear the text in your games.";
-                font-size: Type.fs5;
-                font-weight: Type.w-semibold;
-                letter-spacing: Type.ls-display;
-                line-height-factor: Type.lhf-115;
-                wrap: word-wrap;
-                color: Palette.text;
-            }
-
-            Rectangle {
-                height: Space.s3;
-            }
-
-            Text {
-                text: "DialogReader watches your game and reads dialogue, item pickups and other on-screen text out loud, with a voice that runs on your PC.";
-                font-size: Type.fs3;
-                line-height-factor: Type.lhf-145;
-                wrap: word-wrap;
-                color: Palette.text-2;
-            }
-
-            VerticalLayout {
-                padding-top: Space.s6;
-                padding-bottom: Space.s6;
-                spacing: Space.s4;
-                StepItem {
-                    n: "1";
-                    title: "Pick your game";
-                    desc: "Start the game first. DialogReader finds it.";
-                }
-
-                StepItem {
-                    n: "2";
-                    title: "Mark where text shows up";
-                    desc: "Draw boxes over subtitles, names and pop-ups.";
-                }
-
-                StepItem {
-                    n: "3";
-                    title: "Choose a key, a voice and a mode";
-                    desc: "Then play. The window can stay closed.";
+            alignment: start;
+            SetupPart {
+                n: 0;
+                ObHead {
+                    title: "Hear the text in your games.";
+                    lead: "Reads game dialogue and pop-ups aloud. Runs on your PC.";
                 }
             }
 
-            HorizontalLayout {
-                spacing: Space.s3;
-                alignment: start;
-                Button {
-                    text: "Get started";
-                    trail: Icons.arrow-right;
-                    kind: BtnKind.primary;
-                    large: true;
-                    clicked => {
-                        root.get-started();
+            SetupPart {
+                n: 1;
+                VerticalLayout {
+                    padding-top: Space.s6;
+                    padding-bottom: Space.s6;
+                    spacing: Space.s3;
+                    StepItem {
+                        n: "1";
+                        text: "Pick your game";
                     }
-                }
 
-                Button {
-                    text: "Import settings";
-                    icon: Icons.upload;
-                    large: true;
-                    clicked => {
-                        root.import-settings();
+                    StepItem {
+                        n: "2";
+                        text: "Mark where text shows up";
+                    }
+
+                    StepItem {
+                        n: "3";
+                        text: "Choose a key, a voice and a mode";
                     }
                 }
             }
 
-            Rectangle {
-                height: Space.s4;
-            }
+            SetupPart {
+                n: 2;
+                HorizontalLayout {
+                    spacing: Space.s2;
+                    alignment: start;
+                    Button {
+                        text: "Get started";
+                        kind: BtnKind.primary;
+                        clicked => {
+                            root.get-started();
+                        }
+                    }
 
-            Text {
-                text: "Takes about two minutes. You can change everything later.";
-                font-size: Type.fs1;
-                color: Palette.text-3;
+                    Button {
+                        text: "Import settings";
+                        icon: Icons.upload;
+                        clicked => {
+                            root.import-settings();
+                        }
+                    }
+                }
             }
         }
 
-        VerticalLayout {
-            alignment: center;
-            Card {
-                VerticalLayout {
-                    padding: 1px;
-                    Stage {
-                        height: 287px;
+        SetupPart {
+            n: 3;
+            VerticalLayout {
+                alignment: start;
+                Rectangle {
+                    width: Size.col - 400px - 64px;
+                    height: self.width * 9 / 16;
+                    art := Stage {
                         labels: false;
-                        zones: root.zones;
+                        zones: root.art-zones;
                         radius: Radius.lg;
-                        round-bottom: false;
                         behind: Palette.bg;
-                        OverlayPill {
-                            x: parent.width - self.width - 12px;
-                            y: 12px;
+                        // the dialogue zone is the one being read: the live outline
+                        for z in root.art-zones: ZoneOutline {
+                            visible: z.kind == Kind.dialogue;
+                            live: true;
+                            x: art.off-x + z.x * art.scale * 1px;
+                            y: art.off-y + z.y * art.scale * 1px;
+                            width: z.w * art.scale * 1px;
+                            height: z.h * art.scale * 1px;
+                        }
+                        ArtPill {
+                            x: parent.width - self.width - Space.s3;
+                            y: Space.s3;
                         }
                     }
 
+                    // the hairline of the frame, over the picture
                     Rectangle {
-                        height: 1px;
-                        background: Palette.line;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: Space.s5;
-                        padding-right: Space.s5;
-                        padding-top: Space.s4;
-                        padding-bottom: Space.s4;
-                        spacing: Space.s3;
-                        VerticalLayout {
-                            alignment: center;
-                            Button {
-                                icon-only: true;
-                                icon: Icons.volume;
-                                label: "Play the line";
-                            }
-                        }
-
-                        VerticalLayout {
-                            horizontal-stretch: 1;
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: "Arthur:";
-                                    height: Type.lh2;
-                                    font-weight: Type.w-medium;
-                                    color: Palette.text-2;
-                                    horizontal-stretch: 0;
-                                }
-
-                                Text {
-                                    text: "We need to get these horses moving before the snow buries us.";
-                                    height: Type.lh2;
-                                    color: Palette.text;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
-                                    min-width: 0px;
-                                }
-                            }
-
-                            Text {
-                                text: "Read just now · Kokoro · Adam";
-                                height: Type.lh1;
-                                font-size: Type.fs1;
-                                color: Palette.text-3;
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            // the kind as a grey line icon, no color (Max, 2026-11-22)
-                            Chip {
-                                text: Kinds.name(Kind.dialogue);
-                                dot: false;
-                                icon: Kinds.icon(Kind.dialogue);
-                                fg: Palette.text-2;
-                                bg: Palette.surface-2;
-                            }
-                        }
+                        border-radius: Radius.lg;
+                        border-width: 1px;
+                        border-color: Palette.line;
                     }
                 }
             }

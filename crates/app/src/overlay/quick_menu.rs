@@ -2,7 +2,7 @@
 //! unit-tested (`tests/quick_menu.rs`). Keys come from the hook ([`Menu::key`]), clicks from the window
 //! ([`Menu::activate`]); each returns what the app must do ([`Out`]).
 //!
-//! Order (design rule): Manage zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit.
+//! Order (design rule): Edit zones, Stop (play/pause), Mute, Voice, Speed, Volume, Mode, Settings, Quit.
 //! Up and Down move and wrap around. Left and Right change Speed, Volume and Mode, and Right opens the voice
 //! list. Enter or Space selects. Esc closes. Quit needs two presses: the first arms it ("Press again to quit"),
 //! moving away disarms it. In the voice list Up and Down move (no wrap), Space plays a sample, Enter chooses,
@@ -21,8 +21,9 @@ pub const SETTINGS: usize = 7;
 pub const QUIT: usize = 8;
 pub const ROWS: usize = 9;
 
-pub const SPEED_MIN: f32 = 0.5;
-pub const SPEED_MAX: f32 = 2.0;
+/// The app's speed range (the voice engines' range): every speed slider runs over it.
+pub const SPEED_MIN: f32 = dr_tts::SPEED_MIN;
+pub const SPEED_MAX: f32 = dr_tts::SPEED_MAX;
 pub const SPEED_STEP: f32 = 0.1;
 pub const VOLUME_STEP: f32 = 0.05;
 /// Rows of the voice list on screen at once; a longer list scrolls with the highlight.

@@ -7,7 +7,6 @@ mod common;
 use common::*;
 use dr_app::MainWindow;
 use dr_runtime::{Paths, Profile, Shot, ZoneCfg, profile};
-use i_slint_backend_testing::AccessibleRole;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model};
 
@@ -64,7 +63,7 @@ fn button(w: &MainWindow, s: &StageAt, at: (f32, f32), b: PointerEventButton, do
 fn zones_tab(paths: &Paths) -> (MainWindow, dr_app::vm::Shared, StageAt) {
     saved(paths);
     let (w, vm) = real_window(paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     (w, vm, s)
 }
@@ -73,7 +72,7 @@ fn zones_tab(paths: &Paths) -> (MainWindow, dr_app::vm::Shared, StageAt) {
 fn right_click_while_drawing_discards_the_new_zone() {
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     moved(&w, &s, (100.0, 100.0));
     button(&w, &s, (100.0, 100.0), PointerEventButton::Left, true);
     moved(&w, &s, (300.0, 200.0));
@@ -100,7 +99,7 @@ fn right_click_while_drawing_discards_the_new_zone() {
 fn right_click_while_moving_puts_the_zone_back() {
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     let before = rect(&w, 0);
     moved(&w, &s, (900.0, 950.0));
     button(&w, &s, (900.0, 950.0), PointerEventButton::Left, true);
@@ -129,7 +128,7 @@ fn right_click_while_moving_puts_the_zone_back() {
 fn right_click_while_resizing_puts_the_size_back() {
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     w.invoke_zone_select(0);
     let before = rect(&w, 0);
     // the bottom right handle of Subtitles is at (1700, 1000)
@@ -149,7 +148,7 @@ fn right_click_while_resizing_puts_the_size_back() {
 fn esc_while_drawing_or_moving_cancels() {
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     moved(&w, &s, (100.0, 100.0));
     button(&w, &s, (100.0, 100.0), PointerEventButton::Left, true);
     moved(&w, &s, (300.0, 200.0));
@@ -159,7 +158,7 @@ fn esc_while_drawing_or_moving_cancels() {
     button(&w, &s, (600.0, 400.0), PointerEventButton::Left, false);
     assert_eq!(w.get_zones().row_count(), 1);
 
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     let before = rect(&w, 0);
     moved(&w, &s, (900.0, 950.0));
     button(&w, &s, (900.0, 950.0), PointerEventButton::Left, true);
@@ -175,7 +174,7 @@ fn esc_while_drawing_or_moving_cancels() {
 fn middle_click_never_ends_or_freezes_a_drag() {
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     moved(&w, &s, (100.0, 100.0));
     button(&w, &s, (100.0, 100.0), PointerEventButton::Left, true);
     moved(&w, &s, (300.0, 200.0));
@@ -198,13 +197,13 @@ fn a_drag_without_its_grab_is_cancelled_when_the_mouse_leaves_the_stage() {
     // after a middle click the stage no longer holds the mouse, so a left release outside it would be lost
     let (_dir, paths) = temp_paths();
     let (w, _vm, s) = zones_tab(&paths);
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     moved(&w, &s, (100.0, 100.0));
     button(&w, &s, (100.0, 100.0), PointerEventButton::Left, true);
     moved(&w, &s, (300.0, 200.0));
     button(&w, &s, (300.0, 200.0), PointerEventButton::Middle, true);
     button(&w, &s, (300.0, 200.0), PointerEventButton::Middle, false);
-    // far right of the window: the zone list, off the stage
+    // far right of the window, off the stage
     let out = slint::LogicalPosition::new(1430.0, 450.0);
     w.window()
         .dispatch_event(WindowEvent::PointerMoved { position: out });
@@ -239,7 +238,7 @@ fn focus_loss_during_a_drag_cancels_it() {
     // mouse, and a later release (or press) must not put it at the cursor
     let (_dir, paths) = temp_paths();
     let (w, vm, s) = zones_tab(&paths);
-    press(&w, "Select", AccessibleRole::Tab);
+    draw_tool(&w, false);
     let before = rect(&w, 0);
     moved(&w, &s, (900.0, 950.0));
     button(&w, &s, (900.0, 950.0), PointerEventButton::Left, true);
@@ -258,7 +257,7 @@ fn focus_loss_during_a_drag_cancels_it() {
     assert_eq!(rect(&w, 0), before, "a cancel is no change");
 
     // a draw: the box goes, and the next drag draws as usual
-    press(&w, "Draw zone", AccessibleRole::Tab);
+    draw_tool(&w, true);
     moved(&w, &s, (100.0, 100.0));
     button(&w, &s, (100.0, 100.0), PointerEventButton::Left, true);
     moved(&w, &s, (300.0, 200.0));

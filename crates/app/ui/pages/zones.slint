@@ -1,212 +1,169 @@
-// 11 zone editor tab.
-import { Palette, Space, Radius, Size, Type, Icons, Art, Kind } from "../theme.slint";
+// Zones (d-black 11-zones): one toolbar on black (Draw zone, the kinds, Delete zone; the live note, Retake screenshot
+// and Done on the right), then the picture with the zones as large as the page allows. Dragging on empty picture
+// always draws; "Draw zone" also draws over another zone (src/vm/zones.rs). Each zone has a tag with its kind
+// name above it, under it when there is no room above, and inside it when there is no room under it either.
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, CardHead, Dot } from "../components/base.slint";
-import { Stage, ZoneRow, ZoneTools, LiveView } from "../components/stage.slint";
+import { Button, BtnKind, Icon, IconButton } from "../components/base.slint";
+import { Stage, ShotNote } from "../components/stage.slint";
+import { DrawToggle, KindSeg } from "draw_zones.slint";
+import { OverviewRect } from "overview.slint";
 
 export component ZonesTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
     in-out property <int> selected: 1;
     in-out property <bool> draw: false;
-    in property <string> shot-info: "Screenshot 21:30 · 3840 × 2160 · Fit to window";
-    // window size, so the stage size does not depend on its own layout
-    in property <length> win-w: 1440px;
-    in property <length> win-h: 900px;
-    property <length> sw: min(root.win-w - 360px - 2 * Size.page-x, (root.win-h - Size.bar - 64px - 44px - 2 * Size.page-x) * 16 / 9);
-    callback add-zone();
     callback delete-zone(int);
     // zone editing (src/vm): the picture, the box being drawn, the kind picker
     in property <image> shot: Art.scene;
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> contain: false;
+    // the time of the saved screenshot ("21:30"; Rust leaves it empty while the game shows live)
+    in property <string> shot-time: "21:30";
     in property <bool> drafting: false;
     in property <ZoneData> draft;
     in property <Kind> kind: Kind.dialogue;
     callback pointer(int, float, float, float);
-    callback select(int);
-    callback toggle(int, bool);
-    callback rename(int, string);
-    callback rename-done(bool);
     callback kind-picked(Kind);
     callback retake();
+    // "Done": back to the Overview (app.slint)
+    callback done();
+    // the stage grow from the Overview (README motion table, 11-zones 4): 0 at the Overview stage, 1 here. The
+    // toolbar and the tags fade in 120 ms into the 300 ms grow, over the last 180 ms.
+    in property <float> grow: 1;
+    property <float> tools: Math.clamp((root.grow - 0.4) / 0.6, 0, 1);
 
-    HorizontalLayout {
-        Rectangle {
-            horizontal-stretch: 1;
-            background: Palette.canvas;
-            VerticalLayout {
+    // the toolbar (.zn-tb) and the picture under it, 32 px from the sides
+    property <length> pad: 32px;
+    property <length> top: 64px;
+    property <length> sw: max(160px, min(root.width - 2 * root.pad, (root.height - root.top - Space.s4) * 16 / 9));
+    property <length> sh: root.sw * 9 / 16;
+
+    Rectangle {
+        x: root.pad;
+        y: 12px;
+        width: root.width - 2 * root.pad;
+        height: Size.ctl;
+        opacity: root.tools;
+        HorizontalLayout {
+            spacing: Space.s2;
+            DrawToggle {
+                on <=> root.draw;
+            }
+
+            Rectangle {
+                width: 1px + 2 * Space.s1;
                 Rectangle {
-                    height: 64px;
-                    HorizontalLayout {
-                        padding-left: Size.page-x;
-                        padding-right: Size.page-x;
-                        VerticalLayout {
-                            alignment: center;
-                            ZoneTools {
-                                draw <=> root.draw;
-                                kind: root.kind;
-                                kind-picked(k) => {
-                                    root.kind-picked(k);
-                                }
-                                retake => {
-                                    root.retake();
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        y: parent.height - 1px;
-                        height: 1px;
-                        background: Palette.line;
-                    }
+                    width: 1px;
+                    height: 20px;
+                    background: Palette.line;
                 }
+            }
 
-                Rectangle {
-                    vertical-stretch: 1;
-                    Stage {
-                        width: root.sw;
-                        height: root.sw * 9 / 16;
-                        source: root.shot;
-                        src-w: root.shot-w;
-                        src-h: root.shot-h;
-                        contain: root.contain;
-                        interactive: true;
-                        drafting: root.drafting;
-                        draft: root.draft;
-                        zones: root.zones;
-                        selected: root.selected;
-                        behind: Palette.canvas;
-                        pointer(k, x, y, s) => {
-                            root.pointer(k, x, y, s);
-                        }
-                    }
+            KindSeg {
+                kind: root.kind;
+                picked(k) => {
+                    root.kind-picked(k);
                 }
+            }
 
-                Rectangle {
-                    height: 44px;
-                    Rectangle {
-                        y: 0;
-                        height: 1px;
-                        background: Palette.line;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: Size.page-x;
-                        padding-right: Size.page-x;
-                        Text {
-                            text: "Drag on the screenshot to draw a zone. Drag a corner to resize.";
-                            font-size: Type.fs1;
-                            color: Palette.text-3;
-                            vertical-alignment: center;
-                            horizontal-stretch: 1;
-                        }
-
-                        // the live view note is part of this line (src/vm/live.rs `push_shot_info`): a green dot
-                        // while it is live, never a chip on the game picture
-                        if root.contain && LiveView.note-live: VerticalLayout {
-                            alignment: center;
-                            padding-right: 6px;
-                            Dot {
-                                size: 6px;
-                                tint: Palette.ok;
-                            }
-                        }
-                        Text {
-                            text: root.shot-info;
-                            font-size: Type.fs1;
-                            color: Palette.text-3;
-                            vertical-alignment: center;
-                        }
-                    }
+            IconButton {
+                icon: Icons.trash;
+                tip: "Delete zone";
+                enabled: root.selected >= 0 && root.selected < root.zones.length;
+                clicked => {
+                    root.delete-zone(root.selected);
                 }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            IconButton {
+                icon: Icons.camera;
+                tip: "Retake screenshot";
+                clicked => {
+                    root.retake();
+                }
+            }
+
+            // "Live", or the screenshot's time (src/vm/live.rs)
+        ShotNote {
+                contain: root.contain;
+                time: root.shot-time;
+                padding-right: Space.s2;
+            }
+
+            Button {
+                kind: BtnKind.primary;
+                text: "Done";
+                clicked => {
+                    root.done();
+                }
+            }
+        }
+    }
+
+    // the Overview stage rectangle, where the grow starts
+    property <length> ox: OverviewRect.x(root.width, root.height);
+    property <length> oy: OverviewRect.y(root.width, root.height);
+    property <length> ow: OverviewRect.stage-w(root.width, root.height);
+    pic := Rectangle {
+        x: root.ox + ((root.width - root.sw) / 2 - root.ox) * root.grow;
+        y: root.oy + (root.top - root.oy) * root.grow;
+        width: root.ow + (root.sw - root.ow) * root.grow;
+        height: self.width * 9 / 16;
+        st := Stage {
+            settled: root.grow >= 1;
+            tags-o: root.tools;
+            source: root.shot;
+            src-w: root.shot-w;
+            src-h: root.shot-h;
+            contain: root.contain;
+            interactive: true;
+            drafting: root.drafting;
+            draft: root.draft;
+            zones: root.zones;
+            selected: root.selected;
+            radius: Radius.lg;
+            behind: Palette.bg;
+            pointer(k, x, y, s) => {
+                root.pointer(k, x, y, s);
             }
         }
 
         Rectangle {
-            width: 360px;
-            background: Palette.surface;
-            Rectangle {
-                x: 0;
-                width: 1px;
-                background: Palette.line;
-            }
+            border-radius: Radius.lg;
+            border-width: 1px;
+            border-color: Palette.line;
+        }
 
-            VerticalLayout {
-                padding-left: 1px;
-                CardHead {
-                    height: 64px;
-                    title: "Zones";
-                    count: root.zones.length;
-                    VerticalLayout {
-                        alignment: center;
-                        Button {
-                            text: "Add zone";
-                            icon: Icons.plus;
-                            clicked => {
-                                root.add-zone();
-                            }
-                        }
-                    }
-                }
-
-                // a long zone list scrolls
-                Flickable {
-                    vertical-stretch: 1;
-                    content-height: rows.preferred-height;
-                    rows := VerticalLayout {
-                        width: parent.width;
-                        alignment: start;
-                        for z[i] in root.zones: ZoneRow {
-                            zone: z;
-                            first: i == 0;
-                            selected: i == root.selected;
-                            editable: true;
-                            clicked => {
-                                root.selected = i;
-                                root.select(i);
-                            }
-                            toggled(v) => {
-                                z.on = v;
-                                root.toggle(i, v);
-                            }
-                            renamed(t) => {
-                                root.rename(i, t);
-                            }
-                            rename-done(e) => {
-                                root.rename-done(e);
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 64px;
-                    Rectangle {
-                        y: 0;
-                        height: 1px;
-                        background: Palette.line;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: Space.s5;
-                        padding-right: Space.s5;
-                        alignment: start;
-                        VerticalLayout {
-                            alignment: center;
-                            Button {
-                                text: "Delete zone";
-                                icon: Icons.trash;
-                                kind: BtnKind.danger;
-                                pad-x: -1px;
-                                clicked => {
-                                    root.delete-zone(root.selected);
-                                }
-                            }
-                        }
-                    }
-                }
+        // no zone yet: what to do, in the middle of the picture
+        if root.zones.length == 0 && !root.drafting: Rectangle {
+            opacity: root.tools;
+            width: hint.preferred-width + 2 * Space.s4;
+            height: hint.preferred-height + 2 * Space.s2;
+            border-radius: Radius.lg;
+            background: Palette.float;
+            border-width: 1px;
+            border-color: Palette.float-line;
+            hint := Text {
+                text: "Drag to box text.";
+                color: Palette.text;
+                accessible-role: none;
             }
         }
     }

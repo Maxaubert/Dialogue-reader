@@ -1,20 +1,26 @@
-// The in-game overlay windows (M4, spec 2.7): the pill (13), the quick menu (15-quick-menu-a, 15-quick-menu-voice)
-// and zone edit (16-zone-edit). Rust (src/overlay) creates them as overlay windows: topmost, never active, the
-// pill click-through. All state comes from Rust; mouse input goes back through the callbacks.
-// No PopupWindow here: popups would not get the overlay styles (docs/overlay-spike.md).
-import { Palette, Shadow } from "../theme.slint";
+// The in-game overlay windows (M4, spec 2.7): the pill (13-pill), the quick menu (15-quick-menu) and zone edit
+// (16-zone-edit). Rust (src/overlay) creates them as overlay windows: topmost, never active, the pill
+// click-through. All state comes from Rust; mouse input goes back through the callbacks.
+// No PopupWindow and no Tooltip here: both become popups, which would not get the overlay styles
+// (docs/overlay-spike.md). Tips in these windows are in-window Rectangles.
+//
+// Show and hide fade (README motion table, 9 to 11): `open` true fades a window in, false fades it out, and Rust
+// hides the window when the fade has ended (src/overlay/mod.rs, PILL_OUT, MENU_OUT, ZONE_OUT). A window that fades
+// out takes no clicks.
+import { Palette, Type, Motion, Kind } from "../theme.slint";
 import { VoiceData, EditZone } from "../data.slint";
-import { Kind } from "../theme.slint";
 import { OverlayPill } from "pill.slint";
-import { QuickMenu, QmHints, QmVoices } from "quick_menu.slint";
+import { QuickMenu, QmVoices } from "quick_menu.slint";
 import { ZoneEdit } from "zone_edit.slint";
 
 // 13: the status pill. The window is wider than the pill (a long speaker name fits); the pill sits at its right
 // edge (top right of the game) or in its middle (bottom center). The margin holds the shadow.
+// Show: opacity and y 6 to 0, 180 ms ease-out. Hide: 200 ms ease-in.
 export component PillWindow inherits Window {
     in property <string> speaker;
     in property <bool> ok;
     in property <bool> speaking;
+    in property <bool> open;
     // 0: right edge (top right), 1: middle (bottom center)
     in property <int> align: 0;
     // the margin around the pill, in logical px (place.rs uses the same numbers)
@@ -23,28 +29,42 @@ export component PillWindow inherits Window {
     always-on-top: true;
     background: transparent;
     title: "DialogReader status";
+    default-font-family: Type.font;
+    default-font-size: Type.fs-body;
+    default-font-weight: Type.w-body;
     width: 320px;
     height: 48px;
+    property <float> t: root.open ? 1 : 0;
+    animate t {
+        duration: Motion.d(root.open ? 180ms : 200ms);
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
     pill := OverlayPill {
         x: root.align == 0 ? root.width - root.pad - self.width : (root.width - self.width) / 2;
-        y: root.pad;
+        // it rises 6 px while it shows; it only fades while it hides
+        y: root.pad + (root.open ? (1 - root.t) * 6px * Motion.move : 0px);
+        opacity: root.t;
         speaker: root.speaker;
         ok: root.ok;
         speaking: root.speaking;
     }
 }
 
-// 15: the quick menu, with room on both sides for the voice list (so the card stays in the middle of the window)
-// and a margin of at least the shadow blur (40 px).
+// 15: the quick menu, with room on the right for the voice list and on the left as much again (so the card stays
+// in the middle of the window), and a margin for the shadow.
+// Open: opacity and scale 0.97 to 1 from the top centre, 160 ms ease-out. Close: 120 ms ease-in.
+// The voice list: opacity and x -8 to 0 (160 ms in, 120 ms out).
 export component QuickMenuWindow inherits Window {
     in property <string> game;
     in property <int> highlight;
     in property <bool> stopped;
     in property <bool> muted;
     in property <string> voice;
-    in property <float> speed: 1.0;
-    // in-out and bound both ways: a drag on the slider or a click on Mode sets them inside the menu, and a
-    // one-way binding would then stop following Rust (the windows live for the whole session)
+    in property <bool> open;
+    // in-out and bound both ways: a drag on a slider or a click on Mode sets them inside the menu, and a one-way
+    // binding would then stop following Rust (the windows live for the whole session)
+    in-out property <float> speed: 1.0;
+    in-out property <float> speed-pos: 0.333;
     in-out property <float> volume: 0.8;
     in-out property <bool> automatic: true;
     in property <bool> quit-armed;
@@ -54,23 +74,39 @@ export component QuickMenuWindow inherits Window {
     in property <int> voice-hi;
     in property <int> voice-chosen: -1;
     callback activate(int);
+    callback speed-moved(float);
+    callback speed-let-go(float);
     callback volume-moved(float);
     callback volume-let-go(float);
     callback mode-picked(bool);
     callback choose-voice(int);
-    callback preview-voice(int);
     // a click outside the menu
     callback outside();
-    out property <length> margin: Shadow.pop-blur;
-    // the middle of the card and its key hints, in window px (the window is placed so it is the game's middle)
-    out property <length> group-cy: root.margin + (menu.height + 14px + 38px) / 2;
-    property <length> side: 278px;
+    // room for the card's shadow: it reaches 12 px above the card (24 px blur, 12 px down); the voice list's
+    // room is under the card, and the sides are wider still
+    out property <length> margin: 24px;
+    // the middle of the card, in window px (the window is placed so it is the game's middle)
+    out property <length> group-cy: root.margin + menu.height / 2;
+    property <length> side: voices.width + 8px;
     no-frame: true;
     always-on-top: true;
     background: transparent;
     title: "DialogReader quick menu";
+    default-font-family: Type.font;
+    default-font-size: Type.fs-body;
+    default-font-weight: Type.w-body;
     width: root.margin * 2 + root.side * 2 + menu.width;
-    height: root.margin * 2 + max(menu.height + 14px + 38px, 208px + 7px * 2 + 36px * 8);
+    height: root.margin * 2 + max(menu.height, menu.voice-y + voices.height);
+    property <float> t: root.open ? 1 : 0;
+    animate t {
+        duration: Motion.d(root.open ? 160ms : 120ms);
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> v: root.open && root.voice-open ? 1 : 0;
+    animate v {
+        duration: Motion.d(root.open && root.voice-open ? 160ms : 120ms);
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
     TouchArea {
         clicked => {
             root.outside();
@@ -80,18 +116,28 @@ export component QuickMenuWindow inherits Window {
     menu := QuickMenu {
         x: root.margin + root.side;
         y: root.margin;
+        opacity: root.t;
+        transform-scale: 1 - 0.03 * (1 - root.t) * Motion.move;
+        transform-origin: { x: self.width / 2, y: 0px };
         game: root.game;
         highlight: root.highlight;
         stopped: root.stopped;
         muted: root.muted;
         voice: root.voice;
-        speed: root.speed;
+        speed <=> root.speed;
+        speed-pos <=> root.speed-pos;
         volume <=> root.volume;
         automatic <=> root.automatic;
         quit-armed: root.quit-armed;
         voice-open: root.voice-open;
         activate(i) => {
             root.activate(i);
+        }
+        speed-moved(v) => {
+            root.speed-moved(v);
+        }
+        speed-let-go(v) => {
+            root.speed-let-go(v);
         }
         volume-moved(v) => {
             root.volume-moved(v);
@@ -104,48 +150,32 @@ export component QuickMenuWindow inherits Window {
         }
     }
 
-    if root.voice-open: QmVoices {
-        x: menu.x + menu.width + 8px;
-        y: menu.y + 208px;
+    voices := QmVoices {
+        x: menu.x + menu.width + 8px - (1 - root.v) * 8px * Motion.move;
+        y: menu.y + menu.voice-y;
+        opacity: root.v;
+        visible: root.v > 0.01;
         voices: root.voices;
         chosen: root.voice-chosen;
         highlight: root.voice-hi;
         choose(i) => {
             root.choose-voice(i);
         }
-        preview(i) => {
-            root.preview-voice(i);
-        }
     }
 
-    HorizontalLayout {
-        x: menu.x;
-        y: menu.y + menu.height + 14px;
-        width: menu.width;
-        height: 38px;
-        alignment: center;
-        QmHints {
-            hints: root.voice-open ? [
-                { key: "↑↓", text: "Move" },
-                { key: "Space", text: "Preview" },
-                { key: "Enter", text: "Choose" },
-                { key: "←", text: "Back" },
-            ] : [
-                { key: "↑↓", text: "Move" },
-                { key: "←→", text: "Change" },
-                { key: "Enter", text: "Select" },
-                { key: "Esc", text: "Close" },
-            ];
-        }
-    }
+    // while it fades out, the menu takes no clicks
+    if !root.open: TouchArea { }
 }
 
-// 16: zone edit over a frozen screenshot of the game, the size of what the capture covers.
+// 16: zone edit over a frozen screenshot of the game, the size of what the capture covers. The screenshot shows
+// at once (a fade of the whole window would flash black); the shade, the zones and the bar fade (ZoneEdit).
 export component ZoneEditWindow inherits Window {
     in property <image> shot;
     in property <[EditZone]> zones;
     in-out property <int> selected: -1;
-    in property <string> dim-commands;
+    // the bar's places clear of every zone and tag: top centre, bottom centre, top right, top left (Rust)
+    in property <[bool]> bar-clear: [true, true, true, true];
+    in property <bool> open;
     in-out property <bool> draft: false;
     in-out property <length> draft-x;
     in-out property <length> draft-y;
@@ -154,19 +184,24 @@ export component ZoneEditWindow inherits Window {
     callback done();
     callback remove(int);
     callback commit(Kind, length, length, length, length);
+    callback set-kind(Kind);
     callback pick(length, length) -> int;
     no-frame: true;
     always-on-top: true;
     background: Palette.bg;
     title: "DialogReader zone edit";
+    default-font-family: Type.font;
+    default-font-size: Type.fs-body;
+    default-font-weight: Type.w-body;
     ze := ZoneEdit {
         width: 100%;
         height: 100%;
         real-shot: true;
+        open: root.open;
         shot: root.shot;
         zones: root.zones;
         selected <=> root.selected;
-        dim-commands: root.dim-commands;
+        bar-clear: root.bar-clear;
         draft <=> root.draft;
         draft-x <=> root.draft-x;
         draft-y <=> root.draft-y;
@@ -181,8 +216,14 @@ export component ZoneEditWindow inherits Window {
         commit(k) => {
             root.commit(k, root.draft-x, root.draft-y, root.draft-w, root.draft-h);
         }
+        set-kind(k) => {
+            root.set-kind(k);
+        }
         pick(x, y) => {
             return root.pick(x, y);
         }
     }
+
+    // while it fades out, zone edit takes no clicks
+    if !root.open: TouchArea { }
 }

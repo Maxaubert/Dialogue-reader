@@ -93,6 +93,7 @@ fn real_frames_reach_the_stage_and_stop_with_the_page() {
         game: true,
         icon: None,
     };
+    dr_app::set_instant_motion(true);
     let (w, vm) = dr_app::build_window(Source::Real {
         paths: paths.clone(),
         desktop: Box::new(OneWindow(info)),

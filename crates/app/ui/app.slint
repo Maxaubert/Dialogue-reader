@@ -1,10 +1,40 @@
-// DialogReader main window: page navigation, the game switcher and the overlay previews.
+// DialogReader main window: the title strip, the page host (pages push in and out), the game switcher and the
+// overlay previews. There is no nav bar: the game name opens the switcher (also Ctrl K), the gear opens
+// Settings, and sub-pages (Zones, Settings, Activity) close with back or Esc.
+// Geist is the fallback font when Segoe UI Variable is missing (src/fonts.rs).
 import "fonts/Geist-Variable.ttf";
 import "fonts/GeistMono-Variable.ttf";
 
-import { Palette, Render, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "theme.slint";
-import { ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Page, OverlayPreview } from "data.slint";
-import { Chrome, ObBar, ObFoot, MainBar } from "components/chrome.slint";
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "theme.slint";
+import {
+    ZoneData,
+    WindowData,
+    VoiceData,
+    LineData,
+    GameData,
+    EditZone,
+    Page,
+    OverlayPreview,
+} from "data.slint";
+import {
+    Chrome,
+    ObFoot,
+    TitleStrip,
+    StripMode,
+    Status,
+} from "components/chrome.slint";
 import { WelcomePage } from "pages/welcome.slint";
 import { PickWindowPage } from "pages/pick_window.slint";
 import { DrawZonesPage } from "pages/draw_zones.slint";
@@ -15,27 +45,111 @@ import { OverviewTab } from "pages/overview.slint";
 import { ZonesTab } from "pages/zones.slint";
 import { SettingsTab } from "pages/settings.slint";
 import { ActivityTab } from "pages/activity.slint";
+import { SetupParts } from "pages/setup_part.slint";
 import { PillPreview } from "overlays/pill.slint";
 import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
 import { ZoneEdit } from "overlays/zone_edit.slint";
 import { LiveView } from "components/stage.slint";
-import { PillWindow, QuickMenuWindow, ZoneEditWindow } from "overlays/windows.slint";
+import { ComponentSheet } from "components/sheet.slint";
+import {
+    PillWindow,
+    QuickMenuWindow,
+    ZoneEditWindow,
+} from "overlays/windows.slint";
 import { Tray } from "tray.slint";
 
-export { Palette, Render, Kind, Page, OverlayPreview, ZoneData, WindowData, VoiceData, LineData, GameData, EditZone, Chrome, LiveView, PillWindow, QuickMenuWindow, ZoneEditWindow, Tray }
+export {
+    Palette,
+    Render,
+    Type,
+    Motion,
+    Kind,
+    Page,
+    OverlayPreview,
+    ZoneData,
+    WindowData,
+    VoiceData,
+    LineData,
+    GameData,
+    EditZone,
+    Chrome,
+    LiveView,
+    PillWindow,
+    QuickMenuWindow,
+    ZoneEditWindow,
+    Tray,
+}
+
+// One page of the page host. The page stays alive while it shows or fades out, so it can animate out
+// (README "Decisions", page push with a slight overlap):
+//   forward: the old page goes out in 100 ms (ease-in) to x -16 px; the new one comes in 80 ms later in 260 ms
+//            (ease-out-strong) from x +24 px
+//   back:    out 120 ms to x +16 px; in 200 ms after 80 ms, from x -24 px
+// `t` runs from 0 (gone) to 1 (shown); opacity is `t`, and the offset is (1 - t) times the way in or out, so
+// it never jumps at either end. While the page is not shown, a TouchArea on top takes its clicks, and once it
+// is invisible (opacity 0, also during the incoming page's 80 ms wait) it is out of the accessibility tree.
+// So no page takes clicks while the two change places, and fast clicks leave no ghost page.
+component PageSlot inherits Rectangle {
+    in property <bool> shown;
+    // the direction of the last move: true forward, false back
+    in property <bool> fwd: true;
+    // false: no push (the page set from Rust at launch just shows)
+    in property <bool> armed: true;
+    // Activity: it rises from y +24 px instead of moving sideways, and sinks back
+    in property <bool> rise: false;
+    // Finish: the setup fades out in 140 ms (ease-in) and the Overview comes in 80 ms later, its opacity and
+    // scale (0.98 to 1) in 320 ms (ease-out-strong), with no side move (README motion table, 01-setup 3)
+    in property <bool> morph: false;
+    // Zones from the Overview and back (README motion table, 11-zones 4): the page shows at once (its stage grows
+    // from the Overview stage over 300 ms ease-out-strong, `t` is that progress); going back it shrinks the same way
+    in property <bool> grow: false;
+    // the Overview while the Zones stage grows or shrinks: it only fades, with no side move
+    in property <bool> still: false;
+    // the page for the accessibility tree ("Settings page"); the tests count the pages that are there
+    in property <string> name;
+    accessible-role: tab-panel;
+    accessible-label: root.name;
+    // put the page in an `if slot.alive:` so it is made when it comes and dropped when it has gone
+    out property <bool> alive: root.shown || root.t > 0.001;
+    out property <float> t: root.shown ? 1 : 0;
+    animate t {
+        duration: !root.armed ? 0ms : root.grow ? Motion.grow : root.morph ? (root.shown ? Motion.morph-in : Motion.exit) : root.shown ? (root.fwd ? Motion.push-in : Motion.back-in) : (root.fwd ? Motion.push-out : Motion.back-out);
+        delay: root.armed && root.shown && !root.grow ? Motion.push-gap : 0ms;
+        easing: root.shown || root.grow ? cubic-bezier(0.16, 1, 0.3, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <length> way-in: root.rise ? 24px : root.fwd ? 24px : -24px;
+    property <length> way-out: root.rise ? 24px : root.fwd ? -16px : 16px;
+    property <length> off: root.morph || root.grow || root.still ? 0px : (1 - root.t) * (root.shown ? root.way-in : root.way-out) * Motion.move;
+    // the Overview at Finish and a growing Zones page fade their own parts (FinishPart, the Zones tools)
+    property <bool> whole: (root.morph && root.shown) || root.grow;
+    opacity: root.whole ? 1 : root.t;
+    visible: root.whole ? root.alive : root.t > 0.01;
+    Rectangle {
+        x: root.rise ? 0px : root.off;
+        y: root.rise ? root.off : 0px;
+        width: root.width;
+        height: root.height;
+        @children
+    }
+
+    if !root.shown: TouchArea { }
+}
 
 export component MainWindow inherits Window {
     in-out property <Page> page: Page.welcome;
     in-out property <OverlayPreview> overlay: OverlayPreview.none;
     in-out property <bool> switcher-open: false;
+    // debug: the component sheet over everything (render-screens "00-components", tests/components.rs)
+    in property <bool> sheet: false;
     // view models (src/vm): real profiles and windows, or the fake data of the mockups (src/fake.rs)
     in-out property <[WindowData]> games-running;
     in-out property <[WindowData]> other-windows;
     in-out property <int> picked-window: 0;
     in-out property <[ZoneData]> setup-zones;
     in-out property <[ZoneData]> zones;
-    in-out property <[ZoneData]> extra-zones;
+    // the Overview zone chips: one per kind that has a zone (not Ignore), on while any zone of it is on (Rust)
+    in-out property <[ZoneData]> zone-kinds;
     in-out property <[VoiceData]> voices;
     in-out property <[VoiceData]> menu-voices;
     in-out property <[LineData]> recent;
@@ -44,7 +158,8 @@ export component MainWindow inherits Window {
     in-out property <int> current-game: 0;
     in-out property <[EditZone]> edit-zones;
     in-out property <int> edit-selected: 1;
-    in property <string> edit-dim;
+    // zone edit preview: the bar's places clear of every zone (top centre, bottom centre, top right, top left)
+    in property <[bool]> edit-bar-clear: [true, true, true, true];
     in-out property <bool> edit-draft: true;
     in-out property <length> edit-draft-x: 930px;
     in-out property <length> edit-draft-y: 150px;
@@ -55,12 +170,12 @@ export component MainWindow inherits Window {
     in-out property <string> menu-key: "F7";
     in-out property <int> picked-voice: 0;
     // page 05 sliders (0 to 1): kept here so they outlive the page and Finish can save them
-    in-out property <float> voice-speed: 0.55;
+    // speed: 0 to 1 over 0.5x to 2.0x (vm::voices::speed_of_slider); 0.4 is 1.1x
+    in-out property <float> voice-speed: 0.4;
     in-out property <float> voice-volume: 0.8;
     // voices (M3a): why the list is empty, the Settings line, and the voice test
     in property <string> voices-problem;
-    in property <string> voices-desc: "Built into Windows · 11 voices";
-    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
+    in property <string> voices-desc: "Kokoro 11 · Windows 11";
     in property <bool> voice-testing: true;
     in property <int> test-played: 20;
     in property <string> test-time: "0:02 / 0:04";
@@ -68,9 +183,9 @@ export component MainWindow inherits Window {
     in property <bool> test-in-settings: false;
     // the current game's voice (Overview, Settings): index in `voices`, sliders 0 to 1 as on page 05
     in-out property <int> game-voice: 0;
-    in-out property <float> game-speed: 0.55;
+    in-out property <float> game-speed: 0.4;
     in-out property <float> game-volume: 0.8;
-    in property <string> voice-label: "Kokoro · Adam";
+    in property <string> voice-label: "Adam";
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
     in-out property <bool> adding-game: false;
     in property <string> version: "";
@@ -86,11 +201,14 @@ export component MainWindow inherits Window {
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> real-shots: false;
-    in property <string> shot-info: "Screenshot 21:30 · 3840 × 2160 · Fit to window";
+    // the time of the saved screenshot ("21:30"), shown in the Zones and step 2 toolbars while the game is not
+    // live (Rust: empty while it is live)
+    in property <string> shot-time: "21:30";
+    in property <string> setup-shot-time: "21:30";
     // zone editing on 03 (setup-*) and 11 (zones-*)
-    in-out property <int> setup-selected: 1;
+    in-out property <int> setup-selected: -1;
     in-out property <int> zones-selected: 1;
-    in-out property <bool> setup-draw: true;
+    in-out property <bool> setup-draw: false;
     in-out property <bool> zones-draw: false;
     in property <Kind> zone-kind: Kind.dialogue;
     in property <bool> drafting: false;
@@ -99,9 +217,13 @@ export component MainWindow inherits Window {
     in-out property <string> notice;
     // reading (M3b, src/vm/reading.rs): the status, the line being spoken, Pause, key capture
     in property <string> status-text: "Reading";
+    // false: the game is not running (the Overview stage says so, its controls are off)
+    in property <bool> game-running: true;
+    // the zone of the line being spoken, as an index into `zones` (its outline is lime); -1: none
+    in property <int> live-zone: -1;
     in property <bool> status-ok: true;
     in property <bool> paused: false;
-    in property <string> now-who: "Arthur:";
+    in property <string> now-who: "Arthur";
     in property <string> now-line: "We need to get these horses moving before the snow buries us.";
     // the key row waiting for a key: 0 the read key, 1 the quick menu key, -1 none
     in property <int> capturing-key: -1;
@@ -114,19 +236,55 @@ export component MainWindow inherits Window {
     in-out property <bool> open-minimized: true;
     in-out property <bool> show-in-taskbar: false;
     // Settings > Updates (M5): the line under the version, and whether the automatic install row shows
-    in property <string> update-note: "You have the latest version.";
+    in property <string> update-note: "up to date";
     in property <bool> show-auto-update: true;
     property <bool> setup: root.page == Page.welcome || root.page == Page.pick-window || root.page == Page.draw-zones || root.page == Page.keys || root.page == Page.voice || root.page == Page.mode;
     property <int> step: root.page == Page.pick-window ? 1 : root.page == Page.draw-zones ? 2 : root.page == Page.keys ? 3 : root.page == Page.voice ? 4 : root.page == Page.mode ? 5 : 0;
-    property <int> tab: root.page == Page.zones ? 1 : root.page == Page.settings ? 2 : 0;
+    // a sub-page: it closes with back or Esc, back to the Overview
+    property <bool> sub: root.page == Page.zones || root.page == Page.settings || root.page == Page.activity;
     property <string> game-name: root.games.length > 0 ? root.games[root.current-game].name : "";
     property <string> game-art: root.games.length > 0 ? root.games[root.current-game].art : "rdr2";
     property <image> game-cover: root.games.length > 0 ? root.games[root.current-game].cover : Art.scene;
+    // page push (README "Decisions"): the direction of the last move, and whether pages animate at all. A page
+    // set from Rust before the first move in the UI (the launch) just shows, with no push.
+    property <bool> fwd: true;
+    property <bool> armed: false;
+    // Finish was pressed: the Mode page and the Overview morph instead of pushing (PageSlot.morph)
+    property <bool> finishing: false;
+    // switch game (240 ms, README motion table 7 and 8): for 100 ms the old name rolls out and the texts fade
+    // out while the old picture stays (`rolling`); then the game changes (Rust loads it), the new name rolls in
+    // from below, the texts fade in and the new picture fades in over the old one, 140 ms (`crossing`)
+    property <bool> rolling: false;
+    property <bool> crossing: false;
+    property <int> switch-target: -1;
+    property <duration> switched-at;
+    property <string> old-game-name;
+    property <image> old-shot;
+    property <float> old-shot-w: 1600;
+    property <float> old-shot-h: 900;
+    // 0 to 1 while the old texts fade out (ease-in, 100 ms)
+    property <float> roll-out: root.rolling ? 1 : 0;
+    animate roll-out {
+        duration: root.rolling ? Motion.switch-out : 0ms;
+        easing: cubic-bezier(0.4, 0, 1, 1);
+    }
+    // 0 to 1 while the new game comes in (ease-out-strong, 140 ms), from the clock
+    property <float> cross-p: root.crossing ? Math.clamp((animation-tick() - root.switched-at) / Math.max(1ms, Motion.switch-in), 0, 1) : 1;
+    property <float> cross-t: 1 - Math.pow(1 - root.cross-p, 4);
+    property <float> text-o: root.rolling ? 1 - root.roll-out : root.cross-t;
+    // the last sub-page name: it stays in the strip while it fades out after the sub-page closed
+    property <string> sub-name: "Settings";
+    // the Zones stage grows from the Overview stage, and shrinks back (set by every move between the two)
+    property <bool> grow-zones: false;
+    // the status dot of the title strip
+    property <Status> status: root.status-ok ? Status.reading : root.status-text == "Paused" ? Status.paused : Status.off;
 
     // zone edit (Rust: add, remove, hit test, dim path)
     callback edit-commit(Kind, length, length, length, length);
     callback edit-remove(int);
     callback edit-pick(length, length) -> int;
+    // zone edit preview: the kind picker under the selected zone
+    callback edit-set-kind(Kind);
     callback settings-jump(int);
     // Settings (M5, src/vm/prefs.rs): a Startup or In-game overlay row changed, Check now, Export and Import of a
     // game ("Import settings" on the welcome page imports a game too)
@@ -146,6 +304,8 @@ export component MainWindow inherits Window {
     callback zone-cancel() -> bool;
     callback zone-select(int);
     callback zone-toggle(int, bool);
+    // a zone chip: every zone of that kind on or off
+    callback kind-toggle(Kind, bool);
     callback zone-rename(int, string);
     callback zone-rename-done();
     callback zone-kind-picked(Kind);
@@ -158,6 +318,9 @@ export component MainWindow inherits Window {
     callback game-chosen(int);
     // the switcher opened: covers of the other games are made the first time
     callback switcher-opened();
+    // the switcher's search: Rust sets `switcher-hits` (the games that match, as indices into `games`)
+    callback switcher-search(string);
+    in-out property <[int]> switcher-hits;
     callback add-game();
     // Back on page 02 of "Add game": the main pages show the current game again
     callback setup-cancelled();
@@ -168,7 +331,9 @@ export component MainWindow inherits Window {
     callback pause-clicked();
     callback now-replay();
     callback now-stop();
+    // the Overview read list leaves out the line in Now, so its rows have their own replay callback
     callback recent-replay(int);
+    callback log-replay(int);
     // "Change" on a key row (keys page, Settings): 0 the read key, 1 the quick menu key
     callback key-change(int);
     // voices (src/vm): Play sample / Stop on page 05 (setup voice) and in Settings (current game), Add voices
@@ -187,8 +352,13 @@ export component MainWindow inherits Window {
     callback page-shown(Page);
     // one change callback per property in Slint: both callbacks run from here
     changed page => {
+        if root.sub {
+            root.sub-name = root.page == Page.zones ? "Zones" : root.page == Page.settings ? "Settings" : "Activity";
+        }
         root.page-changed(root.page);
         root.page-shown(root.page);
+        // the keys go to the window again: a text field on the page that left keeps no focus
+        keys.focus();
     }
     // Pause or Resume changed: the tray menu follows (src/tray.rs)
     callback paused-changed(bool);
@@ -216,7 +386,44 @@ export component MainWindow inherits Window {
     no-frame: true;
     background: Palette.bg;
     default-font-family: Type.font;
-    default-font-size: Type.fs2;
+    default-font-size: Type.fs-body;
+    default-font-weight: Type.w-body;
+
+    // Every move between pages in the UI goes through go (forward) or go-back, so the push knows its direction.
+    // `page` itself changes at once: the tests, the live view and Rust read it right away.
+    // A notice stays through setup moves (Finish can end with one); a move from a main page clears it.
+    function go(p: Page) {
+        root.zone-rename-done();
+        if !root.setup {
+            root.notice = "";
+        }
+        root.grow-zones = (root.page == Page.overview && p == Page.zones) || (root.page == Page.zones && p == Page.overview);
+        root.fwd = true;
+        root.armed = true;
+        SetupParts.armed = true;
+        SetupParts.fwd = true;
+        root.finishing = false;
+        root.page = p;
+    }
+    function go-back(p: Page) {
+        root.zone-rename-done();
+        if !root.setup {
+            root.notice = "";
+        }
+        root.grow-zones = (root.page == Page.overview && p == Page.zones) || (root.page == Page.zones && p == Page.overview);
+        root.fwd = false;
+        root.armed = true;
+        SetupParts.armed = true;
+        SetupParts.fwd = false;
+        root.finishing = false;
+        root.page = p;
+    }
+    // back chevron, Esc and Done on a sub-page
+    function close-sub() {
+        if root.sub {
+            root.go-back(Page.overview);
+        }
+    }
     function back() {
         root.zone-rename-done();
         if root.page == Page.pick-window {
@@ -224,18 +431,18 @@ export component MainWindow inherits Window {
                 root.adding-game = false;
                 root.notice = "";
                 root.setup-cancelled();
-                root.page = Page.overview;
+                root.go-back(Page.overview);
             } else {
-                root.page = Page.welcome;
+                root.go-back(Page.welcome);
             }
         } else if root.page == Page.draw-zones {
-            root.page = Page.pick-window;
+            root.go-back(Page.pick-window);
         } else if root.page == Page.keys {
-            root.page = Page.draw-zones;
+            root.go-back(Page.draw-zones);
         } else if root.page == Page.voice {
-            root.page = Page.keys;
+            root.go-back(Page.keys);
         } else if root.page == Page.mode {
-            root.page = Page.voice;
+            root.go-back(Page.voice);
         }
     }
     function next() {
@@ -243,19 +450,75 @@ export component MainWindow inherits Window {
             return;
         }
         if root.page == Page.welcome {
-            root.page = Page.pick-window;
+            root.go(Page.pick-window);
         } else if root.page == Page.pick-window {
-            root.page = Page.draw-zones;
+            root.go(Page.draw-zones);
         } else if root.page == Page.draw-zones {
-            root.page = Page.keys;
+            root.go(Page.keys);
         } else if root.page == Page.keys {
-            root.page = Page.voice;
+            root.go(Page.voice);
         } else if root.page == Page.voice {
-            root.page = Page.mode;
+            root.go(Page.mode);
         } else if root.page == Page.mode {
-            root.page = Page.overview;
+            root.go(Page.overview);
+            root.finishing = true;
         }
     }
+    // The game name, Ctrl K and "Switch game" on the stage open the switcher.
+    public function open-switcher() {
+        if root.setup {
+            return;
+        }
+        root.zone-rename-done();
+        root.switcher-open = true;
+        root.switcher-opened();
+        switcher.focus-search();
+    }
+    // the search field had the keys: they come back to the window
+    changed switcher-open => {
+        if !self.switcher-open {
+            keys.focus();
+        }
+    }
+    // A game was picked in the switcher. With instant motion (tests) or the same game it changes at once. Else the
+    // old name and texts go out in 100 ms with the old picture still there, then the game changes (Rust loads it)
+    // and the new one comes in over 140 ms.
+    function switch-to(i: int) {
+        root.notice = "";
+        root.switcher-open = false;
+        if i == root.current-game || Motion.instant {
+            root.current-game = i;
+            root.game-chosen(i);
+            return;
+        }
+        root.old-game-name = root.game-name;
+        root.switch-target = i;
+        root.rolling = true;
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.switch-out);
+        running: root.rolling;
+        triggered => {
+            root.old-shot = root.shot;
+            root.old-shot-w = root.shot-w;
+            root.old-shot-h = root.shot-h;
+            root.switched-at = animation-tick();
+            root.crossing = true;
+            root.rolling = false;
+            root.current-game = root.switch-target;
+            root.game-chosen(root.switch-target);
+        }
+    }
+
+    Timer {
+        interval: Math.max(1ms, Motion.switch-in);
+        running: root.crossing;
+        triggered => {
+            root.crossing = false;
+            root.old-shot = Art.scene;
+        }
+    }
+
     keys := FocusScope {
         key-pressed(e) => {
             if root.overlay == OverlayPreview.quick-menu || root.overlay == OverlayPreview.quick-menu-voice {
@@ -278,26 +541,23 @@ export component MainWindow inherits Window {
                     return accept;
                 }
                 if e.text == Key.UpArrow {
-                    switcher.highlight = Math.max(0, switcher.highlight - 1);
+                    switcher.step(-1);
                     return accept;
                 }
                 if e.text == Key.DownArrow {
-                    switcher.highlight = Math.min(root.games.length - 1, switcher.highlight + 1);
+                    switcher.step(1);
                     return accept;
                 }
-                if e.text == Key.Return && switcher.highlight >= 0 && switcher.highlight < root.games.length {
-                    root.notice = "";
-                    root.current-game = switcher.highlight;
-                    root.switcher-open = false;
-                    root.game-chosen(switcher.highlight);
+                if e.text == Key.Return {
+                    switcher.pick();
                     return accept;
                 }
             }
             if !root.setup && e.modifiers.control && (e.text == "k" || e.text == "K" || e.text == "\u{b}") {
-                root.switcher-open = !root.switcher-open;
                 if root.switcher-open {
-                    root.zone-rename-done();
-                    root.switcher-opened();
+                    root.switcher-open = false;
+                } else {
+                    root.open-switcher();
                 }
                 return accept;
             }
@@ -314,31 +574,45 @@ export component MainWindow inherits Window {
                     return accept;
                 }
             }
+            // Enter in setup: Get started, Continue or Finish (not while key capture waits for a key)
+            if root.setup && e.text == Key.Return && root.overlay == OverlayPreview.none && !root.switcher-open && root.capturing-key < 0 {
+                root.next();
+                return accept;
+            }
+            if e.text == Key.Escape && root.overlay == OverlayPreview.none && !root.switcher-open {
+                // key capture takes Esc itself (through the key hook): the page stays
+                if root.capturing-key >= 0 {
+                    return accept;
+                }
+                if root.sub {
+                    root.close-sub();
+                    return accept;
+                }
+            }
             reject
         }
         VerticalLayout {
-            if root.setup: ObBar {
-                step: root.step;
-            }
-            if !root.setup: MainBar {
-                tab: root.tab;
-                game: root.game-name;
-                art: root.game-art;
-                cover: root.game-cover;
-                status: root.status-text;
-                status-ok: root.status-ok;
-                tab-clicked(i) => {
-                    // a zone name still being typed is saved before its page goes
-                    root.zone-rename-done();
-                    root.notice = "";
-                    root.page = i == 0 ? Page.overview : i == 1 ? Page.zones : Page.settings;
-                }
+            TitleStrip {
+                mode: root.setup ? StripMode.setup : root.sub ? StripMode.sub : StripMode.main;
+                game: root.rolling ? root.old-game-name : root.game-name;
+                rolling: root.rolling;
+                roll-in: root.cross-t;
+                armed: root.armed;
+                page-name: root.sub-name;
+                status: root.status;
+                status-tip: root.status-text;
+                show-gear: true;
                 game-clicked => {
-                    root.zone-rename-done();
-                    root.switcher-open = true;
-                    root.switcher-opened();
+                    root.open-switcher();
+                }
+                back => {
+                    root.close-sub();
+                }
+                gear => {
+                    root.go(Page.settings);
                 }
             }
+
             if (!root.setup || root.page == Page.welcome) && root.notice != "": Rectangle {
                 height: 32px;
                 background: Palette.danger-soft;
@@ -346,7 +620,7 @@ export component MainWindow inherits Window {
                     x: Size.page-x;
                     width: parent.width - 2 * Size.page-x;
                     text: root.notice;
-                    font-size: Type.fs1;
+                    font-size: Type.fs-small;
                     color: Palette.danger;
                     vertical-alignment: center;
                     overflow: elide;
@@ -354,274 +628,379 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 vertical-stretch: 1;
-                if root.page == Page.welcome: WelcomePage {
-                    zones: root.setup-zones;
-                    get-started => {
-                        root.next();
-                    }
-                    import-settings => {
-                        root.import-game();
-                    }
-                }
-                if root.page == Page.pick-window: PickWindowPage {
-                    games: root.games-running;
-                    others: root.other-windows;
-                    selected <=> root.picked-window;
-                    refresh => {
-                        root.windows-refresh();
-                    }
-                    search-changed(t) => {
-                        root.windows-search(t);
-                    }
-                }
-                if root.page == Page.draw-zones: DrawZonesPage {
-                    zones <=> root.setup-zones;
-                    selected <=> root.setup-selected;
-                    draw <=> root.setup-draw;
-                    shot: root.setup-shot;
-                    shot-w: root.setup-shot-w;
-                    shot-h: root.setup-shot-h;
-                    contain: root.real-shots;
-                    drafting: root.drafting;
-                    draft: root.draft;
-                    kind: root.zone-kind;
-                    pointer(k, x, y, s) => {
-                        keys.focus();
-                        root.zone-pointer(k, x, y, s);
-                    }
-                    select(i) => {
-                        root.zone-select(i);
-                    }
-                    toggle(i, v) => {
-                        root.zone-toggle(i, v);
-                    }
-                    rename(i, t) => {
-                        root.zone-rename(i, t);
-                    }
-                    rename-done(enter) => {
-                        root.zone-rename-done();
-                        if enter {
-                            keys.focus();
+                // switch game: the texts of a sub-page fade out and in (the Overview fades its own texts and keeps
+                // its picture); page containers never fade
+                opacity: root.page == Page.overview ? 1 : root.text-o;
+                welcome-slot := PageSlot {
+                    name: "Welcome page";
+                    shown: root.page == Page.welcome;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if welcome-slot.alive: WelcomePage {
+                        zones: root.setup-zones;
+                        get-started => {
+                            root.next();
+                        }
+                        import-settings => {
+                            root.import-game();
                         }
                     }
-                    kind-picked(k) => {
-                        root.zone-kind-picked(k);
-                    }
-                    retake => {
-                        root.retake-shot();
-                    }
                 }
-                if root.page == Page.keys: KeysPage {
-                    read-key: root.read-key;
-                    menu-key: root.menu-key;
-                    capturing: root.capturing-key;
-                    change(i) => {
-                        root.key-change(i);
-                    }
-                }
-                if root.page == Page.voice: VoicePage {
-                    voices: root.voices;
-                    engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
-                    selected <=> root.picked-voice;
-                    speed <=> root.voice-speed;
-                    volume <=> root.voice-volume;
-                    problem: root.voices-problem;
-                    testing: root.voice-testing && !root.test-in-settings;
-                    test-played: root.test-played;
-                    test-time: root.test-time;
-                    test => {
-                        root.voice-test(true);
-                    }
-                    stop-test => {
-                        root.voice-stop();
-                    }
-                    add-voices => {
-                        root.voices-add();
-                    }
-                    volume-moved => {
-                        root.voice-volume-moved();
-                    }
-                }
-                if root.page == Page.mode: ModePage {
-                    automatic <=> root.automatic;
-                    game: root.setup-game;
-                    art: root.setup-art;
-                    cover: root.setup-cover;
-                    zone-count: root.setup-zones.length;
-                    read-key: root.read-key;
-                    menu-key: root.menu-key;
-                    voice: root.voices.length > 0 ? root.voices[root.picked-voice].engine + " · " + root.voices[root.picked-voice].name : "No voice";
-                    speed: root.voice-speed;
-                    has-voice: root.voices.length > 0;
-                }
-                if root.page == Page.overview: OverviewTab {
-                    shot: root.shot;
-                    shot-w: root.shot-w;
-                    shot-h: root.shot-h;
-                    contain: root.real-shots;
-                    toggle(i, v) => {
-                        root.zone-toggle(i, v);
-                    }
-                    zones <=> root.zones;
-                    extra-zones <=> root.extra-zones;
-                    recent: root.recent;
-                    automatic <=> root.automatic;
-                    read-key: root.read-key;
-                    voice: root.voice-label;
-                    status: root.status-text;
-                    status-ok: root.status-ok;
-                    paused: root.paused;
-                    now-who: root.now-who;
-                    now-line: root.now-line;
-                    mode-changed(a) => {
-                        root.mode-changed(a);
-                    }
-                    read-now => {
-                        root.read-now();
-                    }
-                    pause => {
-                        root.pause-clicked();
-                    }
-                    replay => {
-                        root.now-replay();
-                    }
-                    stop => {
-                        root.now-stop();
-                    }
-                    recent-replay(i) => {
-                        root.recent-replay(i);
-                    }
-                    // the voice and key buttons open their part of Settings
-                    voice-clicked => {
-                        root.page = Page.settings;
-                        settings.jump(3);
-                    }
-                    key-clicked => {
-                        root.page = Page.settings;
-                        settings.jump(2);
-                    }
-                    edit-zones => {
-                        root.page = Page.zones;
-                    }
-                    show-all => {
-                        root.page = Page.activity;
-                    }
-                }
-                if root.page == Page.zones: ZonesTab {
-                    zones <=> root.zones;
-                    win-w: root.width;
-                    win-h: root.height - (root.notice != "" ? 32px : 0px);
-                    selected <=> root.zones-selected;
-                    draw <=> root.zones-draw;
-                    shot: root.shot;
-                    shot-w: root.shot-w;
-                    shot-h: root.shot-h;
-                    contain: root.real-shots;
-                    shot-info: root.shot-info;
-                    drafting: root.drafting;
-                    draft: root.draft;
-                    kind: root.zone-kind;
-                    pointer(k, x, y, s) => {
-                        keys.focus();
-                        root.zone-pointer(k, x, y, s);
-                    }
-                    select(i) => {
-                        root.zone-select(i);
-                    }
-                    toggle(i, v) => {
-                        root.zone-toggle(i, v);
-                    }
-                    rename(i, t) => {
-                        root.zone-rename(i, t);
-                    }
-                    rename-done(enter) => {
-                        root.zone-rename-done();
-                        if enter {
-                            keys.focus();
+
+                pick-slot := PageSlot {
+                    name: "Game page";
+                    shown: root.page == Page.pick-window;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if pick-slot.alive: PickWindowPage {
+                        games: root.games-running;
+                        others: root.other-windows;
+                        selected <=> root.picked-window;
+                        refresh => {
+                            root.windows-refresh();
+                        }
+                        search-changed(t) => {
+                            root.windows-search(t);
                         }
                     }
-                    kind-picked(k) => {
-                        root.zone-kind-picked(k);
-                    }
-                    retake => {
-                        root.retake-shot();
-                    }
-                    add-zone => {
-                        root.zones-draw = true;
-                    }
-                    delete-zone(i) => {
-                        root.zone-delete();
+                }
+
+                draw-slot := PageSlot {
+                    name: "Draw zones page";
+                    shown: root.page == Page.draw-zones;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if draw-slot.alive: DrawZonesPage {
+                        zones <=> root.setup-zones;
+                        selected <=> root.setup-selected;
+                        draw <=> root.setup-draw;
+                        shot: root.setup-shot;
+                        shot-w: root.setup-shot-w;
+                        shot-h: root.setup-shot-h;
+                        contain: root.real-shots;
+                        shot-time: root.setup-shot-time;
+                        drafting: root.drafting;
+                        draft: root.draft;
+                        kind: root.zone-kind;
+                        pointer(k, x, y, s) => {
+                            keys.focus();
+                            root.zone-pointer(k, x, y, s);
+                        }
+                        select(i) => {
+                            root.zone-select(i);
+                        }
+                        toggle(i, v) => {
+                            root.zone-toggle(i, v);
+                        }
+                        rename(i, t) => {
+                            root.zone-rename(i, t);
+                        }
+                        rename-done(enter) => {
+                            root.zone-rename-done();
+                            if enter {
+                                keys.focus();
+                            }
+                        }
+                        kind-picked(k) => {
+                            root.zone-kind-picked(k);
+                        }
+                        retake => {
+                            root.retake-shot();
+                        }
+                        delete-zone => {
+                            root.zone-delete();
+                        }
                     }
                 }
-                if root.page == Page.activity: ActivityTab {
-                    log: root.log;
-                    back => {
-                        root.page = Page.overview;
+
+                keys-slot := PageSlot {
+                    name: "Keys page";
+                    shown: root.page == Page.keys;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if keys-slot.alive: KeysPage {
+                        read-key: root.read-key;
+                        menu-key: root.menu-key;
+                        capturing: root.capturing-key;
+                        change(i) => {
+                            root.key-change(i);
+                        }
                     }
                 }
-                // Settings stays alive so settings-jump can reach it.
-                settings := SettingsTab {
-                    visible: root.page == Page.settings;
-                    read-key: root.read-key;
-                    menu-key: root.menu-key;
-                    capturing: root.capturing-key;
-                    change-key(i) => {
-                        root.key-change(i);
+
+                voice-slot := PageSlot {
+                    name: "Voice page";
+                    shown: root.page == Page.voice;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if voice-slot.alive: VoicePage {
+                        voices: root.voices;
+                        engine: root.voices.length > 0 ? root.voices[0].engine : "Windows";
+                        selected <=> root.picked-voice;
+                        speed <=> root.voice-speed;
+                        volume <=> root.voice-volume;
+                        problem: root.voices-problem;
+                        testing: root.voice-testing && !root.test-in-settings;
+                        test-played: root.test-played;
+                        test-time: root.test-time;
+                        test => {
+                            root.voice-test(true);
+                        }
+                        stop-test => {
+                            root.voice-stop();
+                        }
+                        add-voices => {
+                            root.voices-add();
+                        }
+                        sample(i) => {
+                            root.picked-voice = i;
+                            root.voice-test(true);
+                        }
+                        volume-moved => {
+                            root.voice-volume-moved();
+                        }
                     }
-                    pill-position <=> root.pill-position;
-                    show-speaker <=> root.show-speaker;
-                    start-with-windows <=> root.start-with-windows;
-                    open-minimized <=> root.open-minimized;
-                    show-in-taskbar <=> root.show-in-taskbar;
-                    version: root.version;
-                    update-note: root.update-note;
-                    show-auto-update: root.show-auto-update;
-                    changed => {
-                        root.settings-changed();
+                }
+
+                mode-slot := PageSlot {
+                    morph: root.finishing;
+                    name: "Mode page";
+                    shown: root.page == Page.mode;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if mode-slot.alive: ModePage {
+                        automatic <=> root.automatic;
+                        game: root.setup-game;
+                        art: root.setup-art;
+                        cover: root.setup-cover;
+                        zone-count: root.setup-zones.length;
+                        read-key: root.read-key;
+                        menu-key: root.menu-key;
+                        voice: root.voices.length > 0 ? root.voices[root.picked-voice].name : "";
+                        speed: root.voice-speed;
+                        has-voice: root.voices.length > 0;
                     }
-                    check-updates => {
-                        root.check-updates();
+                }
+
+                overview-slot := PageSlot {
+                    morph: root.finishing && root.page == Page.overview;
+                    still: root.grow-zones;
+                    name: "Overview page";
+                    shown: root.page == Page.overview;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if overview-slot.alive: OverviewTab {
+                        finish: root.finishing && root.armed;
+                        text-o: root.text-o;
+                        pic-t: root.crossing ? root.cross-t : 1;
+                        old-shot: root.old-shot;
+                        old-w: root.old-shot-w;
+                        old-h: root.old-shot-h;
+                        shot: root.shot;
+                        shot-w: root.shot-w;
+                        shot-h: root.shot-h;
+                        contain: root.real-shots;
+                        kind-toggle(k, v) => {
+                            root.kind-toggle(k, v);
+                        }
+                        zones <=> root.zones;
+                        kinds: root.zone-kinds;
+                        recent: root.recent;
+                        automatic <=> root.automatic;
+                        read-key: root.read-key;
+                        voice: root.voice-label;
+                        running: root.game-running;
+                        live-zone: root.live-zone;
+                        paused: root.paused;
+                        now-who: root.now-who;
+                        now-line: root.now-line;
+                        mode-changed(a) => {
+                            root.mode-changed(a);
+                        }
+                        read-now => {
+                            root.read-now();
+                        }
+                        pause => {
+                            root.pause-clicked();
+                        }
+                        replay => {
+                            root.now-replay();
+                        }
+                        stop => {
+                            root.now-stop();
+                        }
+                        recent-replay(i) => {
+                            root.recent-replay(i);
+                        }
+                        // the voice and key buttons open their part of Settings
+                        voice-clicked => {
+                            root.go(Page.settings);
+                            settings.jump(3);
+                        }
+                        key-clicked => {
+                            root.go(Page.settings);
+                            settings.jump(2);
+                        }
+                        edit-zones => {
+                            root.go(Page.zones);
+                        }
+                        show-all => {
+                            root.go(Page.activity);
+                        }
+                        switch-game => {
+                            root.open-switcher();
+                        }
                     }
-                    export-game => {
-                        root.export-game();
+                }
+
+                zones-slot := PageSlot {
+                    grow: root.grow-zones && root.game-running;
+                    name: "Zones page";
+                    shown: root.page == Page.zones;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    if zones-slot.alive: ZonesTab {
+                        grow: zones-slot.grow ? zones-slot.t : 1;
+                        zones <=> root.zones;
+                        selected <=> root.zones-selected;
+                        draw <=> root.zones-draw;
+                        shot: root.shot;
+                        shot-w: root.shot-w;
+                        shot-h: root.shot-h;
+                        contain: root.real-shots;
+                        shot-time: root.shot-time;
+                        drafting: root.drafting;
+                        draft: root.draft;
+                        kind: root.zone-kind;
+                        pointer(k, x, y, s) => {
+                            keys.focus();
+                            root.zone-pointer(k, x, y, s);
+                        }
+                        kind-picked(k) => {
+                            root.zone-kind-picked(k);
+                        }
+                        retake => {
+                            root.retake-shot();
+                        }
+                        delete-zone(i) => {
+                            root.zone-delete();
+                        }
+                        done => {
+                            root.close-sub();
+                        }
                     }
-                    import-game => {
-                        root.import-game();
+                }
+
+                activity-slot := PageSlot {
+                    name: "Activity page";
+                    shown: root.page == Page.activity;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    // Activity rises from 24 px below (brief 3.1 row 6)
+                    rise: true;
+                    if activity-slot.alive: ActivityTab {
+                        log: root.log;
+                        back => {
+                            root.close-sub();
+                        }
+                        read-now => {
+                            root.read-now();
+                        }
+                        replay(i) => {
+                            root.log-replay(i);
+                        }
                     }
-                    voices: root.voices;
-                    voices-desc: root.voices-desc;
-                    kokoro-desc: root.kokoro-desc;
-                    game: root.game-name;
-                    has-game: root.games.length > 0;
-                    game-voice <=> root.game-voice;
-                    game-speed <=> root.game-speed;
-                    game-volume <=> root.game-volume;
-                    testing: root.voice-testing && root.test-in-settings;
-                    add-voices => {
-                        root.voices-add();
-                    }
-                    voice-picked(i) => {
-                        root.game-voice-picked(i);
-                    }
-                    voice-changed => {
-                        root.game-voice-changed();
-                    }
-                    voice-saved => {
-                        root.game-voice-saved();
-                    }
-                    test => {
-                        root.voice-test(false);
-                    }
-                    stop-test => {
-                        root.voice-stop();
+                }
+
+                settings-slot := PageSlot {
+                    name: "Settings page";
+                    shown: root.page == Page.settings;
+                    fwd: root.fwd;
+                    armed: root.armed;
+                    // Settings stays alive so settings-jump can reach it.
+                    settings := SettingsTab {
+                        read-key: root.read-key;
+                        menu-key: root.menu-key;
+                        capturing: root.capturing-key;
+                        change-key(i) => {
+                            root.key-change(i);
+                        }
+                        pill-position <=> root.pill-position;
+                        show-speaker <=> root.show-speaker;
+                        start-with-windows <=> root.start-with-windows;
+                        open-minimized <=> root.open-minimized;
+                        show-in-taskbar <=> root.show-in-taskbar;
+                        version: root.version;
+                        update-note: root.update-note;
+                        show-auto-update: root.show-auto-update;
+                        changed => {
+                            root.settings-changed();
+                        }
+                        check-updates => {
+                            root.check-updates();
+                        }
+                        export-game => {
+                            root.export-game();
+                        }
+                        import-game => {
+                            root.import-game();
+                        }
+                        voices: root.voices;
+                        voices-desc: root.voices-desc;
+                        game: root.game-name;
+                        has-game: root.games.length > 0;
+                        game-voice <=> root.game-voice;
+                        game-speed <=> root.game-speed;
+                        game-volume <=> root.game-volume;
+                        testing: root.voice-testing && root.test-in-settings;
+                        add-voices => {
+                            root.voices-add();
+                        }
+                        voice-picked(i) => {
+                            root.game-voice-picked(i);
+                        }
+                        voice-changed => {
+                            root.game-voice-changed();
+                        }
+                        voice-saved => {
+                            root.game-voice-saved();
+                        }
+                        test => {
+                            root.voice-test(false);
+                        }
+                        stop-test => {
+                            root.voice-stop();
+                        }
                     }
                 }
             }
 
-            if root.setup && root.page != Page.welcome: ObFoot {
-                notice: root.notice;
-                primary: root.page == Page.mode ? "Finish" : "Continue";
-                primary-icon: root.page == Page.mode ? Icons.check : Icons.arrow-right;
+            // the setup footer: there on every setup step, faded out on Welcome
+            // room for the setup footer (drawn below, outside the layout, so it can fade out after Finish)
+            if root.setup: Rectangle {
+                height: 72px;
+            }
+        }
+
+        // The setup footer: there on every setup step, faded out on Welcome. It fades in with the push of the
+        // first step, and out in 140 ms (ease-in) at Finish while the Overview comes in.
+        foot-host := Rectangle {
+            property <bool> on: root.setup && root.page != Page.welcome;
+            y: parent.height - self.height;
+            height: 72px;
+            opacity: self.on ? 1 : 0;
+            visible: self.opacity > 0.01;
+            animate opacity {
+                duration: !root.armed ? 0ms : foot-host.on ? Motion.push-in : root.setup ? Motion.push-out : Motion.exit;
+                delay: root.armed && foot-host.on ? Motion.push-gap : 0ms;
+                easing: foot-host.on ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+            }
+            foot := ObFoot {
+                // after Finish the footer keeps step 5 and "Finish" while it fades out
+                step: root.setup ? root.step : 5;
+                notice: root.setup ? root.notice : "";
+                primary: root.page == Page.mode || !root.setup ? "Finish" : "Continue";
+                primary-icon: root.page == Page.mode || !root.setup ? Icons.check : Icons.arrow-right;
                 back => {
                     root.back();
                 }
@@ -629,20 +1008,25 @@ export component MainWindow inherits Window {
                     root.next();
                 }
             }
+
+            if !foot-host.on: TouchArea { }
         }
 
+        if root.sheet: ComponentSheet { }
+
         switcher := GameSwitcher {
-            visible: root.switcher-open;
+            open: root.switcher-open;
             games: root.games;
+            hits: root.switcher-hits;
+            search(q) => {
+                root.switcher-search(q);
+            }
             current: root.current-game;
             close => {
                 root.switcher-open = false;
             }
             choose(i) => {
-                root.notice = "";
-                root.current-game = i;
-                root.switcher-open = false;
-                root.game-chosen(i);
+                root.switch-to(i);
             }
             add-game => {
                 root.switcher-open = false;
@@ -664,7 +1048,7 @@ export component MainWindow inherits Window {
             }
             open-settings => {
                 root.overlay = OverlayPreview.none;
-                root.page = Page.settings;
+                root.go(Page.settings);
             }
         }
 
@@ -672,7 +1056,10 @@ export component MainWindow inherits Window {
             visible: root.overlay == OverlayPreview.zone-edit;
             zones <=> root.edit-zones;
             selected <=> root.edit-selected;
-            dim-commands: root.edit-dim;
+            bar-clear: root.edit-bar-clear;
+            set-kind(k) => {
+                root.edit-set-kind(k);
+            }
             draft <=> root.edit-draft;
             draft-x <=> root.edit-draft-x;
             draft-y <=> root.edit-draft-y;

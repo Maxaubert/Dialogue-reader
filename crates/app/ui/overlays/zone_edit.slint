@@ -1,31 +1,218 @@
-// 16-zone-edit: in-game zone editing from the quick menu.
-// Drag on empty space adds a zone, click selects it, Delete / Backspace or the small x removes it, Esc finishes.
-import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+// 16 zone edit (d-black 16-zone-edit): in-game zone editing from the quick menu, over a frozen screenshot.
+// Drag on the game draws a box; the kind picker pops under it and a kind adds it. A click selects a zone: its tag
+// turns white with a small x (Delete zone), and the picker under it changes its kind. Delete or Backspace removes
+// the selected zone, Esc drops a box being drawn, then finishes.
+// The bar (Done) sits top centre. When the selected box, its tag or the picker would sit under it, it moves to
+// the first place clear of every zone: bottom centre, top right, top left (Rust works out which are clear:
+// src/overlay/zone_edit.rs, bar_clear).
+// Motion (README, 11): shade 180 ms; outlines and tags 180 ms after 60 ms; bar 180 ms, y -8 to 0; all ease-out.
+// Picker: opacity and scale 0.96 to 1, 140 ms. Bar moving: out 140 ms ease-in, in at the new place 180 ms
+// ease-out, y 8 px. Out: 140 ms ease-in.
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
 import { EditZone } from "../data.slint";
-import { Icon, CIcon } from "../components/base.slint";
+import { Icon, CIcon, Button, BtnKind, Tip } from "../components/base.slint";
 
-component Badge inherits Rectangle {
+// The tag of a zone (.ztag): kind icon and name. Selected: white with a black keyline and a small x at the end.
+component ZoneTag inherits Rectangle {
     in property <Kind> kind;
-    in property <bool> sel;
-    width: 24px;
+    in property <bool> selected: false;
+    callback remove();
+    width: lay.preferred-width;
     height: 24px;
-    border-radius: 6px;
-    background: root.sel ? Palette.accent : Palette.panel;
+    border-radius: Radius.sm;
+    background: root.selected ? Palette.on : Palette.surface-1;
     border-width: 1px;
-    border-color: root.sel ? Palette.accent : Palette.line-2;
-    Icon {
-        source: Kinds.icon(root.kind);
-        width: 14px;
-        height: 14px;
-        color: root.sel ? Palette.on-accent : Palette.text-3;
+    border-color: root.selected ? Palette.on : Palette.float-line;
+    if root.selected: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+    lay := HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: root.selected ? 3px : Space.s2;
+        spacing: Space.s1;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Kinds.icon(root.kind);
+                width: 13px;
+                height: 13px;
+                color: root.selected ? Palette.on-ink : Palette.text-2;
+            }
+        }
+
+        Text {
+            text: Kinds.name(root.kind);
+            font-size: Type.fs-small;
+            color: root.selected ? Palette.on-ink : Palette.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        if root.selected: VerticalLayout {
+            alignment: center;
+            padding-left: Space.s1;
+            del := Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: Radius.sm;
+                background: del-touch.has-hover ? #0000001A : transparent;
+                accessible-role: button;
+                accessible-label: "Delete zone";
+                accessible-action-default => {
+                    root.remove();
+                }
+                Icon {
+                    source: Icons.x;
+                    width: 12px;
+                    height: 12px;
+                    color: Palette.on-ink;
+                }
+
+                del-touch := TouchArea {
+                    clicked => {
+                        root.remove();
+                    }
+                }
+
+                Tip {
+                    x: (parent.width - self.width) / 2;
+                    y: -self.height - 6px;
+                    text: "Delete zone";
+                    shown: del-touch.has-hover;
+                }
+            }
+        }
+    }
+}
+
+// A zone box (.zz): white 70 % line with a black keyline outside, lifted white 8 % over the shade.
+// Selected (or the box just drawn): 2 px white.
+component ZoneBox inherits Rectangle {
+    in property <bool> selected: false;
+    in property <bool> drawing: false;
+    property <length> line: root.selected ? 2px : 1px;
+    background: #FFFFFF14;
+    border-radius: Radius.sm;
+    Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+
+    Rectangle {
+        border-radius: Radius.sm;
+        border-width: root.line;
+        border-color: root.selected || root.drawing ? Palette.on : #FFFFFFB3;
+    }
+}
+
+// The kind picker (.zpick): the five kinds with icon and name; the box's kind is the white one. Each kind has its
+// tip ("Spoken lines" and so on) above it on hover.
+component KindPicker inherits Rectangle {
+    in property <Kind> kind;
+    callback picked(Kind);
+    width: seg.width + 2 * Space.s1 + 2px;
+    height: seg.height + 2 * Space.s1 + 2px;
+    border-radius: Radius.lg;
+    background: Palette.float;
+    border-width: 1px;
+    border-color: Palette.float-line;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    TouchArea { }
+
+    seg := Rectangle {
+        x: 1px + Space.s1;
+        y: 1px + Space.s1;
+        width: lay.preferred-width;
+        height: Size.ctl;
+        border-radius: Radius.md;
+        background: Palette.surface-2;
+        border-width: 1px;
+        border-color: Palette.line;
+        lay := HorizontalLayout {
+            padding: 3px;
+            for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
+                property <bool> on: k == root.kind;
+                border-radius: Radius.sm;
+                background: self.on ? Palette.on : transparent;
+                animate background {
+                    duration: Motion.fast;
+                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+                }
+                accessible-role: button;
+                accessible-label: Kinds.name(k);
+                accessible-description: Kinds.tip(k);
+                accessible-item-selected: self.on;
+                accessible-action-default => {
+                    root.picked(k);
+                }
+                HorizontalLayout {
+                    padding-left: Space.s3;
+                    padding-right: Space.s3;
+                    spacing: Space.s2;
+                    CIcon {
+                        source: Kinds.icon(k);
+                        size: 14px;
+                        color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                    }
+
+                    Text {
+                        text: Kinds.name(k);
+                        font-weight: on ? Type.w-strong : Type.w-body;
+                        color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+
+                kt := TouchArea {
+                    clicked => {
+                        root.picked(k);
+                    }
+                }
+
+                Tip {
+                    x: (parent.width - self.width) / 2;
+                    y: -self.height - Space.s1 - 6px;
+                    text: Kinds.tip(k);
+                    shown: kt.has-hover;
+                }
+            }
+        }
     }
 }
 
 export component ZoneEdit inherits Rectangle {
     in-out property <[EditZone]> zones;
     in-out property <int> selected: -1;
-    // dim layer: one even-odd path, the frame minus every zone (built in Rust, geom::dim_path)
-    in property <string> dim-commands;
+    // the bar's places clear of every zone and tag: top centre, bottom centre, top right, top left (from Rust)
+    in property <[bool]> bar-clear: [true, true, true, true];
+    // shown (true) or fading out (false)
+    in property <bool> open: true;
     // the zone being drawn (frame px); shown with the kind picker until a kind is chosen
     in-out property <bool> draft: false;
     in-out property <length> draft-x;
@@ -41,7 +228,10 @@ export component ZoneEdit inherits Rectangle {
     in property <image> shot;
     callback done();
     callback remove(int);
+    // the box drawn gets this kind (it becomes a zone)
     callback commit(Kind);
+    // the selected zone gets this kind
+    callback set-kind(Kind);
     callback pick(length, length) -> int;
     public function key(k: string) -> bool {
         if k == Key.Delete || k == Key.Backspace {
@@ -60,6 +250,83 @@ export component ZoneEdit inherits Rectangle {
         }
         return false;
     }
+
+    // the box the tag and the picker belong to: the box just drawn, else the selected zone
+    property <bool> has-sel: (root.draft && !root.dragging) || (root.selected >= 0 && root.selected < root.zones.length);
+    property <bool> sel-draft: root.draft;
+    property <length> sx: root.sel-draft ? root.draft-x : root.has-sel ? root.zones[root.selected].x : 0px;
+    property <length> sy: root.sel-draft ? root.draft-y : root.has-sel ? root.zones[root.selected].y : 0px;
+    property <length> sw: root.sel-draft ? root.draft-w : root.has-sel ? root.zones[root.selected].w : 0px;
+    property <length> sh: root.sel-draft ? root.draft-h : root.has-sel ? root.zones[root.selected].h : 0px;
+    property <Kind> sel-kind: root.sel-draft ? root.draft-kind : root.has-sel ? root.zones[root.selected].kind : Kind.dialogue;
+    // where a tag goes: 0 above the box, 1 under it (no room above), 2 inside at the top left (no room either)
+    pure function tag-place(by: length, bh: length) -> int {
+        return by >= 28px ? 0 : by + bh + 28px <= root.height ? 1 : 2;
+    }
+    property <int> sel-tag: root.tag-place(root.sy, root.sh);
+    // the picker: under the box (and under its tag when that is under it too); above it at the bottom edge
+    property <length> pick-top: root.sy + root.sh + Space.s2 + (root.sel-tag == 1 ? 28px : 0px);
+    property <bool> pick-up: root.pick-top + picker.height > root.height - Space.s2;
+    property <length> pick-x: Math.max(Space.s2, Math.min(root.sx, root.width - picker.width - Space.s2));
+    property <length> pick-y: root.pick-up ? root.sy - (root.sel-tag == 1 ? 0px : 28px) - Space.s2 - picker.height : root.pick-top;
+
+    // the bar: does the selection (box, tag, picker) sit under the bar at place p (8 px around it)?
+    pure function bar-x(p: int) -> length {
+        return p == 2 ? root.width - Space.s5 - bar.width : p == 3 ? Space.s5 : (root.width - bar.width) / 2;
+    }
+    pure function bar-y(p: int) -> length {
+        return p == 1 ? root.height - Space.s5 - bar.height : Space.s5;
+    }
+    pure function hits(p: int, x: length, y: length, w: length, h: length) -> bool {
+        return x < root.bar-x(p) + bar.width + Space.s2 && x + w > root.bar-x(p) - Space.s2 && y < root.bar-y(p) + bar.height + Space.s2 && y + h > root.bar-y(p) - Space.s2;
+    }
+    pure function sel-hits(p: int) -> bool {
+        return root.has-sel && (root.hits(p, root.sx - 2px, root.sy - 2px, root.sw + 4px, root.sh + 4px) || root.hits(p, root.sx - 1px, root.sel-tag == 0 ? root.sy - 28px : root.sel-tag == 1 ? root.sy + root.sh + 4px : root.sy + 4px, 130px, 24px) || root.hits(p, root.pick-x, root.pick-y, picker.width, picker.height));
+    }
+    property <int> want-at: !root.sel-hits(0) ? 0 : root.bar-clear[1] && !root.sel-hits(1) ? 1 : root.bar-clear[2] && !root.sel-hits(2) ? 2 : root.bar-clear[3] && !root.sel-hits(3) ? 3 : !root.sel-hits(1) ? 1 : !root.sel-hits(2) ? 2 : !root.sel-hits(3) ? 3 : 0;
+    property <int> bar-at: 0;
+    property <bool> bar-moving: false;
+    changed want-at => {
+        if Motion.instant {
+            root.bar-at = root.want-at;
+        } else if root.want-at != root.bar-at {
+            root.bar-moving = true;
+            mover.running = true;
+        }
+    }
+    mover := Timer {
+        interval: 140ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.bar-at = root.want-at;
+            root.bar-moving = false;
+        }
+    }
+
+    // fades: the shade, then the zones 60 ms later, and the bar
+    property <float> t: root.open ? 1 : 0;
+    animate t {
+        duration: Motion.d(root.open ? 180ms : 140ms);
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> zt: root.open ? 1 : 0;
+    animate zt {
+        duration: Motion.d(root.open ? 180ms : 140ms);
+        delay: root.open ? Motion.wait(60ms) : 0ms;
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> bt: root.open && !root.bar-moving ? 1 : 0;
+    animate bt {
+        duration: Motion.d(root.open && !root.bar-moving ? 180ms : 140ms);
+        easing: root.open && !root.bar-moving ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> pt: root.open && root.has-sel ? 1 : 0;
+    animate pt {
+        duration: Motion.d(140ms);
+        easing: root.open && root.has-sel ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+
     Image {
         width: 100%;
         height: 100%;
@@ -67,14 +334,10 @@ export component ZoneEdit inherits Rectangle {
         image-fit: root.real-shot ? fill : cover;
     }
 
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: root.width / 1px;
-        viewbox-height: root.height / 1px;
-        fill-rule: evenodd;
-        fill: Palette.edit-shade;
-        commands: root.dim-commands;
+    // a flat black 45 % shade; zones do not cut holes in it, they are lifted over it
+    Rectangle {
+        background: #00000073;
+        opacity: root.t;
     }
 
     // drawing and selecting
@@ -108,260 +371,97 @@ export component ZoneEdit inherits Rectangle {
         }
     }
 
-    for z[i] in root.zones: Rectangle {
-        property <bool> sel: i == root.selected;
-        x: z.x;
-        y: z.y;
-        width: z.w;
-        height: z.h;
-        border-radius: 4px;
-        border-width: self.sel ? 2px : 1px;
-        border-color: self.sel ? Palette.accent : Palette.edit-line;
-        background: self.sel ? Palette.edit-sel-fill : transparent;
-        if sel: Rectangle {
-            x: -5px;
-            y: -5px;
-            width: parent.width + 10px;
-            height: parent.height + 10px;
-            border-radius: 7px;
-            border-width: 3px;
-            border-color: Palette.edit-sel-ring;
+    // the zones and their tags (tags over every box); a box never takes the pointer, the TouchArea above picks
+    Rectangle {
+        opacity: root.zt;
+        for z[i] in root.zones: ZoneBox {
+            x: z.x;
+            y: z.y;
+            width: z.w;
+            height: z.h;
+            selected: i == root.selected && !root.draft;
         }
-        Badge {
-            x: sel ? -2px : -1px;
-            y: -self.height - 6px;
+        if root.draft: ZoneBox {
+            x: root.draft-x;
+            y: root.draft-y;
+            width: root.draft-w;
+            height: root.draft-h;
+            drawing: root.dragging;
+            selected: !root.dragging;
+        }
+        for z[i] in root.zones: ZoneTag {
+            property <int> place: root.tag-place(z.y, z.h);
             kind: z.kind;
-            sel: sel;
-        }
-
-        if sel: Rectangle {
-            for p in [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 0.5, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }]: Rectangle {
-                x: parent.width * p.x - 4.5px;
-                y: parent.height * p.y - 4.5px;
-                width: 9px;
-                height: 9px;
-                border-radius: 2px;
-                background: Palette.knob;
-                border-width: 1.5px;
-                border-color: Palette.accent;
-            }
-        }
-        if sel: Rectangle {
-            x: parent.width + 6px;
-            y: -30px;
-            width: 24px;
-            height: 24px;
-            border-radius: 12px;
-            background: Palette.panel;
-            border-width: 1px;
-            border-color: Palette.line-2;
-            accessible-role: button;
-            accessible-label: "Remove zone";
-            accessible-action-default => {
+            selected: i == root.selected && !root.draft;
+            x: z.x + (self.place == 2 ? 4px : -1px);
+            y: self.place == 0 ? z.y - 28px : self.place == 1 ? z.y + z.h + 4px : z.y + 4px;
+            remove => {
                 root.remove(i);
             }
-            Icon {
-                source: Icons.x-sm;
-                width: 13px;
-                height: 13px;
-                color: Palette.text;
-            }
-
-            TouchArea {
-                clicked => {
-                    root.remove(i);
-                }
+        }
+        if root.draft && !root.dragging: ZoneTag {
+            kind: root.draft-kind;
+            selected: true;
+            x: root.draft-x + (root.sel-tag == 2 ? 4px : -1px);
+            y: root.sel-tag == 0 ? root.draft-y - 28px : root.sel-tag == 1 ? root.draft-y + root.draft-h + 4px : root.draft-y + 4px;
+            remove => {
+                root.draft = false;
             }
         }
     }
 
-    // the new zone and its kind picker
-    if root.draft: Rectangle {
-        x: root.draft-x;
-        y: root.draft-y;
-        width: root.draft-w;
-        height: root.draft-h;
-        border-radius: 4px;
-        border-width: 1.5px;
-        border-color: Palette.edit-draft-line;
-        background: Palette.edit-draft-fill;
-        Icon {
-            x: parent.width - 11px;
-            y: parent.height - 11px;
-            width: 22px;
-            height: 22px;
-            source: Icons.cross;
-            colorize: Palette.on-accent;
+    picker := KindPicker {
+        x: root.pick-x;
+        y: root.pick-y;
+        kind: root.sel-kind;
+        opacity: root.pt;
+        visible: root.pt > 0.01;
+        transform-scale: 1 - 0.04 * (1 - root.pt) * Motion.move;
+        transform-origin: { x: 0px, y: root.pick-up ? self.height : 0px };
+        picked(k) => {
+            if root.draft {
+                root.draft-kind = k;
+                root.commit(k);
+            } else if root.selected >= 0 {
+                root.set-kind(k);
+            }
         }
+    }
 
-        Rectangle {
-            x: parent.width + 6px;
-            y: parent.height + 10px;
-            height: 22px;
-            width: size-text.preferred-width + 18px;
-            border-radius: 6px;
-            background: Palette.panel;
-            border-width: 1px;
-            border-color: Palette.line-2;
-            size-text := Text {
-                text: Math.round(root.draft-w / 1px) + " × " + Math.round(root.draft-h / 1px);
-                font-size: Type.fs1;
-                font-weight: Type.w-medium;
+    // the bar with Done
+    bar := Rectangle {
+        property <length> way: root.bar-at == 1 ? 8px : -8px;
+        x: root.bar-x(root.bar-at);
+        y: root.bar-y(root.bar-at) + (1 - root.bt) * self.way * Motion.move;
+        width: bar-lay.preferred-width;
+        height: 48px;
+        opacity: root.bt;
+        border-radius: Radius.lg;
+        background: Palette.float;
+        border-width: 1px;
+        border-color: Palette.float-line;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000099;
+        TouchArea { }
+
+        bar-lay := HorizontalLayout {
+            padding-left: Space.s4;
+            padding-right: Space.s2;
+            spacing: Space.s4;
+            Text {
+                text: "Drag to add · Esc to finish";
                 color: Palette.text-2;
+                vertical-alignment: center;
             }
-        }
-    }
-    if root.draft: Rectangle {
-        x: root.draft-x;
-        y: root.draft-y + root.draft-h + 10px;
-        width: picker.preferred-width;
-        height: 42px;
-        border-radius: 10px;
-        background: Palette.panel;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        drop-shadow-offset-y: Shadow.pop-y;
-        drop-shadow-blur: Shadow.pop-blur;
-        drop-shadow-color: Shadow.pop-color;
-        picker := HorizontalLayout {
-            padding: 5px;
-            spacing: 2px;
-            for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 7px;
-                background: k == root.draft-kind ? Palette.surface-3 : transparent;
-                accessible-role: button;
-                accessible-label: Kinds.name(k);
-                accessible-action-default => {
-                    root.draft-kind = k;
-                    root.commit(k);
-                }
-                Icon {
-                    source: Kinds.icon(k);
-                    color: k == root.draft-kind ? Palette.text : Palette.text-3;
-                }
 
-                TouchArea {
+            VerticalLayout {
+                alignment: center;
+                Button {
+                    text: "Done";
+                    kind: BtnKind.primary;
                     clicked => {
-                        root.draft-kind = k;
-                        root.commit(k);
-                    }
-                }
-            }
-        }
-
-        Rectangle {
-            x: 4px;
-            y: parent.height + 6px;
-            height: 22px;
-            width: tip.preferred-width + 16px;
-            border-radius: 6px;
-            background: Palette.surface-3;
-            tip := Text {
-                text: Kinds.name(root.draft-kind);
-                font-size: Type.fs1;
-                font-weight: Type.w-medium;
-                color: Palette.text;
-            }
-        }
-    }
-
-    // hint bar with Done
-    Rectangle {
-        x: (parent.width - self.width) / 2;
-        y: 24px;
-        width: bar.preferred-width;
-        height: 44px;
-        border-radius: 22px;
-        background: Palette.panel;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        drop-shadow-offset-y: Shadow.pop-y;
-        drop-shadow-blur: Shadow.pop-blur;
-        drop-shadow-color: Shadow.pop-color;
-        bar := HorizontalLayout {
-            padding-left: 17px;
-            padding-right: 7px;
-            spacing: 16px;
-            HorizontalLayout {
-                spacing: Space.s2;
-                CIcon {
-                    source: Icons.zone;
-                    color: Palette.text-2;
-                }
-
-                Text {
-                    text: "Zones";
-                    font-size: 13px;
-                    font-weight: Type.w-semibold;
-                    color: Palette.text;
-                    vertical-alignment: center;
-                }
-            }
-
-            VerticalLayout {
-                alignment: center;
-                Rectangle {
-                    width: 1px;
-                    height: 18px;
-                    background: Palette.line-2;
-                }
-            }
-
-            for h[i] in [{ b: "Drag", t: "to add" }, { b: "Click", t: "to select" }, { b: "Delete", t: "to remove" }, { b: "Esc", t: "to finish" }]: HorizontalLayout {
-                spacing: 16px;
-                if i > 0: VerticalLayout {
-                    alignment: center;
-                    Rectangle {
-                        width: 3px;
-                        height: 3px;
-                        border-radius: 1.5px;
-                        background: Palette.line-2;
-                    }
-                }
-                HorizontalLayout {
-                    spacing: 5px;
-                    Text {
-                        text: h.b;
-                        font-size: Type.fs1;
-                        font-weight: Type.w-semibold;
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                    }
-
-                    Text {
-                        text: h.t;
-                        font-size: Type.fs1;
-                        font-weight: Type.w-medium;
-                        color: Palette.text-3;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-            VerticalLayout {
-                alignment: center;
-                Rectangle {
-                    height: 32px;
-                    width: done-text.preferred-width + 32px;
-                    border-radius: 16px;
-                    background: Palette.accent;
-                    accessible-role: button;
-                    accessible-label: "Done";
-                    accessible-action-default => {
                         root.done();
-                    }
-                    done-text := Text {
-                        text: "Done";
-                        font-size: 13px;
-                        font-weight: Type.w-semibold;
-                        color: Palette.on-accent;
-                    }
-
-                    TouchArea {
-                        clicked => {
-                            root.done();
-                        }
                     }
                 }
             }

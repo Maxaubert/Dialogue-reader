@@ -115,11 +115,8 @@ fn zone_edit_adds_picks_and_removes_in_capture_px() {
     );
     assert_eq!(zone_edit::pick(&e, &m, 150.0, 920.0), Some(0));
     assert_eq!(zone_edit::pick(&e, &m, 10.0, 10.0), None);
-    // the dim layer has a hole for it
-    assert_eq!(
-        zone_edit::dim(&e, &m),
-        "M0 0H1920V1080H0ZM100 900V960H900V900Z"
-    );
+    // the bar can go to any of its places: none covers the zone or its tag
+    assert_eq!(zone_edit::bar_clear_of(&e, &m), [true; 4]);
     // a box over the edge is clamped to the picture
     let j = zone_edit::add(
         &mut e,

@@ -22,6 +22,7 @@ pub struct Screen {
 }
 
 fn page(w: &MainWindow, p: Page) {
+    w.set_sheet(false);
     w.set_overlay(OverlayPreview::None);
     w.set_switcher_open(false);
     w.invoke_settings_close_voice_list();
@@ -112,16 +113,27 @@ pub fn all() -> Vec<Screen> {
                 w.set_overlay(OverlayPreview::QuickMenuVoice);
             },
         },
+        // zone edit as it opens: no zone selected, nothing drawn
         Screen {
             name: "16-zone-edit",
             setup: |w| {
                 page(w, Page::Overview);
+                w.set_edit_selected(-1);
+                w.set_edit_draft(false);
                 w.set_overlay(OverlayPreview::ZoneEdit);
             },
         },
         Screen {
             name: "17-activity",
             setup: |w| page(w, Page::Activity),
+        },
+        // every shared part in its states (ui/components/sheet.slint), to compare with the d-black token sheet
+        Screen {
+            name: "00-components",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_sheet(true);
+            },
         },
         // review aids (M3a, no mockup): the Settings voice picker open (sample voices, the list scrolls), what pages
         // 05 and Settings > Voices show when Kokoro's files are missing, and what 05, 06 and Settings > Voices show
@@ -186,10 +198,95 @@ pub fn all() -> Vec<Screen> {
                 w.set_capturing_key(-1);
                 w.set_status_text(crate::vm::reading::STATUS_NO_WINDOW.into());
                 w.set_status_ok(false);
+                w.set_game_running(false);
+                w.set_voice_label("Adam".into());
                 w.set_now_who("".into());
                 w.set_now_line("".into());
                 w.set_recent(slint::ModelRc::default());
                 page(w, Page::Overview);
+            },
+        },
+        // d-black states (after the others: they change the data): Activity with nothing read, Zones with a box
+        // at the top edge (its tag goes under it), Zones with no zone
+        Screen {
+            name: "17-activity-empty",
+            setup: |w| {
+                // reading again (screen 19 left the game not running): the lime dot stays on an empty Activity
+                w.set_status_text(crate::vm::reading::STATUS_READING.into());
+                w.set_status_ok(true);
+                w.set_game_running(true);
+                w.set_log(slint::ModelRc::default());
+                page(w, Page::Activity);
+            },
+        },
+        Screen {
+            name: "11-zones-top",
+            setup: |w| {
+                use slint::Model;
+                let mut zones: Vec<crate::ZoneData> = w.get_zones().iter().collect();
+                zones.push(crate::ZoneData {
+                    name: "Pickups".into(),
+                    kind: crate::Kind::Pickups,
+                    on: true,
+                    x: 640.0,
+                    y: 4.0,
+                    w: 340.0,
+                    h: 44.0,
+                });
+                w.set_zones_selected(zones.len() as i32 - 1);
+                w.set_zone_kind(crate::Kind::Pickups);
+                w.set_zones(slint::ModelRc::new(slint::VecModel::from(zones)));
+                page(w, Page::Zones);
+            },
+        },
+        Screen {
+            name: "11-zones-empty",
+            setup: |w| {
+                w.set_zones_selected(-1);
+                w.set_zones(slint::ModelRc::default());
+                page(w, Page::Zones);
+            },
+        },
+        // zone edit with a box just drawn: its tag, and the kind picker under it (16-zone-edit-new)
+        Screen {
+            name: "16-zone-edit-new",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_edit_selected(-1);
+                w.set_edit_draft_x(930.0);
+                w.set_edit_draft_y(150.0);
+                w.set_edit_draft_w(360.0);
+                w.set_edit_draft_h(112.0);
+                w.set_edit_draft(true);
+                w.set_overlay(OverlayPreview::ZoneEdit);
+            },
+        },
+        // a zone at the top edge, selected: its tag and the picker go under it, and the bar moves to the top
+        // right (16-zone-edit-top). Last, as it changes the zone list.
+        Screen {
+            name: "16-zone-edit-top",
+            setup: |w| {
+                use slint::Model;
+                page(w, Page::Overview);
+                let mut zones: Vec<crate::EditZone> = w.get_edit_zones().iter().collect();
+                zones.push(crate::EditZone {
+                    kind: crate::Kind::Pickups,
+                    x: 560.0,
+                    y: 4.0,
+                    w: 340.0,
+                    h: 46.0,
+                });
+                let rects: Vec<crate::geom::Rect> = zones
+                    .iter()
+                    .map(|z| crate::geom::Rect::new(z.x, z.y, z.w, z.h))
+                    .collect();
+                let clear =
+                    crate::overlay::zone_edit::bar_clear(&rects, WIDTH as f32, HEIGHT as f32);
+                w.set_edit_bar_clear(slint::ModelRc::new(slint::VecModel::from(clear.to_vec())));
+                w.set_edit_selected(zones.len() as i32 - 1);
+                w.set_edit_zones(slint::ModelRc::new(slint::VecModel::from(zones)));
+                w.set_edit_draft(false);
+                w.set_overlay(OverlayPreview::ZoneEdit);
             },
         },
     ]
@@ -218,7 +315,6 @@ fn windows_voices(w: &MainWindow) {
     w.set_game_voice(0);
     w.set_voices_problem(v.problem_text().into());
     w.set_voices_desc(v.desc().into());
-    w.set_kokoro_desc(v.kokoro_desc().into());
     w.set_voice_label(v.label("").into());
     w.set_voice_testing(false);
     w.set_test_time("0:00".into());
@@ -230,7 +326,6 @@ fn no_voices(w: &MainWindow) {
     w.set_voices(slint::ModelRc::default());
     w.set_voices_problem(none.problem_text().into());
     w.set_voices_desc(none.desc().into());
-    w.set_kokoro_desc(none.kokoro_desc().into());
     w.set_voice_label(none.label("").into());
     w.set_voice_testing(false);
     w.set_test_time("0:00".into());
@@ -298,6 +393,8 @@ impl HeadlessRenderer {
 pub fn render_all(out: &Path) -> Result<Vec<PathBuf>, String> {
     std::fs::create_dir_all(out).map_err(|e| format!("cannot create {}: {e}", out.display()))?;
     let r = HeadlessRenderer::install(WIDTH, HEIGHT)?;
+    // no clock runs between the renders: every page and control shows its end state at once
+    crate::fonts::set_instant_motion(true);
     let w = crate::build_main_window().map_err(|e| e.to_string())?;
     // the software renderer cannot clip to rounded corners: paint them with CornerMask
     w.global::<Render>().set_software(true);

@@ -11,21 +11,18 @@ use crate::geom::{self, Rect};
 use crate::vm::zones::EdZone;
 use crate::{EditZone, GameData, Kind, LineData, MainWindow, VoiceData, WindowData, ZoneData};
 
-/// Zones of the fake scene (1600 x 900 image px): kind, name, x1, y1, x2, y2.
+/// Zones of the fake scene (1600 x 900 image px): kind, name, x1, y1, x2, y2. The UI shows kind names only
+/// (TEXT.md); the names are the kind names too.
 pub const ZONES: [(Kind, &str, f32, f32, f32, f32); 5] = [
-    (Kind::Speaker, "Speaker name", 712.0, 754.0, 888.0, 798.0),
-    (Kind::Dialogue, "Subtitles", 360.0, 800.0, 1240.0, 850.0),
-    (Kind::Pickups, "Item pickups", 88.0, 48.0, 378.0, 132.0),
-    (
-        Kind::Prompts,
-        "Button prompts",
-        1228.0,
-        690.0,
-        1512.0,
-        758.0,
-    ),
-    (Kind::Ignore, "Minimap", 112.0, 682.0, 288.0, 858.0),
+    (Kind::Speaker, "Speaker", 712.0, 754.0, 888.0, 798.0),
+    (Kind::Dialogue, "Dialogue", 360.0, 800.0, 1240.0, 850.0),
+    (Kind::Pickups, "Pickups", 88.0, 48.0, 378.0, 132.0),
+    (Kind::Prompts, "Prompts", 1228.0, 690.0, 1512.0, 758.0),
+    (Kind::Ignore, "Ignore", 112.0, 682.0, 288.0, 858.0),
 ];
+
+/// The zone of the line in Now on the fake Overview (its outline is lime): the dialogue zone.
+pub const LIVE_ZONE: i32 = 1;
 
 /// Zone edit frame: the scene at 1440 x 900 is cropped by 80 px on each side; zones keep 12 px from the edge.
 const FRAME_W: f32 = 1440.0;
@@ -66,25 +63,6 @@ pub fn ed_zones(prompts_on: bool) -> Vec<EdZone> {
             rect: Rect::new(z.x, z.y, z.w, z.h),
         })
         .collect()
-}
-
-fn extra_zones() -> Vec<ZoneData> {
-    [
-        (Kind::Dialogue, "Letters"),
-        (Kind::Pickups, "Shop prices"),
-        (Kind::Dialogue, "Journal"),
-    ]
-    .iter()
-    .map(|&(kind, name)| ZoneData {
-        name: s(name),
-        kind,
-        on: true,
-        x: 0.0,
-        y: 0.0,
-        w: 0.0,
-        h: 0.0,
-    })
-    .collect()
 }
 
 pub fn edit_zones() -> Vec<EditZone> {
@@ -170,8 +148,9 @@ fn menu_voices() -> Vec<VoiceData> {
         ("Adam", "US · Male"),
         ("Bella", "US · Female"),
         ("Michael", "US · Male"),
-        ("Sarah", "US · Female"),
         ("Emma", "UK · Female"),
+        ("George", "UK · Male"),
+        ("Sky", "US · Female"),
     ]
     .iter()
     .map(|&(n, sh)| VoiceData {
@@ -183,69 +162,30 @@ fn menu_voices() -> Vec<VoiceData> {
     .collect()
 }
 
+/// The read list of the mockups (17-activity): times as the rows show them, skipped rows with their tag.
 pub fn log() -> Vec<LineData> {
     [
-        (
-            "21:42:18",
-            Kind::Dialogue,
-            "Arthur:",
-            "We need to get these horses moving before the snow buries us.",
-            "",
-        ),
-        ("21:42:11", Kind::Pickups, "", "+1 Ginseng", ""),
-        (
-            "21:42:09",
-            Kind::Prompts,
-            "",
-            "Hold E to talk",
-            "Prompts off",
-        ),
-        (
-            "21:41:57",
-            Kind::Dialogue,
-            "Dutch:",
-            "We ride at first light. Nobody stays behind.",
-            "",
-        ),
-        ("21:41:50", Kind::Dialogue, "Arthur:", "I hear you.", ""),
-        (
-            "21:41:49",
-            Kind::Dialogue,
-            "Arthur:",
-            "I hear you.",
-            "Already read",
-        ),
-        ("21:41:32", Kind::Pickups, "", "+2 Yarrow", ""),
-        (
-            "21:40:58",
-            Kind::Dialogue,
-            "Sadie:",
-            "Then stop talking and start digging.",
-            "",
-        ),
-        ("21:40:41", Kind::Pickups, "", "Donated to camp: $5.00", ""),
-        (
-            "21:40:12",
-            Kind::Dialogue,
-            "Charles:",
-            "Tracks lead north. Two riders, maybe three.",
-            "",
-        ),
-        ("21:39:55", Kind::Pickups, "", "+1 Venison", ""),
-        (
-            "21:39:30",
-            Kind::Dialogue,
-            "Arthur:",
-            "Keep your voice down.",
-            "",
-        ),
-        (
-            "21:39:02",
-            Kind::Dialogue,
-            "Javier:",
-            "The wagon wheel is cracked. It will not last the night.",
-            "",
-        ),
+        ("21:42", Kind::Dialogue, "Arthur:", "We need to get these horses moving before the snow buries us.", ""),
+        ("21:42", Kind::Pickups, "", "+1 Ginseng", ""),
+        ("21:42", Kind::Prompts, "", "Hold E to talk", "off"),
+        ("21:41", Kind::Dialogue, "Dutch:", "We ride at first light. Nobody stays behind.", ""),
+        ("21:41", Kind::Dialogue, "Arthur:", "I hear you.", ""),
+        ("21:41", Kind::Dialogue, "Arthur:", "I hear you.", "repeat"),
+        ("21:41", Kind::Pickups, "", "+1 Bourbon", ""),
+        ("21:40", Kind::Dialogue, "Hosea:", "If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.", ""),
+        ("21:40", Kind::Dialogue, "Sadie:", "Then stop talking and start digging.", ""),
+        ("21:40", Kind::Pickups, "", "Donated to camp: $5.00", ""),
+        ("21:40", Kind::Dialogue, "Charles:", "Tracks lead north. Two riders, maybe three.", ""),
+        ("21:39", Kind::Pickups, "", "+2 Arrows", ""),
+        ("21:39", Kind::Dialogue, "Arthur:", "Keep your voice down.", ""),
+        ("21:39", Kind::Prompts, "", "Hold E to talk", "off"),
+        ("21:39", Kind::Dialogue, "Javier:", "The wagon wheel is cracked. It will not last the night, and the next town is a full day east of here, past the river and the old mill, so either we fix it with what we have tonight or we leave the wagon and carry the rest on the horses.", ""),
+        ("21:38", Kind::Pickups, "", "+1 Venison", ""),
+        ("21:38", Kind::Dialogue, "Dutch:", "Have a little faith, Arthur.", ""),
+        ("21:37", Kind::Dialogue, "Arthur:", "Easy, girl. Easy.", ""),
+        ("21:37", Kind::Pickups, "", "+1 Oregano", ""),
+        ("21:36", Kind::Dialogue, "Hosea:", "We should keep moving.", ""),
+        ("21:36", Kind::Dialogue, "Charles:", "The horses need rest.", ""),
     ]
     .iter()
     .map(|&(t, kind, who, line, skip)| LineData {
@@ -260,26 +200,10 @@ pub fn log() -> Vec<LineData> {
 
 pub fn games() -> Vec<GameData> {
     [
-        ("Red Dead Redemption 2", "Reading · 5 zones", "rdr2", true),
-        ("Satisfactory", "Paused · 4 zones", "satis", true),
-        (
-            "Persona 4 Golden",
-            "Last played 2 days ago · 3 zones",
-            "p4g",
-            false,
-        ),
-        (
-            "Clair Obscur: Expedition 33",
-            "Last played last week · 4 zones",
-            "e33",
-            false,
-        ),
-        (
-            "Kingdom Come: Deliverance II",
-            "Last played Oct 30 · 2 zones",
-            "kcd2",
-            false,
-        ),
+        ("Red Dead Redemption 2", "Reading", "rdr2", true),
+        ("Satisfactory", "2 days ago", "satis", true),
+        ("Persona 4 Golden", "Last week", "p4g", false),
+        ("Kingdom Come: Deliverance II", "In March", "kcd2", false),
     ]
     .iter()
     .map(|&(n, m, a, r)| GameData {
@@ -296,23 +220,28 @@ fn rect(z: &EditZone) -> Rect {
     Rect::new(z.x, z.y, z.w, z.h)
 }
 
-fn refresh_dim(w: &MainWindow) {
+/// The zone edit bar's places clear of every zone (src/overlay/zone_edit.rs).
+fn refresh_bar(w: &MainWindow) {
     let rects: Vec<Rect> = w.get_edit_zones().iter().map(|z| rect(&z)).collect();
-    w.set_edit_dim(geom::dim_path(FRAME_W, FRAME_H, &rects).into());
+    let clear = crate::overlay::zone_edit::bar_clear(&rects, FRAME_W, FRAME_H);
+    w.set_edit_bar_clear(ModelRc::new(VecModel::from(clear.to_vec())));
 }
 
 /// Puts the fake data that has no real source yet into the window and wires the zone edit callbacks.
 /// Zones, windows and games come through the view-model layer (`vm::install`).
 pub fn fill(w: &MainWindow) {
-    w.set_extra_zones(model(extra_zones()));
     w.set_voices(model(voices()));
     w.set_menu_voices(model(menu_voices()));
     let log = log();
-    w.set_recent(model(log[..5].to_vec()));
+    // the read list leaves out the line in Now (the first one), as the real list does
+    w.set_recent(model(
+        log[1..(crate::vm::reading::RECENT + 1).min(log.len())].to_vec(),
+    ));
+    w.set_live_zone(LIVE_ZONE);
     w.set_log(model(log));
     w.set_edit_zones(model(edit_zones()));
     w.set_version(env!("CARGO_PKG_VERSION").into());
-    refresh_dim(w);
+    refresh_bar(w);
 
     let weak = w.as_weak();
     w.on_edit_pick(move |x, y| {
@@ -330,7 +259,7 @@ pub fn fill(w: &MainWindow) {
         {
             vm.remove(i as usize);
             w.set_edit_selected(-1);
-            refresh_dim(&w);
+            refresh_bar(&w);
         }
     });
     let weak = w.as_weak();
@@ -351,7 +280,18 @@ pub fn fill(w: &MainWindow) {
             });
             w.set_edit_selected(vm.row_count() as i32 - 1);
             w.set_edit_draft(false);
-            refresh_dim(&w);
+            refresh_bar(&w);
+        }
+    });
+    let weak = w.as_weak();
+    w.on_edit_set_kind(move |kind| {
+        let Some(w) = weak.upgrade() else { return };
+        let (zones, i) = (w.get_edit_zones(), w.get_edit_selected());
+        if let Ok(i) = usize::try_from(i)
+            && let Some(mut z) = zones.row_data(i)
+        {
+            z.kind = kind;
+            zones.set_row_data(i, z);
         }
     });
 }

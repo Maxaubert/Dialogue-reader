@@ -106,21 +106,30 @@ pub fn hit_handle(r: Rect, px: f32, py: f32, radius: f32) -> Option<usize> {
         .position(|&(hx, hy)| (hx - px).abs() <= radius && (hy - py).abs() <= radius)
 }
 
-/// SVG path for the zone edit dim layer: the whole frame minus every zone (use with the even-odd fill rule).
-pub fn dim_path(frame_w: f32, frame_h: f32, zones: &[Rect]) -> String {
-    let mut s = format!("M0 0H{frame_w}V{frame_h}H0Z");
-    for z in zones {
-        // holes run the other way round, so they stay open with either fill rule
-        s.push_str(&format!(
-            "M{} {}V{}H{}V{}Z",
-            z.x,
-            z.y,
-            z.y + z.h,
-            z.x + z.w,
-            z.y
-        ));
+/// Where a zone's tag goes on a stage (ui/components/stage.slint, `TagPlace`; d-black README "Notes for the
+/// Slint port"). The tag is 24 px tall with a 4 px gap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TagPlace {
+    /// Above the box: there is room above it.
+    Above,
+    /// Under the box: no room above it.
+    Under,
+    /// Inside the box at its top left: no room above or under it.
+    Inside,
+}
+
+/// Room a tag needs above or under a box: 24 px tag plus a 4 px gap.
+pub const TAG_ROOM: f32 = 28.0;
+
+/// The tag place of a box at `box_y` (view px from the stage top), `box_h` tall, on a stage `stage_h` tall.
+pub fn tag_place(box_y: f32, box_h: f32, stage_h: f32) -> TagPlace {
+    if box_y >= TAG_ROOM {
+        TagPlace::Above
+    } else if box_y + box_h + TAG_ROOM <= stage_h {
+        TagPlace::Under
+    } else {
+        TagPlace::Inside
     }
-    s
 }
 
 #[cfg(test)]
@@ -189,17 +198,24 @@ mod tests {
     }
 
     #[test]
+    fn a_tag_goes_above_then_under_then_inside() {
+        // room above
+        assert_eq!(tag_place(100.0, 40.0, 540.0), TagPlace::Above);
+        assert_eq!(tag_place(28.0, 40.0, 540.0), TagPlace::Above);
+        // at the top edge: under the box
+        assert_eq!(tag_place(4.0, 44.0, 540.0), TagPlace::Under);
+        // as tall as the stage: inside, at the top left
+        assert_eq!(tag_place(4.0, 520.0, 540.0), TagPlace::Inside);
+        assert_eq!(tag_place(0.0, 512.0, 540.0), TagPlace::Under);
+        assert_eq!(tag_place(0.0, 513.0, 540.0), TagPlace::Inside);
+    }
+
+    #[test]
     fn handles_hit_test() {
         let r = Rect::new(100.0, 100.0, 200.0, 50.0);
         assert_eq!(hit_handle(r, 101.0, 99.0, 5.0), Some(0));
         assert_eq!(hit_handle(r, 300.0, 125.0, 5.0), Some(3));
         assert_eq!(hit_handle(r, 200.0, 150.0, 5.0), Some(5));
         assert_eq!(hit_handle(r, 200.0, 125.0, 5.0), None);
-    }
-
-    #[test]
-    fn dim_path_has_one_hole_per_zone() {
-        let p = dim_path(1440.0, 900.0, &[Rect::new(10.0, 20.0, 30.0, 40.0)]);
-        assert_eq!(p, "M0 0H1440V900H0ZM10 20V60H40V20Z");
     }
 }

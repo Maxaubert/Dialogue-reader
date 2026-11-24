@@ -3,7 +3,7 @@
 //!
 //! - The hook keeps which overlay is open (`Runtime::overlay`): the quick menu key and Esc change it on the hook
 //!   thread at once. [`Vm::overlay_sync`] makes the windows match it, on every key event (the runtime's waker
-//!   wakes the UI thread at once) and on the reading timer. The app changes it with `Cmd::Overlay` (Manage zones,
+//!   wakes the UI thread at once) and on the reading timer. The app changes it with `Cmd::Overlay` (Edit zones,
 //!   Settings, a click outside the menu, Done).
 //! - The menu and zone edit open only over the game in front, and close when it is no longer in front (Alt+Tab,
 //!   minimized, closed). While one is open, reading is held (`Cmd::Hold`, not the user's Pause) and the pill hides.
@@ -19,7 +19,7 @@ use std::rc::{Rc, Weak};
 use dr_runtime::keys::{Nav, Overlay};
 use dr_runtime::runtime::{Cmd, Status};
 use dr_runtime::speech;
-use slint::ComponentHandle;
+use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::{Page, Shared, Vm, sync, voices};
 use crate::geom::Rect;
@@ -75,6 +75,10 @@ fn wire(o: &Overlays, vm: &Shared) {
         })
     });
     let go = with(vm);
+    m.on_speed_moved(move |v| go(&|vm| vm.menu_speed(v, false)));
+    let go = with(vm);
+    m.on_speed_let_go(move |v| go(&|vm| vm.menu_speed(v, true)));
+    let go = with(vm);
     m.on_volume_moved(move |v| go(&|vm| vm.menu_volume(v, false)));
     let go = with(vm);
     m.on_volume_let_go(move |v| go(&|vm| vm.menu_volume(v, true)));
@@ -94,13 +98,6 @@ fn wire(o: &Overlays, vm: &Shared) {
         })
     });
     let go = with(vm);
-    m.on_preview_voice(move |i| {
-        go(&|vm| {
-            let first = vm.menu_state(|s| s.voice_slice().0);
-            vm.menu_out(Out::Preview(first + i.max(0) as usize));
-        })
-    });
-    let go = with(vm);
     m.on_outside(move || go(&|vm| vm.set_overlay(Overlay::None)));
     let z = &o.zones;
     let go = with(vm);
@@ -109,6 +106,8 @@ fn wire(o: &Overlays, vm: &Shared) {
     z.on_remove(move |i| go(&|vm| vm.zone_remove(i)));
     let go = with(vm);
     z.on_commit(move |k, x, y, w, h| go(&|vm| vm.zone_add(k, Rect::new(x, y, w, h))));
+    let go = with(vm);
+    z.on_set_kind(move |k| go(&|vm| vm.zone_set_kind(k)));
     let wk = Rc::downgrade(vm);
     z.on_pick(move |x, y| {
         let Some(v) = wk.upgrade() else { return -1 };
@@ -336,6 +335,9 @@ impl Vm {
                 .into(),
         );
         m.set_speed(s.speed);
+        m.set_speed_pos(
+            (s.speed - quick_menu::SPEED_MIN) / (quick_menu::SPEED_MAX - quick_menu::SPEED_MIN),
+        );
         m.set_volume(s.volume);
         m.set_automatic(s.automatic);
         m.set_quit_armed(s.quit_armed);
@@ -429,6 +431,19 @@ impl Vm {
         self.push_menu();
     }
 
+    /// The speed slider of the menu moved to `pos` (0 to 1): the speed snaps to 0.1 as with the keys, and is
+    /// saved when the slider is let go.
+    fn menu_speed(&mut self, pos: f32, save: bool) {
+        let speed = quick_menu::SPEED_MIN
+            + pos.clamp(0.0, 1.0) * (quick_menu::SPEED_MAX - quick_menu::SPEED_MIN);
+        self.with_overlays(|o| {
+            o.state.set_speed(speed);
+        });
+        let s = self.menu_state(|s| s.speed);
+        self.set_game_voice(Some(s), None, save);
+        self.push_menu();
+    }
+
     /// The volume slider of the menu moved (saved when it is let go).
     fn menu_volume(&mut self, v: f32, save: bool) {
         let v = v.clamp(0.0, 1.0);
@@ -487,7 +502,7 @@ impl Vm {
         }
     }
 
-    /// Manage zones: a frozen screenshot of the game, and zone edit over it.
+    /// Edit zones: a frozen screenshot of the game, and zone edit over it.
     pub fn open_zone_edit(&mut self) -> Result<(), String> {
         let i = self.current.ok_or("no current game")?;
         let hwnd = self
@@ -563,8 +578,9 @@ impl Vm {
         };
         let Some(m) = o.map.as_ref() else { return };
         sync(&o.edit_zones, zone_edit::view_zones(&self.main, m));
-        o.zones
-            .set_dim_commands(zone_edit::dim(&self.main, m).into());
+        o.zones.set_bar_clear(ModelRc::new(VecModel::from(
+            zone_edit::bar_clear_of(&self.main, m).to_vec(),
+        )));
         o.zones
             .set_selected(self.main.selected.map_or(-1, |i| i as i32));
     }
@@ -581,6 +597,15 @@ impl Vm {
             self.push_main();
         }
         self.with_overlays(|o| o.zones.set_draft(false));
+        self.push_zone_edit();
+    }
+
+    /// The kind picker under the selected zone: it reads as that kind from now on, saved.
+    fn zone_set_kind(&mut self, kind: crate::Kind) {
+        if self.main.selected.is_some() && self.main.set_kind(super::disk_kind(kind)) {
+            self.save_main();
+            self.push_main();
+        }
         self.push_zone_edit();
     }
 
