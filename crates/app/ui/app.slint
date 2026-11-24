@@ -615,6 +615,10 @@ export component MainWindow inherits Window {
                 gear => {
                     root.go(Page.settings);
                 }
+                // a press on the empty strip is a click outside the voice list too
+                pressed => {
+                    root.voice-menu = false;
+                }
             }
 
             if (!root.setup || root.page == Page.welcome) && root.notice != "": Rectangle {

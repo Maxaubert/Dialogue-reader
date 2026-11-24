@@ -396,6 +396,18 @@ fn the_overview_voice_button_picks_a_voice_in_place() {
     });
     assert!(!w.get_voice_menu());
     assert_eq!(w.get_page(), Page::Overview, "the click did not open Zones");
+    // a click on the empty title strip closes it too
+    press(&w, "Voice", AccessibleRole::Button);
+    let at = slint::LogicalPosition::new(700.0, 20.0);
+    win.dispatch_event(slint::platform::WindowEvent::PointerPressed {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    win.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    assert!(!w.get_voice_menu());
 
     // a pick sets the game's voice, saves it and closes the list
     press(&w, "Voice", AccessibleRole::Button);

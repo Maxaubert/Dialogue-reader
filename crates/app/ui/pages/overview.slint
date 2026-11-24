@@ -613,7 +613,7 @@ export component OverviewTab inherits Rectangle {
         }
     }
 
-    // the voice picker over the page; a click anywhere else on the page closes it
+    // the voice picker over the page; a click anywhere else on the page (or on the title strip, app.slint) closes it
     if root.voice-open: TouchArea {
         clicked => {
             root.voice-open = false;

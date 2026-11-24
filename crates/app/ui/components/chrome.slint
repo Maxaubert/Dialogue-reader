@@ -217,9 +217,16 @@ export component TitleStrip inherits Rectangle {
     callback game-clicked();
     callback back();
     callback gear();
+    // a press on the empty strip (it closes the Overview voice list, app.slint)
+    callback pressed();
     height: Size.strip;
     background: Palette.bg;
     TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.pressed();
+            }
+        }
         moved => {
             if self.pressed {
                 Chrome.drag();
