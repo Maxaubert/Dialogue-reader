@@ -34,27 +34,8 @@ export global Palette {
     // focus ring
     out property <color> focus: #FFFFFF99;
 
-    // Older names, kept so the pages that are not ported yet still compile. Do not use them in new code.
-    out property <color> surface: #0A0A0A;
-    out property <color> accent: #FFFFFF;
-    out property <color> accent-soft: #FFFFFF1F;
-    out property <color> accent-ring: #FFFFFF59;
-    out property <color> ok: #C5FA09;
-    out property <color> ok-soft: #C5FA091F;
-    out property <color> pill-bg: #0A0A0AF5;
-    out property <color> pill-line: #FFFFFF1A;
-    out property <color> on-accent: #000000;
-    out property <color> knob: #FFFFFF;
-    out property <color> on-tag: #000000;
-    out property <color> stage-bg: #0A0A0A;
-    out property <color> keycap-edge: #000000;
-    out property <color> win-close: #C42B1C;
+    // the notice line under the title strip
     out property <color> danger-soft: #F0867E1A;
-    out property <color> danger-dim: #F0867ECC;
-    out property <color> surface-clear: #0A0A0A00;
-    out property <color> accent-wash: #FFFFFF0D;
-    out property <color> accent-wash-mid: #FFFFFF03;
-    out property <color> accent-clear: #FFFFFF00;
     // zone edit: shade (flat black 45%), outline, selection and the box being drawn
     out property <color> edit-shade: #00000073;
     out property <color> edit-line: #F2F2F29E;
@@ -86,8 +67,6 @@ export global Radius {
     out property <length> md: 8px;
     out property <length> lg: 10px;
     out property <length> pill: 999px;
-    // older name, kept for the pages not ported yet
-    out property <length> xs: 6px;
 }
 
 export global Size {
@@ -109,9 +88,7 @@ export global Size {
     out property <length> col: 960px;
     out property <length> page-x: 24px;
     out property <length> page-max: 1376px;
-    // older names, kept for the pages not ported yet
-    out property <length> ctl-lg: 32px;
-    out property <length> bar: 40px;
+    // small keycaps (Kbd)
     out property <length> kbd: 24px;
     out property <length> kbd-sm: 20px;
 }
@@ -150,20 +127,6 @@ export global Type {
     out property <float> lhf-143: 1.43 / self.natural;
     out property <float> lhf-145: 1.45 / self.natural;
     out property <float> lhf-150: 1.5 / self.natural;
-    // older names, kept for the pages not ported yet
-    out property <length> fs1: 12.5px;
-    out property <length> fs2: 14px;
-    out property <length> fs3: 16px;
-    out property <length> fs4: 20px;
-    out property <length> fs5: 26px;
-    out property <length> lh1: 17px;
-    out property <length> lh2: 20px;
-    out property <length> lh3: 23px;
-    out property <length> ls-display: -0.4px;
-    out property <length> ls-card-title: -0.18px;
-    out property <length> ls-menu-title: -0.15px;
-    out property <length> ls-caps: 0.66px;
-    out property <length> ls-arrows: 2px;
 }
 
 // One soft drop shadow for floating panels (no spread in Slint). The software renderer draws none.

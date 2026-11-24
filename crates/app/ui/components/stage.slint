@@ -141,7 +141,7 @@ export component Stage inherits Rectangle {
     callback zone-clicked(int);
     // 0 press, 1 move, 2 release; x and y in image px; scale = view px per image px
     callback pointer(int, float, float, float);
-    background: Palette.stage-bg;
+    background: Palette.surface-1;
     // The real window clips to these corners. Software renders cannot, so the CornerMask below paints them.
     border-top-left-radius: root.round-top ? root.radius : 0px;
     border-top-right-radius: root.round-top ? root.radius : 0px;
@@ -211,7 +211,7 @@ export component Stage inherits Rectangle {
                 width: 8px;
                 height: 8px;
                 border-radius: 4px;
-                background: Palette.knob;
+                background: Palette.on;
                 border-width: 1.5px;
                 border-color: Palette.on-ink;
             }
@@ -319,7 +319,7 @@ export component LiveNote inherits Rectangle {
         }
         Text {
             text: LiveView.note;
-            font-size: Type.fs1;
+            font-size: Type.fs-small;
             font-weight: LiveView.note-live ? Type.w-medium : Type.w-regular;
             color: LiveView.note-live ? Palette.text-2 : Palette.text-3;
             vertical-alignment: center;

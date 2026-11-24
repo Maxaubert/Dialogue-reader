@@ -38,14 +38,6 @@ export component CIcon inherits VerticalLayout {
     }
 }
 
-// Text with the app defaults.
-export component Label inherits Text {
-    color: Palette.text;
-    font-size: Type.fs-body;
-    vertical-alignment: center;
-    overflow: elide;
-}
-
 // Covers the corners of a box with the color behind it. Only for the software renderer (Render.software), which
 // does not clip to rounded corners. The real window clips instead, so the mask never shows a wrong color there.
 export component CornerMask {
@@ -603,15 +595,6 @@ export component Segmented inherits Rectangle {
     }
 }
 
-export component Radio inherits Rectangle {
-    in property <bool> on;
-    width: 16px;
-    height: 16px;
-    border-radius: 8px;
-    border-width: root.on ? 5px : 1.5px;
-    border-color: root.on ? Palette.on : Palette.line-2;
-}
-
 // Slider (.slider): 4 px surface-3 track, white fill and a 16 px white knob. The accessible value is the percent.
 export component Slider {
     in-out property <float> value: 0.5;
@@ -739,19 +722,6 @@ export component SettingRow inherits Rectangle {
     }
 }
 
-// Old card. New code uses Panel. Selected: white border and the surface-2 fill (setup step 5).
-export component Card inherits Rectangle {
-    in property <bool> selected: false;
-    background: root.selected ? Palette.surface-2 : Palette.surface-1;
-    border-width: 1px;
-    border-color: root.selected ? Palette.on : Palette.line;
-    border-radius: Radius.lg;
-    animate background, border-color {
-        duration: Motion.fast;
-        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-    }
-}
-
 export component Count inherits Rectangle {
     in property <string> text;
     height: 20px;
@@ -769,48 +739,6 @@ export component Count inherits Rectangle {
             color: Palette.text-2;
             vertical-alignment: center;
         }
-    }
-}
-
-// Old card header: title, optional count, then anything on the right.
-export component CardHead inherits Rectangle {
-    in property <string> title;
-    in property <string> count;
-    in property <length> pad-left: Space.s5;
-    in property <length> pad-right: Space.s5;
-    in property <length> title-size: Type.fs-body;
-    height: 56px;
-    HorizontalLayout {
-        padding-left: root.pad-left;
-        padding-right: root.pad-right;
-        spacing: Space.s2;
-        alignment: stretch;
-        Text {
-            text: root.title;
-            font-size: root.title-size;
-            font-weight: Type.w-strong;
-            color: Palette.text;
-            vertical-alignment: center;
-            horizontal-stretch: 0;
-        }
-
-        if root.count != "": VerticalLayout {
-            alignment: center;
-            Count {
-                text: root.count;
-            }
-        }
-        Rectangle {
-            horizontal-stretch: 1;
-        }
-
-        @children
-    }
-
-    Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
-        background: Palette.line;
     }
 }
 
@@ -852,52 +780,6 @@ export component StatusDot inherits Rectangle {
     }
 }
 
-// Old status chip. New code uses StatusDot.
-export component StatusChip inherits Rectangle {
-    in property <string> text: "Reading";
-    in property <bool> ok: true;
-    height: 28px;
-    horizontal-stretch: 0;
-    border-radius: 14px;
-    background: Palette.surface-2;
-    HorizontalLayout {
-        padding-left: Space.s3;
-        padding-right: Space.s3;
-        spacing: Space.s2;
-        alignment: center;
-        VerticalLayout {
-            alignment: center;
-            Dot {
-                tint: root.ok ? Palette.live : Palette.text-2;
-            }
-        }
-
-        Text {
-            text: root.text;
-            font-size: Type.fs-small;
-            color: Palette.text-2;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// Icon tile in lists.
-export component ITile inherits Rectangle {
-    in property <image> icon: Icons.window;
-    in property <bool> on: false;
-    in property <length> icon-size: Size.icon;
-    width: 32px;
-    height: 32px;
-    border-radius: Radius.md;
-    background: root.on ? Palette.surface-3 : Palette.surface-2;
-    Icon {
-        source: root.icon;
-        color: root.on ? Palette.text : Palette.text-2;
-        width: root.icon-size;
-        height: root.icon-size;
-    }
-}
-
 // Waveform from a list of bar heights (.wave). Bars at index >= played are flat grey. Lime: it is live.
 export component Wave {
     in property <[int]> bars;
@@ -921,32 +803,6 @@ export component Wave {
             }
         }
     }
-}
-
-// Pill waveform with fixed heights (14 bars at 14 px, or 18 bars at 16 px).
-export component PillWave inherits Wave {
-    in property <bool> big: false;
-    bars: root.big ? [4, 15, 10, 12, 14, 7, 15, 8, 14, 13, 9, 15, 6, 15, 11, 11, 15, 6] : [4, 13, 9, 10, 12, 6, 13, 7, 12, 11, 8, 13, 5, 13];
-    bar-w: 2px;
-    gap: 2px;
-    height: root.big ? 16px : 14px;
-}
-
-// Kind as a grey line icon.
-export component KindIcon inherits Icon {
-    in property <Kind> kind;
-    source: Kinds.icon(root.kind);
-}
-
-export component VSep inherits Rectangle {
-    width: 1px;
-    height: 20px;
-    background: Palette.line-2;
-}
-
-export component HLine inherits Rectangle {
-    height: 1px;
-    background: Palette.line;
 }
 
 // Text field with a leading icon and a placeholder (.field): surface-2, hairline, radius 6, 32 px.
@@ -999,79 +855,6 @@ export component TextField inherits Rectangle {
             }
         }
     }
-}
-
-// Old big keycap (the old keys page). New code uses Keycap.
-export component KeyCap inherits Rectangle {
-    in property <string> text;
-    in property <image> icon;
-    in property <length> bottom: 4px;
-    width: 140px;
-    height: 44px;
-    border-radius: Radius.md;
-    background: Palette.surface-2;
-    border-width: 1px;
-    border-color: Palette.line-2;
-    HorizontalLayout {
-        alignment: center;
-        spacing: Space.s2;
-        if root.icon.width > 0: CIcon {
-            source: root.icon;
-            size: 18px;
-            color: Palette.text-2;
-        }
-        Text {
-            text: root.text;
-            font-family: Type.mono;
-            font-size: Type.fs3;
-            color: Palette.text;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// Old chip: text on a soft background with an optional leading dot or icon.
-export component Chip inherits Rectangle {
-    in property <string> text;
-    in property <color> fg: Palette.text-2;
-    in property <color> bg: Palette.surface-2;
-    in property <bool> dot: true;
-    in property <image> icon;
-    height: 22px;
-    horizontal-stretch: 0;
-    border-radius: Radius.sm;
-    background: root.bg;
-    HorizontalLayout {
-        padding-left: Space.s2;
-        padding-right: Space.s2;
-        spacing: 6px;
-        if root.dot: VerticalLayout {
-            alignment: center;
-            Dot {
-                size: 6px;
-                tint: root.fg;
-            }
-        }
-        if root.icon.width > 0: CIcon {
-            source: root.icon;
-            size: Size.icon-sm;
-            color: root.fg;
-        }
-        Text {
-            text: root.text;
-            font-size: Type.fs-small;
-            color: root.fg;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// Section label: small and grey.
-export component SmallLabel inherits Text {
-    font-size: Type.fs-small;
-    color: Palette.text-2;
-    vertical-alignment: center;
-    height: Type.lh-small;
 }
 
 // A small pill tag (.tag): "off", "repeat". 20 px, hairline, text-2.
