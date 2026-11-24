@@ -504,9 +504,16 @@ export component MainWindow inherits Window {
         interval: Math.max(1ms, Motion.switch-out);
         running: root.rolling;
         triggered => {
-            root.old-shot = root.shot;
-            root.old-shot-w = root.shot-w;
-            root.old-shot-h = root.shot-h;
+            // the picture on screen now: the last live frame while the game shows live, else the saved shot
+            if root.real-shots && LiveView.on {
+                root.old-shot = LiveView.frame;
+                root.old-shot-w = LiveView.w;
+                root.old-shot-h = LiveView.h;
+            } else {
+                root.old-shot = root.shot;
+                root.old-shot-w = root.shot-w;
+                root.old-shot-h = root.shot-h;
+            }
             root.switched-at = animation-tick();
             root.crossing = true;
             root.rolling = false;
@@ -636,9 +643,8 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 vertical-stretch: 1;
-                // switch game: the texts of a sub-page fade out and in (the Overview fades its own texts and keeps
-                // its picture); page containers never fade
-                opacity: root.page == Page.overview ? 1 : root.text-o;
+                // switch game: each page fades only what belongs to the game (`text-o`) and crossfades its picture
+                // (`pic-t` over `old-shot`); the page itself never fades, so there is no dark dip
                 welcome-slot := PageSlot {
                     name: "Welcome page";
                     shown: root.page == Page.welcome;
@@ -860,6 +866,11 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     if zones-slot.alive: ZonesTab {
                         grow: zones-slot.grow ? zones-slot.t : 1;
+                        text-o: root.text-o;
+                        pic-t: root.crossing ? root.cross-t : 1;
+                        old-shot: root.old-shot;
+                        old-w: root.old-shot-w;
+                        old-h: root.old-shot-h;
                         zones <=> root.zones;
                         selected <=> root.zones-selected;
                         draw <=> root.zones-draw;
@@ -896,6 +907,7 @@ export component MainWindow inherits Window {
                     rise: true;
                     if activity-slot.alive: ActivityTab {
                         log: root.log;
+                        text-o: root.text-o;
                         back => {
                             root.close-sub();
                         }
@@ -915,6 +927,7 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     // Settings stays alive so settings-jump can reach it.
                     settings := SettingsTab {
+                        text-o: root.text-o;
                         read-key: root.read-key;
                         menu-key: root.menu-key;
                         capturing: root.capturing-key;

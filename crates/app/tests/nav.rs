@@ -838,3 +838,163 @@ fn the_title_strip_has_no_status_dot() {
         "{strip_items:?}"
     );
 }
+
+/// The lowest opacity each of these elements had while the game switched (240 ms, in 10 ms steps), and whether
+/// two game pictures (the old one under the new one) showed at some point.
+struct SwitchTrace {
+    lowest: Vec<f32>,
+    two_pictures: bool,
+}
+
+fn opacity_of(w: &MainWindow, find: &dyn Fn(&MainWindow) -> Option<ElementHandle>) -> f32 {
+    find(w).map_or(1.0, |e| e.computed_opacity())
+}
+
+fn pictures(w: &MainWindow) -> usize {
+    ElementHandle::find_by_accessible_label(w, "Game picture")
+        .filter(|e| e.size().width > 0.0)
+        .count()
+}
+
+/// Switches to the next game from the page shown (the game name, Down, Enter) and traces `parts` over the 240 ms.
+fn trace_switch(
+    w: &MainWindow,
+    parts: &[&dyn Fn(&MainWindow) -> Option<ElementHandle>],
+) -> SwitchTrace {
+    // from the first game, Down picks the next one
+    w.set_current_game(0);
+    let before = w.get_current_game();
+    ctrl_k(w);
+    assert!(w.get_switcher_open(), "Ctrl K opens the switcher");
+    // a click on the third game (after a page push the switcher's keys do not reach it in the testing backend)
+    wait(200);
+    let row = ElementHandle::find_by_element_type_name(w, "GameItem")
+        .nth(2)
+        .expect("the third game");
+    let (p, sz) = (row.absolute_position(), row.size());
+    let at = slint::LogicalPosition::new(p.x + sz.width / 2.0, p.y + sz.height / 2.0);
+    w.window()
+        .dispatch_event(WindowEvent::PointerMoved { position: at });
+    w.window().dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    w.window().dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    w.window().dispatch_event(WindowEvent::PointerExited);
+    let mut t = SwitchTrace {
+        lowest: vec![1.0; parts.len()],
+        two_pictures: false,
+    };
+    for _ in 0..26 {
+        wait(10);
+        for (i, f) in parts.iter().enumerate() {
+            t.lowest[i] = t.lowest[i].min(opacity_of(w, f));
+        }
+        t.two_pictures |= pictures(w) == 2;
+    }
+    assert_ne!(w.get_current_game(), before, "the game changed");
+    settle();
+    t
+}
+
+fn by_label(
+    label: &'static str,
+    role: AccessibleRole,
+) -> impl Fn(&MainWindow) -> Option<ElementHandle> {
+    move |w| {
+        ElementHandle::find_by_accessible_label(w, label)
+            .find(|e| e.accessible_role() == Some(role))
+    }
+}
+
+fn by_type(name: &'static str) -> impl Fn(&MainWindow) -> Option<ElementHandle> {
+    move |w| ElementHandle::find_by_element_type_name(w, name).next()
+}
+
+/// Max, 2026-11-24: Settings, Zones and Activity follow a game switch as the Overview does. Only what belongs to
+/// the game fades out and in; the page stays, and the Zones picture crossfades (no dark dip).
+#[test]
+fn motion_switch_game_crossfades_settings_zones_and_activity() {
+    switch_crossfades(false);
+}
+
+/// The same under reduce motion: the fades are 80 ms, and still only the game's parts fade.
+#[test]
+fn motion_switch_game_crossfades_under_reduce_motion() {
+    switch_crossfades(true);
+}
+
+fn switch_crossfades(reduce: bool) {
+    {
+        let w = window_motion(true, reduce);
+        w.set_page(Page::Overview);
+
+        press(&w, "Settings", AccessibleRole::Button);
+        settle();
+        let still = by_label("Start with Windows", AccessibleRole::Checkbox);
+        let voice = by_label("Narrator", AccessibleRole::Combobox);
+        let t = trace_switch(&w, &[&still, &voice]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "Settings stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the game's voice fades (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(opacity_of(&w, &voice) > 0.99);
+        key(&w, Key::Escape);
+        settle();
+
+        press(&w, "Edit zones", AccessibleRole::Button);
+        settle();
+        assert_eq!(pictures(&w), 1);
+        let draw = by_label("Draw zone", AccessibleRole::Button);
+        let tag = by_type("ZoneTag");
+        let t = trace_switch(&w, &[&draw, &tag]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "the Zones toolbar stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the zones fade (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.two_pictures,
+            "the old picture lies under the new one (reduce {reduce})"
+        );
+        assert_eq!(
+            pictures(&w),
+            1,
+            "the old picture is gone once the new one is in"
+        );
+        assert!(opacity_of(&w, &tag) > 0.99);
+        press(&w, "Done", AccessibleRole::Button);
+        settle();
+
+        press(&w, "Show all", AccessibleRole::Button);
+        settle();
+        let today = by_label("Today", AccessibleRole::Text);
+        let row = by_type("ListRow");
+        let t = trace_switch(&w, &[&today, &row]);
+        assert!(
+            t.lowest[0] > 0.99,
+            "\"Today\" stays (reduce {reduce}): {:?}",
+            t.lowest
+        );
+        assert!(
+            t.lowest[1] < 0.5,
+            "the list fades (reduce {reduce}): {:?}",
+            t.lowest
+        );
+    }
+    dr_app::set_reduce_motion(None);
+}

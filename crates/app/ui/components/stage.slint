@@ -134,8 +134,12 @@ export component Stage inherits Rectangle {
     // the stage is drawn this many times bigger (a setup step in a big window, SetupStage): the live view makes its
     // frames for the size on screen
     in property <float> zoom: 1;
+    // false: the picture stays `source` while the game shows live (the old picture under a game switch)
+    in property <bool> follow-live: true;
+    // switch game: the zone boxes and tags of the old game fade out (0 to 1)
+    in property <float> marks-o: 1;
     // real screenshots (contain) follow the live view when there is one
-    property <bool> live: root.contain && LiveView.on;
+    property <bool> live: root.contain && LiveView.on && root.follow-live;
     property <float> pw: root.live ? LiveView.w : root.src-w;
     property <float> ph: root.live ? LiveView.h : root.src-h;
     out property <float> scale: root.contain ? min(root.width / 1px / root.pw, root.height / 1px / root.ph) : max(root.width / 1px / root.pw, root.height / 1px / root.ph);
@@ -193,6 +197,7 @@ export component Stage inherits Rectangle {
         // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
         property <color> zf: Palette.zone-fill;
         property <bool> sel: i == root.selected;
+        opacity: root.marks-o;
         live: i == root.live-zone && z.on;
         line: self.live ? Palette.live : root.quiet ? #FFFFFF61 : self.sel ? Palette.on : Palette.text;
         x: root.off-x + z.x * root.scale * 1px;
@@ -283,7 +288,7 @@ export component Stage inherits Rectangle {
     }
     // Tags go above every zone box, so they are drawn after all boxes. A tag never takes the pointer.
     if root.labels: Rectangle {
-        opacity: root.tags-o;
+        opacity: root.tags-o * root.marks-o;
         for z[i] in root.zones: ZoneTag {
             property <length> bx: root.off-x + z.x * root.scale * 1px;
             property <length> by: root.off-y + z.y * root.scale * 1px;

@@ -43,6 +43,14 @@ export component ZonesTab inherits Rectangle {
     // toolbar and the tags fade in 120 ms into the 300 ms grow, over the last 180 ms.
     in property <float> grow: 1;
     property <float> tools: Math.clamp((root.grow - 0.4) / 0.6, 0, 1);
+    // switch game (app.slint), as on the Overview: the zones and the screenshot time fade out and in (`text-o`);
+    // the new picture fades in (`pic-t`, 0 to 1) over the old one (`old-shot`), so the picture never dips to black.
+    // The toolbar stays.
+    in property <float> text-o: 1;
+    in property <float> pic-t: 1;
+    in property <image> old-shot;
+    in property <float> old-w: 1600;
+    in property <float> old-h: 900;
 
     // the toolbar (.zn-tb) and the picture under it, 32 px from the sides
     property <length> pad: 32px;
@@ -94,6 +102,7 @@ export component ZonesTab inherits Rectangle {
 
             // "Live", or the screenshot's time (src/vm/live.rs)
         ShotNote {
+                opacity: root.text-o;
                 contain: root.contain;
                 time: root.shot-time;
                 padding-right: Space.s2;
@@ -119,7 +128,22 @@ export component ZonesTab inherits Rectangle {
         y: root.oy + (root.top - root.oy) * root.grow;
         width: root.ow + (root.sw - root.ow) * root.grow;
         height: self.width * 9 / 16;
+        // switch game: the old picture stays under the new one while it fades in
+        if root.pic-t < 1: Stage {
+            follow-live: false;
+            settled: false;
+            source: root.old-shot;
+            src-w: root.old-w;
+            src-h: root.old-h;
+            contain: root.contain;
+            labels: false;
+            radius: Radius.lg;
+            behind: Palette.bg;
+        }
         st := Stage {
+            opacity: root.pic-t;
+            // the old game's zones go out with its texts; the new ones come in with the new picture
+            marks-o: root.pic-t < 1 ? 1 : root.text-o;
             settled: root.grow >= 1;
             tags-o: root.tools;
             source: root.shot;
@@ -146,7 +170,7 @@ export component ZonesTab inherits Rectangle {
 
         // no zone yet: what to do, in the middle of the picture
         if root.zones.length == 0 && !root.drafting: Rectangle {
-            opacity: root.tools;
+            opacity: root.tools * root.text-o;
             width: hint.preferred-width + 2 * Space.s4;
             height: hint.preferred-height + 2 * Space.s2;
             border-radius: Radius.lg;

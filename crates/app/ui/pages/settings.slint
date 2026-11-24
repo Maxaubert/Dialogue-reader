@@ -112,6 +112,8 @@ export component SettingsTab inherits Rectangle {
     in property <string> voices-desc: "Kokoro 11 · Windows 11";
     in property <string> game: "Red Dead Redemption 2";
     in property <bool> has-game: true;
+    // switch game (app.slint): the current game's keys and voice fade out and in; the rest stays
+    in property <float> text-o: 1;
     in-out property <int> game-voice: 0;
     in-out property <float> game-speed: 0.4;
     in-out property <float> game-volume: 0.8;
@@ -230,6 +232,7 @@ export component SettingsTab inherits Rectangle {
             keys := Group {
                 title: "Keys";
                 KeysCard {
+                    opacity: root.text-o;
                     read-key: root.read-key;
                     menu-key: root.menu-key;
                     capturing: root.capturing;
@@ -243,6 +246,7 @@ export component SettingsTab inherits Rectangle {
             voice := Group {
                 title: "Voice";
                 Panel {
+                    opacity: root.text-o;
                     VerticalLayout {
                         padding: 1px;
                         SettingRow {

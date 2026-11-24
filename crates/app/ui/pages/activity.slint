@@ -26,6 +26,8 @@ import {
 export component ActivityTab inherits Rectangle {
     in property <[LineData]> log;
     in-out property <int> filter: 0;
+    // switch game (app.slint): the list fades out and in; "Today" and the filter stay
+    in property <float> text-o: 1;
     callback back();
     // "Read now" on the empty list (app.slint: the same as Read now on the Overview)
     callback read-now();
@@ -82,6 +84,7 @@ export component ActivityTab inherits Rectangle {
             }
 
             if root.log.length == 0: Panel {
+                opacity: root.text-o;
                 VerticalLayout {
                     padding: Space.s4 + 4px;
                     spacing: Space.s3;
@@ -106,6 +109,7 @@ export component ActivityTab inherits Rectangle {
                 }
             }
             if root.log.length > 0: Panel {
+                opacity: root.text-o;
                 VerticalLayout {
                     padding: Space.s1 + 1px;
                     // a plain `for` of rows, so a row's full-text card can lie over the rows below it

@@ -363,6 +363,9 @@ export component OverviewTab inherits Rectangle {
             height: root.stage-h;
         // switch game: the old picture stays under the new one while it fades in
         if root.pic-t < 1: Stage {
+                // a still picture: it neither follows the live view nor sets its size
+                follow-live: false;
+                settled: false;
                 source: root.old-shot;
                 src-w: root.old-w;
                 src-h: root.old-h;
