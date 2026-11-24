@@ -386,12 +386,13 @@ fn page_02_lists_games_and_scrolls_a_long_list() {
 fn voice_speed_and_volume_are_saved() {
     let (_dir, paths) = temp_paths();
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
+    // 0.6 of the 0.5x to 2.0x track is 1.4x
     w.set_voice_speed(0.6);
     w.set_voice_volume(0.5);
     w.set_picked_voice(1);
     finish_onboarding(&w);
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
-    assert!((p.voice.speed - 1.2).abs() < 1e-4, "{}", p.voice.speed);
+    assert!((p.voice.speed - 1.4).abs() < 1e-4, "{}", p.voice.speed);
     assert!((p.voice.volume - 0.5).abs() < 1e-4);
     assert_eq!(
         (p.voice.engine.as_str(), p.voice.id.as_str()),

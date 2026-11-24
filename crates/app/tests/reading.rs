@@ -131,8 +131,17 @@ impl App {
         done(self)
     }
 
+    /// The Overview read list (it leaves out the line in Now).
     fn recent(&self) -> Vec<String> {
         let m = self.w.get_recent();
+        (0..m.row_count())
+            .filter_map(|i| m.row_data(i))
+            .map(|r| r.line.to_string())
+            .collect()
+    }
+    /// The Activity list (every line, the one in Now included).
+    fn log(&self) -> Vec<String> {
+        let m = self.w.get_log();
         (0..m.row_count())
             .filter_map(|i| m.row_data(i))
             .map(|r| r.line.to_string())
@@ -150,9 +159,13 @@ fn the_game_is_read_and_its_line_shows_and_is_logged() {
         == reading::STATUS_READING));
     assert!(a.w.get_status_ok());
     assert!(a.vm.borrow().reading_target().is_some());
-    // the line on the still screen is spoken: the "now speaking" card, Recent, the log file
+    // the line on the still screen is spoken: the "now speaking" card, the Activity list, the log file. The
+    // Overview read list leaves it out, as it shows in Now.
     assert!(a.until(WAIT, |a| a.w.get_now_line().as_str() == LINE));
-    assert!(a.until(WAIT, |a| a.recent().first().is_some_and(|l| l == LINE)));
+    // while it is spoken, its zone's outline is lime (the zone of the line)
+    assert!(a.until(WAIT, |a| a.w.get_live_zone() == 0));
+    assert!(a.until(WAIT, |a| a.log().first().is_some_and(|l| l == LINE)));
+    assert!(a.recent().is_empty(), "{:?}", a.recent());
     let log = dr_runtime::activity::Log::new(a.paths.activity_log("test-game"));
     let saved = log.last(10);
     assert_eq!(saved.len(), 1, "{saved:?}");
@@ -273,7 +286,7 @@ fn elevated_and_fullscreen_games_are_explained() {
 #[test]
 fn a_replay_adds_no_row() {
     let a = app();
-    assert!(a.until(WAIT, |a| a.recent().first().is_some_and(|l| l == LINE)));
+    assert!(a.until(WAIT, |a| a.log().first().is_some_and(|l| l == LINE)));
     let idle = |a: &App| {
         a.vm.borrow()
             .speech_status()
@@ -285,7 +298,7 @@ fn a_replay_adds_no_row() {
             .is_some_and(|s| s.speaking.as_deref() == Some(LINE))
     };
     assert!(a.until(WAIT, idle));
-    // the replay button of the Recent row
+    // the replay button of the Activity row
     a.vm.borrow().replay_row(0);
     assert!(a.until(WAIT, speaking), "the row was not replayed");
     assert!(a.until(WAIT, idle));
@@ -293,7 +306,16 @@ fn a_replay_adds_no_row() {
     a.vm.borrow().speech_cmd(dr_runtime::speech::Cmd::Replay);
     assert!(a.until(WAIT, speaking), "the line was not replayed");
     assert!(a.until(WAIT, idle));
-    assert_eq!(a.recent(), [LINE]);
+    assert_eq!(
+        a.w.get_live_zone(),
+        -1,
+        "no zone is lime once the line ends"
+    );
+    assert_eq!(a.log(), [LINE]);
+    assert!(
+        a.recent().is_empty(),
+        "the line in Now is not repeated in the list"
+    );
     let log = dr_runtime::activity::Log::new(a.paths.activity_log("test-game"));
     assert_eq!(log.last(10).len(), 1, "{:?}", log.last(10));
 }
@@ -329,7 +351,7 @@ fn a_game_switch_stops_speech_and_keeps_the_logs_apart() {
     };
     assert!(a.until(WAIT, idle), "speech did not stop");
     // the events of the Stop come after it: let them in
-    assert!(!a.until(Duration::from_millis(500), |a| !a.recent().is_empty()));
+    assert!(!a.until(Duration::from_millis(500), |a| !a.log().is_empty()));
     let old = dr_runtime::activity::Log::new(a.paths.activity_log("test-game")).last(10);
     assert_eq!(old.len(), 1, "{old:?}");
     assert_eq!((old[0].text.as_str(), old[0].skip), (LINE, None));

@@ -1,7 +1,7 @@
 // Settings (d-black 12-settings): one 640 px column, no side list. Group labels above panels of 44 px rows:
 // Startup, In-game overlay, Keys, Voice and App. The Startup and In-game overlay rows are saved
 // (src/vm/prefs.rs); the voice, speed and volume are the current game's (saved in its profile).
-import { Palette, Space, Radius, Size, Type, Icons } from "../theme.slint";
+import { Palette, Space, Radius, Size, Type, Icons, Speeds } from "../theme.slint";
 import { Button, IconButton, Toggle, Segmented, Slider, Panel, GroupLabel, SettingRow } from "../components/base.slint";
 import { VoiceData } from "../data.slint";
 import { KeysCard } from "keys.slint";
@@ -93,12 +93,10 @@ export component SettingsTab inherits Rectangle {
     in property <[VoiceData]> voices;
     // "Kokoro 11 · Windows 11" (src/vm/voices.rs, Voices::desc)
     in property <string> voices-desc: "Kokoro 11 · Windows 11";
-    // no longer shown (one Voices row); kept for the view model
-    in property <string> kokoro-desc;
     in property <string> game: "Red Dead Redemption 2";
     in property <bool> has-game: true;
     in-out property <int> game-voice: 0;
-    in-out property <float> game-speed: 0.55;
+    in-out property <float> game-speed: 0.4;
     in-out property <float> game-volume: 0.8;
     in property <bool> testing;
     callback add-voices();
@@ -373,7 +371,7 @@ export component SettingsTab inherits Rectangle {
                             RowSlider {
                                 value <=> root.game-speed;
                                 label: "Speed";
-                                shown: Math.round(Math.max(0.25, root.game-speed) * 20) / 10 + "x";
+                                shown: Speeds.text(Speeds.of(root.game-speed));
                                 changed => {
                                     root.voice-changed();
                                 }

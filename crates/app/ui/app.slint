@@ -91,7 +91,6 @@ export component MainWindow inherits Window {
     in-out property <int> picked-window: 0;
     in-out property <[ZoneData]> setup-zones;
     in-out property <[ZoneData]> zones;
-    in-out property <[ZoneData]> extra-zones;
     // the Overview zone chips: one per kind that has a zone (not Ignore), on while any zone of it is on (Rust)
     in-out property <[ZoneData]> zone-kinds;
     in-out property <[VoiceData]> voices;
@@ -114,12 +113,12 @@ export component MainWindow inherits Window {
     in-out property <string> menu-key: "F7";
     in-out property <int> picked-voice: 0;
     // page 05 sliders (0 to 1): kept here so they outlive the page and Finish can save them
-    in-out property <float> voice-speed: 0.55;
+    // speed: 0 to 1 over 0.5x to 2.0x (vm::voices::speed_of_slider); 0.4 is 1.1x
+    in-out property <float> voice-speed: 0.4;
     in-out property <float> voice-volume: 0.8;
     // voices (M3a): why the list is empty, the Settings line, and the voice test
     in property <string> voices-problem;
     in property <string> voices-desc: "Kokoro 11 · Windows 11";
-    in property <string> kokoro-desc: "Installed · 11 voices · 312 MB";
     in property <bool> voice-testing: true;
     in property <int> test-played: 20;
     in property <string> test-time: "0:02 / 0:04";
@@ -127,7 +126,7 @@ export component MainWindow inherits Window {
     in property <bool> test-in-settings: false;
     // the current game's voice (Overview, Settings): index in `voices`, sliders 0 to 1 as on page 05
     in-out property <int> game-voice: 0;
-    in-out property <float> game-speed: 0.55;
+    in-out property <float> game-speed: 0.4;
     in-out property <float> game-volume: 0.8;
     in property <string> voice-label: "Adam";
     // set up a game from the switcher ("Add game"): Back on page 02 returns to the main pages
@@ -145,9 +144,12 @@ export component MainWindow inherits Window {
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> real-shots: false;
-    in property <string> shot-info: "Screenshot 21:30 · 3840 × 2160 · Fit to window";
+    // the time of the saved screenshot ("21:30"), shown in the Zones and step 2 toolbars while the game is not
+    // live (Rust: empty while it is live)
+    in property <string> shot-time: "21:30";
+    in property <string> setup-shot-time: "21:30";
     // zone editing on 03 (setup-*) and 11 (zones-*)
-    in-out property <int> setup-selected: 1;
+    in-out property <int> setup-selected: -1;
     in-out property <int> zones-selected: 1;
     in-out property <bool> setup-draw: false;
     in-out property <bool> zones-draw: false;
@@ -158,6 +160,10 @@ export component MainWindow inherits Window {
     in-out property <string> notice;
     // reading (M3b, src/vm/reading.rs): the status, the line being spoken, Pause, key capture
     in property <string> status-text: "Reading";
+    // false: the game is not running (the Overview stage says so, its controls are off)
+    in property <bool> game-running: true;
+    // the zone of the line being spoken, as an index into `zones` (its outline is lime); -1: none
+    in property <int> live-zone: -1;
     in property <bool> status-ok: true;
     in property <bool> paused: false;
     in property <string> now-who: "Arthur";
@@ -246,7 +252,9 @@ export component MainWindow inherits Window {
     callback pause-clicked();
     callback now-replay();
     callback now-stop();
+    // the Overview read list leaves out the line in Now, so its rows have their own replay callback
     callback recent-replay(int);
+    callback log-replay(int);
     // "Change" on a key row (keys page, Settings): 0 the read key, 1 the quick menu key
     callback key-change(int);
     // voices (src/vm): Play sample / Stop on page 05 (setup voice) and in Settings (current game), Add voices
@@ -566,6 +574,7 @@ export component MainWindow inherits Window {
                         shot-w: root.setup-shot-w;
                         shot-h: root.setup-shot-h;
                         contain: root.real-shots;
+                        shot-time: root.setup-shot-time;
                         drafting: root.drafting;
                         draft: root.draft;
                         kind: root.zone-kind;
@@ -689,8 +698,8 @@ export component MainWindow inherits Window {
                         automatic <=> root.automatic;
                         read-key: root.read-key;
                         voice: root.voice-label;
-                        // vm::reading::STATUS_NO_WINDOW
-                        running: root.status-text != "Game not running";
+                        running: root.game-running;
+                        live-zone: root.live-zone;
                         paused: root.paused;
                         now-who: root.now-who;
                         now-line: root.now-line;
@@ -746,6 +755,7 @@ export component MainWindow inherits Window {
                         shot-w: root.shot-w;
                         shot-h: root.shot-h;
                         contain: root.real-shots;
+                        shot-time: root.shot-time;
                         drafting: root.drafting;
                         draft: root.draft;
                         kind: root.zone-kind;
@@ -784,7 +794,7 @@ export component MainWindow inherits Window {
                             root.read-now();
                         }
                         replay(i) => {
-                            root.recent-replay(i);
+                            root.log-replay(i);
                         }
                     }
                 }
@@ -824,7 +834,6 @@ export component MainWindow inherits Window {
                         }
                         voices: root.voices;
                         voices-desc: root.voices-desc;
-                        kokoro-desc: root.kokoro-desc;
                         game: root.game-name;
                         has-game: root.games.length > 0;
                         game-voice <=> root.game-voice;

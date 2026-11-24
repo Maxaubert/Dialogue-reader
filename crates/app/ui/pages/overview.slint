@@ -22,6 +22,8 @@ export component OverviewTab inherits Rectangle {
     in property <bool> paused: false;
     // false: the game is not running (status "Game not running"): the stage says so and the controls are off
     in property <bool> running: true;
+    // the zone of the line being spoken: its outline is lime (-1: none)
+    in property <int> live-zone: -1;
     in-out property <bool> automatic: true;
     in property <string> voice: "Adam";
     in property <string> read-key: "Mouse 4";
@@ -144,6 +146,7 @@ export component OverviewTab inherits Rectangle {
             zones: root.zones;
             labels: false;
             quiet: true;
+            live-zone: root.live-zone;
             radius: Radius.lg;
             behind: Palette.surface-1;
         }
@@ -327,8 +330,8 @@ export component OverviewTab inherits Rectangle {
                     background: Palette.line;
                 }
 
-                // a Flickable that does not scroll: the rows do not make the panel taller, they are cut at its end
-                Flickable {
+                // a Flickable that does not scroll: the rows do not make the panel taller. Only whole rows show.
+                list := Flickable {
                     interactive: false;
                     content-height: rows.preferred-height;
                     rows := VerticalLayout {
@@ -343,6 +346,7 @@ export component OverviewTab inherits Rectangle {
                             tag: r.skip;
                             replay-label: r.skip == "" ? "Replay" : "";
                             rest-bg: Palette.surface-1;
+                            visible: self.y + self.height <= list.height;
                             replay => {
                                 root.recent-replay(i);
                             }

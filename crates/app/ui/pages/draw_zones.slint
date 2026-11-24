@@ -6,7 +6,7 @@ import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } f
 import { ZoneData } from "../data.slint";
 import { CIcon, IconButton } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
-import { Stage, LiveNote, LiveView } from "../components/stage.slint";
+import { Stage, ShotNote } from "../components/stage.slint";
 
 // "Draw zone" (.zt-draw): a button that stays on (surface-3 and a white border) while the tool is picked.
 export component DrawToggle inherits Rectangle {
@@ -149,13 +149,16 @@ export component KindSeg inherits Rectangle {
 
 export component DrawZonesPage inherits Rectangle {
     in-out property <[ZoneData]> zones;
-    in-out property <int> selected: 1;
+    // nothing is selected when the step opens (the trash is off until a zone is picked or drawn)
+    in-out property <int> selected: -1;
     in-out property <bool> draw: false;
     // zone editing (src/vm): the picture, the box being drawn, the kind picker
     in property <image> shot: Art.scene;
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> contain: false;
+    // the time of the screenshot ("21:30"; Rust leaves it empty while the game shows live)
+    in property <string> shot-time: "21:30";
     in property <bool> drafting: false;
     in property <ZoneData> draft;
     in property <Kind> kind: Kind.dialogue;
@@ -226,6 +229,11 @@ export component DrawZonesPage inherits Rectangle {
                     horizontal-stretch: 1;
                 }
 
+                ShotNote {
+                    contain: root.contain;
+                    time: root.shot-time;
+                }
+
                 IconButton {
                     icon: Icons.camera;
                     tip: "Retake screenshot";
@@ -281,11 +289,5 @@ export component DrawZonesPage inherits Rectangle {
                 accessible-role: none;
             }
         }
-    }
-
-    // "Live", or why the saved screenshot shows: in a line under the picture, never on it
-    if root.contain && LiveView.note != "": LiveNote {
-        x: pic.x + Space.s1;
-        y: pic.y + pic.height + Space.s2;
     }
 }

@@ -1071,8 +1071,9 @@ export component Tag inherits Rectangle {
 
 // A line of the read list (.lrow): kind icon, the grey speaker and the white line, at most two lines, then
 // cut with "...". `meta` (a time) and `tag` ("off", "repeat") sit at the end. Hover fills the row; with
-// `replay-label` set, a replay button floats over the row end. A cut line shows its full text in a card over
-// the rows below after Motion.hover-delay. The accessible label is the full "Speaker: line".
+// `replay-label` set, a replay button floats over the row end. After Motion.hover-delay on a cut line, the row
+// grows: its fill becomes a card that lies over the rows below, and the text shows in full. The icon, the grey
+// speaker and replay stay where they are. The accessible label is the full "Speaker: line".
 // `speaker` comes with its colon, as the view model gives it in LineData.who ("Arthur:"). Rust caps the name so
 // it fits on line 1 (vm::reading::short_speaker).
 // Put rows in a `for` with no layout clip below them, so the card can lie over the next rows.
@@ -1100,6 +1101,20 @@ export component ListRow inherits Rectangle {
     // the text is cut when the whole text needs more than two lines
     property <bool> cut: measure.preferred-height > t.height + 1px;
     property <bool> card: touch.has-hover && root.cut;
+    // the card shows (after the hover delay): the text is shown in full
+    property <bool> open: false;
+    changed card => {
+        if !root.card {
+            root.open = false;
+        }
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.hover-delay);
+        running: root.card && !root.open;
+        triggered => {
+            root.open = true;
+        }
+    }
     // the row's own height (one or two lines); a filtered list sets `height: 0` on the rows it hides
     out property <length> natural-h: max(Size.list, t.height + 16px);
     height: root.natural-h;
@@ -1111,6 +1126,27 @@ export component ListRow inherits Rectangle {
         easing: cubic-bezier(0.2, 0.7, 0.2, 1);
     }
     touch := TouchArea { }
+
+    // the card: the row fill grown to the whole text, under the row content, over the rows below
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: Math.max(root.height, measure.preferred-height + 16px);
+        border-radius: Radius.md;
+        border-width: 1px;
+        border-color: Palette.line-2;
+        background: Palette.surface-2;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: Shadow.pop-color;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0.01;
+        animate opacity {
+            duration: Motion.fast;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+    }
 
     HorizontalLayout {
         padding-left: Space.s3;
@@ -1134,12 +1170,12 @@ export component ListRow inherits Rectangle {
                 x: 0;
                 y: 0;
                 width: parent.width;
-                height: min(self.preferred-height, 2 * Type.lh-body);
+                height: root.open ? measure.preferred-height : min(self.preferred-height, 2 * Type.lh-body);
                 text: root.full;
                 color: root.text-c;
                 wrap: word-wrap;
                 overflow: elide;
-                max-lines: 2;
+                max-lines: root.open ? 0 : 2;
                 vertical-alignment: top;
                 line-height-factor: Type.lhf-143;
             }
@@ -1216,37 +1252,6 @@ export component ListRow inherits Rectangle {
         }
     }
 
-    // the full text over the rows below
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: parent.width;
-        height: card-text.preferred-height + 2 * Space.s2;
-        border-radius: Radius.md;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        background: Palette.surface-2;
-        drop-shadow-offset-y: 12px;
-        drop-shadow-blur: 24px;
-        drop-shadow-color: Shadow.pop-color;
-        opacity: root.card ? 1 : 0;
-        visible: self.opacity > 0.01;
-        animate opacity {
-            duration: Motion.fast;
-            delay: root.card ? Motion.hover-delay : 0ms;
-            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
-        }
-        card-text := Text {
-            x: Space.s3 + Size.icon + Space.s2 - 1px;
-            y: Space.s2 - 1px;
-            width: text-box.width;
-            text: root.full;
-            color: root.text-c;
-            wrap: word-wrap;
-            line-height-factor: Type.lhf-143;
-            accessible-role: none;
-        }
-    }
 }
 
 // A zone chip of the Overview strip (.zi): one per kind. On: white text; off: text-2 and a struck icon.

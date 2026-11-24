@@ -221,7 +221,6 @@ fn push_voice_list(w: &MainWindow, v: &Voices) {
     w.set_voices(ModelRc::new(VecModel::from(v.rows())));
     w.set_voices_problem(v.problem_text().into());
     w.set_voices_desc(v.desc().into());
-    w.set_kokoro_desc(v.kokoro_desc().into());
 }
 
 /// Slint kind from a profile kind, and back.
@@ -616,8 +615,8 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
     w.set_games_running(ModelRc::from(vm.games_running.clone()));
     w.set_other_windows(ModelRc::from(vm.other_windows.clone()));
     w.set_games(ModelRc::from(vm.game_rows.clone()));
-    // the fake (mockup) state: zone 1 selected on 03 and 11, as the mockups show
-    vm.setup.select(Some(1));
+    // the fake (mockup) state: no zone selected on 03, zone 1 selected on 11, as the mockups show
+    vm.setup.select(None);
     vm.setup.kind = dr_runtime::Kind::Dialogue;
     vm.main.select(Some(1));
     vm.main.draw = false;
@@ -644,10 +643,9 @@ pub fn install(w: &MainWindow, source: Source) -> Shared {
             w.set_test_played(0);
             w.set_test_time("0:00".into());
             w.set_picked_voice(0);
-            w.set_voice_speed(0.5);
+            w.set_voice_speed(voices::slider_of_speed(1.0));
             w.set_voice_label(vm.voices.label("").into());
             w.set_real_shots(true);
-            w.set_extra_zones(ModelRc::default());
             vm.reading_models(w);
             w.set_now_who("".into());
             w.set_now_line("".into());
@@ -752,7 +750,7 @@ impl Vm {
             .map(|(i, (g, is_running))| {
                 // TEXT.md: "Reading" or when it was last played. Profiles do not keep when a game was last
                 // played, so only the game being read says something.
-                let reading = is_running && self.current == Some(i);
+                let reading = is_running && self.current == Some(i) && self.is_reading();
                 GameData {
                     name: g.profile.name.as_str().into(),
                     meta: if reading { "Reading" } else { "" }.into(),
@@ -816,7 +814,6 @@ impl Vm {
             );
             w.set_shot_w(sw as f32);
             w.set_shot_h(sh as f32);
-            w.set_shot_info(format!("Screenshot · {sw} × {sh} · Fit to window").into());
         }
         self.push_profile_settings();
         self.push_games();
@@ -1211,6 +1208,7 @@ impl Vm {
                 w.set_setup_shot(img.clone());
                 w.set_setup_shot_w(shot.width as f32);
                 w.set_setup_shot_h(shot.height as f32);
+                w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
                 w.set_setup_game(win.title.as_str().into());
                 w.set_setup_cover(img);
                 self.setup_shot = Some(shot);
@@ -1379,6 +1377,7 @@ impl Vm {
                         w.set_setup_shot(img.clone());
                         w.set_setup_shot_w(shot.width as f32);
                         w.set_setup_shot_h(shot.height as f32);
+                        w.set_setup_shot_time(live::clock_of(std::time::SystemTime::now()).into());
                         w.set_setup_cover(img);
                     }
                     self.setup_shot = Some(shot);
@@ -1433,8 +1432,8 @@ impl Vm {
         }
         self.games[i].cover = Some(cover_of(shot));
         self.games[i].shot_size = Some((shot.width, shot.height));
-        // the line under the stage on 11 keeps the live view note ("Live", or why the saved screenshot shows)
-        self.push_shot_info();
+        // the Zones toolbar shows the new screenshot's time while the game is not live
+        self.push_shot_time();
         self.save_main();
         self.push_main();
         Ok(())
@@ -1781,6 +1780,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
     w.on_now_stop(move || v.borrow().speech_cmd(dr_runtime::speech::Cmd::Stop));
     let v = vm.clone();
     w.on_recent_replay(move |i| {
+        if let Ok(i) = usize::try_from(i) {
+            v.borrow().replay_recent(i);
+        }
+    });
+    let v = vm.clone();
+    w.on_log_replay(move |i| {
         if let Ok(i) = usize::try_from(i) {
             v.borrow().replay_row(i);
         }

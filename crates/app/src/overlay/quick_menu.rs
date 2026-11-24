@@ -21,8 +21,9 @@ pub const SETTINGS: usize = 7;
 pub const QUIT: usize = 8;
 pub const ROWS: usize = 9;
 
-pub const SPEED_MIN: f32 = 0.5;
-pub const SPEED_MAX: f32 = 2.0;
+/// The app's speed range (the voice engines' range): every speed slider runs over it.
+pub const SPEED_MIN: f32 = dr_tts::SPEED_MIN;
+pub const SPEED_MAX: f32 = dr_tts::SPEED_MAX;
 pub const SPEED_STEP: f32 = 0.1;
 pub const VOLUME_STEP: f32 = 0.05;
 /// Rows of the voice list on screen at once; a longer list scrolls with the highlight.

@@ -5,72 +5,8 @@
 import { Palette, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
 import { ZoneData } from "../data.slint";
 import { Button, BtnKind, Icon, IconButton } from "../components/base.slint";
-import { Stage, LiveNote, LiveView } from "../components/stage.slint";
+import { Stage, ShotNote } from "../components/stage.slint";
 import { DrawToggle, KindSeg } from "draw_zones.slint";
-
-// The tag of a zone (.ztag): kind icon and name, and the small "off" pill for an off zone. The selected zone's
-// tag is white with a black keyline.
-component ZoneTag inherits Rectangle {
-    in property <Kind> kind;
-    in property <bool> on: true;
-    in property <bool> selected: false;
-    property <color> fg: root.selected ? Palette.on-ink : root.on ? Palette.text : Palette.text-2;
-    width: lay.preferred-width;
-    height: 24px;
-    border-radius: Radius.sm;
-    background: root.selected ? Palette.on : Palette.surface-1;
-    border-width: 1px;
-    border-color: root.selected ? Palette.on : Palette.float-line;
-    if root.selected: Rectangle {
-        x: -1px;
-        y: -1px;
-        width: root.width + 2px;
-        height: root.height + 2px;
-        border-radius: Radius.sm + 1px;
-        border-width: 1px;
-        border-color: Palette.keyline;
-    }
-    lay := HorizontalLayout {
-        padding-left: Space.s2;
-        padding-right: root.on ? Space.s2 : 3px;
-        spacing: Space.s1;
-        VerticalLayout {
-            alignment: center;
-            Icon {
-                source: Kinds.icon(root.kind);
-                width: 13px;
-                height: 13px;
-                color: root.selected ? Palette.on-ink : Palette.text-2;
-            }
-        }
-
-        Text {
-            text: Kinds.name(root.kind);
-            font-size: Type.fs-small;
-            color: root.fg;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-
-        if !root.on: VerticalLayout {
-            alignment: center;
-            padding-left: Space.s1;
-            Rectangle {
-                height: 18px;
-                width: off.preferred-width + 2 * Space.s2;
-                border-radius: Radius.pill;
-                border-width: 1px;
-                border-color: root.selected ? #00000059 : Palette.line-2;
-                off := Text {
-                    text: "off";
-                    font-size: Type.fs-small;
-                    color: root.selected ? Palette.on-ink : Palette.text-2;
-                    accessible-role: none;
-                }
-            }
-        }
-    }
-}
 
 export component ZonesTab inherits Rectangle {
     in-out property <[ZoneData]> zones;
@@ -82,6 +18,8 @@ export component ZonesTab inherits Rectangle {
     in property <float> shot-w: 1600;
     in property <float> shot-h: 900;
     in property <bool> contain: false;
+    // the time of the saved screenshot ("21:30"; Rust leaves it empty while the game shows live)
+    in property <string> shot-time: "21:30";
     in property <bool> drafting: false;
     in property <ZoneData> draft;
     in property <Kind> kind: Kind.dialogue;
@@ -94,7 +32,7 @@ export component ZonesTab inherits Rectangle {
     // the toolbar (.zn-tb) and the picture under it, 32 px from the sides
     property <length> pad: 32px;
     property <length> top: 64px;
-    property <length> sw: max(160px, min(root.width - 2 * root.pad, (root.height - root.top - Size.page-x) * 16 / 9));
+    property <length> sw: max(160px, min(root.width - 2 * root.pad, (root.height - root.top - Space.s4) * 16 / 9));
     property <length> sh: root.sw * 9 / 16;
 
     HorizontalLayout {
@@ -136,12 +74,12 @@ export component ZonesTab inherits Rectangle {
             horizontal-stretch: 1;
         }
 
-        // "Live", or why the saved screenshot shows (src/vm/live.rs)
-        if root.contain && LiveView.note != "": VerticalLayout {
-            alignment: center;
-            padding-right: Space.s2;
-            LiveNote { }
+        // "Live", or the screenshot's time (src/vm/live.rs)
+        ShotNote {
+            contain: root.contain;
+            time: root.shot-time;
         }
+
         IconButton {
             icon: Icons.camera;
             tip: "Retake screenshot";
@@ -173,7 +111,6 @@ export component ZonesTab inherits Rectangle {
             drafting: root.drafting;
             draft: root.draft;
             zones: root.zones;
-            labels: false;
             selected: root.selected;
             radius: Radius.lg;
             behind: Palette.bg;
@@ -186,23 +123,6 @@ export component ZonesTab inherits Rectangle {
             border-radius: Radius.lg;
             border-width: 1px;
             border-color: Palette.line;
-        }
-
-        // the tags, over every box (a tag never takes the pointer)
-        Rectangle {
-            clip: true;
-            for z[i] in root.zones: ZoneTag {
-                property <length> bx: st.off-x + z.x * st.scale * 1px;
-                property <length> by: st.off-y + z.y * st.scale * 1px;
-                property <length> bh: z.h * st.scale * 1px;
-                // room above the box (24 px tag, 4 px gap), else under it, else inside it at the top left
-                property <int> place: self.by >= 28px ? 0 : self.by + self.bh + 28px <= st.height ? 1 : 2;
-                kind: z.kind;
-                on: z.on;
-                selected: i == root.selected;
-                x: self.bx + (self.place == 2 ? 4px : -1px);
-                y: self.place == 0 ? self.by - 28px : self.place == 1 ? self.by + self.bh + 4px : self.by + 4px;
-            }
         }
 
         // no zone yet: what to do, in the middle of the picture

@@ -518,7 +518,7 @@ impl Vm {
             }
         }
         if !setup {
-            self.push_shot_info();
+            self.push_shot_time();
         }
     }
 
@@ -536,9 +536,8 @@ impl Vm {
             let g = w.global::<LiveView>();
             g.set_note(note.into());
             g.set_note_live(note == NOTE_LIVE);
-            // page 11 shows the note in its line under the stage
             if self.live.of != Some(For::Setup) {
-                self.push_shot_info();
+                self.push_shot_time();
             }
         }
     }
@@ -634,7 +633,7 @@ impl Vm {
             g.set_on(true);
         }
         if !setup {
-            self.push_shot_info();
+            self.push_shot_time();
         }
         self.live_note(&w, NOTE_LIVE);
     }
@@ -646,26 +645,31 @@ impl Vm {
         }
     }
 
-    /// The line under the stage on page 11: what shows (with the live view note: "Live", or why the saved
-    /// screenshot shows) and its size. The stage itself has no note on it.
-    pub(super) fn push_shot_info(&self) {
+    /// The time of the current game's saved screenshot ("21:30") in the Zones toolbar while the saved
+    /// screenshot shows (TEXT.md); empty while the game shows live.
+    pub(super) fn push_shot_time(&self) {
         let Some(w) = self.win() else { return };
-        let (what, sw, sh) = if self.live.showing {
-            let g = w.global::<LiveView>();
-            (NOTE_LIVE, g.get_w(), g.get_h())
+        let t = if self.live.showing {
+            String::new()
         } else {
-            let what = if self.live.note.is_empty() || self.live.note == NOTE_LIVE {
-                "Screenshot"
-            } else {
-                self.live.note.as_str()
-            };
-            match self.still_size(false) {
-                Some((sw, sh)) => (what, sw, sh),
-                None => return,
-            }
+            self.real
+                .as_ref()
+                .zip(self.current.and_then(|i| self.games.get(i)))
+                .and_then(|(r, g)| std::fs::metadata(r.paths.profile_png(&g.profile.id)).ok())
+                .and_then(|m| m.modified().ok())
+                .map_or(String::new(), clock_of)
         };
-        w.set_shot_info(format!("{what} · {sw} × {sh} · Fit to window").into());
+        w.set_shot_time(t.into());
     }
+}
+
+/// "21:30": the local hours and minutes of a file time or a capture time.
+pub fn clock_of(t: std::time::SystemTime) -> String {
+    let ms = t
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64);
+    let s = dr_runtime::activity::local_time(ms);
+    s.get(..5).unwrap_or(&s).to_string()
 }
 
 /// Wires the live view: the stage size, frames, page changes and the timer.

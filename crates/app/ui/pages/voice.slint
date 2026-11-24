@@ -2,7 +2,7 @@
 // ("Play a sample"); the picked voice has the surface-3 fill, which glides (360 ms). With no voice: "No voices
 // found." and Add voices. Right: "Sound" with Speed and Volume.
 import { SetupPart } from "setup_part.slint";
-import { Palette, Space, Radius, Size, Type, Motion, Icons } from "../theme.slint";
+import { Palette, Space, Radius, Size, Type, Motion, Icons, Speeds } from "../theme.slint";
 import { VoiceData } from "../data.slint";
 import { Button, IconButton, Slider, Wave, GroupLabel, Panel, SettingRow } from "../components/base.slint";
 import { ObHead } from "../components/chrome.slint";
@@ -85,7 +85,7 @@ component VoiceRow inherits Rectangle {
 export component VoicePage inherits Rectangle {
     in property <[VoiceData]> voices;
     in-out property <int> selected: 0;
-    in-out property <float> speed: 0.55;
+    in-out property <float> speed: 0.4;
     in-out property <float> volume: 0.8;
     // kept for app.slint: the engine of the list, why it is empty (the page says "No voices found.")
     in property <string> engine: "Kokoro";
@@ -103,8 +103,6 @@ export component VoicePage inherits Rectangle {
     callback volume-moved();
     // the row whose sample plays (picking another row while it plays keeps the stop button on this one)
     property <int> played: -1;
-    // speed: the slider runs from 0 to 2x, the profile keeps at least 0.5x; shown with one decimal ("1.0x")
-    property <int> tenths: Math.round(Math.max(0.25, root.speed) * 20);
     property <length> list-y: Space.s7 + head.preferred-height + Space.s5 + Type.lh-small + Space.s2;
     property <length> list-max: Math.max(3 * Size.list, root.height - root.list-y - Space.s5 - 2 * Space.s1 - 2px);
     VerticalLayout {
@@ -231,7 +229,7 @@ export component VoicePage inherits Rectangle {
 
                                 Text {
                                     width: 32px;
-                                    text: Math.floor(root.tenths / 10) + "." + Math.mod(root.tenths, 10) + "x";
+                                    text: Speeds.text(Speeds.of(root.speed));
                                     font-size: Type.fs-small;
                                     color: Palette.text-2;
                                     horizontal-alignment: right;

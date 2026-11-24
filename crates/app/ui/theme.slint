@@ -208,6 +208,22 @@ export global Motion {
     out property <float> press: 0.97;
 }
 
+// The app's speed range (dr_tts::SPEED_MIN, SPEED_MAX): every speed slider runs 0.5x to 2.0x, so 1.1x sits at 40%.
+// Rust maps the same way (vm::voices::speed_of_slider).
+export global Speeds {
+    out property <float> min: 0.5;
+    out property <float> max: 2.0;
+    // the speed of a slider place (0 to 1), in tenths
+    public pure function of(v: float) -> float {
+        return Math.round((self.min + Math.clamp(v, 0, 1) * (self.max - self.min)) * 10) / 10;
+    }
+    // "1.1x": one decimal, also for whole numbers ("1.0x")
+    public pure function text(s: float) -> string {
+        let t = Math.round(s * 10);
+        return Math.floor(t / 10) + "." + Math.mod(t, 10) + "x";
+    }
+}
+
 // How the window is drawn. `software` is set by the headless renderer (src/screens.rs): the software renderer
 // does not clip to rounded corners, so CornerMask paints them. The real window clips and needs no mask.
 export global Render {

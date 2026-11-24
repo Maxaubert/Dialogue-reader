@@ -61,7 +61,8 @@ fn page_05_lists_the_voices_and_plays_a_sample_with_the_page_settings() {
     assert!(!w.get_voice_testing(), "nothing plays at the start");
 
     w.set_page(Page::Voice);
-    w.set_voice_speed(0.75);
+    // two thirds of the 0.5x to 2.0x track is 1.5x
+    w.set_voice_speed(2.0 / 3.0);
     w.set_voice_volume(0.4);
     // the play button of the Zira row picks Zira and plays her sample
     press(&w, "Play a sample of Zira", AccessibleRole::Button);
@@ -104,11 +105,9 @@ fn with_no_voice_installed_the_pages_say_so_and_finish_still_saves() {
     let opened = desktop.opened_settings.clone();
     let (w, _vm) = real_window_with(&paths, desktop, Voices::none());
     assert_eq!(w.get_voices().row_count(), 0);
-    assert_eq!(w.get_voices_desc(), "No voices found");
-    assert_eq!(
-        w.get_voices_problem(),
-        "The Kokoro voices are missing and no Windows voice is installed. Press Add voices to get a Windows voice."
-    );
+    // one form everywhere (TEXT.md: "No voices found." plus Add voices)
+    assert_eq!(w.get_voices_desc(), "No voices found.");
+    assert_eq!(w.get_voices_problem(), "No voices found.");
     assert_eq!(w.get_voice_label(), "No voice");
     w.set_page(Page::Voice);
     // nothing to play: no play button, the page says so
@@ -160,7 +159,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
 
     w.set_page(Page::Settings);
     w.invoke_game_voice_picked(1);
-    w.set_game_speed(0.75);
+    w.set_game_speed(2.0 / 3.0);
     w.set_game_volume(0.3);
     w.invoke_game_voice_changed();
     assert_eq!(w.get_voice_label(), "Zira");
@@ -187,7 +186,7 @@ fn settings_voice_speed_and_volume_are_saved_in_the_current_profile() {
     let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
     assert_eq!(w.get_page(), Page::Overview);
     assert_eq!(w.get_game_voice(), 1);
-    assert!((w.get_game_speed() - 0.75).abs() < 1e-4);
+    assert!((w.get_game_speed() - 2.0 / 3.0).abs() < 1e-4);
     assert!((w.get_game_volume() - 0.3).abs() < 1e-4);
 }
 
@@ -332,7 +331,7 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
         w.get_voices().iter().map(|v| v.name.to_string()).collect()
     };
     assert_eq!(names(&w), ["Heart", "Adam"]);
-    assert!(w.get_kokoro_desc().starts_with("Installed · 2 voices"));
+    assert_eq!(w.get_voices_desc(), "Kokoro 2 · Windows 2");
     assert_eq!(w.get_voice_label(), "Heart");
 
     // the model fails on its own thread; the next page change shows the Windows voices
@@ -340,9 +339,6 @@ fn a_kokoro_model_that_fails_to_load_switches_the_screens_to_the_windows_voices(
     w.set_page(Page::Voice);
     settle();
     assert_eq!(names(&w), ["David", "Zira"]);
-    assert_eq!(
-        w.get_kokoro_desc(),
-        "Not found · Windows voices speak instead"
-    );
+    assert_eq!(w.get_voices_desc(), "Windows 2");
     assert_eq!(w.get_voice_label(), "David");
 }

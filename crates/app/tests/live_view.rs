@@ -40,8 +40,9 @@ fn near(a: [f32; 4], b: [f32; 4]) -> bool {
     a.iter().zip(b).all(|(x, y)| (x - y).abs() < 2.0)
 }
 
-/// The live view note shows `note`, under the game picture: it never overlaps it (Max, 2026-11-23: the chip
-/// covered the top right corner of the picture, where a zone may be).
+/// The live view note shows `note`, next to the game picture: it never overlaps it (Max, 2026-11-23: the chip
+/// covered the top right corner of the picture, where a zone may be). On the Overview it sits under the picture;
+/// on Zones and setup step 2 it is in the toolbar just above it (d-black).
 fn note_under_the_picture(w: &MainWindow, note: &str) {
     use i_slint_backend_testing::ElementHandle;
     let chip = ElementHandle::find_by_accessible_label(w, "Live view")
@@ -68,12 +69,14 @@ fn note_under_the_picture(w: &MainWindow, note: &str) {
             "the note {cp:?} {cs:?} is on the picture {pp:?} {ps:?}"
         );
     }
-    // just under the picture (on Overview below the zone strip), inside the window
-    let below = pics.iter().any(|p| {
+    // just under the picture (on Overview below the zone strip) or in the toolbar just above it
+    let close = pics.iter().any(|p| {
         let (pp, ps) = (p.absolute_position(), p.size());
-        cp.y >= pp.y + ps.height && cp.y - (pp.y + ps.height) < 80.0
+        let under = cp.y >= pp.y + ps.height && cp.y - (pp.y + ps.height) < 80.0;
+        let above = cp.y + cs.height <= pp.y && pp.y - (cp.y + cs.height) < 80.0;
+        under || above
     });
-    assert!(below, "the note {cp:?} is not under the picture");
+    assert!(close, "the note {cp:?} is not next to the picture");
     let win = w.window().size();
     let k = w.window().scale_factor();
     assert!(
@@ -124,6 +127,16 @@ impl Setup {
     fn note(&self) -> String {
         self.w.global::<LiveView>().get_note().into()
     }
+    /// The Zones toolbar shows the saved screenshot's time ("21:30", TEXT.md) while the game is not live.
+    fn shows_shot_time(&self) -> bool {
+        let t = self.w.get_shot_time();
+        let b = t.as_bytes();
+        b.len() == 5
+            && b[2] == b':'
+            && b.iter()
+                .enumerate()
+                .all(|(i, c)| i == 2 || c.is_ascii_digit())
+    }
 }
 
 #[test]
@@ -155,7 +168,9 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     go_zones(&s.w);
     s.tick();
     assert_eq!((s.live.starts.get(), s.live.stops.get()), (1, 0));
-    assert_eq!(s.w.get_shot_info(), "Live · 1920 × 1080 · Fit to window");
+    // live: no screenshot time, the note says "Live"
+    assert_eq!(s.w.get_shot_time(), "");
+    assert_eq!(s.note(), NOTE_LIVE);
 
     // Settings has no stage: it stops, and the saved screenshot is back
     go_settings(&s.w);
@@ -172,10 +187,7 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     go_zones(&s.w);
     s.tick();
     assert_eq!(s.live.starts.get(), 2);
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Screenshot · 1920 × 1080 · Fit to window"
-    );
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]
@@ -224,7 +236,9 @@ fn zones_follow_a_game_that_changed_size() {
         "{:?}",
         rect(&s.w, 0)
     );
-    assert_eq!(s.w.get_shot_info(), "Live · 3840 × 2160 · Fit to window");
+    assert_eq!(s.w.get_shot_time(), "");
+    let g = s.w.global::<LiveView>();
+    assert_eq!((g.get_w(), g.get_h()), (3840.0, 2160.0));
     // the size change alone is not saved
     assert_eq!(on_disk(&s.paths).zones[0].base, [SHOT_W, SHOT_H]);
 
@@ -360,11 +374,8 @@ fn a_closed_game_shows_the_saved_screenshot_with_a_note() {
         near(rect(&s.w, 0), [200.0, 900.0, 1500.0, 100.0]),
         "zones back on the screenshot"
     );
-    // page 11 has the note in its line under the stage
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Saved screenshot · the game is closed · 1920 × 1080 · Fit to window"
-    );
+    // page 11 has the note and the screenshot's time in its toolbar
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 
     // not running when the page opens
     go_settings(&s.w);
@@ -388,8 +399,8 @@ fn a_capture_that_fails_shows_the_saved_screenshot_with_a_note() {
     assert_eq!(s.note(), NOTE_FAILED);
     s.w.invoke_retake_shot();
     assert_eq!(s.w.get_notice(), "", "the retake worked");
-    let info = s.w.get_shot_info();
-    assert!(info.starts_with(NOTE_FAILED), "{info}");
+    assert_eq!(s.note(), NOTE_FAILED);
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]
@@ -580,10 +591,7 @@ fn a_note_that_the_saved_screenshot_shows_is_under_the_picture_too() {
     go_zones(&s.w);
     s.tick();
     assert_eq!(s.note(), NOTE_MINIMIZED);
-    assert_eq!(
-        s.w.get_shot_info(),
-        "Saved screenshot · the game is minimized · 1920 × 1080 · Fit to window"
-    );
+    assert!(s.shows_shot_time(), "{}", s.w.get_shot_time());
 }
 
 #[test]

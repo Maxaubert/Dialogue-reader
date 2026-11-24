@@ -74,6 +74,9 @@ pub struct ReadState {
     entries: Vec<Entry>,
     /// The item that started to play last (a later Cut of it was spoken already).
     started: Option<Item>,
+    /// The log line shown in Now (its time and text): the Overview read list leaves it out, so it is not shown
+    /// twice. It stays in the Activity list.
+    now: Option<(u64, String)>,
     /// Key capture: 0 the read key, 1 the quick menu key.
     capture: Option<i32>,
     lookup: u64,
@@ -99,6 +102,7 @@ impl Default for ReadState {
             marks: 0,
             entries: Vec::new(),
             started: None,
+            now: None,
             capture: None,
             lookup: 0,
             looking: false,
@@ -308,10 +312,12 @@ impl Vm {
         self.reading.game = id;
         // `started` stays: the Cut of a line that played when the game changed comes later, and must not be
         // logged as "Stopped" (a stale item never matches a new one: its queue time differs)
+        self.reading.now = None;
         self.push_log();
         if let Some(w) = self.win() {
             w.set_now_who("".into());
             w.set_now_line("".into());
+            w.set_live_zone(-1);
         }
         let cfg = game.map(|g| RunCfg::of(&g.profile));
         // a window search still running is for the game before
@@ -418,20 +424,30 @@ impl Vm {
             let old = !self.reading.older.is_empty();
             let line = match e {
                 speech::Ev::Started { item, .. } => {
+                    let e = (!item.replay).then(|| entry_of(&item, None));
                     if !old && let Some(w) = self.win() {
                         let (who, line) = now_of(&item);
                         w.set_now_who(who.into());
                         w.set_now_line(line.into());
+                        w.set_live_zone(self.live_zone_of(&item));
+                        // a new line in Now: the list leaves it out (a replay is in the list already)
+                        if let Some(e) = &e {
+                            self.reading.now = Some((e.t, e.text.clone()));
+                        }
                     }
-                    let e = (!item.replay).then(|| entry_of(&item, None));
                     self.reading.started = Some(item);
                     e
                 }
                 // cut before it was heard: say so in the log
-                speech::Ev::Cut { item, .. } => (!item.replay
-                    && self.reading.started.as_ref() != Some(&item))
-                .then(|| entry_of(&item, Some(Skip::Stopped))),
+                speech::Ev::Cut { item, .. } => {
+                    let heard = self.reading.started.as_ref() == Some(&item);
+                    if heard {
+                        self.live_zone_off();
+                    }
+                    (!item.replay && !heard).then(|| entry_of(&item, Some(Skip::Stopped)))
+                }
                 speech::Ev::Cleared(item) => {
+                    self.live_zone_off();
                     (!item.replay).then(|| entry_of(&item, Some(Skip::Stopped)))
                 }
                 speech::Ev::Dropped(item) => {
@@ -445,7 +461,10 @@ impl Vm {
                     (!item.replay && self.reading.started.as_ref() != Some(&item))
                         .then(|| entry_of(&item, Some(Skip::VoiceError)))
                 }
-                speech::Ev::Finished { .. } => None,
+                speech::Ev::Finished { .. } => {
+                    self.live_zone_off();
+                    None
+                }
                 speech::Ev::Mark(m) => {
                     while self.reading.older.front().is_some_and(|(id, _)| *id <= m) {
                         self.reading.older.pop_front();
@@ -489,14 +508,46 @@ impl Vm {
         self.push_log();
     }
 
-    /// Recent (newest five) and the activity list (newest first).
+    /// The Overview read list (newest first, without the line in Now) and the activity list (newest first).
     fn push_log(&self) {
         let rows: Vec<LineData> = self.reading.entries.iter().rev().map(row).collect();
-        super::sync(
-            &self.reading.recent,
-            rows.iter().take(RECENT).cloned().collect(),
-        );
+        let recent = self.recent_rows().map(|i| rows[i].clone()).collect();
+        super::sync(&self.reading.recent, recent);
         super::sync(&self.reading.all, rows);
+    }
+
+    /// The rows of the Overview read list, as indices into the activity list (newest first). The line in Now is
+    /// left out.
+    fn recent_rows(&self) -> impl Iterator<Item = usize> + '_ {
+        let now = self.reading.now.as_ref();
+        self.reading
+            .entries
+            .iter()
+            .rev()
+            .enumerate()
+            .filter(move |(_, e)| now.is_none_or(|(t, text)| e.t != *t || e.text != *text))
+            .map(|(i, _)| i)
+            .take(RECENT)
+    }
+
+    /// The zone of the line being spoken, as an index into the current game's zones (-1: none).
+    fn live_zone_of(&self, item: &Item) -> i32 {
+        let zone = entry_of(item, None).zone;
+        if zone.is_empty() {
+            return -1;
+        }
+        self.main
+            .zones
+            .iter()
+            .position(|z| z.name == zone)
+            .map_or(-1, |i| i as i32)
+    }
+
+    /// The line stopped: no zone is lime any more.
+    fn live_zone_off(&self) {
+        if let Some(w) = self.win() {
+            w.set_live_zone(-1);
+        }
     }
 
     pub fn runtime_event(&mut self, e: Ev) {
@@ -610,6 +661,14 @@ impl Vm {
         w.set_status_text(text.into());
         w.set_status_ok(st == Status::Reading);
         w.set_paused(rt.is_paused());
+        w.set_game_running(st != Status::NoWindow);
+        // the switcher row of the game says "Reading" only while it is read
+        self.push_games();
+    }
+
+    /// The current game is being read (not paused, not waiting for its window).
+    pub(super) fn is_reading(&self) -> bool {
+        matches!(self.reading.status, Some((Status::Reading, false)))
     }
 
     /// "Read now" on Overview.
@@ -661,7 +720,14 @@ impl Vm {
         }
     }
 
-    /// The replay button of a Recent row (newest first): spoken next, as a replay (no new log line). What plays
+    /// The replay button of an Overview read list row (newest first, without the line in Now).
+    pub fn replay_recent(&self, i: usize) {
+        if let Some(j) = self.recent_rows().nth(i) {
+            self.replay_row(j);
+        }
+    }
+
+    /// The replay button of an Activity row (newest first): spoken next, as a replay (no new log line). What plays
     /// now and the lines that wait go on.
     pub fn replay_row(&self, i: usize) {
         let Some(e) = self.reading.entries.iter().rev().nth(i) else {

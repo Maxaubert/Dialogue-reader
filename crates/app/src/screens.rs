@@ -198,6 +198,8 @@ pub fn all() -> Vec<Screen> {
                 w.set_capturing_key(-1);
                 w.set_status_text(crate::vm::reading::STATUS_NO_WINDOW.into());
                 w.set_status_ok(false);
+                w.set_game_running(false);
+                w.set_voice_label("Adam".into());
                 w.set_now_who("".into());
                 w.set_now_line("".into());
                 w.set_recent(slint::ModelRc::default());
@@ -212,6 +214,7 @@ pub fn all() -> Vec<Screen> {
                 // reading again (screen 19 left the game not running): the lime dot stays on an empty Activity
                 w.set_status_text(crate::vm::reading::STATUS_READING.into());
                 w.set_status_ok(true);
+                w.set_game_running(true);
                 w.set_log(slint::ModelRc::default());
                 page(w, Page::Activity);
             },
@@ -312,7 +315,6 @@ fn windows_voices(w: &MainWindow) {
     w.set_game_voice(0);
     w.set_voices_problem(v.problem_text().into());
     w.set_voices_desc(v.desc().into());
-    w.set_kokoro_desc(v.kokoro_desc().into());
     w.set_voice_label(v.label("").into());
     w.set_voice_testing(false);
     w.set_test_time("0:00".into());
@@ -324,7 +326,6 @@ fn no_voices(w: &MainWindow) {
     w.set_voices(slint::ModelRc::default());
     w.set_voices_problem(none.problem_text().into());
     w.set_voices_desc(none.desc().into());
-    w.set_kokoro_desc(none.kokoro_desc().into());
     w.set_voice_label(none.label("").into());
     w.set_voice_testing(false);
     w.set_test_time("0:00".into());
