@@ -206,6 +206,9 @@ pub fn all() -> Vec<Screen> {
         Screen {
             name: "17-activity-empty",
             setup: |w| {
+                // reading again (screen 19 left the game not running): the lime dot stays on an empty Activity
+                w.set_status_text(crate::vm::reading::STATUS_READING.into());
+                w.set_status_ok(true);
                 w.set_log(slint::ModelRc::default());
                 page(w, Page::Activity);
             },

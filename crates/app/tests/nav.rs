@@ -474,3 +474,34 @@ fn motion_finish_fades_the_setup_into_the_overview() {
             .is_none()
     );
 }
+
+/// The y of every text labelled `label` on screen, top to bottom.
+fn text_ys(w: &MainWindow, label: &str) -> Vec<f32> {
+    let mut ys: Vec<f32> = ElementHandle::find_by_accessible_label(w, label)
+        .map(|e| e.absolute_position().y)
+        .collect();
+    ys.sort_by(f32::total_cmp);
+    ys
+}
+
+#[test]
+fn activity_filter_keeps_only_its_rows_and_closes_the_gaps() {
+    let w = window();
+    w.set_page(Page::Overview);
+    press(&w, "Show all", AccessibleRole::Button);
+    assert_eq!(w.get_page(), Page::Activity);
+    let first = "Arthur: We need to get these horses moving before the snow buries us.";
+    let top = text_ys(&w, first)[0];
+    // All: the first "Hold E to talk" (an off prompt) is the third row, 36 px each
+    assert_eq!(text_ys(&w, "Hold E to talk")[0], top + 72.0);
+    // Skipped: the off prompt is now the first row, the repeat the second, the next off prompt the third
+    press(&w, "Skipped", AccessibleRole::Tab);
+    assert_eq!(text_ys(&w, "Hold E to talk"), [top, top + 72.0]);
+    // Read: the read rows close up (Ginseng second, Dutch third)
+    press(&w, "Read", AccessibleRole::Tab);
+    assert_eq!(text_ys(&w, "+1 Ginseng"), [top + 36.0]);
+    assert_eq!(
+        text_ys(&w, "Dutch: We ride at first light. Nobody stays behind."),
+        [top + 72.0]
+    );
+}

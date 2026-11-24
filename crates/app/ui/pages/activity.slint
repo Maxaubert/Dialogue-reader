@@ -15,10 +15,19 @@ export component ActivityTab inherits Rectangle {
     callback read-now();
     // the replay button of row i (the log, newest first)
     callback replay(int);
-    // false until the page is made: the rows fade in from it
-    property <bool> entered: false;
+    // The row fade is worked out from the clock (`animation-tick`), as in setup_part.slint: the page is made in the
+    // frame that first draws it, so an `animate` flip in `init` would already be at its end.
+    property <duration> born;
+    property <bool> done: Motion.instant;
     init => {
-        root.entered = true;
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Motion.push-gap + 5 * 30ms + Motion.page;
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
     }
     property <length> col-w: 720px;
 
@@ -94,12 +103,8 @@ export component ActivityTab inherits Rectangle {
                         rest-bg: Palette.surface-1;
                         height: self.shown ? self.natural-h : 0px;
                         visible: self.shown;
-                        opacity: root.entered ? 1 : 0;
-                        animate opacity {
-                            duration: Motion.page;
-                            delay: Motion.instant ? 0ms : Motion.push-gap + min(i, 5) * 30ms;
-                            easing: cubic-bezier(0.16, 1, 0.3, 1);
-                        }
+                        // 0 to 1 over 260 ms, 80 ms after the push starts, 30 ms per row up to the 6th; eased out
+                        opacity: root.done ? 1 : 1 - Math.pow(1 - Math.clamp((animation-tick() - root.born - Motion.push-gap - min(i, 5) * 30ms) / Math.max(1ms, Motion.page), 0, 1), 4);
                         replay => {
                             root.replay(i);
                         }

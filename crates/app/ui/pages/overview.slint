@@ -191,10 +191,12 @@ export component OverviewTab inherits Rectangle {
         }
     }
 
-    // why the saved screenshot shows (not "Live": TEXT.md drops it here): in the frame under the picture, never on it
+    // why the saved screenshot shows (not "Live": TEXT.md drops it here), never on the picture: in the frame under
+    // it, or, when the frame has no band under the picture (a wide window), at the end of the zone chip row
     if root.running && root.contain && LiveView.note != "" && !LiveView.note-live: LiveNote {
-        x: root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1;
-        y: root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2;
+        property <bool> in-band: (root.frame-h - root.stage-h) / 2 >= 30px;
+        x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - Size.ctl - Space.s4 - self.width;
+        y: self.in-band ? root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2 : root.frame-y + root.frame-h + Space.s2 + (Size.row - self.height) / 2;
     }
 
     // the zone chips (.zs) and the pencil
