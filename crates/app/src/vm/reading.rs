@@ -29,7 +29,7 @@ use dr_runtime::reader::ReaderEv;
 use dr_runtime::runtime::{Cmd, Ev, RunCfg, Runtime, Status, Target};
 use dr_runtime::speech::{self, Item};
 use dr_runtime::windows_list::WinInfo;
-use slint::{ModelRc, VecModel};
+use slint::{Model, ModelRc, VecModel};
 
 use super::{Page, Vm, best_profile};
 use crate::{Kind, LineData, MainWindow};
@@ -171,6 +171,24 @@ pub fn short_speaker(who: &str) -> String {
     let cut: String = name.chars().take(SPEAKER_MAX).collect();
     let colon = if who.ends_with(':') { ":" } else { "" };
     format!("{}...{colon}", cut.trim_end())
+}
+
+/// Most rows that slide in at once; a bigger change (a game loaded, a list cleared) just shows.
+const ARRIVE_MAX: usize = 3;
+
+/// How many rows are new at the top of a list: `new` is those rows, then the rows of `old` in the same order (the
+/// last ones may have dropped off the end). 0 when the list changed in any other way, for example a replayed line
+/// that left the middle of the list.
+pub fn arrived<T: PartialEq>(old: &[T], new: &[T]) -> usize {
+    (1..=ARRIVE_MAX.min(new.len()))
+        .find(|&k| {
+            let rest = &new[k..];
+            // every old row that is still there kept its order; a list that is all new was empty before
+            rest.len() <= old.len()
+                && rest == &old[..rest.len()]
+                && (old.is_empty() || !rest.is_empty())
+        })
+        .unwrap_or(0)
 }
 
 /// A log line as a Recent or activity row.
@@ -517,7 +535,17 @@ impl Vm {
         if n > KEEP {
             self.reading.entries.drain(..n - KEEP);
         }
+        // new lines slide in at the top of both lists (20-motion "new line")
+        let old_recent: Vec<LineData> = self.reading.recent.iter().collect();
+        let old_all: Vec<LineData> = self.reading.all.iter().collect();
         self.push_log();
+        let r = arrived(&old_recent, &self.reading.recent.iter().collect::<Vec<_>>());
+        let a = arrived(&old_all, &self.reading.all.iter().collect::<Vec<_>>());
+        if (r > 0 || a > 0)
+            && let Some(w) = self.win()
+        {
+            w.invoke_lines_arrived(r as i32, a as i32);
+        }
     }
 
     /// The Overview read list (newest first, without the line in Now) and the activity list (newest first).
@@ -873,6 +901,22 @@ impl Vm {
 mod tests {
     use super::*;
     use dr_core::ZoneKind;
+
+    #[test]
+    fn new_rows_at_the_top_are_found() {
+        // one new row on top; the rest moved down one place (and the last one may drop off the end)
+        assert_eq!(arrived(&["b", "c"], &["a", "b", "c"]), 1);
+        assert_eq!(arrived(&["b", "c"], &["a", "b"]), 1);
+        assert_eq!(arrived(&["c"], &["a", "b", "c"]), 2);
+        // the first rows of an empty list
+        assert_eq!(arrived::<&str>(&[], &["a"]), 1);
+        // a replayed line left the middle, or another game's list: no slide
+        assert_eq!(arrived(&["b", "c", "d"], &["a", "b", "d"]), 0);
+        assert_eq!(arrived(&["x", "y"], &["a", "b", "c"]), 0);
+        // a big batch just shows
+        assert_eq!(arrived(&["e"], &["a", "b", "c", "d", "e"]), 0);
+        assert_eq!(arrived::<&str>(&["a"], &[]), 0);
+    }
     use dr_runtime::speech::Line;
 
     #[test]

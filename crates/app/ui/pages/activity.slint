@@ -28,6 +28,9 @@ export component ActivityTab inherits Rectangle {
     in-out property <int> filter: 0;
     // switch game (app.slint): the list fades out and in; "Today" and the filter stay
     in property <float> text-o: 1;
+    // new lines (app.slint): the first `fresh` rows arrive (`arrive`, 0 to 1)
+    in property <int> fresh: 0;
+    in property <float> arrive: 1;
     callback back();
     // "Read now" on the empty list (app.slint: the same as Read now on the Overview)
     callback read-now();
@@ -124,7 +127,8 @@ export component ActivityTab inherits Rectangle {
                         meta: l.time;
                         replay-label: l.skip == "" ? "Replay" : "";
                         rest-bg: Palette.surface-1;
-                        height: self.shown ? self.natural-h : 0px;
+                        arrive: i < root.fresh ? root.arrive : 1;
+                        height: self.shown ? self.slot-h : 0px;
                         visible: self.shown;
                         // 0 to 1 over 260 ms, 80 ms after the push starts, 30 ms per row up to the 6th; eased out
                         opacity: root.done ? 1 : 1 - Math.pow(1 - Math.clamp((animation-tick() - root.born - Motion.push-gap - min(i, 5) * Motion.row-stagger) / Math.max(1ms, Motion.page), 0, 1), 4);

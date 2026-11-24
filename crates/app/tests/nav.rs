@@ -998,3 +998,98 @@ fn switch_crossfades(reduce: bool) {
     }
     dr_app::set_reduce_motion(None);
 }
+
+/// Puts a new line on top of the Overview read list and says so, as the view model does when a line is read.
+fn new_line(w: &MainWindow) -> String {
+    let mut rows: Vec<dr_app::LineData> = w.get_recent().iter().collect();
+    rows.insert(
+        0,
+        dr_app::LineData {
+            time: "21:31".into(),
+            kind: dr_app::Kind::Dialogue,
+            who: "Sadie:".into(),
+            line: "Let us get to work.".into(),
+            skip: "".into(),
+        },
+    );
+    w.set_recent(slint::ModelRc::new(slint::VecModel::from(rows)));
+    w.invoke_lines_arrived(1, 0);
+    "Sadie: Let us get to work.".into()
+}
+
+/// The text of a list row, and the top of the row after it.
+fn row_text(w: &MainWindow, label: &str) -> ElementHandle {
+    ElementHandle::find_by_accessible_label(w, label)
+        .find(|e| e.accessible_role() == Some(AccessibleRole::Text))
+        .unwrap_or_else(|| panic!("no row {label:?}"))
+}
+
+fn list_rows(w: &MainWindow) -> Vec<(f32, f32)> {
+    ElementHandle::find_by_element_type_name(w, "ListRow")
+        .map(|r| (r.absolute_position().y, r.size().height))
+        .collect()
+}
+
+/// 20-motion "new line": the new row fades in from 8 px above in 180 ms (ease-out), and the rows below move down
+/// by its height, smoothly.
+#[test]
+fn motion_a_new_line_slides_in_and_the_rows_below_move_down() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    settle();
+    let before = list_rows(&w);
+    let label = new_line(&w);
+    wait(10);
+    let early = list_rows(&w);
+    let (o0, y0) = (
+        row_text(&w, &label).computed_opacity(),
+        row_text(&w, &label).absolute_position().y,
+    );
+    assert!(o0 < 0.4, "{o0}");
+    // the old first row has hardly moved yet
+    assert!(
+        early[1].0 - before[0].0 < 0.4 * early[1].1,
+        "{before:?} {early:?}"
+    );
+    wait(80);
+    let mid = list_rows(&w);
+    assert!(
+        mid[1].0 > early[1].0 + 4.0,
+        "the rows below move down: {early:?} {mid:?}"
+    );
+    assert!(row_text(&w, &label).computed_opacity() > o0);
+    wait(150);
+    let end = list_rows(&w);
+    let t_end = row_text(&w, &label);
+    assert!(t_end.computed_opacity() > 0.99);
+    // the old first row moved down by the new row's own height
+    assert!(
+        (end[1].0 - (before[0].0 + end[0].1)).abs() < 1.0,
+        "{before:?} {end:?}"
+    );
+    // the new row came from above: it ends lower than it started
+    assert!(t_end.absolute_position().y > y0 + 2.0);
+}
+
+/// Under reduce motion the new row only fades (80 ms); nothing moves.
+#[test]
+fn motion_a_new_line_only_fades_under_reduce_motion() {
+    let w = window_motion(true, true);
+    w.set_page(Page::Overview);
+    settle();
+    let label = new_line(&w);
+    wait(10);
+    let early = list_rows(&w);
+    let (o0, y0) = (
+        row_text(&w, &label).computed_opacity(),
+        row_text(&w, &label).absolute_position().y,
+    );
+    assert!(o0 < 0.6, "{o0}");
+    wait(100);
+    let end = list_rows(&w);
+    let t_end = row_text(&w, &label);
+    assert!(t_end.computed_opacity() > 0.99);
+    assert_eq!(early, end, "nothing moves");
+    assert_eq!(y0, t_end.absolute_position().y);
+    dr_app::set_reduce_motion(None);
+}

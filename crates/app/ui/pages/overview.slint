@@ -208,6 +208,9 @@ export component OverviewTab inherits Rectangle {
     // one chip per kind (Rust: vm::kind_chips)
     in property <[ZoneData]> kinds;
     in property <[LineData]> recent;
+    // new lines (app.slint): the first `fresh` rows arrive (`arrive`, 0 to 1); the rows below move down
+    in property <int> fresh: 0;
+    in property <float> arrive: 1;
     in property <bool> paused: false;
     // false: the game is not running (status "Game not running"): the stage says so and the controls are off
     in property <bool> running: true;
@@ -584,7 +587,15 @@ export component OverviewTab inherits Rectangle {
                                 tag: r.skip;
                                 replay-label: r.skip == "" ? "Replay" : "";
                                 rest-bg: Palette.surface-1;
-                                visible: self.y + self.height <= list.height;
+                                arrive: i < root.fresh ? root.arrive : 1;
+                                // only whole rows show; a row pushed out by a new line fades out (140 ms)
+                                property <bool> fits: self.y + self.height <= list.height;
+                                opacity: self.fits ? 1 : 0;
+                                animate opacity {
+                                    duration: Motion.exit;
+                                    easing: cubic-bezier(0.4, 0, 1, 1);
+                                }
+                                visible: self.opacity > 0.01;
                                 replay => {
                                     root.recent-replay(i);
                                 }

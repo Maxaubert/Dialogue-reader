@@ -270,6 +270,34 @@ export component MainWindow inherits Window {
     property <float> cross-p: root.crossing ? Math.clamp((animation-tick() - root.switched-at) / Math.max(1ms, Motion.switch-in), 0, 1) : 1;
     property <float> cross-t: 1 - Math.pow(1 - root.cross-p, 4);
     property <float> text-o: root.rolling ? 1 - root.roll-out : root.cross-t;
+    // New lines (20-motion "new line", 180 ms ease-out): Rust says how many rows are new at the top of the
+    // Overview list and of the Activity list (`lines-arrived`). They come in from the clock, as Activity's rows do.
+    // (out: the tests read the last counts; they are kept under instant motion too)
+    out property <int> recent-new: 0;
+    out property <int> log-new: 0;
+    property <bool> arriving: false;
+    property <duration> arrived-at;
+    property <float> arrive-p: root.arriving ? Math.clamp((animation-tick() - root.arrived-at) / Math.max(1ms, Motion.base), 0, 1) : 1;
+    property <float> arrive-e: 1 - Math.pow(1 - root.arrive-p, 3);
+    public function lines-arrived(recent: int, log: int) {
+        root.recent-new = recent;
+        root.log-new = log;
+        if Motion.instant {
+            return;
+        }
+        root.arrived-at = animation-tick();
+        root.arriving = true;
+        arrive-end.running = false;
+        arrive-end.running = true;
+    }
+    arrive-end := Timer {
+        interval: Math.max(1ms, Motion.base);
+        running: false;
+        triggered => {
+            self.running = false;
+            root.arriving = false;
+        }
+    }
     // the last sub-page name: it stays in the strip while it fades out after the sub-page closed
     property <string> sub-name: "Settings";
     // the Zones stage grows from the Overview stage, and shrinks back (set by every move between the two)
@@ -808,6 +836,8 @@ export component MainWindow inherits Window {
                         zones <=> root.zones;
                         kinds: root.zone-kinds;
                         recent: root.recent;
+                        fresh: root.arriving ? root.recent-new : 0;
+                        arrive: root.arrive-e;
                         automatic <=> root.automatic;
                         read-key: root.read-key;
                         voice: root.voice-label;
@@ -908,6 +938,8 @@ export component MainWindow inherits Window {
                     if activity-slot.alive: ActivityTab {
                         log: root.log;
                         text-o: root.text-o;
+                        fresh: root.arriving ? root.log-new : 0;
+                        arrive: root.arrive-e;
                         back => {
                             root.close-sub();
                         }
