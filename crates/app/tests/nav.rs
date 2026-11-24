@@ -846,7 +846,7 @@ struct SwitchTrace {
     two_pictures: bool,
 }
 
-fn opacity_of(w: &MainWindow, find: &dyn Fn(&MainWindow) -> Option<ElementHandle>) -> f32 {
+fn opacity_of(w: &MainWindow, find: Find) -> f32 {
     find(w).map_or(1.0, |e| e.computed_opacity())
 }
 
@@ -856,12 +856,12 @@ fn pictures(w: &MainWindow) -> usize {
         .count()
 }
 
-/// Switches to the next game from the page shown (the game name, Down, Enter) and traces `parts` over the 240 ms.
-fn trace_switch(
-    w: &MainWindow,
-    parts: &[&dyn Fn(&MainWindow) -> Option<ElementHandle>],
-) -> SwitchTrace {
-    // from the first game, Down picks the next one
+/// Finds one element of the window (or none).
+type Find<'a> = &'a dyn Fn(&MainWindow) -> Option<ElementHandle>;
+
+/// Switches to the third game from the page shown (Ctrl K, a click on it) and traces `parts` over the 240 ms.
+fn trace_switch(w: &MainWindow, parts: &[Find]) -> SwitchTrace {
+    // from the first game
     w.set_current_game(0);
     let before = w.get_current_game();
     ctrl_k(w);

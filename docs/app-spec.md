@@ -248,8 +248,8 @@ in [overlay-spike.md](overlay-spike.md).
   uses (M4).
 - The quick menu is centered on the game (design rule). Order: Manage zones, Stop (play/pause), Mute, Voice,
   Speed, Volume, Mode, Settings, Quit (press twice). Arrows move and change, Enter selects, Esc closes.
-- Zone edit: drag on empty space adds a zone, click selects, Delete/Backspace or the small x removes, Esc or Done
-  finishes. It draws over a frozen screenshot of the game, so the zones line up even when the game moves.
+- Zone edit: drag on empty space adds a zone, click selects, a handle of the selected zone resizes it (saved on the
+  release; Esc puts it back), Delete/Backspace or the small x removes, Esc or Done finishes. It draws over a frozen screenshot of the game, so the zones line up even when the game moves.
 
 ### 2.8 Profiles and settings on disk
 

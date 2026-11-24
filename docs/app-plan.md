@@ -847,6 +847,25 @@ differs from the d-black mockups:
    Resume button, the switcher row); "Game not running." is on the Overview stage. "Stopped" and "Cannot read" were
    only in the dot's tip and are not shown in the window now.
 
+### Motion left over from the port (2026-11-24)
+
+9. New line in the read lists (Overview and Activity, 20-motion "new line"): the new row fades in from 8 px above
+   in 180 ms (ease-out) while its room grows from 0, so the rows below move down by its own height. The mockup's
+   `_build.py` uses 12 px; the task asked for 8 px, so the port uses 8. A row pushed off the Overview list fades out
+   in 140 ms. Rust tells the window how many rows are new (`lines-arrived`), only when the rest of the list kept
+   its order, at most 3 rows. A replayed line (it leaves the middle of the list) and a game change do not slide.
+   Reduce motion: only the 80 ms fade.
+10. Zone edit bar: it keeps its place until the selected box, its tag or the kind picker comes within 8 px, and
+    moves to a place (home too) only when they are 24 px clear. It goes home again only when home is also clear of
+    every zone (as the mockup's `keepBarClear`). Before, it went home as soon as the selection left home.
+11. Zone edit: the selected zone has the same 8 resize handles as Zones. A box just drawn (with the kind picker
+    under it) has none until its kind is picked. Esc from the hook during a resize puts the zone back and keeps
+    zone edit open; Delete does nothing during a resize.
+12. Switch game on Settings, Zones and Activity: the page stays; only what belongs to the game fades out (100 ms)
+    and in (140 ms): Settings the keys card and the Voice panel, Zones the zone boxes, tags and screenshot time,
+    Activity the list panel. The Zones picture crossfades over the old one, as the Overview's does. While the game
+    shows live, the old picture is the last live frame.
+
 ## After v1
 
 - Zone-only frame copies in `dr-core` to cut CPU on 4K.
