@@ -18,6 +18,7 @@ import { OverviewTab } from "pages/overview.slint";
 import { ZonesTab } from "pages/zones.slint";
 import { SettingsTab } from "pages/settings.slint";
 import { ActivityTab } from "pages/activity.slint";
+import { SetupParts } from "pages/setup_part.slint";
 import { PillPreview } from "overlays/pill.slint";
 import { GameSwitcher } from "overlays/game_switcher.slint";
 import { QuickMenuPreview } from "overlays/quick_menu_preview.slint";
@@ -298,6 +299,7 @@ export component MainWindow inherits Window {
         }
         root.fwd = true;
         root.armed = true;
+        SetupParts.armed = true;
         root.finishing = false;
         root.page = p;
     }
@@ -308,6 +310,7 @@ export component MainWindow inherits Window {
         }
         root.fwd = false;
         root.armed = true;
+        SetupParts.armed = true;
         root.finishing = false;
         root.page = p;
     }
@@ -650,7 +653,7 @@ export component MainWindow inherits Window {
                 }
 
                 overview-slot := PageSlot {
-                    morph: root.finishing;
+                    morph: root.finishing && root.page == Page.overview;
                     name: "Overview page";
                     shown: root.page == Page.overview;
                     fwd: root.fwd;

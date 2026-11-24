@@ -202,7 +202,7 @@ fn key_capture_takes_a_key_refuses_clicks_and_saves_in_settings() {
     a.vm.borrow_mut()
         .key_event(Action::Captured(Key::parse("F7").unwrap()));
     assert!(
-        a.w.get_notice().contains("quick menu key"),
+        a.w.get_notice().contains("menu key"),
         "{}",
         a.w.get_notice()
     );

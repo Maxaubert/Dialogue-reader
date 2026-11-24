@@ -109,7 +109,7 @@ component Group inherits VerticalLayout {
         // the fill of the picked row
         Rectangle {
             x: Space.s1 + 1px;
-            y: Space.s1 + 1px + Math.max(0, root.here) * Size.media;
+            y: Space.s1 + 1px + Math.clamp(root.here, 0, Math.max(0, root.rows.length - 1)) * Size.media;
             width: parent.width - 2 * Space.s1 - 2px;
             height: Size.media;
             border-radius: Radius.md;

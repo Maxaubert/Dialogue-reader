@@ -1,20 +1,36 @@
 // One part of a setup step (.sx in d-black 01-setup): it fades in with the step slide, 80 ms after the old step
 // starts to go, the parts 40 ms apart (at most 6). The page slot moves the step sideways; the part only fades.
-// With instant motion (tests, renders) it shows at once.
+// With instant motion (tests, renders), and for the page Rust shows at launch, it shows at once.
+//
+// The fade is worked out from the clock (`animation-tick`), not with `animate`: the part is made in the frame
+// that first draws it, so a property flipped after it is made is already at its end when it is drawn.
 import { Motion } from "../theme.slint";
+
+export global SetupParts {
+    // true after the first page move in the UI (app.slint `go`, `go-back`)
+    in-out property <bool> armed: false;
+}
 
 export component SetupPart inherits Rectangle {
     // the place of the part in its step, from 0
     in property <int> n: 0;
-    property <bool> shown: false;
+    property <duration> wait: Motion.push-gap + Math.min(root.n, 5) * Motion.stagger;
+    property <duration> born;
+    // the fade is over (or there is none): the clock is no longer read, so nothing redraws for it
+    property <bool> done: Motion.instant || !SetupParts.armed;
     init => {
-        root.shown = true;
+        root.born = animation-tick();
     }
-    opacity: root.shown ? 1 : 0;
-    animate opacity {
-        duration: Motion.push-in;
-        delay: Motion.push-gap + Math.min(root.n, 5) * Motion.stagger;
-        easing: cubic-bezier(0.16, 1, 0.3, 1);
+    Timer {
+        interval: root.wait + Motion.push-in;
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
     }
+
+    // 0 to 1 over the fade, eased out (close to the mockup's ease-out-strong)
+    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - root.wait) / Math.max(1ms, Motion.push-in), 0, 1);
+    opacity: 1 - Math.pow(1 - root.p, 4);
     @children
 }

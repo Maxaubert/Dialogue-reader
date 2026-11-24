@@ -674,7 +674,7 @@ impl Vm {
         }
         if let Some(w) = self.win() {
             w.set_capturing_key(-1);
-            // the refusal of a click (the click on Cancel, for one) is not news any more
+            // the refusal of a click (the click on the keycap, for one) is not news any more
             if w.get_notice().as_str() == NOTE_CLICK {
                 w.set_notice("".into());
             }
@@ -714,7 +714,7 @@ impl Vm {
                 };
                 if other.as_str() == text {
                     let msg = if which == 0 {
-                        "That key is already the quick menu key. Press another one."
+                        "That key is already the menu key. Press another one."
                     } else {
                         "That key is already the read key. Press another one."
                     };
