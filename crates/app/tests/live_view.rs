@@ -147,13 +147,13 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     assert_eq!((g.get_w(), g.get_h()), (SHOT_W as f32, SHOT_H as f32));
 
     // Zones keeps the same session
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!((s.live.starts.get(), s.live.stops.get()), (1, 0));
     assert_eq!(s.w.get_shot_info(), "Live · 1920 × 1080 · Fit to window");
 
     // Settings has no stage: it stops, and the saved screenshot is back
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     assert_eq!(s.live.stops.get(), 1);
     assert!(!s.vm.borrow().live_running());
@@ -164,7 +164,7 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
     s.arrived();
     assert!(!s.on());
 
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.live.starts.get(), 2);
     assert_eq!(
@@ -177,11 +177,11 @@ fn runs_on_pages_with_a_stage_and_stops_on_the_others() {
 fn the_page_change_alone_starts_it() {
     // no tick by hand: the `changed page` callback runs the check
     let s = open();
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     slint::platform::update_timers_and_animations();
     s.tick();
     assert!(!s.vm.borrow().live_running());
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     slint::platform::update_timers_and_animations();
     assert!(s.vm.borrow().live_running());
 }
@@ -209,7 +209,7 @@ fn a_hidden_or_minimized_app_stops_it() {
 #[test]
 fn zones_follow_a_game_that_changed_size() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     // the game now runs at 3840 x 2160: zones keep their place on the picture, in its pixels
     s.live.frame(3840, 2160, 1280, 720);
@@ -237,9 +237,9 @@ fn zones_follow_a_game_that_changed_size() {
     );
 
     // the live view stops: back to the saved 1920 x 1080 screenshot, zones with it
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     assert!(
         near(rect(&s.w, 0), [200.0, 900.0, 1500.0, 100.0]),
         "{:?}",
@@ -255,7 +255,7 @@ fn zones_follow_a_game_that_changed_size() {
 #[test]
 fn a_size_change_waits_for_the_end_of_a_drag() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -296,7 +296,7 @@ fn a_size_change_waits_for_the_end_of_a_drag() {
 #[test]
 fn a_size_change_during_a_cancelled_drag_shows_after_the_cancel() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -328,9 +328,9 @@ fn a_minimized_game_shows_the_saved_screenshot_with_a_note() {
     assert_eq!(s.note(), NOTE_MINIMIZED);
     // restored: the next try (a few seconds later) starts it; a page change tries at once
     s.live.minimized.set(false);
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     assert_eq!(s.note(), "", "no note until a frame comes");
@@ -339,7 +339,7 @@ fn a_minimized_game_shows_the_saved_screenshot_with_a_note() {
 #[test]
 fn a_closed_game_shows_the_saved_screenshot_with_a_note() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(3840, 2160, 1280, 720);
     s.arrived();
@@ -362,9 +362,9 @@ fn a_closed_game_shows_the_saved_screenshot_with_a_note() {
     );
 
     // not running when the page opens
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.note(), NOTE_CLOSED);
@@ -378,7 +378,7 @@ fn a_capture_that_fails_shows_the_saved_screenshot_with_a_note() {
     assert_eq!(s.note(), NOTE_FAILED);
     assert!(!s.on());
     // page 11 has the note in its line under the stage, and a new screenshot keeps it there
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.note(), NOTE_FAILED);
     s.w.invoke_retake_shot();
@@ -410,9 +410,9 @@ fn an_end_while_the_game_is_still_open_is_a_failure_not_a_close() {
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.note(), NOTE_FAILED);
     // a page change tries at once, and a frame brings the live picture back
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Overview", AccessibleRole::Tab);
+    go_overview(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
@@ -436,16 +436,16 @@ fn the_game_window_is_searched_off_the_ui_thread() {
     assert_eq!(*s.live.title.borrow(), "Test Game");
 
     // an answer for the page before is not used
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert_eq!(s.live.searches.borrow().len(), 1);
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     s.live.answer();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running(), "the old answer is dropped");
     assert_eq!(s.live.searches.borrow().len(), 1, "a new search runs");
@@ -454,10 +454,10 @@ fn the_game_window_is_searched_off_the_ui_thread() {
     assert!(s.vm.borrow().live_running());
 
     // a closed game: the answer has no window, and the note says so
-    press(&s.w, "Settings", AccessibleRole::Tab);
+    go_settings(&s.w);
     s.tick();
     s.live.closed.set(true);
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.answer();
     s.tick();
@@ -468,7 +468,7 @@ fn the_game_window_is_searched_off_the_ui_thread() {
 #[test]
 fn the_frames_fit_the_stage() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     // the stage reported its size when it was built (logical px times the scale factor, 1 here)
     let st = i_slint_backend_testing::ElementHandle::find_by_accessible_label(&s.w, "Screenshot")
         .next()
@@ -539,7 +539,7 @@ fn setup_page_shows_the_picked_window_live() {
 #[test]
 fn a_game_minimized_while_live_shows_the_saved_screenshot_until_it_is_back() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -572,7 +572,7 @@ fn a_note_that_the_saved_screenshot_shows_is_under_the_picture_too() {
     assert_eq!(s.note(), NOTE_MINIMIZED);
     note_under_the_picture(&s.w, NOTE_MINIMIZED);
     // page 11: in the line under the stage
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert_eq!(s.note(), NOTE_MINIMIZED);
     assert_eq!(
@@ -616,7 +616,7 @@ fn overview_pauses_while_the_app_has_no_focus_and_keeps_the_last_frame() {
 #[test]
 fn zones_keep_running_without_focus_but_overview_does_not() {
     let s = open();
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     s.live.frame(SHOT_W, SHOT_H, 640, 360);
     s.arrived();
@@ -624,12 +624,12 @@ fn zones_keep_running_without_focus_but_overview_does_not() {
     s.tick();
     assert!(s.vm.borrow().live_running(), "page 11 runs without focus");
     // to Overview while the app has no focus (the tab is pressed by the test): it pauses there
-    press(&s.w, "Overview", AccessibleRole::Tab);
+    go_overview(&s.w);
     s.tick();
     assert!(!s.vm.borrow().live_running());
     assert!(s.on(), "the last frame stays");
     // back to Zones: it runs again
-    press(&s.w, "Zones", AccessibleRole::Tab);
+    go_zones(&s.w);
     s.tick();
     assert!(s.vm.borrow().live_running());
     dr_app::focus_gained(&s.vm);

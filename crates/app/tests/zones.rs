@@ -41,7 +41,7 @@ fn draw_select_resize_delete_and_kind() {
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
     assert_eq!(w.get_page(), Page::Overview);
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     assert_eq!(w.get_page(), Page::Zones);
     assert_eq!(w.get_zones().row_count(), 1);
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
@@ -133,7 +133,7 @@ fn typed_rename_is_one_change_and_one_undo_step() {
     let (_dir, paths) = temp_paths();
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     w.invoke_zone_select(0);
     w.set_zones_selected(0);
     let f = name_field(&w);
@@ -178,7 +178,7 @@ fn typed_rename_is_saved_when_another_zone_is_clicked() {
     let (_dir, paths) = temp_paths();
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     w.invoke_zone_rename(0, "Lines".into());
     // a click on the stage (empty space) commits it before anything else
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
@@ -186,7 +186,7 @@ fn typed_rename_is_saved_when_another_zone_is_clicked() {
     assert_eq!(on_disk(&paths).zones[0].name, "Lines");
     // a tab change (the field goes away with no focus event) saves it too
     w.invoke_zone_rename(0, "Speech".into());
-    press(&w, "Overview", AccessibleRole::Tab);
+    go_overview(&w);
     assert_eq!(on_disk(&paths).zones[0].name, "Speech");
 }
 
@@ -195,7 +195,7 @@ fn delete_while_dragging_a_zone_does_not_crash() {
     let (_dir, paths) = temp_paths();
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     press(&w, "Select", AccessibleRole::Tab);
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     let win = w.window();
@@ -279,7 +279,7 @@ fn tool_choice_survives_other_actions() {
     let (_dir, paths) = temp_paths();
     saved(&paths);
     let (w, _vm) = real_window(&paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     press(&w, "Draw zone", AccessibleRole::Tab);
     assert!(w.get_zones_draw());
     // picking a kind, clicking a row and switching a zone keep the draw tool

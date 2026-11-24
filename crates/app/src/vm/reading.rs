@@ -44,7 +44,7 @@ pub const RECENT: usize = 5;
 
 pub const STATUS_READING: &str = "Reading";
 pub const STATUS_PAUSED: &str = "Paused";
-pub const STATUS_NO_WINDOW: &str = "Not running";
+pub const STATUS_NO_WINDOW: &str = "Game not running";
 pub const STATUS_STOPPED: &str = "Stopped";
 pub const STATUS_ERROR: &str = "Cannot read";
 
@@ -151,12 +151,26 @@ fn kind_of(name: &str) -> Kind {
     }
 }
 
+/// Speaker names longer than this are cut with "..." in the list rows, so the grey name always fits on the
+/// first line of a two-line row (ui/components/base.slint, ListRow).
+pub const SPEAKER_MAX: usize = 20;
+
+/// The speaker name as a list row shows it: at most [`SPEAKER_MAX`] characters, then "...".
+pub fn short_speaker(who: &str) -> String {
+    let who = who.trim();
+    if who.chars().count() <= SPEAKER_MAX {
+        return who.to_string();
+    }
+    let cut: String = who.chars().take(SPEAKER_MAX).collect();
+    format!("{}...", cut.trim_end())
+}
+
 /// A log line as a Recent or activity row.
 pub fn row(e: &Entry) -> LineData {
     LineData {
         time: activity::local_time(e.t).into(),
         kind: kind_of(&e.kind),
-        who: e.who.as_str().into(),
+        who: short_speaker(&e.who).into(),
         line: e.text.as_str().into(),
         skip: e.skip.map_or("", Skip::text).into(),
     }
@@ -761,6 +775,19 @@ mod tests {
     use super::*;
     use dr_core::ZoneKind;
     use dr_runtime::speech::Line;
+
+    #[test]
+    fn long_speaker_names_are_cut() {
+        assert_eq!(short_speaker("Arthur"), "Arthur");
+        assert_eq!(
+            short_speaker(&"x".repeat(SPEAKER_MAX)),
+            "x".repeat(SPEAKER_MAX)
+        );
+        assert_eq!(
+            short_speaker("Third Officer of the Royal Guard"),
+            "Third Officer of the..."
+        );
+    }
 
     fn item(lines: Vec<Line>) -> Item {
         let text = lines

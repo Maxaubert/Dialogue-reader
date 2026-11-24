@@ -83,6 +83,9 @@ impl Overlays {
                 "overlay windows not made".into(),
             ));
         };
+        crate::fonts::style_window!(pill);
+        crate::fonts::style_window!(menu);
+        crate::fonts::style_window!(zones);
         let voices = Rc::new(VecModel::default());
         let edit_zones = Rc::new(VecModel::default());
         menu.set_voices(ModelRc::from(voices.clone()));

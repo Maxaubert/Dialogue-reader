@@ -1,63 +1,75 @@
-// Midnight design tokens (design/mockups/c-midnight/tokens.css) as Slint globals.
-// Colors with alpha use 8-digit hex (#RRGGBBAA).
+// d-black design tokens (design/mockups/d-black/tokens.css) as Slint globals.
+// Colors with alpha use 8-digit hex (#RRGGBBAA). Neutral greys only (r = g = b). White means "on".
+// Lime (`live`) is only for live things: the status dot, the waveform, the live zone outline and the pill dot.
 
 export global Palette {
-    out property <color> bg: #07090E;
-    out property <color> surface: #0C1018;
-    out property <color> surface-2: #121825;
-    out property <color> surface-3: #1A2232;
-    out property <color> line: #1C2331;
-    out property <color> line-2: #283143;
-    out property <color> scrim: #030509A8;
-    out property <color> text: #EDF0F6;
-    out property <color> text-2: #A2ABBC;
-    out property <color> text-3: #7F899D;
-    out property <color> accent: #5B7CFF;
-    out property <color> accent-soft: #5B7CFF2E;
-    out property <color> accent-ring: #5B7CFF73;
-    out property <color> ok: #4ADE80;
-    out property <color> ok-soft: #4ADE801F;
-    out property <color> danger: #F87171;
-    out property <color> pill-bg: #07090EDB;
-    out property <color> pill-line: #FFFFFF1A;
-    // text and marks drawn on the accent color, the white knobs and handles
-    out property <color> on-accent: #FFFFFF;
-    out property <color> knob: #FFFFFF;
-    // dark text on the grey zone tags of the stage
-    out property <color> on-tag: #07090E;
-    // behind the game picture (shows only while it loads or at its edges)
-    out property <color> stage-bg: #0E141E;
-    // bottom edge of the big keycap (04-read-key-d)
-    out property <color> keycap-edge: #05070B;
+    // d-black tokens
+    out property <color> bg: #000000;
+    out property <color> surface-1: #0A0A0A;
+    out property <color> surface-2: #121212;
+    out property <color> surface-3: #1A1A1A;
+    out property <color> line: #FFFFFF14;
+    out property <color> line-2: #FFFFFF24;
+    out property <color> text: #F2F2F2;
+    out property <color> text-2: #9A9A9A;
+    // off but readable rows ("Hold E to talk")
+    out property <color> text-3: #808080;
+    // disabled controls only
+    out property <color> text-off: #5C5C5C;
+    out property <color> on: #FFFFFF;
+    out property <color> on-ink: #000000;
+    // the primary pill on hover
+    out property <color> on-hover: #E6E6E6;
+    out property <color> live: #C5FA09;
+    out property <color> danger: #F0867E;
     // window close button on hover (the Windows red)
+    out property <color> close-hover: #C42B1C;
+    // floating panels (switcher, quick menu, hover cards) are opaque, with a 1 px white 10% border
+    out property <color> float: #0A0A0A;
+    out property <color> float-line: #FFFFFF1A;
+    // the black keyline around zone outlines, so they hold on bright games (30% on dimmed zones)
+    out property <color> keyline: #00000099;
+    out property <color> keyline-dim: #0000004D;
+    out property <color> scrim: #00000099;
+    // focus ring
+    out property <color> focus: #FFFFFF99;
+
+    // Older names, kept so the pages that are not ported yet still compile. Do not use them in new code.
+    out property <color> surface: #0A0A0A;
+    out property <color> accent: #FFFFFF;
+    out property <color> accent-soft: #FFFFFF1F;
+    out property <color> accent-ring: #FFFFFF59;
+    out property <color> ok: #C5FA09;
+    out property <color> ok-soft: #C5FA091F;
+    out property <color> pill-bg: #0A0A0AF5;
+    out property <color> pill-line: #FFFFFF1A;
+    out property <color> on-accent: #000000;
+    out property <color> knob: #FFFFFF;
+    out property <color> on-tag: #000000;
+    out property <color> stage-bg: #0A0A0A;
+    out property <color> keycap-edge: #000000;
     out property <color> win-close: #C42B1C;
-    // quit row in the quick menu: red wash and dimmed red text
-    out property <color> danger-soft: #F871711A;
-    out property <color> danger-dim: #F87171CC;
-    // surface at zero alpha, the start of a fade to the card color
-    out property <color> surface-clear: #0C101800;
-    // accent wash from the left on the main key card (04-read-key-d)
-    out property <color> accent-wash: #5B7CFF1A;
-    out property <color> accent-wash-mid: #5B7CFF05;
-    out property <color> accent-clear: #5B7CFF00;
-    // zone edit (16): shade outside the zones, zone outline, selection and the box being drawn
-    out property <color> edit-shade: #05070B57;
-    out property <color> edit-line: #EDF0F69E;
-    out property <color> edit-sel-fill: #5B7CFF24;
-    out property <color> edit-sel-ring: #5B7CFF38;
-    out property <color> edit-draft-line: #5B7CFF80;
-    out property <color> edit-draft-fill: #5B7CFF0D;
-    // text-2 as text, for colors inside @markdown strings (Slint cannot print a color).
-    // tests/tokens.rs checks that it equals text-2.
-    out property <string> text-2-hex: "#A2ABBC";
-    // overlay panels (quick menu, zone edit)
-    out property <color> panel: #0A0D14;
-    out property <color> canvas: #05070B;
-    // zones on every stage are grey: line text-2, fill zone-fill, tag text-2; the selected zone uses the accent.
-    // Zone kinds carry no color anywhere (Max, 2026-11-22): one grey line icon per kind.
-    out property <color> zone-fill: #A2ABBC24;
+    out property <color> danger-soft: #F0867E1A;
+    out property <color> danger-dim: #F0867ECC;
+    out property <color> surface-clear: #0A0A0A00;
+    out property <color> accent-wash: #FFFFFF0D;
+    out property <color> accent-wash-mid: #FFFFFF03;
+    out property <color> accent-clear: #FFFFFF00;
+    // zone edit: shade (flat black 45%), outline, selection and the box being drawn
+    out property <color> edit-shade: #00000073;
+    out property <color> edit-line: #F2F2F29E;
+    out property <color> edit-sel-fill: #FFFFFF14;
+    out property <color> edit-sel-ring: #FFFFFF38;
+    out property <color> edit-draft-line: #FFFFFFB3;
+    out property <color> edit-draft-fill: #FFFFFF0D;
+    // text-2 as text, for colors inside @markdown strings (Slint cannot print a color)
+    out property <string> text-2-hex: "#9A9A9A";
+    out property <color> panel: #0A0A0A;
+    out property <color> canvas: #000000;
+    out property <color> zone-fill: #9A9A9A24;
 }
 
+// Spacing snaps to 4, 8, 12, 16, 24 (and 32, 48 for page margins).
 export global Space {
     out property <length> s1: 4px;
     out property <length> s2: 8px;
@@ -68,69 +80,132 @@ export global Space {
     out property <length> s7: 48px;
 }
 
+// Radii are 6, 8, 10 or full only.
 export global Radius {
-    out property <length> xs: 4px;
     out property <length> sm: 6px;
     out property <length> md: 8px;
-    out property <length> lg: 12px;
+    out property <length> lg: 10px;
     out property <length> pill: 999px;
+    // older name, kept for the pages not ported yet
+    out property <length> xs: 6px;
 }
 
 export global Size {
-    out property <length> ctl: 32px;
-    out property <length> ctl-lg: 40px;
-    out property <length> bar: 52px;
+    // rows: settings rows 44, list rows 36, rows with a picture (switcher) 48
     out property <length> row: 44px;
+    out property <length> list: 36px;
+    out property <length> media: 48px;
+    // buttons, fields, segmented controls
+    out property <length> ctl: 32px;
+    // the title strip
+    out property <length> strip: 40px;
     out property <length> icon: 16px;
+    out property <length> icon-lg: 18px;
     out property <length> icon-sm: 12px;
+    // keycaps (Keycap): 28, small 24
+    out property <length> keycap: 28px;
+    out property <length> keycap-sm: 24px;
+    // the setup column and the page margin
+    out property <length> col: 960px;
+    out property <length> page-x: 24px;
+    out property <length> page-max: 1376px;
+    // older names, kept for the pages not ported yet
+    out property <length> ctl-lg: 32px;
+    out property <length> bar: 40px;
     out property <length> kbd: 24px;
     out property <length> kbd-sm: 20px;
-    out property <length> col: 960px;
-    out property <length> page-x: 32px;
-    out property <length> page-max: 1376px;
 }
 
+// Type. The font is "Segoe UI Variable Text" (Windows 11). When it is missing, Rust sets Geist (src/fonts.rs).
+// Slint takes one family name, not a CSS list, and a missing family falls back to an Arial-like font.
 export global Type {
-    out property <length> fs1: 12px;
-    out property <length> fs2: 14px;
-    out property <length> fs3: 16px;
-    out property <length> fs4: 20px;
-    out property <length> fs5: 32px;
-    out property <string> font: "Geist";
-    out property <string> mono: "Geist Mono";
-    // Font weights (Geist and Geist Mono are variable fonts, so these are exact). The mockup shots look heavier
-    // because Chromium draws text with ClearType and extra contrast; Slint draws grayscale coverage. That makes
-    // all text, at every weight, about 15 to 30% lighter in ink. It is not a weight problem (README, Fonts).
+    in-out property <string> font: "Segoe UI Variable Text";
+    // keycaps: Cascadia Mono, or Geist Mono when it is missing
+    in-out property <string> mono: "Cascadia Mono";
+    // the font's own line height in em (Segoe UI Variable about 1.35, Geist 1.3): the lhf-* factors use it
+    in-out property <float> natural: 1.35;
+    // the d-black scale (tokens.css, Slint weights)
+    out property <length> fs-title: 26px;
+    out property <length> fs-hero: 20px;
+    out property <length> fs-body: 14px;
+    out property <length> fs-small: 12.5px;
+    out property <int> w-title: 600;
+    out property <int> w-hero: 500;
+    out property <int> w-body: 500;
+    out property <int> w-small: 500;
+    // headings, buttons, the game name
+    out property <int> w-strong: 600;
+    out property <length> ls-title: -0.4px;
+    // CSS line boxes as Text heights: body 20, small 17, hero 27, title 35
+    out property <length> lh-body: 20px;
+    out property <length> lh-small: 17px;
+    out property <length> lh-hero: 27px;
+    out property <length> lh-title: 35px;
     out property <int> w-regular: 400;
     out property <int> w-medium: 500;
     out property <int> w-semibold: 600;
-    // CSS line boxes (font size x line height), used as Text heights so blocks stack as in the mockups
+    // Text line-height-factor is relative to the font's natural line height. lhf-N gives CSS line-height N / 100.
+    out property <float> lhf-115: 1.15 / self.natural;
+    out property <float> lhf-140: 1.4 / self.natural;
+    out property <float> lhf-143: 1.43 / self.natural;
+    out property <float> lhf-145: 1.45 / self.natural;
+    out property <float> lhf-150: 1.5 / self.natural;
+    // older names, kept for the pages not ported yet
+    out property <length> fs1: 12.5px;
+    out property <length> fs2: 14px;
+    out property <length> fs3: 16px;
+    out property <length> fs4: 20px;
+    out property <length> fs5: 26px;
     out property <length> lh1: 17px;
     out property <length> lh2: 20px;
     out property <length> lh3: 23px;
-    // Text line-height-factor is relative to Geist's natural line height (1.3 em: ascent + descent, no gap).
-    // lhf-N gives CSS line-height N / 100, so lhf-140 = 1.4 / 1.3.
-    out property <float> lhf-115: 0.8846;
-    out property <float> lhf-140: 1.0769;
-    out property <float> lhf-145: 1.1154;
-    out property <float> lhf-150: 1.1538;
-    // letter spacing: page headings (fs5, -0.025em), key card titles (18 px, -0.01em),
-    // quick menu title (-0.01em), small caps labels in the quick menu (0.06em), arrow key hints
-    out property <length> ls-display: -0.8px;
+    out property <length> ls-display: -0.4px;
     out property <length> ls-card-title: -0.18px;
     out property <length> ls-menu-title: -0.15px;
     out property <length> ls-caps: 0.66px;
     out property <length> ls-arrows: 2px;
 }
 
-// Shadows (tokens.css --shadow-1 and --shadow-pop). The software renderer draws none; the real window does.
+// One soft drop shadow for floating panels (no spread in Slint). The software renderer draws none.
 export global Shadow {
     out property <length> low-y: 1px;
     out property <length> low-blur: 2px;
     out property <color> low-color: #00000066;
-    out property <length> pop-y: 16px;
-    out property <length> pop-blur: 40px;
-    out property <color> pop-color: #0000008C;
+    out property <length> pop-y: 8px;
+    out property <length> pop-blur: 24px;
+    out property <color> pop-color: #00000099;
+}
+
+// Motion tokens (tokens.css, brief section 3 and the decided page push). Every `animate` reads them.
+// Slint has no easing property type, so easings are written where they are used. Their names:
+//   ease-out        cubic-bezier(0.2, 0.7, 0.2, 1)
+//   ease-out-strong cubic-bezier(0.16, 1, 0.3, 1)
+//   ease-in         cubic-bezier(0.4, 0, 1, 1)
+export global Motion {
+    // true: every animation is instant (headless tests and screen renders, where time does not run)
+    in-out property <bool> instant: false;
+    out property <duration> fast: self.instant ? 0ms : 120ms;
+    out property <duration> base: self.instant ? 0ms : 180ms;
+    out property <duration> page: self.instant ? 0ms : 260ms;
+    out property <duration> exit: self.instant ? 0ms : 140ms;
+    out property <duration> stagger: self.instant ? 0ms : 40ms;
+    out property <duration> glide: self.instant ? 0ms : 360ms;
+    // page push: forward out 100 then in 260 after 80; back out 120 then in 200 after 80
+    out property <duration> push-out: self.instant ? 0ms : 100ms;
+    out property <duration> push-in: self.instant ? 0ms : 260ms;
+    out property <duration> back-out: self.instant ? 0ms : 120ms;
+    out property <duration> back-in: self.instant ? 0ms : 200ms;
+    out property <duration> push-gap: self.instant ? 0ms : 80ms;
+    // switch game: 240 ms in all, out 100 then in 140
+    out property <duration> switch-out: self.instant ? 0ms : 100ms;
+    out property <duration> switch-in: self.instant ? 0ms : 140ms;
+    // title strip swap: out 80, in 160 after 80
+    out property <duration> swap-out: self.instant ? 0ms : 80ms;
+    out property <duration> swap-in: self.instant ? 0ms : 160ms;
+    // hover delay of the tips and of the full-row hover card
+    out property <duration> hover-delay: self.instant ? 0ms : 200ms;
+    // press scale of every pressable item
+    out property <float> press: 0.97;
 }
 
 // How the window is drawn. `software` is set by the headless renderer (src/screens.rs): the software renderer
@@ -142,6 +217,14 @@ export global Render {
 export enum Kind { dialogue, speaker, pickups, prompts, ignore }
 
 export global Kinds {
+    // tooltips of the kind buttons (TEXT.md)
+    public pure function tip(k: Kind) -> string {
+        if k == Kind.dialogue { return "Spoken lines"; }
+        if k == Kind.speaker { return "Who is talking"; }
+        if k == Kind.pickups { return "Item pop-ups"; }
+        if k == Kind.prompts { return "Button hints"; }
+        return "Never read";
+    }
     public pure function name(k: Kind) -> string {
         if k == Kind.dialogue { return "Dialogue"; }
         if k == Kind.speaker { return "Speaker"; }

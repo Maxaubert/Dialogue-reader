@@ -30,6 +30,8 @@ export component ZonesTab inherits Rectangle {
     callback rename-done(bool);
     callback kind-picked(Kind);
     callback retake();
+    // "Done": back to the Overview (app.slint)
+    callback done();
 
     HorizontalLayout {
         Rectangle {

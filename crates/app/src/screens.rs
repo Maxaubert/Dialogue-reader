@@ -298,6 +298,8 @@ impl HeadlessRenderer {
 pub fn render_all(out: &Path) -> Result<Vec<PathBuf>, String> {
     std::fs::create_dir_all(out).map_err(|e| format!("cannot create {}: {e}", out.display()))?;
     let r = HeadlessRenderer::install(WIDTH, HEIGHT)?;
+    // no clock runs between the renders: every page and control shows its end state at once
+    crate::fonts::set_instant_motion(true);
     let w = crate::build_main_window().map_err(|e| e.to_string())?;
     // the software renderer cannot clip to rounded corners: paint them with CornerMask
     w.global::<Render>().set_software(true);

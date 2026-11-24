@@ -87,6 +87,8 @@ export component ActivityTab inherits Rectangle {
     in property <[LineData]> log;
     in-out property <int> filter: 0;
     callback back();
+    // "Read now" on the empty list (app.slint: the same as Read now on the Overview)
+    callback read-now();
     VerticalLayout {
         padding: Space.s5;
         Card {

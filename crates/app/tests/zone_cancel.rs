@@ -64,7 +64,7 @@ fn button(w: &MainWindow, s: &StageAt, at: (f32, f32), b: PointerEventButton, do
 fn zones_tab(paths: &Paths) -> (MainWindow, dr_app::vm::Shared, StageAt) {
     saved(paths);
     let (w, vm) = real_window(paths, FakeDesktop::new());
-    press(&w, "Zones", AccessibleRole::Tab);
+    go_zones(&w);
     let s = stage(&w, SHOT_W as f32, SHOT_H as f32);
     (w, vm, s)
 }

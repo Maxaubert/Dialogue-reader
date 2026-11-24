@@ -20,6 +20,8 @@ export component VoicePage inherits Rectangle {
     callback test();
     callback stop-test();
     callback add-voices();
+    // the play button of a voice row: picks that voice and plays a sample (app.slint)
+    callback sample(int);
     // the Volume slider moved (a playing sample follows it)
     callback volume-moved();
     VerticalLayout {

@@ -9,6 +9,7 @@ pub mod crash;
 #[cfg(windows)]
 pub mod dialogs;
 pub mod fake;
+pub mod fonts;
 pub mod geom;
 pub mod overlay;
 pub mod screens;
@@ -21,6 +22,8 @@ pub mod vm;
 /// The workspace version (Cargo.toml `[workspace.package]`): `--version`, Settings > Updates, the installer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub use fonts::set_instant_motion;
+
 /// The main window with the fake data of the mockups (render-screens and the screen and nav tests).
 pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
     build_window(vm::Source::Fake).map(|(w, _)| w)
@@ -30,6 +33,8 @@ pub fn build_main_window() -> Result<MainWindow, slint::PlatformError> {
 /// window (the callbacks hold it too).
 pub fn build_window(source: vm::Source) -> Result<(MainWindow, vm::Shared), slint::PlatformError> {
     let w = MainWindow::new()?;
+    // the font of this PC, and instant motion in headless tests and renders (src/fonts.rs)
+    fonts::style_window!(w);
     let vm = vm::install(&w, source);
     wire(&w, &vm);
     Ok((w, vm))

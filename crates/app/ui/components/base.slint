@@ -1,8 +1,10 @@
-// Shared building blocks (tokens.css: .btn, .kbd, .toggle, .seg, .radio, .slider, .card, .count, .dot, .status, .itile).
-import { Palette, Render, Shadow, Space, Radius, Size, Type, Icons, Art, Kind, Kinds } from "../theme.slint";
+// Shared building blocks of the d-black design (design/mockups/d-black/tokens.css: .btn, .iconbtn, .toggle, .seg,
+// .slider, .kbd, .panel, .srow, .lrow, .tag, .zi, .sdot, .tip, .wave).
+// Every pressable item scales to 0.97 on press. Hover and press colours fade 120 ms (Motion.fast).
+import { Palette, Render, Shadow, Space, Radius, Size, Type, Motion, Icons, Art, Kind, Kinds } from "../theme.slint";
 
 export component Icon inherits Image {
-    in property <color> color: Palette.text-3;
+    in property <color> color: Palette.text-2;
     width: Size.icon;
     height: Size.icon;
     colorize: root.color;
@@ -12,7 +14,7 @@ export component Icon inherits Image {
 // Icon centered on the cross axis of a HorizontalLayout.
 export component CIcon inherits VerticalLayout {
     in property <image> source;
-    in property <color> color: Palette.text-3;
+    in property <color> color: Palette.text-2;
     in property <length> size: Size.icon;
     alignment: center;
     Icon {
@@ -23,10 +25,10 @@ export component CIcon inherits VerticalLayout {
     }
 }
 
-// Text with the app defaults. Height is the CSS line box, so blocks stack as in the mockups.
+// Text with the app defaults.
 export component Label inherits Text {
     color: Palette.text;
-    font-size: Type.fs2;
+    font-size: Type.fs-body;
     vertical-alignment: center;
     overflow: elide;
 }
@@ -81,13 +83,13 @@ export component CornerMask {
     }
 }
 
-// Game art with rounded corners. `behind` is the color around it (used by the mask in software renders only).
-// A game picture: `picture` when set (a real screenshot), else the fake art named by `art`.
+// A game picture with rounded corners: `picture` when set (a real screenshot), else the fake art named by `art`.
+// `behind` is the color around it (used by the mask in software renders only).
 export component Thumb {
     in property <string> art: "rdr2";
     in property <image> picture;
     in property <length> radius: Radius.sm;
-    in property <color> behind: Palette.surface;
+    in property <color> behind: Palette.surface-1;
     Rectangle {
         width: 100%;
         height: 100%;
@@ -109,6 +111,60 @@ export component Thumb {
     }
 }
 
+// A tooltip bubble (.tip) at a fixed place. Place it yourself and drive `shown` (it fades 120 ms after
+// Motion.hover-delay). For a tip that follows the pointer, use Slint's own `Tooltip` element (IconButton does).
+export component Tip inherits Rectangle {
+    in property <string> text;
+    in property <bool> shown;
+    width: tip-text.preferred-width + 2 * Space.s2 + 2px;
+    height: 26px;
+    border-radius: Radius.md;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.surface-2;
+    drop-shadow-offset-y: Shadow.pop-y;
+    drop-shadow-blur: Shadow.pop-blur;
+    drop-shadow-color: Shadow.pop-color;
+    opacity: root.shown ? 1 : 0;
+    visible: self.opacity > 0.01;
+    animate opacity {
+        duration: Motion.fast;
+        delay: root.shown ? Motion.hover-delay : 0ms;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    tip-text := Text {
+        text: root.text;
+        font-size: Type.fs-small;
+        color: Palette.text;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        // the tip says what the control's label already says
+        accessible-role: none;
+    }
+}
+
+// The tooltip style for Slint's `Tooltip` element (pointer tips after 500 ms): one styled Rectangle.
+component TipBody inherits Rectangle {
+    in property <string> text;
+    border-radius: Radius.md;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    background: Palette.surface-2;
+    HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: Space.s2;
+        padding-top: Space.s1;
+        padding-bottom: Space.s1;
+        Text {
+            text: root.text;
+            font-size: Type.fs-small;
+            color: Palette.text;
+            accessible-role: none;
+        }
+    }
+}
+
+// Old small keycap (switcher "Ctrl K", hints). New code uses Keycap.
 export component Kbd inherits Rectangle {
     in property <string> text;
     in property <bool> small: false;
@@ -128,16 +184,91 @@ export component Kbd inherits Rectangle {
         Text {
             text: root.text;
             font-family: Type.mono;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
+            font-size: Type.fs-small;
+            font-weight: Type.w-regular;
             color: root.fg;
             vertical-alignment: center;
         }
     }
 }
 
+// A key as a keycap (.kbd): Cascadia Mono 12.5, 28 px high (small: 24). A click starts key capture
+// (`clicked`); while `capturing` it says "Press a key" and its border pulses (900 ms, both ways).
+export component Keycap inherits Rectangle {
+    in property <string> text;
+    in property <bool> small: false;
+    in property <bool> capturing: false;
+    in property <bool> enabled: true;
+    // the tooltip ("Click to change"); empty: none
+    in property <string> tip;
+    // the accessible label; the key name by default
+    in property <string> label: root.text;
+    callback clicked();
+    property <bool> pulse-hi: true;
+    height: root.small ? Size.keycap-sm : Size.keycap;
+    min-width: self.height;
+    horizontal-stretch: 0;
+    border-radius: Radius.sm;
+    border-width: 1px;
+    border-color: root.capturing ? (root.pulse-hi ? Palette.on : Palette.on.with-alpha(0.4)) : Palette.line-2;
+    background: touch.has-hover && root.enabled ? Palette.surface-3 : Palette.surface-2;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    animate border-color {
+        duration: root.capturing ? (Motion.instant ? 0ms : 900ms) : Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: root.capturing ? "Press a key" : root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+    Timer {
+        interval: 900ms;
+        running: root.capturing && !Motion.instant;
+        triggered => {
+            root.pulse-hi = !root.pulse-hi;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: (root.small ? Space.s2 : Space.s3) - 1px;
+        padding-right: (root.small ? Space.s2 : Space.s3) - 1px;
+        alignment: center;
+        Text {
+            text: root.capturing ? "Press a key" : root.text;
+            font-family: root.capturing ? Type.font : Type.mono;
+            font-size: Type.fs-small;
+            font-weight: Type.w-regular;
+            color: root.capturing ? Palette.text-2 : (root.enabled ? Palette.text : Palette.text-off);
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    if root.tip != "": Tooltip {
+        TipBody {
+            text: root.tip;
+        }
+    }
+}
+
 export enum BtnKind { default, primary, ghost, danger }
 
+// A button (.btn). default: secondary (surface-2 with a hairline); primary: the white pill; ghost: no fill until
+// hover; danger: red text. `large` is an older name and draws the same 32 px button.
 export component Button inherits Rectangle {
     in property <string> text;
     in property <image> icon;
@@ -147,22 +278,29 @@ export component Button inherits Rectangle {
     in property <bool> large: false;
     in property <bool> icon-only: false;
     in property <string> label: root.text;
+    // a tooltip after 500 ms on hover; empty: none
+    in property <string> tip;
     in property <length> icon-size: Size.icon;
-    in property <length> pad-x: root.large ? Space.s4 : Space.s3;
-    in property <color> fg: root.kind == BtnKind.primary ? Palette.bg : root.kind == BtnKind.ghost ? Palette.text-2 : root.kind == BtnKind.danger ? Palette.danger : Palette.text;
-    in property <color> icon-color: root.fg;
+    in property <length> pad-x: root.kind == BtnKind.primary ? Space.s4 : Space.s3;
+    in property <color> fg: !root.enabled ? Palette.text-off : root.kind == BtnKind.primary ? Palette.on-ink : root.kind == BtnKind.danger ? Palette.danger : Palette.text;
+    in property <color> icon-color: root.kind == BtnKind.primary || root.kind == BtnKind.danger || !root.enabled ? root.fg : Palette.text-2;
     in property <LayoutAlignment> align: center;
-    // false: dimmed, and a click does nothing
+    // false: grey, and a click does nothing
     in property <bool> enabled: true;
     callback clicked();
-    height: root.large ? Size.ctl-lg : Size.ctl;
-    opacity: root.enabled ? 1 : 0.4;
+    out property <bool> has-hover: touch.has-hover;
+    height: Size.ctl;
     min-width: root.icon-only ? self.height : 0px;
     horizontal-stretch: 0;
-    border-radius: Radius.md;
+    border-radius: root.kind == BtnKind.primary ? Radius.pill : Radius.md;
     border-width: 1px;
-    border-color: root.kind == BtnKind.primary ? Palette.text : root.kind == BtnKind.default ? Palette.line-2 : transparent;
-    background: root.kind == BtnKind.primary ? Palette.text : root.kind == BtnKind.default ? (touch.has-hover ? Palette.surface-3 : Palette.surface-2) : (touch.has-hover ? Palette.surface-2 : transparent);
+    border-color: !root.enabled ? (root.kind == BtnKind.primary ? Palette.surface-2 : root.kind == BtnKind.default ? Palette.line : transparent) : root.kind == BtnKind.primary ? (touch.has-hover ? Palette.on-hover : Palette.on) : root.kind == BtnKind.default ? (touch.has-hover ? Palette.line-2 : Palette.line) : transparent;
+    background: !root.enabled ? (root.kind == BtnKind.primary ? Palette.surface-2 : transparent) : root.kind == BtnKind.primary ? (touch.has-hover ? Palette.on-hover : Palette.on) : root.kind == BtnKind.default ? (touch.pressed || touch.has-hover ? Palette.surface-3 : Palette.surface-2) : (touch.pressed ? Palette.surface-3 : touch.has-hover ? Palette.surface-2 : transparent);
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, border-color, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
     accessible-role: button;
     accessible-label: root.label;
     accessible-enabled: root.enabled;
@@ -172,8 +310,8 @@ export component Button inherits Rectangle {
         }
     }
     HorizontalLayout {
-        padding-left: root.icon-only ? 0px : root.pad-x + 1px;
-        padding-right: root.icon-only ? 0px : root.pad-x + 1px;
+        padding-left: root.icon-only ? 0px : root.pad-x - 1px;
+        padding-right: root.icon-only ? 0px : root.pad-x - 1px;
         spacing: Space.s2;
         alignment: root.icon-only ? LayoutAlignment.center : root.align;
         if root.icon.width > 0: CIcon {
@@ -184,8 +322,8 @@ export component Button inherits Rectangle {
         if root.text != "": Text {
             text: root.text;
             color: root.fg;
-            font-size: Type.fs2;
-            font-weight: Type.w-medium;
+            font-size: Type.fs-body;
+            font-weight: Type.w-strong;
             vertical-alignment: center;
         }
         if root.kbd != "": VerticalLayout {
@@ -207,69 +345,212 @@ export component Button inherits Rectangle {
             root.clicked();
         }
     }
+
+    if root.tip != "": Tooltip {
+        TipBody {
+            text: root.tip;
+        }
+    }
 }
 
+// An icon button (.iconbtn): 32 x 32 (small: 28), grey icon, white on hover. `tip` is its tooltip and, unless
+// `label` is set, its accessible label too.
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> tip;
+    in property <string> label: root.tip;
+    in property <bool> small: false;
+    in property <bool> enabled: true;
+    // drawn as on (white icon), for example a tool that is picked
+    in property <bool> on: false;
+    in property <length> icon-size: Size.icon;
+    callback clicked();
+    out property <bool> has-hover: touch.has-hover;
+    width: root.small ? 28px : Size.ctl;
+    height: root.small ? 28px : Size.ctl;
+    border-radius: Radius.md;
+    background: !root.enabled ? transparent : touch.pressed ? Palette.surface-3 : touch.has-hover || root.on ? Palette.surface-2 : transparent;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+    Icon {
+        source: root.icon;
+        width: root.icon-size;
+        height: root.icon-size;
+        color: !root.enabled ? Palette.text-off : touch.has-hover || root.on ? Palette.text : Palette.text-2;
+        animate color {
+            duration: Motion.fast;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    if root.tip != "" && root.enabled: Tooltip {
+        TipBody {
+            text: root.tip;
+        }
+    }
+}
+
+// An option button on black (.opt): icon and label, no border, a surface-2 fill on hover. The Overview toolbar
+// ("Automatic", "Adam", "Mouse 4").
+export component OptButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <string> label: root.text;
+    in property <string> tip;
+    in property <bool> chevron: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: Size.ctl;
+    horizontal-stretch: 0;
+    border-radius: Radius.md;
+    background: root.enabled && touch.has-hover ? Palette.surface-2 : transparent;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+    HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: Space.s3;
+        spacing: Space.s2;
+        if root.icon.width > 0: CIcon {
+            source: root.icon;
+            color: root.enabled ? Palette.text-2 : Palette.text-off;
+        }
+        Text {
+            text: root.text;
+            color: root.enabled ? Palette.text : Palette.text-off;
+            vertical-alignment: center;
+        }
+        if root.chevron: CIcon {
+            source: Icons.chev-down-sm;
+            size: 14px;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    if root.tip != "": Tooltip {
+        TipBody {
+            text: root.tip;
+        }
+    }
+}
+
+// The 40 x 22 switch (.toggle): white track and black knob when on. Knob and colours 180 ms.
 export component Toggle inherits Rectangle {
     in property <bool> on;
     in property <string> label;
-    in property <length> track-w: 32px;
+    in property <bool> enabled: true;
+    // older name; the track is 40 px
+    in property <length> track-w: 40px;
     callback toggled(bool);
-    width: root.track-w;
-    height: 20px;
-    border-radius: 10px;
-    background: root.on ? Palette.accent : Palette.line-2;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    border-width: 1px;
+    border-color: root.on ? Palette.on : Palette.line-2;
+    background: root.on ? Palette.on : Palette.surface-3;
+    opacity: root.enabled ? 1 : 0.4;
+    animate background, border-color {
+        duration: Motion.base;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
     accessible-role: checkbox;
     accessible-label: root.label;
     accessible-checkable: true;
     accessible-checked: root.on;
+    accessible-enabled: root.enabled;
     accessible-action-default => {
-        root.toggled(!root.on);
+        if root.enabled {
+            root.toggled(!root.on);
+        }
     }
     Rectangle {
-        x: root.on ? root.width - 17px : 3px;
+        x: root.on ? 22px : 3px;
         y: 3px;
         width: 14px;
         height: 14px;
         border-radius: 7px;
-        background: root.on ? Palette.knob : Palette.text-2;
-        animate x { duration: 120ms; }
+        background: root.on ? Palette.on-ink : Palette.text-2;
+        animate x, background {
+            duration: Motion.base;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
     }
 
     TouchArea {
+        enabled: root.enabled;
         clicked => {
             root.toggled(!root.on);
         }
     }
 }
 
-// Segmented control. `accent-on` draws the chosen item in the accent color (quick menu).
+// Segmented control (.seg): the chosen item is the white "on" fill with black text. Items are tabs for the
+// accessibility tree. `accent-on` is an older name and changes nothing.
 export component Segmented inherits Rectangle {
     in property <[string]> items;
     in property <int> selected;
     in property <bool> accent-on: false;
-    in property <length> item-h: 26px;
+    in property <length> item-h: Size.ctl - 8px;
     in property <length> item-pad: Space.s3;
-    in property <length> font-size: Type.fs2;
+    in property <length> font-size: Type.fs-body;
     in property <bool> fill: false;
     // fixed item width (equal items); 0 = size to the label
     in property <length> item-w: 0px;
     callback select(int);
-    height: root.item-h + 6px;
+    height: root.item-h + 8px;
     horizontal-stretch: root.fill ? 1 : 0;
     border-radius: Radius.md;
     background: Palette.surface-2;
     border-width: 1px;
-    border-color: Palette.line-2;
+    border-color: Palette.line;
     HorizontalLayout {
         padding: 3px;
-        spacing: 2px;
+        spacing: 0px;
         for item[i] in root.items: Rectangle {
             height: root.item-h;
             horizontal-stretch: root.fill ? 1 : 0;
             min-width: root.item-w;
             max-width: root.item-w > 0 ? root.item-w : 100000px;
             border-radius: Radius.sm;
-            background: i == root.selected ? (root.accent-on ? Palette.accent : Palette.surface-3) : transparent;
+            background: i == root.selected ? Palette.on : transparent;
+            animate background {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
             accessible-role: tab;
             accessible-label: item;
             accessible-item-selected: i == root.selected;
@@ -283,13 +564,13 @@ export component Segmented inherits Rectangle {
                 Text {
                     text: item;
                     font-size: root.font-size;
-                    font-weight: Type.w-medium;
+                    font-weight: i == root.selected ? Type.w-strong : Type.w-body;
                     vertical-alignment: center;
-                    color: i == root.selected ? (root.accent-on ? Palette.on-accent : Palette.text) : Palette.text-2;
+                    color: i == root.selected ? Palette.on-ink : seg-touch.has-hover ? Palette.text : Palette.text-2;
                 }
             }
 
-            TouchArea {
+            seg-touch := TouchArea {
                 clicked => {
                     root.select(i);
                 }
@@ -304,19 +585,22 @@ export component Radio inherits Rectangle {
     height: 16px;
     border-radius: 8px;
     border-width: root.on ? 5px : 1.5px;
-    border-color: root.on ? Palette.accent : Palette.line-2;
+    border-color: root.on ? Palette.on : Palette.line-2;
 }
 
+// Slider (.slider): 4 px surface-3 track, white fill and a 16 px white knob. The accessible value is the percent.
 export component Slider {
     in-out property <float> value: 0.5;
     in property <length> knob: 16px;
+    in property <string> label;
     callback changed(float);
     // the pointer let go of the slider (save here; `changed` comes on every move)
     callback released(float);
-    // 4 px track; the knob hangs over it (it does not add to the height, as in the mockups)
+    // 4 px track; the knob hangs over it (it does not add to the height)
     height: 4px;
     min-width: 40px;
     accessible-role: slider;
+    accessible-label: root.label;
     accessible-value: Math.round(root.value * 100);
     accessible-value-minimum: 0;
     accessible-value-maximum: 100;
@@ -324,7 +608,7 @@ export component Slider {
         y: 0;
         height: 4px;
         border-radius: 2px;
-        background: Palette.line-2;
+        background: Palette.surface-3;
     }
 
     Rectangle {
@@ -333,7 +617,7 @@ export component Slider {
         width: root.width * root.value;
         height: 4px;
         border-radius: 2px;
-        background: Palette.accent;
+        background: Palette.on;
     }
 
     Rectangle {
@@ -342,7 +626,7 @@ export component Slider {
         width: root.knob;
         height: root.knob;
         border-radius: root.knob / 2;
-        background: Palette.knob;
+        background: Palette.on;
         drop-shadow-offset-y: Shadow.low-y;
         drop-shadow-blur: Shadow.low-blur;
         drop-shadow-color: Shadow.low-color;
@@ -369,21 +653,77 @@ export component Slider {
     }
 }
 
+// A panel with a hairline (.panel): surface-1, 1 px line, radius 10. Put SettingRow or ListRow items in it.
+export component Panel inherits Rectangle {
+    background: Palette.surface-1;
+    border-width: 1px;
+    border-color: Palette.line;
+    border-radius: Radius.lg;
+}
+
+// A group label above a panel ("Startup", "Voice"): 12.5 px text-2, 4 px in from the panel edge.
+export component GroupLabel inherits Text {
+    font-size: Type.fs-small;
+    color: Palette.text-2;
+    vertical-alignment: center;
+    height: Type.lh-small;
+}
+
+// A settings row (.srow): at least 44 px, label (and an optional line under it) on the left, the controls
+// (children) on the right. Every row but the first has a hairline on top.
+export component SettingRow inherits Rectangle {
+    in property <string> text;
+    in property <string> sub;
+    in property <bool> first: false;
+    in property <bool> off: false;
+    min-height: Size.row;
+    if !root.first: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.line;
+    }
+    HorizontalLayout {
+        padding-left: Space.s4;
+        padding-right: Space.s3;
+        padding-top: Space.s1;
+        padding-bottom: Space.s1;
+        spacing: Space.s3;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: root.text;
+                color: root.off ? Palette.text-3 : Palette.text;
+                overflow: elide;
+            }
+
+            if root.sub != "": Text {
+                text: root.sub;
+                font-size: Type.fs-small;
+                color: Palette.text-2;
+                overflow: elide;
+            }
+        }
+
+        HorizontalLayout {
+            horizontal-stretch: 0;
+            alignment: end;
+            spacing: Space.s2;
+            @children
+        }
+    }
+}
+
+// Old card. New code uses Panel. Selected: white border and the surface-2 fill (setup step 5).
 export component Card inherits Rectangle {
     in property <bool> selected: false;
-    background: Palette.surface;
+    background: root.selected ? Palette.surface-2 : Palette.surface-1;
     border-width: 1px;
-    border-color: root.selected ? Palette.accent : Palette.line;
+    border-color: root.selected ? Palette.on : Palette.line;
     border-radius: Radius.lg;
-    // Selection ring: 1 px, 3 px outside the box (CSS outline with outline-offset 2px).
-    if root.selected: Rectangle {
-        x: -3px;
-        y: -3px;
-        width: root.width + 6px;
-        height: root.height + 6px;
-        border-radius: root.border-radius + 3px;
-        border-width: 1px;
-        border-color: Palette.accent-ring;
+    animate background, border-color {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
     }
 }
 
@@ -400,21 +740,20 @@ export component Count inherits Rectangle {
         alignment: center;
         Text {
             text: root.text;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
+            font-size: Type.fs-small;
             color: Palette.text-2;
             vertical-alignment: center;
         }
     }
 }
 
-// Card header: title, optional count, then anything on the right.
+// Old card header: title, optional count, then anything on the right.
 export component CardHead inherits Rectangle {
     in property <string> title;
     in property <string> count;
     in property <length> pad-left: Space.s5;
     in property <length> pad-right: Space.s5;
-    in property <length> title-size: Type.fs2;
+    in property <length> title-size: Type.fs-body;
     height: 56px;
     HorizontalLayout {
         padding-left: root.pad-left;
@@ -424,14 +763,16 @@ export component CardHead inherits Rectangle {
         Text {
             text: root.title;
             font-size: root.title-size;
-            font-weight: Type.w-semibold;
+            font-weight: Type.w-strong;
             color: Palette.text;
             vertical-alignment: center;
             horizontal-stretch: 0;
         }
         if root.count != "": VerticalLayout {
             alignment: center;
-            Count { text: root.count; }
+            Count {
+                text: root.count;
+            }
         }
         Rectangle {
             horizontal-stretch: 1;
@@ -448,22 +789,51 @@ export component CardHead inherits Rectangle {
 }
 
 export component Dot inherits Rectangle {
-    in property <color> tint: Palette.ok;
+    in property <color> tint: Palette.live;
     in property <length> size: 8px;
     width: root.size;
     height: root.size;
     border-radius: root.size / 2;
     background: root.tint;
+    animate background {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
 }
 
+export enum Status { reading, paused, off }
+
+// The status dot of the title strip (.sdot): lime while reading, grey when paused, dim when the game is not
+// running. Hover shows `tip` to the left of the dot (no pointer tip: it stays put).
+export component StatusDot inherits Rectangle {
+    in property <Status> status: Status.reading;
+    in property <string> tip;
+    width: 40px;
+    height: 40px;
+    accessible-role: text;
+    accessible-label: root.tip;
+    Dot {
+        tint: root.status == Status.reading ? Palette.live : root.status == Status.paused ? Palette.text-2 : Palette.text-off;
+    }
+
+    touch := TouchArea { }
+
+    Tip {
+        x: 0px - self.width + 6px;
+        y: 7px;
+        text: root.tip;
+        shown: touch.has-hover;
+    }
+}
+
+// Old status chip. New code uses StatusDot.
 export component StatusChip inherits Rectangle {
     in property <string> text: "Reading";
-    // green while reading; grey otherwise (paused, game not running)
     in property <bool> ok: true;
     height: 28px;
     horizontal-stretch: 0;
     border-radius: 14px;
-    background: root.ok ? Palette.ok-soft : Palette.surface-3;
+    background: Palette.surface-2;
     HorizontalLayout {
         padding-left: Space.s3;
         padding-right: Space.s3;
@@ -472,21 +842,20 @@ export component StatusChip inherits Rectangle {
         VerticalLayout {
             alignment: center;
             Dot {
-                tint: root.ok ? Palette.ok : Palette.text-3;
+                tint: root.ok ? Palette.live : Palette.text-2;
             }
         }
 
         Text {
             text: root.text;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
-            color: root.ok ? Palette.ok : Palette.text-2;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
             vertical-alignment: center;
         }
     }
 }
 
-// Icon tile in lists (.itile).
+// Icon tile in lists.
 export component ITile inherits Rectangle {
     in property <image> icon: Icons.window;
     in property <bool> on: false;
@@ -494,20 +863,20 @@ export component ITile inherits Rectangle {
     width: 32px;
     height: 32px;
     border-radius: Radius.md;
-    background: root.on ? Palette.accent-soft : Palette.surface-3;
+    background: root.on ? Palette.surface-3 : Palette.surface-2;
     Icon {
         source: root.icon;
-        color: root.on ? Palette.accent : Palette.text-2;
+        color: root.on ? Palette.text : Palette.text-2;
         width: root.icon-size;
         height: root.icon-size;
     }
 }
 
-// Waveform from a list of bar heights (.wave and .pill-wave). Bars at index >= played are grey.
+// Waveform from a list of bar heights (.wave). Bars at index >= played are flat grey. Lime: it is live.
 export component Wave {
     in property <[int]> bars;
     in property <int> played: 999;
-    in property <length> bar-w: 3px;
+    in property <length> bar-w: 2px;
     in property <length> gap: 3px;
     HorizontalLayout {
         spacing: root.gap;
@@ -516,15 +885,19 @@ export component Wave {
             alignment: center;
             Rectangle {
                 width: root.bar-w;
-                height: h * 1px;
-                border-radius: root.bar-w / 2 + 0.5px;
-                background: i < root.played ? Palette.accent : Palette.line-2;
+                height: i < root.played ? h * 1px : 2px;
+                border-radius: root.bar-w / 2;
+                background: i < root.played ? Palette.live : Palette.text-off;
+                animate height {
+                    duration: Motion.fast;
+                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+                }
             }
         }
     }
 }
 
-// Pill waveform with fixed heights from the mockups (14 bars at 14 px, or 18 bars at 16 px).
+// Pill waveform with fixed heights (14 bars at 14 px, or 18 bars at 16 px).
 export component PillWave inherits Wave {
     in property <bool> big: false;
     bars: root.big ? [4, 15, 10, 12, 14, 7, 15, 8, 14, 13, 9, 15, 6, 15, 11, 11, 15, 6] : [4, 13, 9, 10, 12, 6, 13, 7, 12, 11, 8, 13, 5, 13];
@@ -550,19 +923,33 @@ export component HLine inherits Rectangle {
     background: Palette.line;
 }
 
-// Text field with a leading icon and a placeholder (.input).
+// Text field with a leading icon and a placeholder (.field): surface-2, hairline, radius 6, 32 px.
 export component TextField inherits Rectangle {
     in property <image> icon;
     in property <string> placeholder;
     in-out property <string> text;
+    out property <bool> has-focus: input.has-focus;
     height: Size.ctl;
-    border-radius: Radius.md;
+    border-radius: Radius.sm;
     border-width: 1px;
-    border-color: input.has-focus ? Palette.accent : Palette.line-2;
+    border-color: input.has-focus ? Palette.focus : touch.has-hover ? Palette.line-2 : Palette.line;
     background: Palette.surface-2;
+    animate border-color {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    public function focus-input() {
+        input.focus();
+    }
+    touch := TouchArea {
+        clicked => {
+            input.focus();
+        }
+    }
+
     HorizontalLayout {
-        padding-left: Space.s3 + 1px;
-        padding-right: Space.s3 + 1px;
+        padding-left: Space.s3 - 1px;
+        padding-right: Space.s3 - 1px;
         spacing: Space.s2;
         if root.icon.width > 0: CIcon {
             source: root.icon;
@@ -573,8 +960,9 @@ export component TextField inherits Rectangle {
                 x: 0;
                 width: parent.width;
                 text: root.placeholder;
-                color: Palette.text-3;
+                color: Palette.text-2;
                 vertical-alignment: center;
+                accessible-role: none;
             }
             input := TextInput {
                 text <=> root.text;
@@ -587,7 +975,7 @@ export component TextField inherits Rectangle {
     }
 }
 
-// A key as a raised keycap (04-read-key-d): 1 px border, thick dark bottom edge.
+// Old big keycap (the old keys page). New code uses Keycap.
 export component KeyCap inherits Rectangle {
     in property <string> text;
     in property <image> icon;
@@ -595,46 +983,32 @@ export component KeyCap inherits Rectangle {
     width: 140px;
     height: 44px;
     border-radius: Radius.md;
-    background: Palette.keycap-edge;
-    Rectangle {
-        x: 0;
-        y: 0;
-        height: parent.height - root.bottom + 1px;
-        border-radius: Radius.md;
-        background: Palette.line-2;
-    }
-
-    Rectangle {
-        x: 1px;
-        y: 1px;
-        width: parent.width - 2px;
-        height: parent.height - root.bottom - 1px;
-        border-radius: Radius.md - 1px;
-        background: Palette.surface-3;
-        HorizontalLayout {
-            alignment: center;
-            spacing: Space.s2;
-            if root.icon.width > 0: CIcon {
-                source: root.icon;
-                size: 18px;
-                color: Palette.text-2;
-            }
-            Text {
-                text: root.text;
-                font-size: Type.fs3;
-                font-weight: Type.w-semibold;
-                color: Palette.text;
-                vertical-alignment: center;
-            }
+    background: Palette.surface-2;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    HorizontalLayout {
+        alignment: center;
+        spacing: Space.s2;
+        if root.icon.width > 0: CIcon {
+            source: root.icon;
+            size: 18px;
+            color: Palette.text-2;
+        }
+        Text {
+            text: root.text;
+            font-family: Type.mono;
+            font-size: Type.fs3;
+            color: Palette.text;
+            vertical-alignment: center;
         }
     }
 }
 
-// A chip: colored text on a soft background with an optional leading dot or icon (.chip).
+// Old chip: text on a soft background with an optional leading dot or icon.
 export component Chip inherits Rectangle {
     in property <string> text;
-    in property <color> fg: Palette.ok;
-    in property <color> bg: Palette.ok-soft;
+    in property <color> fg: Palette.text-2;
+    in property <color> bg: Palette.surface-2;
     in property <bool> dot: true;
     in property <image> icon;
     height: 22px;
@@ -659,19 +1033,330 @@ export component Chip inherits Rectangle {
         }
         Text {
             text: root.text;
-            font-size: Type.fs1;
-            font-weight: Type.w-medium;
+            font-size: Type.fs-small;
             color: root.fg;
             vertical-alignment: center;
         }
     }
 }
 
-// Section label (.label): small, medium weight, faint.
+// Section label: small and grey.
 export component SmallLabel inherits Text {
-    font-size: Type.fs1;
-    font-weight: Type.w-medium;
-    color: Palette.text-3;
+    font-size: Type.fs-small;
+    color: Palette.text-2;
     vertical-alignment: center;
-    height: Type.lh1;
+    height: Type.lh-small;
+}
+
+// A small pill tag (.tag): "off", "repeat". 20 px, hairline, text-2.
+export component Tag inherits Rectangle {
+    in property <string> text;
+    height: 20px;
+    horizontal-stretch: 0;
+    border-radius: Radius.pill;
+    border-width: 1px;
+    border-color: Palette.line-2;
+    HorizontalLayout {
+        padding-left: Space.s2 - 1px;
+        padding-right: Space.s2 - 1px;
+        Text {
+            text: root.text;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// A line of the read list (.lrow): kind icon, the grey speaker and the white line, at most two lines, then
+// cut with "...". `meta` (a time) and `tag` ("off", "repeat") sit at the end. Hover fills the row; with
+// `replay-label` set, a replay button floats over the row end. A cut line shows its full text in a card over
+// the rows below after Motion.hover-delay. The accessible label is the full "Speaker: line".
+// Rust caps the speaker name so it fits on line 1 (vm::reading::short_speaker).
+// Put rows in a `for` with no layout clip below them, so the card can lie over the next rows.
+export component ListRow inherits Rectangle {
+    in property <image> icon;
+    // the icon's tooltip (the kind name on Activity rows); empty: none
+    in property <string> icon-tip;
+    in property <string> speaker;
+    in property <string> line;
+    // dimmed row (a kind that is off, a skipped line)
+    in property <bool> off: false;
+    in property <string> tag;
+    in property <string> meta;
+    // the replay button's label ("Replay"); empty: no replay button
+    in property <string> replay-label;
+    // the row colour at rest (the panel it sits on)
+    in property <color> rest-bg: transparent;
+    callback replay();
+    property <string> full: root.speaker == "" ? root.line : root.speaker + ": " + root.line;
+    property <color> text-c: root.off ? Palette.text-3 : Palette.text;
+    property <color> who-c: root.off ? Palette.text-3 : Palette.text-2;
+    // the hover colour, shared by the row and the patch under the grey speaker name
+    property <color> row-bg: touch.has-hover ? Palette.surface-2 : root.rest-bg;
+    // the text is cut when the whole text needs more than two lines
+    property <bool> cut: measure.preferred-height > t.height + 1px;
+    property <bool> card: touch.has-hover && root.cut;
+    min-height: Size.list;
+    height: max(Size.list, t.height + 16px);
+    border-radius: Radius.md;
+    background: root.row-bg;
+    z: root.card ? 10 : 0;
+    animate background {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    touch := TouchArea { }
+
+    HorizontalLayout {
+        padding-left: Space.s3;
+        padding-right: Space.s2;
+        padding-top: Space.s2;
+        padding-bottom: Space.s2;
+        spacing: Space.s2;
+        VerticalLayout {
+            alignment: start;
+            padding-top: 2px;
+            Icon {
+                source: root.icon;
+                color: root.off ? Palette.text-3 : Palette.text-2;
+            }
+        }
+
+        text-box := Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            t := Text {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: min(self.preferred-height, 2 * Type.lh-body);
+                text: root.full;
+                color: root.text-c;
+                wrap: word-wrap;
+                overflow: elide;
+                max-lines: 2;
+                vertical-alignment: top;
+                line-height-factor: Type.lhf-143;
+            }
+
+            // the whole text, never drawn: it tells whether the two lines cut it
+            measure := Text {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: 0px;
+                visible: false;
+                text: root.full;
+                wrap: word-wrap;
+                vertical-alignment: top;
+                line-height-factor: Type.lhf-143;
+                accessible-role: none;
+            }
+
+            // the speaker again in grey, on a patch in the row colour that hides the white copy
+            if root.speaker != "": Rectangle {
+                x: 0;
+                y: 0;
+                width: min(sp.preferred-width, parent.width);
+                height: sp.preferred-height;
+                background: root.row-bg;
+                sp := Text {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    overflow: elide;
+                    accessible-role: none;
+                    text: root.speaker + ":";
+                    color: root.who-c;
+                    line-height-factor: Type.lhf-143;
+                }
+            }
+        }
+
+        if root.tag != "": VerticalLayout {
+            alignment: start;
+            Tag {
+                text: root.tag;
+            }
+        }
+        if root.meta != "": Text {
+            text: root.meta;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            height: Type.lh-body;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
+        }
+    }
+
+    if root.replay-label != "": Rectangle {
+        x: parent.width - self.width - Space.s1;
+        y: Space.s1;
+        width: 28px;
+        height: 28px;
+        border-radius: Radius.md;
+        background: Palette.surface-2;
+        opacity: touch.has-hover || rp.has-hover ? 1 : 0;
+        animate opacity {
+            duration: Motion.fast;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+        rp := IconButton {
+            small: true;
+            icon: Icons.replay;
+            tip: root.replay-label;
+            clicked => {
+                root.replay();
+            }
+        }
+    }
+
+    // the full text over the rows below
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: card-text.preferred-height + 2 * Space.s2;
+        border-radius: Radius.md;
+        border-width: 1px;
+        border-color: Palette.line-2;
+        background: Palette.surface-2;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: Shadow.pop-color;
+        opacity: root.card ? 1 : 0;
+        visible: self.opacity > 0.01;
+        animate opacity {
+            duration: Motion.fast;
+            delay: root.card ? Motion.hover-delay : 0ms;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+        card-text := Text {
+            x: Space.s3 + Size.icon + Space.s2 - 1px;
+            y: Space.s2 - 1px;
+            width: text-box.width;
+            text: root.full;
+            color: root.text-c;
+            wrap: word-wrap;
+            line-height-factor: Type.lhf-143;
+            accessible-role: none;
+        }
+    }
+}
+
+// A zone chip of the Overview strip (.zi): one per kind. On: white text; off: text-2 and a struck icon.
+// It is a checkbox for the accessibility tree; the tooltip says "Speaker: on" and so on.
+export component ZoneChip inherits Rectangle {
+    in property <Kind> kind;
+    in property <bool> on: true;
+    in property <bool> enabled: true;
+    in property <string> text: Kinds.name(root.kind);
+    callback toggled(bool);
+    property <color> c: !root.enabled ? Palette.text-off : root.on ? Palette.text : Palette.text-2;
+    height: Size.ctl;
+    horizontal-stretch: 0;
+    border-radius: Radius.md;
+    background: root.enabled && touch.has-hover ? Palette.surface-2 : transparent;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: checkbox;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.on;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.toggled(!root.on);
+        }
+    }
+    HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: Space.s3;
+        spacing: Space.s2;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: Size.icon;
+                height: Size.icon;
+                Icon {
+                    source: Kinds.icon(root.kind);
+                    color: root.c;
+                }
+
+                if !root.on: Path {
+                    width: Size.icon;
+                    height: Size.icon;
+                    viewbox-width: 16;
+                    viewbox-height: 16;
+                    commands: "M 2 14 L 14 2";
+                    stroke: root.c;
+                    stroke-width: 1.5px;
+                }
+            }
+        }
+
+        Text {
+            text: root.text;
+            color: root.c;
+            vertical-alignment: center;
+            animate color {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.toggled(!root.on);
+        }
+    }
+
+    if root.enabled: Tooltip {
+        TipBody {
+            text: root.text + (root.on ? ": on" : ": off");
+        }
+    }
+}
+
+// A zone outline with its black keyline (README "Notes for the Slint port"): the outline, plus a second
+// Rectangle 1 px larger (2 px when live) with a black 60% border (30% when dimmed), so it holds on bright games.
+// Size it like the zone box; children go inside.
+export component ZoneOutline inherits Rectangle {
+    // live: the zone being read (lime, 2 px)
+    in property <bool> live: false;
+    in property <bool> dim: false;
+    in property <bool> selected: false;
+    in property <color> line: root.live ? Palette.live : root.selected ? Palette.on : Palette.text;
+    in property <length> line-w: root.live ? 2px : 1.5px;
+    in property <length> radius: Radius.sm;
+    property <length> k: root.live ? 2px : 1px;
+    property <color> line-c: root.dim ? root.line.with-alpha(0.45) : root.line;
+    border-radius: root.radius;
+    Rectangle {
+        x: -root.k;
+        y: -root.k;
+        width: root.width + 2 * root.k;
+        height: root.height + 2 * root.k;
+        border-radius: root.radius + root.k;
+        border-width: root.k;
+        border-color: root.dim ? Palette.keyline-dim : Palette.keyline;
+    }
+
+    Rectangle {
+        border-radius: root.radius;
+        border-width: root.line-w;
+        border-color: root.line-c;
+        animate border-color {
+            duration: Motion.fast;
+            easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+    }
+
+    @children
 }

@@ -410,6 +410,8 @@ export component OverviewTab inherits Rectangle {
     callback key-clicked();
     callback edit-zones();
     callback show-all();
+    // "Switch game" on the stage when the game is not running: opens the switcher (app.slint)
+    callback switch-game();
     callback mode-changed(bool);
     callback toggle(int, bool);
     in property <image> shot: Art.scene;
