@@ -483,3 +483,41 @@ fn the_overview_voice_list_previews_a_voice() {
     assert_eq!(w.get_preview_voice(), -1);
     assert_eq!(w.get_voice_label(), "David", "still the game's voice");
 }
+
+/// A real pointer click on a row's play button (the button sits inside the row's TouchArea, so the row keeps its
+/// hover): it plays that voice and does not pick the row or close the list.
+#[test]
+fn a_mouse_click_on_the_play_button_does_not_pick_the_row() {
+    let (_dir, paths) = temp_paths();
+    let (vs, _, _) = voices(1.0);
+    let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    for _ in 0..3 {
+        press(&w, "Continue", AccessibleRole::Button);
+    }
+    press(&w, "Finish", AccessibleRole::Button);
+    settle();
+    press(&w, "Voice", AccessibleRole::Button);
+    assert!(w.get_voice_menu());
+    let play = ElementHandle::find_by_accessible_label(&w, "Play a sample of Zira")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+        .expect("the play button of Zira");
+    let (p, s) = (play.absolute_position(), play.size());
+    let at = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    let win = w.window();
+    win.dispatch_event(slint::platform::WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(slint::platform::WindowEvent::PointerPressed {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    win.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    assert_eq!(w.get_preview_voice(), 1, "Zira plays");
+    assert!(w.get_voice_testing());
+    assert_eq!(w.get_game_voice(), 0, "not picked");
+    assert_eq!(w.get_voice_label(), "David");
+    assert!(w.get_voice_menu(), "the list stays open");
+}

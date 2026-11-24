@@ -878,16 +878,21 @@ differs from the d-black mockups:
    Esc or a click outside closes the list and stops it. As every sample (Settings, step 4), it stops a line that is
    being read and clears the queue. The list is 300 px wide now (was 280).
 2. Overview: the Now panel is as tall as the picture frame, so their tops and bottoms line up at every size; the
-   zone chips stay under the frame. The frame has the only outline (the picture in it has none, so a picture that
-   nearly fills the frame no longer shows two). The frame's outline lights up on hover, and a click anywhere in the
-   frame opens Zones.
+   zone chips stay under the frame. With no chips (and no screenshot note), the frame and the Now panel run to the
+   bottom margin. The frame has the only outline. When the band beside a 16:9 picture would be 16 px or less on a
+   side, the frame hugs the picture and the Now panel takes the width left (`OverviewRect`, also the start of the
+   Zones grow), so a thin band no longer reads as a second frame (1707 x 912). A screenshot that is not 16:9 still
+   shows its own edge in the band. The frame's outline lights up on hover, and a click anywhere in it opens Zones.
 3. Game switcher: the highlighted row ends with a trash button (tip "Delete game"); "Reading" stays on every row.
-   A click (or the Delete key) turns it into a red "Delete" on that row; Enter or a click deletes, Esc, another row
-   or the mouse leaving the row cancels. Delete removes the game's profile, its `.bad`/`.tmp` copies, its
-   screenshot and its activity log (only files in the data folder). The current game makes way for the game now
+   A click (or the Delete key, with an empty search) turns it into a red "Delete" on that row; Enter or a click
+   deletes, Esc, another row or the mouse leaving the row cancels. "Delete" takes no click in the first 500 ms, so a
+   double click on the trash button does not delete. Delete removes the game's screenshot, activity log,
+   `.bad`/`.tmp` copies and then its profile (only files in the data folder); the profile goes last, so a delete
+   that fails leaves the game whole and listed. The current game makes way for the game now
    at its place (or the last one); with no game left the app goes to Welcome.
-4. `render-screens` takes a window size (`-- <out-dir> 1707x912`) and has three more screens:
-   `10-overview-voice-preview`, `10-overview-real-shot`, `14-game-switcher-delete`.
+4. `render-screens` takes a window size (`-- <out-dir> 1707x912`) and has more screens:
+   `10-overview-voice-preview`, `10-overview-real-shot`, `10-overview-real-shot-16x9`, `10-overview-no-chips`,
+   `14-game-switcher-delete`. `tests/overview_frame.rs` checks the frame edge and the no-chip bottom at 1707 x 912.
 
 ## After v1
 
