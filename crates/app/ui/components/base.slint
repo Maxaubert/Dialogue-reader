@@ -877,6 +877,17 @@ export component Tag inherits Rectangle {
     }
 }
 
+// A resize handle of the selected zone (.zz i): an 8 px white dot with a black ring. The Zones stage and in-game
+// zone edit draw the same one.
+export component ZoneHandle inherits Rectangle {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: Palette.on;
+    border-width: 1.5px;
+    border-color: Palette.on-ink;
+}
+
 // A line of the read list (.lrow): kind icon, the grey speaker and the white line, at most two lines, then
 // cut with "...". `meta` (a time) and `tag` ("off", "repeat") sit at the end. Hover fills the row; with
 // `replay-label` set, a replay button floats over the row end. After Motion.hover-delay on a cut line, the row

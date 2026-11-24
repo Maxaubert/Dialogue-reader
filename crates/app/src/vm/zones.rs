@@ -275,6 +275,25 @@ impl Editor {
         }
     }
 
+    /// Starts a resize of the selected zone by `handle` (0 top left, clockwise to 7 left), as a press on that
+    /// handle does. Zone edit hit-tests its handles itself. False when no zone is selected.
+    pub fn begin_resize(&mut self, handle: usize) -> bool {
+        self.cancel_drag();
+        let Some(i) = self.selected.filter(|&i| i < self.zones.len()) else {
+            return false;
+        };
+        if handle > 7 {
+            return false;
+        }
+        self.drag = Drag::Resize {
+            i,
+            handle,
+            orig: self.zones[i].rect,
+            before: self.zones.clone(),
+        };
+        true
+    }
+
     /// A drag (draw, move or resize) is going on.
     pub fn dragging(&self) -> bool {
         self.drag != Drag::None

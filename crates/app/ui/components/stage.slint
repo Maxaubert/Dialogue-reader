@@ -12,7 +12,7 @@ import {
     Kinds,
 } from "../theme.slint";
 import { ZoneData } from "../data.slint";
-import { Icon, CornerMask, Dot, ZoneOutline } from "base.slint";
+import { Icon, CornerMask, Dot, ZoneOutline, ZoneHandle } from "base.slint";
 
 // The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
 // Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
@@ -218,15 +218,9 @@ export component Stage inherits Rectangle {
                 { x: 0, y: 1 },
                 { x: 0.5, y: 1 },
                 { x: 1, y: 1 }
-            ]: Rectangle {
+            ]: ZoneHandle {
                 x: parent.width * p.x - 4px;
                 y: parent.height * p.y - 4px;
-                width: 8px;
-                height: 8px;
-                border-radius: 4px;
-                background: Palette.on;
-                border-width: 1.5px;
-                border-color: Palette.on-ink;
             }
         }
         if !root.interactive && !root.quiet: TouchArea {

@@ -115,6 +115,24 @@ pub fn add(e: &mut Editor, m: &CaptureMap, r: Rect, kind: Kind) -> Option<usize>
     e.add(capture_rect(r, m), kind)
 }
 
+/// Starts a resize of the selected zone by one of its handles (0 top left, clockwise to 7 left).
+pub fn resize_start(e: &mut Editor, handle: i32) -> bool {
+    usize::try_from(handle).is_ok_and(|h| e.begin_resize(h))
+}
+
+/// The pointer during a resize, at (x, y) in the window (logical px). The zone keeps its smallest size and stays
+/// on the picture. True on the release when the zone changed (save it).
+pub fn resize_to(e: &mut Editor, m: &CaptureMap, x: f32, y: f32, release: bool) -> bool {
+    let (cx, cy) = m.to_capture(x, y);
+    let scale = m.view_per_capture();
+    if release {
+        e.pointer_up(cx, cy, scale).zones
+    } else {
+        e.pointer_move(cx, cy, scale);
+        false
+    }
+}
+
 /// Removes zone `i`.
 pub fn remove(e: &mut Editor, i: usize) -> bool {
     if i >= e.zones.len() {

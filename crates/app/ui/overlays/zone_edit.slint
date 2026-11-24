@@ -5,6 +5,8 @@
 // The bar (Done) sits top centre. When the selected box, its tag or the picker would sit under it, it moves to
 // the first place clear of every zone: bottom centre, top right, top left (Rust works out which are clear:
 // src/overlay/zone_edit.rs, bar_clear).
+// The selected zone has 8 resize handles, as on Zones: drag one to resize (Rust keeps the smallest size and the
+// edges of the picture, and saves on the release). Esc, a right press or a lost pointer puts the zone back.
 // Motion (README, 11): shade 180 ms; outlines and tags 180 ms after 60 ms; bar 180 ms, y -8 to 0; all ease-out.
 // Picker: opacity and scale 0.96 to 1, 140 ms. Bar moving: out 140 ms ease-in, in at the new place 180 ms
 // ease-out, y 8 px. Out: 140 ms ease-in.
@@ -22,7 +24,7 @@ import {
     Kinds,
 } from "../theme.slint";
 import { EditZone } from "../data.slint";
-import { Icon, CIcon, Button, BtnKind, Tip } from "../components/base.slint";
+import { Icon, CIcon, Button, BtnKind, Tip, ZoneHandle } from "../components/base.slint";
 
 // The tag of a zone (.ztag): kind icon and name. Selected: white with a black keyline and a small x at the end.
 component ZoneTag inherits Rectangle {
@@ -233,7 +235,29 @@ export component ZoneEdit inherits Rectangle {
     // the selected zone gets this kind
     callback set-kind(Kind);
     callback pick(length, length) -> int;
+    // resizing the selected zone by a handle (0 top left, clockwise to 7 left): start (false: no zone to resize),
+    // the pointer moved, let go, cancelled
+    callback resize-start(int) -> bool;
+    callback resize-move(length, length);
+    callback resize-end(length, length);
+    callback resize-cancel();
+    // a handle is being dragged (Rust ends it when the hook's Esc cancels it)
+    in-out property <bool> resizing: false;
+    property <int> resize-h: -1;
+    function stop-resize() {
+        if root.resizing {
+            root.resizing = false;
+            root.resize-cancel();
+        }
+    }
     public function key(k: string) -> bool {
+        if k == Key.Escape && root.resizing {
+            root.stop-resize();
+            return true;
+        }
+        if root.resizing {
+            return true;
+        }
         if k == Key.Delete || k == Key.Backspace {
             if root.selected >= 0 {
                 root.remove(root.selected);
@@ -259,6 +283,22 @@ export component ZoneEdit inherits Rectangle {
     property <length> sw: root.sel-draft ? root.draft-w : root.has-sel ? root.zones[root.selected].w : 0px;
     property <length> sh: root.sel-draft ? root.draft-h : root.has-sel ? root.zones[root.selected].h : 0px;
     property <Kind> sel-kind: root.sel-draft ? root.draft-kind : root.has-sel ? root.zones[root.selected].kind : Kind.dialogue;
+    // the selected zone (not a box being drawn) has resize handles
+    property <bool> handles: !root.draft && root.selected >= 0 && root.selected < root.zones.length;
+    // the handle within 6 px of (x, y), as geom::hit_handle: 0 top left, clockwise to 7 left; -1 none.
+    // The corners are tried first (on a small box the handles are close together).
+    pure function near(x: length, y: length, hx: length, hy: length) -> bool {
+        return abs(x - hx) <= 6px && abs(y - hy) <= 6px;
+    }
+    pure function handle-at(x: length, y: length) -> int {
+        if !root.handles {
+            return -1;
+        }
+        return root.near(x, y, root.sx, root.sy) ? 0 : root.near(x, y, root.sx + root.sw, root.sy) ? 2 : root.near(x, y, root.sx + root.sw, root.sy + root.sh) ? 4 : root.near(x, y, root.sx, root.sy + root.sh) ? 6 : root.near(x, y, root.sx + root.sw / 2, root.sy) ? 1 : root.near(x, y, root.sx + root.sw, root.sy + root.sh / 2) ? 3 : root.near(x, y, root.sx + root.sw / 2, root.sy + root.sh) ? 5 : root.near(x, y, root.sx, root.sy + root.sh / 2) ? 7 : -1;
+    }
+    pure function cursor-of(h: int) -> MouseCursor {
+        return h == 0 || h == 4 ? MouseCursor.nwse-resize : h == 2 || h == 6 ? MouseCursor.nesw-resize : h == 1 || h == 5 ? MouseCursor.ns-resize : h == 3 || h == 7 ? MouseCursor.ew-resize : MouseCursor.default;
+    }
     // where a tag goes: 0 above the box, 1 under it (no room above), 2 inside at the top left (no room either)
     pure function tag-place(by: length, bh: length) -> int {
         return by >= 28px ? 0 : by + bh + 28px <= root.height ? 1 : 2;
@@ -340,10 +380,28 @@ export component ZoneEdit inherits Rectangle {
         opacity: root.t;
     }
 
-    // drawing and selecting
+    // drawing, selecting and resizing. A resize follows the stage.slint pattern: moves come from `pointer-event`
+    // (also without the mouse grab); a right press, a cancel or the pointer leaving the window cancels it.
     TouchArea {
+        mouse-cursor: root.cursor-of(root.resizing ? root.resize-h : root.handle-at(self.mouse-x, self.mouse-y));
         pointer-event(e) => {
+            if root.resizing {
+                if e.kind == PointerEventKind.move {
+                    root.resize-move(self.mouse-x, self.mouse-y);
+                } else if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                    root.resizing = false;
+                    root.resize-end(self.mouse-x, self.mouse-y);
+                } else if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) || e.kind == PointerEventKind.cancel {
+                    root.stop-resize();
+                }
+                return;
+            }
             if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                if root.handle-at(self.mouse-x, self.mouse-y) >= 0 && root.resize-start(root.handle-at(self.mouse-x, self.mouse-y)) {
+                    root.resize-h = root.handle-at(self.mouse-x, self.mouse-y);
+                    root.resizing = true;
+                    return;
+                }
                 root.press-x = self.mouse-x;
                 root.press-y = self.mouse-y;
                 root.dragging = false;
@@ -358,8 +416,13 @@ export component ZoneEdit inherits Rectangle {
                 }
             }
         }
+        changed has-hover => {
+            if !self.has-hover {
+                root.stop-resize();
+            }
+        }
         moved => {
-            if self.pressed && (abs(self.mouse-x - root.press-x) > 4px || abs(self.mouse-y - root.press-y) > 4px) {
+            if !root.resizing && self.pressed && (abs(self.mouse-x - root.press-x) > 4px || abs(self.mouse-y - root.press-y) > 4px) {
                 root.dragging = true;
                 root.draft = true;
                 root.selected = -1;
@@ -380,6 +443,26 @@ export component ZoneEdit inherits Rectangle {
             width: z.w;
             height: z.h;
             selected: i == root.selected && !root.draft;
+        }
+        // the resize handles of the selected zone
+        if root.handles: Rectangle {
+            x: root.sx;
+            y: root.sy;
+            width: root.sw;
+            height: root.sh;
+            for p in [
+                { x: 0, y: 0 },
+                { x: 0.5, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+                { x: 0, y: 1 },
+                { x: 0.5, y: 1 },
+                { x: 1, y: 1 }
+            ]: ZoneHandle {
+                x: parent.width * p.x - 4px;
+                y: parent.height * p.y - 4px;
+            }
         }
         if root.draft: ZoneBox {
             x: root.draft-x;

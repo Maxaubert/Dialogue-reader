@@ -108,6 +108,20 @@ fn wire(o: &Overlays, vm: &Shared) {
     z.on_commit(move |k, x, y, w, h| go(&|vm| vm.zone_add(k, Rect::new(x, y, w, h))));
     let go = with(vm);
     z.on_set_kind(move |k| go(&|vm| vm.zone_set_kind(k)));
+    let go = with(vm);
+    z.on_resize_move(move |x, y| go(&|vm| vm.zone_resize(x, y, false)));
+    let go = with(vm);
+    z.on_resize_end(move |x, y| go(&|vm| vm.zone_resize(x, y, true)));
+    let go = with(vm);
+    z.on_resize_cancel(move || go(&|vm| vm.zone_resize_cancel()));
+    let wk = Rc::downgrade(vm);
+    z.on_resize_start(move |h| {
+        let Some(v) = wk.upgrade() else { return false };
+        let Ok(mut vm) = v.try_borrow_mut() else {
+            return false;
+        };
+        zone_edit::resize_start(&mut vm.main, h)
+    });
     let wk = Rc::downgrade(vm);
     z.on_pick(move |x, y| {
         let Some(v) = wk.upgrade() else { return -1 };
@@ -362,6 +376,8 @@ impl Vm {
                 self.menu_out(out);
             }
             Overlay::Zones => match n {
+                // a zone being resized is not deleted
+                Nav::Delete if self.main.dragging() => {}
                 Nav::Delete => {
                     let sel = self.main.selected;
                     if let Some(i) = sel {
@@ -370,7 +386,11 @@ impl Vm {
                 }
                 Nav::Esc => {
                     let draft = self.overlays.as_ref().is_some_and(|o| o.zones.get_draft());
-                    if draft {
+                    // Esc during a resize puts the zone back first; then it drops a box being drawn, then finishes
+                    if self.main.dragging() {
+                        self.with_overlays(|o| o.zones.set_resizing(false));
+                        self.zone_resize_cancel();
+                    } else if draft {
                         self.with_overlays(|o| o.zones.set_draft(false));
                     } else {
                         self.set_overlay(Overlay::None);
@@ -617,6 +637,24 @@ impl Vm {
             self.push_main();
         }
         self.push_zone_edit();
+    }
+
+    /// A handle of the selected zone is dragged in zone edit: the zone follows, and on the release it is saved and
+    /// read from now on.
+    fn zone_resize(&mut self, x: f32, y: f32, release: bool) {
+        let Some(m) = self.zone_map() else { return };
+        if zone_edit::resize_to(&mut self.main, &m, x, y, release) {
+            self.save_main();
+            self.push_main();
+        }
+        self.push_zone_edit();
+    }
+
+    /// Esc, a right press or a lost pointer during a resize: the zone goes back as it was, nothing is saved.
+    fn zone_resize_cancel(&mut self) {
+        if self.main.cancel_drag() {
+            self.push_zone_edit();
+        }
     }
 
     /// A click in zone edit: the zone under it is selected (or none).
