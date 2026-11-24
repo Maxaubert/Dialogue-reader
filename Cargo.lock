@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "ab_glyph",
  "anyhow",
@@ -1246,7 +1246,7 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 
 [[package]]
 name = "dr-app"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "dr-core",
  "dr-runtime",
@@ -1262,11 +1262,11 @@ dependencies = [
 
 [[package]]
 name = "dr-core"
-version = "0.3.1"
+version = "0.3.2"
 
 [[package]]
 name = "dr-ocr"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "dr-core",
  "image",
@@ -1275,7 +1275,7 @@ dependencies = [
 
 [[package]]
 name = "dr-runtime"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "arena",
  "dr-core",
@@ -1292,7 +1292,7 @@ dependencies = [
 
 [[package]]
 name = "dr-tts"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "misaki",
  "ort",
@@ -3820,7 +3820,7 @@ dependencies = [
 
 [[package]]
 name = "overlay-spike"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "serde_json",
  "slint",
@@ -4273,7 +4273,7 @@ dependencies = [
 
 [[package]]
 name = "recorder"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "chrono",

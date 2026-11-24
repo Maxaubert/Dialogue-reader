@@ -26,6 +26,7 @@ fn page(w: &MainWindow, p: Page) {
     w.set_overlay(OverlayPreview::None);
     w.set_switcher_open(false);
     w.set_voice_menu(false);
+    w.set_preview_voice(-1);
     w.invoke_settings_close_voice_list();
     w.set_page(p);
 }
@@ -79,9 +80,44 @@ pub fn all() -> Vec<Screen> {
                 w.set_voice_menu(true);
             },
         },
+        // No mockup (Max, 2026-11-24): the third voice's sample plays from the picker (its button is Stop)
+        Screen {
+            name: "10-overview-voice-preview",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_voice_menu(true);
+                w.set_voice_testing(true);
+                w.set_preview_voice(2);
+            },
+        },
+        // a real screenshot that is not 16:9 (shown whole): one frame, as tall as the Now panel (Max, 2026-11-24)
+        Screen {
+            name: "10-overview-real-shot",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_real_shots(true);
+                w.set_shot_w(1880.0);
+                w.set_shot_h(1000.0);
+            },
+        },
+        // a 16:9 real screenshot: at 1707 x 912 the frame hugs the picture (no thin band, no second frame)
+        Screen {
+            name: "10-overview-real-shot-16x9",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_real_shots(true);
+                w.set_shot_w(1920.0);
+                w.set_shot_h(1080.0);
+            },
+        },
         Screen {
             name: "11-zones",
-            setup: |w| page(w, Page::Zones),
+            setup: |w| {
+                w.set_real_shots(false);
+                w.set_shot_w(1600.0);
+                w.set_shot_h(900.0);
+                page(w, Page::Zones);
+            },
         },
         Screen {
             name: "12-settings",
@@ -106,6 +142,15 @@ pub fn all() -> Vec<Screen> {
             setup: |w| {
                 page(w, Page::Overview);
                 w.set_switcher_open(true);
+            },
+        },
+        // No mockup (Max, 2026-11-24): Delete in the switcher asks first, on the highlighted row
+        Screen {
+            name: "14-game-switcher-delete",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_switcher_open(true);
+                w.invoke_switcher_ask_delete();
             },
         },
         Screen {
@@ -298,6 +343,15 @@ pub fn all() -> Vec<Screen> {
                 w.set_overlay(OverlayPreview::ZoneEdit);
             },
         },
+        // a game with no zone chips: the picture and the Now panel run to the bottom (Max, 2026-11-24). Last, as it
+        // empties the chips.
+        Screen {
+            name: "10-overview-no-chips",
+            setup: |w| {
+                w.set_zone_kinds(slint::ModelRc::default());
+                page(w, Page::Overview);
+            },
+        },
     ]
 }
 
@@ -400,8 +454,13 @@ impl HeadlessRenderer {
 
 /// Renders every screen to `<out>/<name>.png`. Returns the written paths.
 pub fn render_all(out: &Path) -> Result<Vec<PathBuf>, String> {
+    render_all_at(out, WIDTH, HEIGHT)
+}
+
+/// [`render_all`] at another window size (logical px, scale 1), for example 1707 x 912 (Max's maximized window).
+pub fn render_all_at(out: &Path, width: u32, height: u32) -> Result<Vec<PathBuf>, String> {
     std::fs::create_dir_all(out).map_err(|e| format!("cannot create {}: {e}", out.display()))?;
-    let r = HeadlessRenderer::install(WIDTH, HEIGHT)?;
+    let r = HeadlessRenderer::install(width, height)?;
     // no clock runs between the renders: every page and control shows its end state at once
     crate::fonts::set_instant_motion(true);
     let w = crate::build_main_window().map_err(|e| e.to_string())?;

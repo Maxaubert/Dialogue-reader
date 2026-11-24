@@ -418,3 +418,106 @@ fn the_overview_voice_button_picks_a_voice_in_place() {
     let p = profile::load(&paths.profile_json("test-game")).unwrap();
     assert_eq!(p.voice.id, "win:fake-zira");
 }
+
+/// The play button of a row in the Overview voice picker plays that voice at the game's speed and volume without
+/// picking it (Max, 2026-11-24). It is Stop while it plays; another row's button switches; closing the list stops it.
+#[test]
+fn the_overview_voice_list_previews_a_voice() {
+    let (_dir, paths) = temp_paths();
+    // sounds last their full length (about 4 s for the sample)
+    let (vs, tts, _) = voices(1.0);
+    let (w, vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    for _ in 0..3 {
+        press(&w, "Continue", AccessibleRole::Button);
+    }
+    press(&w, "Finish", AccessibleRole::Button);
+    settle();
+    assert_eq!(w.get_page(), Page::Overview);
+    // the game reads at 1.5x
+    w.set_game_speed(2.0 / 3.0);
+    vm.borrow_mut().game_voice_changed();
+    vm.borrow_mut().game_voice_saved();
+
+    press(&w, "Voice", AccessibleRole::Button);
+    press(&w, "Play a sample of Zira", AccessibleRole::Button);
+    assert!(w.get_voice_testing());
+    assert_eq!(w.get_preview_voice(), 1);
+    assert_eq!(w.get_game_voice(), 0, "not picked");
+    assert_eq!(w.get_voice_label(), "David");
+    assert!(w.get_voice_menu(), "the list stays open");
+    let end = Instant::now() + Duration::from_secs(5);
+    while tts.calls().is_empty() {
+        assert!(Instant::now() < end, "no sample was made");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let call = tts.calls().pop().unwrap();
+    assert_eq!(
+        (call.text.as_str(), call.voice.as_str(), call.speed),
+        (dr_app::vm::voices::SAMPLE, "fake-zira", 1.5)
+    );
+    // Settings and page 05 do not show it as theirs
+    assert!(!w.get_test_in_settings());
+
+    // the playing row's button is Stop; another row's play switches to that voice
+    assert!(
+        ElementHandle::find_by_accessible_label(&w, "Stop")
+            .any(|e| e.accessible_role() == Some(AccessibleRole::Button))
+    );
+    press(&w, "Play a sample of David", AccessibleRole::Button);
+    assert_eq!(w.get_preview_voice(), 0);
+    assert!(w.get_voice_testing());
+    // pressed again: it stops
+    press(&w, "Stop", AccessibleRole::Button);
+    assert!(!w.get_voice_testing());
+    assert_eq!(w.get_preview_voice(), -1);
+
+    // closing the list (Esc) stops it
+    press(&w, "Play a sample of Zira", AccessibleRole::Button);
+    assert!(w.get_voice_testing());
+    key(&w, slint::platform::Key::Escape);
+    settle();
+    assert!(!w.get_voice_menu());
+    assert!(!w.get_voice_testing());
+    assert_eq!(w.get_preview_voice(), -1);
+    assert_eq!(w.get_voice_label(), "David", "still the game's voice");
+}
+
+/// A real pointer click on a row's play button (the button sits inside the row's TouchArea, so the row keeps its
+/// hover): it plays that voice and does not pick the row or close the list.
+#[test]
+fn a_mouse_click_on_the_play_button_does_not_pick_the_row() {
+    let (_dir, paths) = temp_paths();
+    let (vs, _, _) = voices(1.0);
+    let (w, _vm) = real_window_with(&paths, FakeDesktop::new(), vs);
+    press(&w, "Get started", AccessibleRole::Button);
+    press(&w, "Continue", AccessibleRole::Button);
+    for _ in 0..3 {
+        press(&w, "Continue", AccessibleRole::Button);
+    }
+    press(&w, "Finish", AccessibleRole::Button);
+    settle();
+    press(&w, "Voice", AccessibleRole::Button);
+    assert!(w.get_voice_menu());
+    let play = ElementHandle::find_by_accessible_label(&w, "Play a sample of Zira")
+        .find(|e| e.accessible_role() == Some(AccessibleRole::Button))
+        .expect("the play button of Zira");
+    let (p, s) = (play.absolute_position(), play.size());
+    let at = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+    let win = w.window();
+    win.dispatch_event(slint::platform::WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(slint::platform::WindowEvent::PointerPressed {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    win.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+        position: at,
+        button: slint::platform::PointerEventButton::Left,
+    });
+    assert_eq!(w.get_preview_voice(), 1, "Zira plays");
+    assert!(w.get_voice_testing());
+    assert_eq!(w.get_game_voice(), 0, "not picked");
+    assert_eq!(w.get_voice_label(), "David");
+    assert!(w.get_voice_menu(), "the list stays open");
+}

@@ -67,8 +67,9 @@ pub struct ReadState {
     /// The profile id of the game whose log is open.
     game: Option<String>,
     /// Logs of games left while their speech still had events to come: line events go to the front one until its
-    /// speech mark comes back.
-    older: VecDeque<(u64, Log)>,
+    /// speech mark comes back. `None`: the game was deleted, its late lines are dropped (they would make its log
+    /// file again).
+    older: VecDeque<(u64, Option<Log>)>,
     marks: u64,
     /// The newest lines of the current game, oldest first, at most [`KEEP`].
     entries: Vec<Entry>,
@@ -380,7 +381,16 @@ impl Vm {
             let m = self.reading.marks;
             sp.send(speech::Cmd::Stop);
             sp.send(speech::Cmd::Mark(m));
-            self.reading.older.push_back((m, log));
+            self.reading.older.push_back((m, Some(log)));
+        }
+    }
+
+    /// A game was deleted: lines of it that come late are not written (its log file stays gone).
+    pub(super) fn forget_log(&mut self, path: &std::path::Path) {
+        for (_, log) in self.reading.older.iter_mut() {
+            if log.as_ref().is_some_and(|l| l.path() == path) {
+                *log = None;
+            }
         }
     }
 
@@ -504,11 +514,12 @@ impl Vm {
             };
             let Some(line) = line else { continue };
             match self.reading.older.front() {
-                Some((_, log)) => {
+                Some((_, Some(log))) => {
                     if let Err(e) = log.append(&[line]) {
                         self.err(&format!("activity log: {e}"));
                     }
                 }
+                Some((_, None)) => {}
                 None => new.push(line),
             }
         }

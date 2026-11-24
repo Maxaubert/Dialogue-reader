@@ -938,10 +938,9 @@ impl Vm {
         self.push_profile_settings();
     }
 
-    /// Play sample (page 05, `setup`) or Test (Settings, the current game).
-    pub fn test_voice(&mut self, setup: bool) -> bool {
+    /// A sample can play: there are voices and a speech thread (else the notice says why).
+    fn can_play_sample(&mut self) -> bool {
         self.check_kokoro();
-        let Some(w) = self.win() else { return false };
         if self.voices.list.is_empty() {
             self.notice(&self.voices.problem_text());
             return false;
@@ -950,8 +949,15 @@ impl Vm {
             self.notice("Sample data: voices do not play here.");
             return false;
         }
-        // events of an earlier sample are old news; line events still go to the log
-        let _ = self.drain_speech();
+        true
+    }
+
+    /// Play sample (page 05, `setup`) or Test (Settings, the current game).
+    pub fn test_voice(&mut self, setup: bool) -> bool {
+        if !self.can_play_sample() {
+            return false;
+        }
+        let Some(w) = self.win() else { return false };
         let (voice, speed, volume) = if setup {
             let i = usize::try_from(w.get_picked_voice()).unwrap_or(0);
             let id = self
@@ -972,6 +978,50 @@ impl Vm {
             let v = &g.profile.voice;
             (self.voices.effective(&v.id), v.speed, v.volume)
         };
+        self.play_sample(voice, speed, volume, !setup, -1)
+    }
+
+    /// The play button of row `i` of the Overview voice picker: a sample of that voice at the current game's speed
+    /// and volume, without picking it. The same row again stops it; another row's button switches to that voice.
+    pub fn menu_preview(&mut self, i: i32) -> bool {
+        let Some(w) = self.win() else { return false };
+        if self.test_running.is_some() && w.get_preview_voice() == i {
+            self.stop_test();
+            return false;
+        }
+        if !self.can_play_sample() {
+            return false;
+        }
+        let Some(voice) = usize::try_from(i)
+            .ok()
+            .and_then(|i| self.voices.list.get(i))
+            .map(|v| v.id.clone())
+        else {
+            return false;
+        };
+        let (speed, volume) = match self.current.and_then(|g| self.games.get(g)) {
+            Some(g) => (g.profile.voice.speed, g.profile.voice.volume),
+            None => (
+                voices::speed_of_slider(w.get_game_speed()),
+                w.get_game_volume(),
+            ),
+        };
+        self.play_sample(voice, speed, volume, false, i)
+    }
+
+    /// Sends a voice test to the speech thread (it stops what plays and clears the queue, as every sample does).
+    /// `in_settings`: started in Settings; `preview`: the row of the Overview voice picker (-1: not from there).
+    fn play_sample(
+        &mut self,
+        voice: String,
+        speed: f32,
+        volume: f32,
+        in_settings: bool,
+        preview: i32,
+    ) -> bool {
+        let Some(w) = self.win() else { return false };
+        // events of an earlier sample are old news; line events still go to the log
+        let _ = self.drain_speech();
         let Some(sp) = &self.voices.speech else {
             return false;
         };
@@ -985,7 +1035,8 @@ impl Vm {
         });
         self.test_running = Some(self.test_id);
         w.set_voice_testing(true);
-        w.set_test_in_settings(!setup);
+        w.set_test_in_settings(in_settings);
+        w.set_preview_voice(preview);
         w.set_test_played(0);
         w.set_test_time("0:00".into());
         true
@@ -1000,6 +1051,7 @@ impl Vm {
         self.test_timer.stop();
         if let Some(w) = self.win() {
             w.set_voice_testing(false);
+            w.set_preview_voice(-1);
             w.set_test_played(0);
         }
     }
@@ -1037,6 +1089,7 @@ impl Vm {
         if ended {
             self.test_running = None;
             w.set_voice_testing(false);
+            w.set_preview_voice(-1);
             w.set_test_played(0);
             w.set_test_time("0:00".into());
             // a sample that did not play may mean that Kokoro failed to load
@@ -1323,6 +1376,78 @@ impl Vm {
         self.push_setup();
         self.push_profile_settings();
         self.push_main();
+    }
+
+    /// Delete in the game switcher: game `i` goes, with its profile, screenshot and activity log. When it was the
+    /// current game, the game now at its place in the list (or the last one) becomes current; with no game left,
+    /// the app goes to Welcome. The fake data (render-screens, nav tests) only loses the row.
+    pub fn delete_game(&mut self, i: usize) {
+        let Some(w) = self.win() else { return };
+        self.commit_rename();
+        let Some(real) = &self.real else {
+            if i >= self.game_rows.row_count() {
+                return;
+            }
+            self.game_rows.remove(i);
+            let n = self.game_rows.row_count();
+            let cur = usize::try_from(w.get_current_game()).unwrap_or(0);
+            self.push_switcher_hits();
+            if n == 0 {
+                w.set_switcher_open(false);
+                w.set_page(Page::Welcome);
+            } else {
+                let cur = if cur > i { cur - 1 } else { cur.min(n - 1) };
+                w.set_current_game(cur as i32);
+            }
+            return;
+        };
+        let Some(g) = self.games.get(i) else { return };
+        let id = g.profile.id.clone();
+        let paths = real.paths.clone();
+        let log_path = paths.activity_log(&id);
+        let was_current = self.current == Some(i);
+        let voice_dirty = self.voice_dirty;
+        if was_current {
+            // leave the game first: what it read or had queued is written now (to the files deleted below), and
+            // nothing of it is saved again
+            self.voice_dirty = false;
+            if self.test_running.is_some() {
+                self.stop_test();
+            }
+            self.live_stop();
+            self.current = None;
+            self.reading_start();
+        }
+        // lines of it that come later (its speech is stopping) are dropped, or they would make its log again
+        self.forget_log(&log_path);
+        if let Err(e) = profile::delete(&paths, &id) {
+            // the profile is still on disk (profile::delete removes it last): the game stays, with a voice change
+            // that was not saved yet
+            if was_current {
+                self.open_game(i, None);
+                self.voice_dirty = voice_dirty;
+            }
+            self.notice(&format!("The game could not be deleted: {e}"));
+            return;
+        }
+        self.games.remove(i);
+        match self.current {
+            _ if was_current && self.games.is_empty() => {
+                self.main = Editor::new(Vec::new(), 1600.0, 900.0);
+                self.main.draw = false;
+                self.push_games();
+                self.push_main();
+                w.set_adding_game(false);
+                w.set_switcher_open(false);
+                w.set_page(Page::Welcome);
+            }
+            _ if was_current => self.open_game(i.min(self.games.len() - 1), None),
+            Some(c) if c > i => {
+                self.current = Some(c - 1);
+                self.push_games();
+            }
+            _ => self.push_games(),
+        }
     }
 
     /// Saves the current profile.
@@ -1661,6 +1786,12 @@ fn wire(w: &MainWindow, vm: &Shared) {
     let v = vm.clone();
     w.on_switcher_opened(move || v.borrow_mut().load_covers());
     let v = vm.clone();
+    w.on_game_deleted(move |i| {
+        if let Ok(i) = usize::try_from(i) {
+            v.borrow_mut().delete_game(i);
+        }
+    });
+    let v = vm.clone();
     w.on_switcher_search(move |q| {
         let mut vm = v.borrow_mut();
         vm.switcher_query = q.to_string();
@@ -1670,13 +1801,9 @@ fn wire(w: &MainWindow, vm: &Shared) {
     w.on_mode_changed(move |a| v.borrow_mut().set_mode(a));
     let v = vm.clone();
     w.on_setup_cancelled(move || v.borrow_mut().cancel_setup());
-    let v = vm.clone();
-    w.on_voice_test(move |setup| {
-        if !v.borrow_mut().test_voice(setup) {
-            return;
-        }
-        // poll the speech thread while the sample plays (the timer runs only with an event loop)
-        let weak = Rc::downgrade(&v);
+    // poll the speech thread while a sample plays (the timer runs only with an event loop)
+    fn poll_sample(v: &Shared) {
+        let weak = Rc::downgrade(v);
         v.borrow().test_timer.start(
             slint::TimerMode::Repeated,
             std::time::Duration::from_millis(100),
@@ -1689,6 +1816,18 @@ fn wire(w: &MainWindow, vm: &Shared) {
                 }
             },
         );
+    }
+    let v = vm.clone();
+    w.on_voice_test(move |setup| {
+        if v.borrow_mut().test_voice(setup) {
+            poll_sample(&v);
+        }
+    });
+    let v = vm.clone();
+    w.on_voice_preview(move |i| {
+        if v.borrow_mut().menu_preview(i) {
+            poll_sample(&v);
+        }
     });
     let v = vm.clone();
     w.on_voice_stop(move || v.borrow_mut().stop_test());

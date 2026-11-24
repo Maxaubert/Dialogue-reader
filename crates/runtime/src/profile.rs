@@ -359,6 +359,37 @@ pub fn ids_on_disk(paths: &Paths) -> Vec<String> {
         .collect()
 }
 
+/// Deletes a game: `profiles\<id>.json` (and its `.bad` and `.tmp` copies), `profiles\<id>.png` and its activity
+/// log `log\<id>.jsonl`. Only files in the data folder, named from the id; an id that could point outside it (a
+/// path separator, `..`) deletes nothing. A file that is not there is fine. The `.json` goes last and the first
+/// error stops it: an error always leaves the profile on disk, so the game stays whole and listed.
+pub fn delete(paths: &Paths, id: &str) -> Result<(), String> {
+    if id.is_empty() || id.contains(['/', '\\', ':']) || id.contains("..") {
+        return Err(format!("not a profile id: {id:?}"));
+    }
+    let json = paths.profile_json(id);
+    let with = |ext: &str| {
+        let mut p = json.as_os_str().to_owned();
+        p.push(ext);
+        PathBuf::from(p)
+    };
+    let files = [
+        paths.profile_png(id),
+        paths.activity_log(id),
+        with(".bad"),
+        with(".tmp"),
+        json,
+    ];
+    for f in files {
+        match std::fs::remove_file(&f) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("could not delete {}: {e}", f.display())),
+        }
+    }
+    Ok(())
+}
+
 /// A file-safe id from a game name, unique among `taken` (case does not matter, as on a Windows disk):
 /// "Red Dead Redemption 2" -> "red-dead-redemption-2".
 pub fn new_id(name: &str, taken: &[String]) -> String {
@@ -390,6 +421,35 @@ pub fn new_id(name: &str, taken: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delete_removes_the_files_of_one_game_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::at(dir.path().join("DialogReader"));
+        for id in ["gone", "kept"] {
+            save(&paths, &Profile::new(id, id, "game.exe")).unwrap();
+            std::fs::write(paths.profile_png(id), b"png").unwrap();
+            std::fs::create_dir_all(paths.activity_log(id).parent().unwrap()).unwrap();
+            std::fs::write(paths.activity_log(id), b"{}").unwrap();
+        }
+        std::fs::write(paths.profiles().join("gone.json.bad"), b"x").unwrap();
+        delete(&paths, "gone").unwrap();
+        assert!(!paths.profile_json("gone").exists());
+        assert!(!paths.profile_png("gone").exists());
+        assert!(!paths.activity_log("gone").exists());
+        assert!(!paths.profiles().join("gone.json.bad").exists());
+        assert!(paths.profile_json("kept").exists());
+        assert!(paths.profile_png("kept").exists());
+        assert!(paths.activity_log("kept").exists());
+        assert_eq!(ids_on_disk(&paths), ["kept", "kept"]);
+        // again: nothing left to delete is not an error
+        delete(&paths, "gone").unwrap();
+        // an id that could leave the folder deletes nothing
+        for bad in ["", "..\\kept", "../kept", "c:kept"] {
+            assert!(delete(&paths, bad).is_err(), "{bad:?}");
+        }
+        assert!(paths.profile_json("kept").exists());
+    }
 
     #[test]
     fn ids_are_file_safe_and_unique() {

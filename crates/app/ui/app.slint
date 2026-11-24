@@ -141,6 +141,13 @@ export component MainWindow inherits Window {
     in-out property <bool> switcher-open: false;
     // the voice picker of the Overview toolbar is open (Esc closes it)
     in-out property <bool> voice-menu: false;
+    // the voice picker row whose sample plays (Rust; -1: none). Closing the picker stops it.
+    in property <int> preview-voice: -1;
+    changed voice-menu => {
+        if !self.voice-menu && self.preview-voice >= 0 {
+            root.voice-stop();
+        }
+    }
     // debug: the component sheet over everything (render-screens "00-components", tests/components.rs)
     in property <bool> sheet: false;
     // view models (src/vm): real profiles and windows, or the fake data of the mockups (src/fake.rs)
@@ -151,6 +158,9 @@ export component MainWindow inherits Window {
     in-out property <[ZoneData]> zones;
     // the Overview zone chips: one per kind that has a zone (not Ignore), on while any zone of it is on (Rust)
     in-out property <[ZoneData]> zone-kinds;
+    // the Overview keeps a row under the picture for the chips, or for the note about the saved screenshot; with
+    // neither, the picture and the Now panel run to the bottom (OverviewRect)
+    property <bool> overview-chips: root.zone-kinds.length > 0 || (root.game-running && root.real-shots && LiveView.note != "" && !LiveView.note-live);
     in-out property <[VoiceData]> voices;
     in-out property <[VoiceData]> menu-voices;
     in-out property <[LineData]> recent;
@@ -182,6 +192,8 @@ export component MainWindow inherits Window {
     in property <string> test-time: "0:02 / 0:04";
     // the playing sample was started in Settings (its button says Stop), not on page 05
     in property <bool> test-in-settings: false;
+    // the play button of a row in the Overview voice picker: a sample of that voice at the game's speed and volume
+    callback voice-preview(int);
     // the current game's voice (Overview, Settings): index in `voices`, sliders 0 to 1 as on page 05
     in-out property <int> game-voice: 0;
     in-out property <float> game-speed: 0.4;
@@ -344,6 +356,8 @@ export component MainWindow inherits Window {
     callback game-chosen(int);
     // the switcher opened: covers of the other games are made the first time
     callback switcher-opened();
+    // Delete in the switcher was confirmed: the game (index in `games`) goes, with its files (src/vm/mod.rs)
+    callback game-deleted(int);
     // the switcher's search: Rust sets `switcher-hits` (the games that match, as indices into `games`)
     callback switcher-search(string);
     in-out property <[int]> switcher-hits;
@@ -391,6 +405,10 @@ export component MainWindow inherits Window {
     callback paused-changed(bool);
     changed paused => {
         root.paused-changed(root.paused);
+    }
+    // Delete asks on the highlighted row of the switcher (render-screens)
+    public function switcher-ask-delete() {
+        switcher.ask-delete();
     }
     // opens the Settings voice picker (render-screens)
     public function settings-open-voice-list() {
@@ -584,7 +602,14 @@ export component MainWindow inherits Window {
             }
             if root.switcher-open {
                 if e.text == Key.Escape {
-                    root.switcher-open = false;
+                    // a Delete that asks is cancelled first
+                    if !switcher.cancel-delete() {
+                        root.switcher-open = false;
+                    }
+                    return accept;
+                }
+                if e.text == Key.Delete {
+                    switcher.ask-delete();
                     return accept;
                 }
                 if e.text == Key.UpArrow {
@@ -786,7 +811,7 @@ export component MainWindow inherits Window {
                         speed <=> root.voice-speed;
                         volume <=> root.voice-volume;
                         problem: root.voices-problem;
-                        testing: root.voice-testing && !root.test-in-settings;
+                        testing: root.voice-testing && !root.test-in-settings && root.preview-voice < 0;
                         test-played: root.test-played;
                         test-time: root.test-time;
                         test => {
@@ -843,6 +868,7 @@ export component MainWindow inherits Window {
                         }
                         zones <=> root.zones;
                         kinds: root.zone-kinds;
+                        chip-row: root.overview-chips;
                         recent: root.recent;
                         fresh: root.arriving ? root.recent-new : 0;
                         arrive: root.arrive-e;
@@ -876,9 +902,16 @@ export component MainWindow inherits Window {
                         voices: root.voices;
                         game-voice: root.game-voice;
                         voice-open <=> root.voice-menu;
+                        voice-playing: root.voice-testing ? root.preview-voice : -1;
                         voice-picked(i) => {
                             root.game-voice = i;
                             root.game-voice-picked(i);
+                        }
+                        voice-preview(i) => {
+                            root.voice-preview(i);
+                        }
+                        voice-preview-stop => {
+                            root.voice-stop();
                         }
                         key-clicked => {
                             root.go(Page.settings);
@@ -904,6 +937,7 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     if zones-slot.alive: ZonesTab {
                         grow: zones-slot.grow ? zones-slot.t : 1;
+                        overview-chips: root.overview-chips;
                         text-o: root.text-o;
                         pic-t: root.crossing ? root.cross-t : 1;
                         old-shot: root.old-shot;
@@ -1001,7 +1035,7 @@ export component MainWindow inherits Window {
                         game-voice <=> root.game-voice;
                         game-speed <=> root.game-speed;
                         game-volume <=> root.game-volume;
-                        testing: root.voice-testing && root.test-in-settings;
+                        testing: root.voice-testing && root.test-in-settings && root.preview-voice < 0;
                         add-voices => {
                             root.voices-add();
                         }
@@ -1090,6 +1124,9 @@ export component MainWindow inherits Window {
             add-game => {
                 root.switcher-open = false;
                 root.add-game();
+            }
+            delete-game(i) => {
+                root.game-deleted(i);
             }
         }
 
