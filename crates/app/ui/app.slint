@@ -158,6 +158,9 @@ export component MainWindow inherits Window {
     in-out property <[ZoneData]> zones;
     // the Overview zone chips: one per kind that has a zone (not Ignore), on while any zone of it is on (Rust)
     in-out property <[ZoneData]> zone-kinds;
+    // the Overview keeps a row under the picture for the chips, or for the note about the saved screenshot; with
+    // neither, the picture and the Now panel run to the bottom (OverviewRect)
+    property <bool> overview-chips: root.zone-kinds.length > 0 || (root.game-running && root.real-shots && LiveView.note != "" && !LiveView.note-live);
     in-out property <[VoiceData]> voices;
     in-out property <[VoiceData]> menu-voices;
     in-out property <[LineData]> recent;
@@ -865,6 +868,7 @@ export component MainWindow inherits Window {
                         }
                         zones <=> root.zones;
                         kinds: root.zone-kinds;
+                        chip-row: root.overview-chips;
                         recent: root.recent;
                         fresh: root.arriving ? root.recent-new : 0;
                         arrive: root.arrive-e;
@@ -933,6 +937,7 @@ export component MainWindow inherits Window {
                     armed: root.armed;
                     if zones-slot.alive: ZonesTab {
                         grow: zones-slot.grow ? zones-slot.t : 1;
+                        overview-chips: root.overview-chips;
                         text-o: root.text-o;
                         pic-t: root.crossing ? root.cross-t : 1;
                         old-shot: root.old-shot;

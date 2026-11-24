@@ -42,6 +42,8 @@ export component ZonesTab inherits Rectangle {
     // the stage grow from the Overview (README motion table, 11-zones 4): 0 at the Overview stage, 1 here. The
     // toolbar and the tags fade in 120 ms into the 300 ms grow, over the last 180 ms.
     in property <float> grow: 1;
+    // the Overview has its zone chip row (OverviewRect): where the grow starts
+    in property <bool> overview-chips: true;
     property <float> tools: Math.clamp((root.grow - 0.4) / 0.6, 0, 1);
     // switch game (app.slint), as on the Overview: the zones and the screenshot time fade out and in (`text-o`);
     // the new picture fades in (`pic-t`, 0 to 1) over the old one (`old-shot`), so the picture never dips to black.
@@ -121,9 +123,9 @@ export component ZonesTab inherits Rectangle {
     }
 
     // the Overview stage rectangle, where the grow starts
-    property <length> ox: OverviewRect.x(root.width, root.height);
-    property <length> oy: OverviewRect.y(root.width, root.height);
-    property <length> ow: OverviewRect.stage-w(root.width, root.height);
+    property <length> ox: OverviewRect.x(root.width, root.height, root.overview-chips);
+    property <length> oy: OverviewRect.y(root.width, root.height, root.overview-chips);
+    property <length> ow: OverviewRect.stage-w(root.width, root.height, root.overview-chips);
     pic := Rectangle {
         x: root.ox + ((root.width - root.sw) / 2 - root.ox) * root.grow;
         y: root.oy + (root.top - root.oy) * root.grow;

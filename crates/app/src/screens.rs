@@ -100,6 +100,16 @@ pub fn all() -> Vec<Screen> {
                 w.set_shot_h(1000.0);
             },
         },
+        // a 16:9 real screenshot: at 1707 x 912 the frame hugs the picture (no thin band, no second frame)
+        Screen {
+            name: "10-overview-real-shot-16x9",
+            setup: |w| {
+                page(w, Page::Overview);
+                w.set_real_shots(true);
+                w.set_shot_w(1920.0);
+                w.set_shot_h(1080.0);
+            },
+        },
         Screen {
             name: "11-zones",
             setup: |w| {
@@ -331,6 +341,15 @@ pub fn all() -> Vec<Screen> {
                 w.set_edit_zones(slint::ModelRc::new(slint::VecModel::from(zones)));
                 w.set_edit_draft(false);
                 w.set_overlay(OverlayPreview::ZoneEdit);
+            },
+        },
+        // a game with no zone chips: the picture and the Now panel run to the bottom (Max, 2026-11-24). Last, as it
+        // empties the chips.
+        Screen {
+            name: "10-overview-no-chips",
+            setup: |w| {
+                w.set_zone_kinds(slint::ModelRc::default());
+                page(w, Page::Overview);
             },
         },
     ]

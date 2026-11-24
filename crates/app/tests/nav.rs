@@ -1323,6 +1323,8 @@ fn the_switcher_deletes_a_game_after_asking() {
         key(&w, Key::UpArrow);
     }
     press(&w, &format!("Delete {first}"), AccessibleRole::Button);
+    // "Delete" takes no click in the first 500 ms (the second click of a double click on the trash button)
+    wait(600);
     press(
         &w,
         &format!("Confirm delete {first}"),
@@ -1387,10 +1389,16 @@ fn the_switcher_delete_by_mouse() {
     to(300.0, 600.0);
     assert!(!asks(&w));
     assert!(w.get_switcher_open());
-    // the "Delete" in the trash button's place deletes
+    // a double click on the trash button only asks: its second click lands on "Delete" and does nothing
     to(300.0, row2);
     click(trash, row2);
-    assert!(asks(&w));
+    click(trash, row2);
+    assert!(asks(&w), "still asks");
+    assert_eq!(names(&w), before, "nothing deleted");
+    assert_eq!(w.get_current_game(), 0, "no game switch");
+    assert!(w.get_switcher_open());
+    // a moment later the "Delete" in the trash button's place deletes
+    wait(600);
     click(450.0, row2);
     assert_eq!(names(&w).len(), before.len() - 1);
     assert!(!names(&w).contains(&before[1]));

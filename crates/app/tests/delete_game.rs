@@ -112,6 +112,8 @@ fn deleting_games_down_to_none() {
     // the current game (by mouse: trash, then Delete): the next one becomes current
     key(&w, Key::UpArrow);
     press(&w, &format!("Delete {first}"), AccessibleRole::Button);
+    // "Delete" takes no click in the first 500 ms (a double click on the trash button must not delete)
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(600));
     press(
         &w,
         &format!("Confirm delete {first}"),
@@ -137,4 +139,32 @@ fn deleting_games_down_to_none() {
         assert_eq!(files_of(&paths, id), [false; 3], "{id}");
     }
     assert!(profile::ids_on_disk(&paths).is_empty());
+}
+
+#[test]
+fn a_failed_delete_keeps_the_game_whole() {
+    let (_dir, paths) = temp_paths();
+    saved(&paths);
+    let (w, _vm) = real_window(&paths, FakeDesktop::new());
+    let first = current(&w);
+    let id = id_of(&first);
+    // a folder where the screenshot is: it cannot be removed as a file
+    std::fs::remove_file(paths.profile_png(&id)).unwrap();
+    std::fs::create_dir(paths.profile_png(&id)).unwrap();
+    ctrl_key(&w, "k");
+    key(&w, Key::UpArrow);
+    key(&w, Key::Delete);
+    assert!(asks(&w, &first));
+    key(&w, Key::Return);
+    // the profile goes last, so it is still there, and the game stays listed and current
+    assert!(paths.profile_json(&id).exists());
+    assert!(profile::ids_on_disk(&paths).contains(&id));
+    assert_eq!(names(&w).len(), 3);
+    assert_eq!(current(&w), first);
+    assert_eq!(w.get_page(), Page::Overview);
+    assert!(
+        w.get_notice().contains("could not be deleted"),
+        "{}",
+        w.get_notice()
+    );
 }

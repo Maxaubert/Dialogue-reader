@@ -1406,6 +1406,7 @@ impl Vm {
         let paths = real.paths.clone();
         let log_path = paths.activity_log(&id);
         let was_current = self.current == Some(i);
+        let voice_dirty = self.voice_dirty;
         if was_current {
             // leave the game first: what it read or had queued is written now (to the files deleted below), and
             // nothing of it is saved again
@@ -1420,8 +1421,11 @@ impl Vm {
         // lines of it that come later (its speech is stopping) are dropped, or they would make its log again
         self.forget_log(&log_path);
         if let Err(e) = profile::delete(&paths, &id) {
+            // the profile is still on disk (profile::delete removes it last): the game stays, with a voice change
+            // that was not saved yet
             if was_current {
                 self.open_game(i, None);
+                self.voice_dirty = voice_dirty;
             }
             self.notice(&format!("The game could not be deleted: {e}"));
             return;

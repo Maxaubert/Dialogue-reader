@@ -1,9 +1,10 @@
 // 14 game switcher (d-black 14-game-switcher): a scrim under the title strip and a panel under the game name.
 // The game name or Ctrl K opens it. Type to search; Up and Down move the highlight (it glides 120 ms); Enter
 // switches; Esc or a click outside closes it. Rust filters the games (`hits`, src/vm/mod.rs).
-// Delete a game (Max, 2026-11-24): the highlighted row has a trash button at its right end (the Delete key does
-// the same). It asks first: the button becomes a small "Delete" on that row, which Enter or a click confirms. Esc,
-// another row or the mouse leaving the row cancels it.
+// Delete a game (Max, 2026-11-24): the highlighted row has a trash button at its right end (the Delete key, with
+// an empty search, does the same). It asks first: the button becomes a small "Delete" on that row, which Enter or
+// a click confirms. Esc, another row or the mouse leaving the row cancels it. A click on "Delete" in the first 500 ms after the ask does
+// nothing: "Delete" sits where the trash button was, so a double click must not delete (Max: not one misclick).
 // Motion (README, 7 and 8): scrim 0 to 0.6, panel opacity, y -8 to 0 and scale 0.98 to 1, 180 ms ease-out;
 // close 140 ms ease-in.
 import {
@@ -16,7 +17,14 @@ import {
     Icons,
 } from "../theme.slint";
 import { GameData } from "../data.slint";
-import { CIcon, Icon, Thumb, IconButton, Button, BtnKind } from "../components/base.slint";
+import {
+    CIcon,
+    Icon,
+    Thumb,
+    IconButton,
+    Button,
+    BtnKind,
+} from "../components/base.slint";
 
 // One game row (.gr): picture, name, and "Reading" or when it was last played on the right. The highlighted row
 // ends with a trash button; while `confirm`, a "Delete" button instead.
@@ -51,75 +59,75 @@ component GameItem inherits Rectangle {
             }
         }
 
-    HorizontalLayout {
-        padding-left: Space.s2;
-        padding-right: root.hi || root.confirm ? Space.s2 : Space.s3;
-        spacing: Space.s3;
-        VerticalLayout {
-            alignment: center;
-            Rectangle {
-                width: 48px;
-                height: 27px;
-                Thumb {
-                    width: 100%;
-                    height: 100%;
-                    art: root.game.art;
-                    picture: root.game.cover;
-                    radius: Radius.sm;
-                    behind: root.hi ? Palette.surface-3 : Palette.surface-1;
-                }
-
+        HorizontalLayout {
+            padding-left: Space.s2;
+            padding-right: root.hi || root.confirm ? Space.s2 : Space.s3;
+            spacing: Space.s3;
+            VerticalLayout {
+                alignment: center;
                 Rectangle {
-                    border-radius: Radius.sm;
-                    border-width: 1px;
-                    border-color: Palette.line;
+                    width: 48px;
+                    height: 27px;
+                    Thumb {
+                        width: 100%;
+                        height: 100%;
+                        art: root.game.art;
+                        picture: root.game.cover;
+                        radius: Radius.sm;
+                        behind: root.hi ? Palette.surface-3 : Palette.surface-1;
+                    }
+
+                    Rectangle {
+                        border-radius: Radius.sm;
+                        border-width: 1px;
+                        border-color: Palette.line;
+                    }
+                }
+            }
+
+            Text {
+                text: root.game.name;
+                color: Palette.text;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+                // the row carries the name (a Text with it would count as the strip's game name)
+                accessible-role: none;
+            }
+
+            Text {
+                text: root.game.meta;
+                font-size: Type.fs-small;
+                color: Palette.text-2;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+
+            if root.hi && !root.confirm: VerticalLayout {
+                alignment: center;
+                IconButton {
+                    small: true;
+                    icon: Icons.trash;
+                    tip: "Delete game";
+                    label: "Delete " + root.game.name;
+                    clicked => {
+                        root.delete-asked();
+                    }
+                }
+            }
+            if root.confirm: VerticalLayout {
+                alignment: center;
+                Button {
+                    kind: BtnKind.danger;
+                    text: "Delete";
+                    label: "Confirm delete " + root.game.name;
+                    height: 28px;
+                    clicked => {
+                        root.delete-confirmed();
+                    }
                 }
             }
         }
-
-        Text {
-            text: root.game.name;
-            color: Palette.text;
-            vertical-alignment: center;
-            horizontal-stretch: 1;
-            overflow: elide;
-            // the row carries the name (a Text with it would count as the strip's game name)
-            accessible-role: none;
-        }
-
-        Text {
-            text: root.game.meta;
-            font-size: Type.fs-small;
-            color: Palette.text-2;
-            vertical-alignment: center;
-            accessible-role: none;
-        }
-
-        if root.hi && !root.confirm: VerticalLayout {
-            alignment: center;
-            IconButton {
-                small: true;
-                icon: Icons.trash;
-                tip: "Delete game";
-                label: "Delete " + root.game.name;
-                clicked => {
-                    root.delete-asked();
-                }
-            }
-        }
-        if root.confirm: VerticalLayout {
-            alignment: center;
-            Button {
-                kind: BtnKind.danger;
-                text: "Delete";
-                label: "Confirm delete " + root.game.name;
-                height: 28px;
-                clicked => {
-                    root.delete-confirmed();
-                }
-            }
-        }
-    }
     }
 }
 
@@ -136,6 +144,9 @@ export component GameSwitcher inherits Rectangle {
     property <bool> by-mouse: false;
     // the row (a place in `hits`) that asks "Delete?" now (-1: none)
     in-out property <int> confirm: -1;
+    // when the row asked (animation-tick): a click on "Delete" that comes too soon is the second click of a
+    // double click on the trash button
+    property <duration> asked-at;
     callback close();
     // a game was picked (its index in `games`)
     callback choose(int);
@@ -176,6 +187,7 @@ export component GameSwitcher inherits Rectangle {
     public function ask-delete() {
         if root.highlight >= 0 && root.highlight < root.hits.length {
             root.confirm = root.highlight;
+            root.asked-at = animation-tick();
         }
     }
     // Esc: a Delete that was asked is off (true), or there was none (false: Esc closes the switcher)
@@ -280,7 +292,8 @@ export component GameSwitcher inherits Rectangle {
                                 root.pick();
                                 return accept;
                             }
-                            if e.text == Key.Delete && root.hits.length > 0 {
+                            // Delete asks only with an empty search: with text, it deletes a character
+                            if e.text == Key.Delete && root.query == "" && root.hits.length > 0 {
                                 root.ask-delete();
                                 return accept;
                             }
@@ -375,8 +388,12 @@ export component GameSwitcher inherits Rectangle {
                         delete-asked => {
                             root.highlight = j;
                             root.confirm = j;
+                            root.asked-at = animation-tick();
                         }
                         delete-confirmed => {
+                            if animation-tick() - root.asked-at < 500ms {
+                                return;
+                            }
                             root.confirm = j;
                             root.confirm-delete();
                         }

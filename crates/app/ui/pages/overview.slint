@@ -27,25 +27,44 @@ import {
 } from "../components/base.slint";
 import { Stage, LiveNote, LiveView } from "../components/stage.slint";
 
-// Where the Overview stage sits in a page `w` x `h` (the frame left of the Now panel, the 16:9 stage centred in it).
+// Where the Overview stage sits in a page `w` x `h`: the frame left of the Now panel, the 16:9 stage centred in it.
+// `chips`: the zone chip row is under the frame; without it the frame (and the Now panel) run to the page bottom
+// (Max, 2026-11-24: the panels end together and nothing empty stays under them).
+// A band of 16 px or less on a side reads as a second frame around the picture (Max, 11.png at 1707 x 912): then
+// the frame hugs the stage and the Now panel takes the width that is left.
 // The Zones page grows its stage from this rectangle (README motion table, 11-zones 4).
 export global OverviewRect {
-    out property <length> panel-w: 320px;
+    // the Now panel at its narrowest
+    out property <length> panel-min: 320px;
     out property <length> frame-y: 60px;
-    public pure function frame-w(w: length) -> length {
-        return w - 2 * Size.page-x - Space.s4 - self.panel-w;
+    out property <length> snap: 16px;
+    // the room for the frame
+    pure function room-w(w: length) -> length {
+        return w - 2 * Size.page-x - Space.s4 - self.panel-min;
     }
-    public pure function frame-h(h: length) -> length {
-        return h - self.frame-y - Space.s2 - Size.row - Size.page-x;
+    pure function room-h(h: length, chips: bool) -> length {
+        return h - self.frame-y - Size.page-x - (chips ? Space.s2 + Size.row : 0px);
     }
-    public pure function stage-w(w: length, h: length) -> length {
-        return Math.min(self.frame-w(w), self.frame-h(h) * 16 / 9);
+    public pure function stage-w(w: length, h: length, chips: bool) -> length {
+        return Math.min(self.room-w(w), self.room-h(h, chips) * 16 / 9);
     }
-    public pure function x(w: length, h: length) -> length {
-        return Size.page-x + (self.frame-w(w) - self.stage-w(w, h)) / 2;
+    public pure function stage-h(w: length, h: length, chips: bool) -> length {
+        return self.stage-w(w, h, chips) * 9 / 16;
     }
-    public pure function y(w: length, h: length) -> length {
-        return self.frame-y + (self.frame-h(h) - self.stage-w(w, h) * 9 / 16) / 2;
+    public pure function frame-w(w: length, h: length, chips: bool) -> length {
+        return self.room-w(w) - self.stage-w(w, h, chips) <= 2 * self.snap ? self.stage-w(w, h, chips) : self.room-w(w);
+    }
+    public pure function frame-h(w: length, h: length, chips: bool) -> length {
+        return self.room-h(h, chips) - self.stage-h(w, h, chips) <= 2 * self.snap ? self.stage-h(w, h, chips) : self.room-h(h, chips);
+    }
+    public pure function panel-w(w: length, h: length, chips: bool) -> length {
+        return self.panel-min + self.room-w(w) - self.frame-w(w, h, chips);
+    }
+    public pure function x(w: length, h: length, chips: bool) -> length {
+        return Size.page-x + (self.frame-w(w, h, chips) - self.stage-w(w, h, chips)) / 2;
+    }
+    public pure function y(w: length, h: length, chips: bool) -> length {
+        return self.frame-y + (self.frame-h(w, h, chips) - self.stage-h(w, h, chips)) / 2;
     }
 }
 
@@ -171,55 +190,56 @@ component VoiceMenu inherits Rectangle {
                 accessible-action-default => {
                     root.picked(i);
                 }
+                // the play button is inside the row's TouchArea, so the row keeps its hover while the mouse is on it
                 row-touch := TouchArea {
                     clicked => {
                         root.picked(i);
                     }
-                }
 
-                HorizontalLayout {
-                    padding-left: Space.s2;
-                    padding-right: Space.s1;
-                    spacing: Space.s2;
-                    Rectangle {
-                        width: Size.icon;
-                        if i == root.current: CIcon {
-                            source: Icons.check;
-                            color: Palette.text;
+                    HorizontalLayout {
+                        padding-left: Space.s2;
+                        padding-right: Space.s1;
+                        spacing: Space.s2;
+                        Rectangle {
+                            width: Size.icon;
+                            if i == root.current: CIcon {
+                                source: Icons.check;
+                                color: Palette.text;
+                            }
                         }
-                    }
 
-                    Text {
-                        text: v.name;
-                        color: Palette.text;
-                        font-weight: i == root.current ? Type.w-strong : Type.w-body;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                        overflow: elide;
-                        accessible-role: none;
-                    }
+                        Text {
+                            text: v.name;
+                            color: Palette.text;
+                            font-weight: i == root.current ? Type.w-strong : Type.w-body;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                            accessible-role: none;
+                        }
 
-                    Text {
-                        text: v.short;
-                        font-size: Type.fs-small;
-                        color: Palette.text-2;
-                        vertical-alignment: center;
-                        horizontal-stretch: 0;
-                        accessible-role: none;
-                    }
+                        Text {
+                            text: v.short;
+                            font-size: Type.fs-small;
+                            color: Palette.text-2;
+                            vertical-alignment: center;
+                            horizontal-stretch: 0;
+                            accessible-role: none;
+                        }
 
-                    VerticalLayout {
-                        alignment: center;
-                        IconButton {
-                            small: true;
-                            icon: i == root.playing ? Icons.stop : Icons.play;
-                            tip: i == root.playing ? "Stop" : "Play a sample";
-                            label: i == root.playing ? "Stop" : "Play a sample of " + v.name;
-                            clicked => {
-                                if i == root.playing {
-                                    root.preview-stop();
-                                } else {
-                                    root.preview(i);
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                small: true;
+                                icon: i == root.playing ? Icons.stop : Icons.play;
+                                tip: i == root.playing ? "Stop" : "Play a sample";
+                                label: i == root.playing ? "Stop" : "Play a sample of " + v.name;
+                                clicked => {
+                                    if i == root.playing {
+                                        root.preview-stop();
+                                    } else {
+                                        root.preview(i);
+                                    }
                                 }
                             }
                         }
@@ -285,14 +305,16 @@ export component OverviewTab inherits Rectangle {
     in property <float> shot-h: 900;
     in property <bool> contain: false;
 
+    // the zone chip row is under the frame (app.slint: there are chips, or the note about the screenshot needs it)
+    in property <bool> chip-row: true;
     // the frame (left of the Now panel) and the 16:9 stage centred in it (OverviewRect)
-    property <length> panel-w: OverviewRect.panel-w;
+    property <length> panel-w: OverviewRect.panel-w(root.width, root.height, root.chip-row);
     property <length> frame-x: Size.page-x;
     property <length> frame-y: OverviewRect.frame-y;
-    property <length> frame-w: OverviewRect.frame-w(root.width);
-    property <length> frame-h: OverviewRect.frame-h(root.height);
-    property <length> stage-w: OverviewRect.stage-w(root.width, root.height);
-    property <length> stage-h: root.stage-w * 9 / 16;
+    property <length> frame-w: OverviewRect.frame-w(root.width, root.height, root.chip-row);
+    property <length> frame-h: OverviewRect.frame-h(root.width, root.height, root.chip-row);
+    property <length> stage-w: OverviewRect.stage-w(root.width, root.height, root.chip-row);
+    property <length> stage-h: OverviewRect.stage-h(root.width, root.height, root.chip-row);
 
     // the toolbar (.ov-tb)
     FinishPart {
@@ -489,7 +511,7 @@ export component OverviewTab inherits Rectangle {
     }
 
     // the zone chips (.zs)
-    FinishPart {
+    if root.chip-row: FinishPart {
         n: 3;
         run: root.finish;
         also: root.text-o;

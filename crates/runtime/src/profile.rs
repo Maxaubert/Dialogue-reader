@@ -361,7 +361,8 @@ pub fn ids_on_disk(paths: &Paths) -> Vec<String> {
 
 /// Deletes a game: `profiles\<id>.json` (and its `.bad` and `.tmp` copies), `profiles\<id>.png` and its activity
 /// log `log\<id>.jsonl`. Only files in the data folder, named from the id; an id that could point outside it (a
-/// path separator, `..`) deletes nothing. A file that is not there is fine.
+/// path separator, `..`) deletes nothing. A file that is not there is fine. The `.json` goes last and the first
+/// error stops it: an error always leaves the profile on disk, so the game stays whole and listed.
 pub fn delete(paths: &Paths, id: &str) -> Result<(), String> {
     if id.is_empty() || id.contains(['/', '\\', ':']) || id.contains("..") {
         return Err(format!("not a profile id: {id:?}"));
@@ -373,11 +374,11 @@ pub fn delete(paths: &Paths, id: &str) -> Result<(), String> {
         PathBuf::from(p)
     };
     let files = [
-        json.clone(),
-        with(".bad"),
-        with(".tmp"),
         paths.profile_png(id),
         paths.activity_log(id),
+        with(".bad"),
+        with(".tmp"),
+        json,
     ];
     for f in files {
         match std::fs::remove_file(&f) {
