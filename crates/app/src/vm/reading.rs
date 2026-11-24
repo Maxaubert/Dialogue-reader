@@ -430,9 +430,21 @@ impl Vm {
                         w.set_now_who(who.into());
                         w.set_now_line(line.into());
                         w.set_live_zone(self.live_zone_of(&item));
-                        // a new line in Now: the list leaves it out (a replay is in the list already)
-                        if let Some(e) = &e {
-                            self.reading.now = Some((e.t, e.text.clone()));
+                        // the line in Now leaves the list: a new line (logged below), or a replayed one (its newest
+                        // row in the log); the line Now showed before comes back into the list
+                        match &e {
+                            Some(e) => self.reading.now = Some((e.t, e.text.clone())),
+                            None => {
+                                let text = entry_of(&item, None).text;
+                                self.reading.now = self
+                                    .reading
+                                    .entries
+                                    .iter()
+                                    .rev()
+                                    .find(|x| x.text == text)
+                                    .map(|x| (x.t, x.text.clone()));
+                                self.push_log();
+                            }
                         }
                     }
                     self.reading.started = Some(item);

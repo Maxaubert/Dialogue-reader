@@ -156,6 +156,10 @@ export global Motion {
     public pure function d(ms: duration) -> duration {
         return self.instant ? 0ms : self.reduce ? 80ms : ms;
     }
+    // a move or size change of `ms` (a knob, a highlight, a bar): it jumps when instant or under reduce motion
+    public pure function slide(ms: duration) -> duration {
+        return self.instant || self.reduce ? 0ms : ms;
+    }
     // a wait (delay, stagger) of `ms`: 0 when instant or under reduce motion
     public pure function wait(ms: duration) -> duration {
         return self.instant || self.reduce ? 0ms : ms;
@@ -182,7 +186,8 @@ export global Motion {
     out property <duration> swap-out: self.d(80ms);
     out property <duration> swap-in: self.d(160ms);
     // stage grow into Zones (300) and the toolbar and tags after it (180 after 120)
-    out property <duration> grow: self.d(300ms);
+    // (the grow is a move: it jumps under reduce motion)
+    out property <duration> grow: self.slide(300ms);
     out property <duration> grow-tools: self.d(180ms);
     out property <duration> grow-tools-wait: self.wait(120ms);
     // Activity rows: 30 ms apart (rows after the 6th share its delay)

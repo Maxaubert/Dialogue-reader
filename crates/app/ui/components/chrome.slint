@@ -407,7 +407,7 @@ export component ObFoot inherits Rectangle {
             border-radius: 4px;
             background: i + 1 == root.step ? Palette.text : Palette.text-off;
             animate width, background {
-                duration: Motion.page;
+                duration: Motion.slide(260ms);
                 easing: cubic-bezier(0.16, 1, 0.3, 1);
             }
         }

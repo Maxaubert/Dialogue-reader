@@ -3,9 +3,25 @@
 // Rows: Edit zones, Stop, Mute, Voice, Speed, Volume, Mode, Settings, Quit (press twice). The header shows the
 // game and a small status, as the game has no title strip. No key hints (one place for key hints: the switcher).
 // One highlight glides between the rows (120 ms, keys). Keys come from the low-level hook, never from focus.
-import { Palette, Space, Radius, Size, Type, Motion, Icons, Speeds } from "../theme.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Speeds,
+} from "../theme.slint";
 import { VoiceData } from "../data.slint";
-import { Icon, CIcon, Toggle, Segmented, Slider, Dot } from "../components/base.slint";
+import {
+    Icon,
+    CIcon,
+    Toggle,
+    Segmented,
+    Slider,
+    Dot,
+} from "../components/base.slint";
 
 // The app's speed range (SPEED_MIN, SPEED_MAX in src/overlay/quick_menu.rs): the slider runs 0.5x to 2.0x.
 export global QmSpeed {
@@ -198,7 +214,7 @@ export component QuickMenu inherits Rectangle {
                 border-radius: Radius.md;
                 background: Palette.surface-3;
                 animate y {
-                    duration: Motion.fast;
+                    duration: Motion.slide(120ms);
                     easing: cubic-bezier(0.16, 1, 0.3, 1);
                 }
             }
@@ -373,7 +389,7 @@ export component QmVoices inherits Rectangle {
         border-radius: Radius.md;
         background: Palette.surface-3;
         animate y {
-            duration: Motion.fast;
+            duration: Motion.slide(120ms);
             easing: cubic-bezier(0.16, 1, 0.3, 1);
         }
     }

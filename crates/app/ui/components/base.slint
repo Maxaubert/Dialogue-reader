@@ -513,7 +513,7 @@ export component Toggle inherits Rectangle {
         border-radius: 7px;
         background: root.on ? Palette.on-ink : Palette.text-2;
         animate x, background {
-            duration: Motion.base;
+            duration: Motion.slide(180ms);
             easing: cubic-bezier(0.2, 0.7, 0.2, 1);
         }
     }
@@ -797,7 +797,7 @@ export component Wave {
                 border-radius: root.bar-w / 2;
                 background: i < root.played ? Palette.live : Palette.text-off;
                 animate height {
-                    duration: Motion.fast;
+                    duration: Motion.slide(120ms);
                     easing: cubic-bezier(0.2, 0.7, 0.2, 1);
                 }
             }
@@ -907,7 +907,7 @@ export component ListRow inherits Rectangle {
     // the hover colour, shared by the row and the patch under the grey speaker name
     property <color> row-bg: touch.has-hover ? Palette.surface-2 : root.rest-bg;
     // the text is cut when the whole text needs more than two lines
-    property <bool> cut: measure.preferred-height > t.height + 1px;
+    property <bool> cut: measure.preferred-height > 2 * Type.lh-body + 1px;
     property <bool> card: touch.has-hover && root.cut;
     // the card shows (after the hover delay): the text is shown in full
     property <bool> open: false;
@@ -924,7 +924,7 @@ export component ListRow inherits Rectangle {
         }
     }
     // the row's own height (one or two lines); a filtered list sets `height: 0` on the rows it hides
-    out property <length> natural-h: max(Size.list, t.height + 16px);
+    out property <length> natural-h: max(Size.list, min(measure.preferred-height, 2 * Type.lh-body) + 16px);
     height: root.natural-h;
     border-radius: Radius.md;
     background: root.row-bg;

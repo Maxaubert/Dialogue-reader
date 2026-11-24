@@ -259,7 +259,7 @@ export component GameSwitcher inherits Rectangle {
                     border-radius: Radius.md;
                     background: Palette.surface-3;
                     animate y {
-                        duration: root.by-mouse ? Motion.glide : Motion.fast;
+                        duration: root.by-mouse ? Motion.glide : Motion.slide(120ms);
                         easing: cubic-bezier(0.16, 1, 0.3, 1);
                     }
                 }

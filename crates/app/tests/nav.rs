@@ -510,6 +510,75 @@ fn motion_switch_game_keeps_the_old_picture_under_the_new_one() {
     );
 }
 
+/// The tag of a zone goes above its box, under it at the top edge, and inside it when there is no room under it
+/// either (the Slint `TagPlace`; the same rule as `geom::tag_place`).
+#[test]
+fn zone_tags_go_above_under_or_inside_their_box() {
+    use slint::Model;
+    let w = window();
+    let mut zones: Vec<dr_app::ZoneData> = w.get_zones().iter().collect();
+    let n = zones.len();
+    // at the top edge (tag under it), and as tall as the picture (tag inside it)
+    for (y, h) in [(4.0, 44.0), (2.0, 894.0)] {
+        zones.push(dr_app::ZoneData {
+            name: "Pickups".into(),
+            kind: dr_app::Kind::Pickups,
+            on: true,
+            x: 1000.0,
+            y,
+            w: 300.0,
+            h,
+        });
+    }
+    w.set_zones(slint::ModelRc::new(slint::VecModel::from(zones.clone())));
+    w.set_page(Page::Zones);
+    // the Zones stage at 1440 x 900: 1376 px wide (1600 px picture, scale 0.86), 104 px down in the window
+    let (top, k) = (40.0 + 64.0, 1376.0 / 1600.0);
+    let tags: Vec<f32> = ElementHandle::find_by_element_type_name(&w, "ZoneTag")
+        .map(|t| t.absolute_position().y)
+        .collect();
+    assert_eq!(tags.len(), n + 2, "{tags:?}");
+    let has = |y: f32| tags.iter().any(|t| (t - y).abs() < 1.5);
+    // room above: 28 px over the box (the first fake zone, the speaker line)
+    let z0 = &zones[0];
+    assert!(has(top + z0.y * k - 28.0), "above: {tags:?}");
+    // at the top edge: 4 px under the box
+    assert!(has(top + (4.0 + 44.0) * k + 4.0), "under: {tags:?}");
+    // no room under it either: inside, 4 px from its top
+    assert!(has(top + 2.0 * k + 4.0), "inside: {tags:?}");
+}
+
+#[test]
+fn motion_a_cut_line_shows_in_full_after_the_hover_delay() {
+    let w = window_with(true);
+    w.set_page(Page::Overview);
+    let full = "Hosea: If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.";
+    let text = |w: &MainWindow| {
+        ElementHandle::find_by_accessible_label(w, full)
+            .find(|e| e.accessible_role() == Some(AccessibleRole::Text))
+            .expect("the Hosea row")
+    };
+    let t = text(&w);
+    assert!(
+        t.size().height <= 41.0,
+        "two lines, then cut: {:?}",
+        t.size()
+    );
+    let at = t.absolute_position();
+    let p = slint::LogicalPosition::new(at.x + 20.0, at.y + 8.0);
+    w.window()
+        .dispatch_event(WindowEvent::PointerMoved { position: p });
+    // before the 200 ms delay the row keeps its two lines
+    wait(100);
+    assert!(text(&w).size().height <= 41.0);
+    wait(150);
+    assert!(
+        text(&w).size().height > 45.0,
+        "the whole line shows: {:?}",
+        text(&w).size()
+    );
+}
+
 #[test]
 fn motion_reduce_motion_fades_without_moving() {
     let w = window_motion(true, true);
@@ -532,6 +601,16 @@ fn motion_reduce_motion_fades_without_moving() {
         (mid.x, mid.y),
         (end.x, end.y),
         "nothing moves under reduce motion"
+    );
+    // the Zones stage does not grow: it is at its full size at once
+    key(&w, Key::Escape);
+    settle();
+    press(&w, "Edit zones", AccessibleRole::Button);
+    wait(10);
+    assert!(
+        (zones_stage(&w).0 - 1376.0).abs() < 1.0,
+        "{:?}",
+        zones_stage(&w)
     );
     dr_app::set_reduce_motion(None);
 }
