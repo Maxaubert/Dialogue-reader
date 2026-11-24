@@ -254,12 +254,12 @@ export component DrawZonesPage inherits Rectangle {
             }
         }
 
-        // 960 x 540, smaller when the window is short (16 px stay above the footer): then it keeps 16:9 and sits in
-        // the middle of the column
+        // 960 x 540, lower when the window is short (16 px stay above the footer): then it gets narrower too, to
+        // the shape of the picture (16:9 at least, so a 4:3 game keeps its bars), in the middle of the column
         pic := SetupPart {
             n: 2;
             height: Math.max(160px, Math.min(Size.col * 9 / 16, stage.vh - stage.top - root.head-h - 16px));
-            width: self.height * 16 / 9;
+            width: Math.min(Size.col, self.height * Math.max(16 / 9, root.shot-w / Math.max(1, root.shot-h)));
             x: (stage.vw - self.width) / 2;
             y: stage.top + root.head-h;
             Stage {

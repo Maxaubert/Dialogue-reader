@@ -1190,3 +1190,37 @@ fn the_voice_list_opens_on_the_current_voice() {
         .unwrap();
     assert_eq!(top.absolute_position().y, list.absolute_position().y + 5.0);
 }
+
+/// Clicks at a point of the window (logical px), as the mouse does.
+fn click_at(w: &MainWindow, x: f32, y: f32) {
+    let at = slint::LogicalPosition::new(x, y);
+    let win = w.window();
+    win.dispatch_event(WindowEvent::PointerMoved { position: at });
+    win.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+    win.dispatch_event(WindowEvent::PointerExited);
+}
+
+/// On Max's maximized window (1707 x 912) setup is drawn 1.4 times bigger, the footer too. A click lands where
+/// the bigger button and card are drawn (the points are read off a Skia render of this size), not where they
+/// would be at 1x.
+#[test]
+fn clicks_land_on_the_bigger_setup() {
+    let w = window();
+    w.window().set_size(slint::LogicalSize::new(1707.0, 912.0));
+    w.set_page(Page::Mode);
+    assert!(w.get_automatic());
+    // the "On key press" card: at 1x its column ends at x 1333, so x 1450 is only on the bigger card
+    click_at(&w, 1450.0, 480.0);
+    assert!(!w.get_automatic(), "the click picked On key press");
+    // "Continue" on step 1: at 1x the button ends at x 1333, the bigger one spans about x 1365 to 1524
+    w.set_page(Page::PickWindow);
+    click_at(&w, 1500.0, 878.0);
+    assert_eq!(w.get_page(), Page::DrawZones);
+}
