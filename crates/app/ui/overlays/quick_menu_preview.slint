@@ -1,0 +1,118 @@
+// Review preview of the quick menu inside the main window (15-quick-menu, 15-quick-menu-voice): the game picture
+// with the menu on it, where the mockup puts it. The real overlay window (M4) imports quick_menu.slint only.
+import { Render, Art } from "../theme.slint";
+import { VoiceData } from "../data.slint";
+import { QuickMenu, QmVoices, QmSpeed } from "quick_menu.slint";
+
+export component QuickMenuPreview inherits Rectangle {
+    in property <[VoiceData]> voices;
+    in-out property <bool> voice-open: false;
+    in-out property <int> highlight: 0;
+    in-out property <int> voice-index: 0;
+    in-out property <int> voice-hi: 0;
+    in-out property <bool> stopped: false;
+    in-out property <bool> quit-armed: false;
+    callback close();
+    callback manage-zones();
+    callback open-settings();
+    callback quit();
+    public function key(k: string) -> bool {
+        if root.voice-open {
+            if k == Key.UpArrow {
+                root.voice-hi = Math.max(0, root.voice-hi - 1);
+            } else if k == Key.DownArrow {
+                root.voice-hi = Math.min(root.voices.length - 1, root.voice-hi + 1);
+            } else if k == Key.Return {
+                root.voice-index = root.voice-hi;
+                root.voice-open = false;
+            } else if k == Key.LeftArrow || k == Key.Escape {
+                root.voice-open = false;
+            } else {
+                return false;
+            }
+            return true;
+        }
+        if k == Key.UpArrow {
+            root.highlight = Math.mod(root.highlight + 8, 9);
+            root.quit-armed = false;
+        } else if k == Key.DownArrow {
+            root.highlight = Math.mod(root.highlight + 1, 9);
+            root.quit-armed = false;
+        } else if k == Key.Return || k == " " {
+            root.run(root.highlight);
+        } else if k == Key.RightArrow {
+            if root.highlight == 3 {
+                root.voice-open = true;
+            } else if root.highlight == 4 {
+                menu.speed = Math.min(QmSpeed.max, Math.round(menu.speed * 10 + 1) / 10);
+                menu.speed-pos = (menu.speed - QmSpeed.min) / (QmSpeed.max - QmSpeed.min);
+            } else if root.highlight == 5 {
+                menu.volume = Math.min(1.0, menu.volume + 0.05);
+            } else if root.highlight == 6 {
+                menu.automatic = false;
+            }
+        } else if k == Key.LeftArrow {
+            if root.highlight == 4 {
+                menu.speed = Math.max(QmSpeed.min, Math.round(menu.speed * 10 - 1) / 10);
+                menu.speed-pos = (menu.speed - QmSpeed.min) / (QmSpeed.max - QmSpeed.min);
+            } else if root.highlight == 5 {
+                menu.volume = Math.max(0.0, menu.volume - 0.05);
+            } else if root.highlight == 6 {
+                menu.automatic = true;
+            }
+        } else if k == Key.Escape {
+            root.close();
+        } else {
+            return false;
+        }
+        return true;
+    }
+    function run(i: int) {
+        root.highlight = i;
+        root.quit-armed = i == 8 && !root.quit-armed;
+        if i == 0 {
+            root.manage-zones();
+        } else if i == 1 {
+            root.stopped = !root.stopped;
+        } else if i == 2 {
+            menu.muted = !menu.muted;
+        } else if i == 3 {
+            root.voice-open = true;
+        } else if i == 7 {
+            root.open-settings();
+        } else if i == 8 && !root.quit-armed {
+            root.quit();
+        }
+    }
+    Image {
+        width: 100%;
+        height: 100%;
+        source: Render.software ? Art.scene-full : Art.scene;
+        image-fit: cover;
+    }
+
+    menu := QuickMenu {
+        x: (parent.width - self.width) / 2;
+        y: 150px;
+        highlight: root.highlight;
+        voice-open: root.voice-open;
+        voice: root.voices.length > 0 ? root.voices[root.voice-index].name : "";
+        stopped: root.stopped;
+        quit-armed: root.quit-armed;
+        activate(i) => {
+            root.run(i);
+        }
+    }
+
+    if root.voice-open: QmVoices {
+        x: menu.x + menu.width + 8px;
+        y: menu.y + menu.voice-y;
+        voices: root.voices;
+        chosen: root.voice-index;
+        highlight <=> root.voice-hi;
+        choose(i) => {
+            root.voice-index = i;
+            root.voice-open = false;
+        }
+    }
+}

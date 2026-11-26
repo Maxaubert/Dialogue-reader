@@ -1,0 +1,718 @@
+// The Overview (d-black 10-overview): a toolbar on black, the game picture in a letterbox frame with the zone chips
+// under it, and the Now panel (the line being read, then the read list) on the right.
+// Page coordinates: the title strip is above the page, so the toolbar sits 12 px down and the frame 60 px down.
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
+import { ZoneData, LineData, VoiceData } from "../data.slint";
+import {
+    Button,
+    BtnKind,
+    CIcon,
+    IconButton,
+    OptButton,
+    ZoneChip,
+    ListRow,
+    Panel,
+    Wave,
+} from "../components/base.slint";
+import { Stage, LiveNote, LiveView } from "../components/stage.slint";
+
+// Where the Overview stage sits in a page `w` x `h`: the frame left of the Now panel, the 16:9 stage centred in it.
+// `chips`: the zone chip row is under the frame; without it the frame (and the Now panel) run to the page bottom
+// (Max, 2026-11-24: the panels end together and nothing empty stays under them).
+// A band of 16 px or less on a side reads as a second frame around the picture (Max, 11.png at 1707 x 912): then
+// the frame hugs the stage and the Now panel takes the width that is left.
+// The Zones page grows its stage from this rectangle (README motion table, 11-zones 4).
+export global OverviewRect {
+    // the Now panel at its narrowest
+    out property <length> panel-min: 320px;
+    out property <length> frame-y: 60px;
+    out property <length> snap: 16px;
+    // the room for the frame
+    pure function room-w(w: length) -> length {
+        return w - 2 * Size.page-x - Space.s4 - self.panel-min;
+    }
+    pure function room-h(h: length, chips: bool) -> length {
+        return h - self.frame-y - Size.page-x - (chips ? Space.s2 + Size.row : 0px);
+    }
+    public pure function stage-w(w: length, h: length, chips: bool) -> length {
+        return Math.min(self.room-w(w), self.room-h(h, chips) * 16 / 9);
+    }
+    public pure function stage-h(w: length, h: length, chips: bool) -> length {
+        return self.stage-w(w, h, chips) * 9 / 16;
+    }
+    public pure function frame-w(w: length, h: length, chips: bool) -> length {
+        return self.room-w(w) - self.stage-w(w, h, chips) <= 2 * self.snap ? self.stage-w(w, h, chips) : self.room-w(w);
+    }
+    public pure function frame-h(w: length, h: length, chips: bool) -> length {
+        return self.room-h(h, chips) - self.stage-h(w, h, chips) <= 2 * self.snap ? self.stage-h(w, h, chips) : self.room-h(h, chips);
+    }
+    public pure function panel-w(w: length, h: length, chips: bool) -> length {
+        return self.panel-min + self.room-w(w) - self.frame-w(w, h, chips);
+    }
+    public pure function x(w: length, h: length, chips: bool) -> length {
+        return Size.page-x + (self.frame-w(w, h, chips) - self.stage-w(w, h, chips)) / 2;
+    }
+    public pure function y(w: length, h: length, chips: bool) -> length {
+        return self.frame-y + (self.frame-h(w, h, chips) - self.stage-h(w, h, chips)) / 2;
+    }
+}
+
+// One part of the Overview that comes in at Finish (README motion table, 01-setup 3): 80 ms after the setup starts
+// to go, the parts 40 ms apart (stage, top controls, Now panel, zone strip), 320 ms ease-out-strong. The stage
+// also scales 0.98 to 1. The fade is worked out from the clock, as the page is made in the frame that first draws
+// it (see setup_part.slint). `also` multiplies the opacity (the text fade of switch game).
+component FinishPart inherits Rectangle {
+    in property <int> n;
+    in property <bool> run;
+    in property <bool> scale: false;
+    in property <float> also: 1;
+    property <duration> born;
+    property <bool> done: Motion.instant || !root.run;
+    init => {
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.push-gap + root.n * Motion.stagger + Motion.morph-in);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - Motion.push-gap - root.n * Motion.stagger) / Math.max(1ms, Motion.morph-in), 0, 1);
+    property <float> e: 1 - Math.pow(1 - root.p, 4);
+    opacity: root.e * root.also;
+    transform-scale: root.scale ? 1 - 0.02 * (1 - root.e) * Motion.move : 1;
+    @children
+}
+
+// The Now panel waveform (.wave): 28 lime bars, flat and grey while paused.
+component NowWave inherits Wave {
+    bars: [
+        6,
+        10,
+        16,
+        9,
+        20,
+        13,
+        7,
+        15,
+        22,
+        12,
+        8,
+        17,
+        11,
+        19,
+        9,
+        6,
+        13,
+        18,
+        10,
+        7,
+        14,
+        20,
+        12,
+        8,
+        5,
+        11,
+        16,
+        9
+    ];
+    bar-w: 2px;
+    gap: 3px;
+    height: 24px;
+}
+
+// The voice picker of the Overview toolbar (Max, 2026-11-24): the voices under the Voice button, the game's voice
+// with a check. A click picks one and closes the list; Esc (app.slint) or a click outside closes it. Eight rows
+// show; the rest scroll. The play button of a row plays a sample of that voice without picking it; it is a stop
+// button while that sample plays, and closing the list stops it (app.slint).
+component VoiceMenu inherits Rectangle {
+    in property <[VoiceData]> voices;
+    in property <int> current;
+    // the row whose sample plays (-1: none)
+    in property <int> playing: -1;
+    callback picked(int);
+    callback preview(int);
+    callback preview-stop();
+    // up to 8 rows show; with more, 7 and a half show, so the cut row says the list goes on
+    property <length> list-h: root.voices.length > 8 ? 7.5 * Size.list : Math.max(1, root.voices.length) * Size.list;
+    width: 300px;
+    height: root.list-h + 2 * Space.s1 + 2px;
+    // the list opens on the current voice: scrolled so its row is in the middle when it is below the first rows
+    init => {
+        flick.content-y = -Math.clamp((root.current + 0.5) * Size.list - root.list-h / 2, 0, Math.max(0px, root.voices.length * Size.list - root.list-h));
+    }
+    border-radius: Radius.lg;
+    border-width: 1px;
+    border-color: Palette.float-line;
+    background: Palette.float;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    accessible-role: list;
+    accessible-label: "Voices";
+    // clicks on the list never reach the page under it
+    TouchArea { }
+
+    if root.voices.length == 0: Text {
+        x: Space.s3 + 1px;
+        text: "No voices found.";
+        color: Palette.text-2;
+        vertical-alignment: center;
+    }
+    flick := Flickable {
+        x: Space.s1 + 1px;
+        y: Space.s1 + 1px;
+        width: parent.width - 2 * Space.s1 - 2px;
+        height: root.list-h;
+        content-height: root.voices.length * Size.list;
+        VerticalLayout {
+            alignment: start;
+            for v[i] in root.voices: Rectangle {
+                height: Size.list;
+                border-radius: Radius.md;
+                background: row-touch.has-hover ? Palette.surface-3 : transparent;
+                accessible-role: list-item;
+                accessible-label: v.name;
+                accessible-item-selected: i == root.current;
+                accessible-action-default => {
+                    root.picked(i);
+                }
+                // the play button is inside the row's TouchArea, so the row keeps its hover while the mouse is on it
+                row-touch := TouchArea {
+                    clicked => {
+                        root.picked(i);
+                    }
+
+                    HorizontalLayout {
+                        padding-left: Space.s2;
+                        padding-right: Space.s1;
+                        spacing: Space.s2;
+                        Rectangle {
+                            width: Size.icon;
+                            if i == root.current: CIcon {
+                                source: Icons.check;
+                                color: Palette.text;
+                            }
+                        }
+
+                        Text {
+                            text: v.name;
+                            color: Palette.text;
+                            font-weight: i == root.current ? Type.w-strong : Type.w-body;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                            accessible-role: none;
+                        }
+
+                        Text {
+                            text: v.short;
+                            font-size: Type.fs-small;
+                            color: Palette.text-2;
+                            vertical-alignment: center;
+                            horizontal-stretch: 0;
+                            accessible-role: none;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                small: true;
+                                icon: i == root.playing ? Icons.stop : Icons.play;
+                                tip: i == root.playing ? "Stop" : "Play a sample";
+                                label: i == root.playing ? "Stop" : "Play a sample of " + v.name;
+                                clicked => {
+                                    if i == root.playing {
+                                        root.preview-stop();
+                                    } else {
+                                        root.preview(i);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component OverviewTab inherits Rectangle {
+    in-out property <[ZoneData]> zones;
+    // one chip per kind (Rust: vm::kind_chips)
+    in property <[ZoneData]> kinds;
+    in property <[LineData]> recent;
+    // new lines (app.slint): the first `fresh` rows arrive (`arrive`, 0 to 1); the rows below move down
+    in property <int> fresh: 0;
+    in property <float> arrive: 1;
+    in property <bool> paused: false;
+    // false: the game is not running (status "Game not running"): the stage says so and the controls are off
+    in property <bool> running: true;
+    // the zone of the line being spoken: its outline is lime (-1: none)
+    in property <int> live-zone: -1;
+    // Finish was pressed: the parts come in one after the other (FinishPart)
+    in property <bool> finish: false;
+    // switch game (app.slint): the texts fade out and in (`text-o`); the new picture fades in (`pic-t`, 0 to 1)
+    // over the old one (`old-shot`), so the picture never dips to black
+    in property <float> text-o: 1;
+    in property <float> pic-t: 1;
+    in property <image> old-shot;
+    in property <float> old-w: 1600;
+    in property <float> old-h: 900;
+    in-out property <bool> automatic: true;
+    in property <string> voice: "Adam";
+    in property <string> read-key: "Mouse 4";
+    // the speaker of the line in Now, with no colon ("Arthur")
+    in property <string> now-who: "Arthur";
+    in property <string> now-line: "We need to get these horses moving before the snow buries us.";
+    callback read-now();
+    callback pause();
+    callback replay();
+    callback stop();
+    callback recent-replay(int);
+    // the voice picker (VoiceMenu): the voices, the game's voice (index in `voices`), open or not
+    in property <[VoiceData]> voices;
+    in property <int> game-voice;
+    in-out property <bool> voice-open: false;
+    // the voice list row whose sample plays (-1: none)
+    in property <int> voice-playing: -1;
+    callback voice-picked(int);
+    callback voice-preview(int);
+    callback voice-preview-stop();
+    callback key-clicked();
+    callback edit-zones();
+    callback show-all();
+    // "Switch game" on the stage when the game is not running: opens the switcher (app.slint)
+    callback switch-game();
+    callback mode-changed(bool);
+    // a zone chip: every zone of that kind on or off
+    callback kind-toggle(Kind, bool);
+    in property <image> shot: Art.scene;
+    in property <float> shot-w: 1600;
+    in property <float> shot-h: 900;
+    in property <bool> contain: false;
+
+    // the zone chip row is under the frame (app.slint: there are chips, or the note about the screenshot needs it)
+    in property <bool> chip-row: true;
+    // the frame (left of the Now panel) and the 16:9 stage centred in it (OverviewRect)
+    property <length> panel-w: OverviewRect.panel-w(root.width, root.height, root.chip-row);
+    property <length> frame-x: Size.page-x;
+    property <length> frame-y: OverviewRect.frame-y;
+    property <length> frame-w: OverviewRect.frame-w(root.width, root.height, root.chip-row);
+    property <length> frame-h: OverviewRect.frame-h(root.width, root.height, root.chip-row);
+    property <length> stage-w: OverviewRect.stage-w(root.width, root.height, root.chip-row);
+    property <length> stage-h: OverviewRect.stage-h(root.width, root.height, root.chip-row);
+
+    // the toolbar (.ov-tb)
+    FinishPart {
+        n: 1;
+        run: root.finish;
+        also: root.text-o;
+        x: Size.page-x;
+        y: 12px;
+        width: root.width - 2 * Size.page-x;
+        height: Size.ctl;
+        HorizontalLayout {
+            spacing: Space.s2;
+            Button {
+                kind: BtnKind.primary;
+                text: "Read now";
+                icon: Icons.play-fill;
+                icon-size: 14px;
+                enabled: root.running;
+                clicked => {
+                    root.read-now();
+                }
+            }
+
+            Button {
+                kind: BtnKind.ghost;
+                text: root.paused ? "Resume" : "Pause";
+                icon: root.paused ? Icons.play : Icons.pause;
+                icon-size: 14px;
+                enabled: root.running;
+                clicked => {
+                    root.pause();
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            OptButton {
+                icon: Icons.zap;
+                text: root.automatic ? "Automatic" : "On key press";
+                label: "Mode";
+                clicked => {
+                    root.automatic = !root.automatic;
+                    root.mode-changed(root.automatic);
+                }
+            }
+
+            voice-btn := OptButton {
+                icon: Icons.volume;
+                text: root.voice;
+                label: "Voice";
+                clicked => {
+                    root.voice-open = !root.voice-open;
+                }
+            }
+
+            OptButton {
+                icon: @image-url("../icons/keyboard.svg");
+                text: root.read-key;
+                label: "Read key";
+                clicked => {
+                    root.key-clicked();
+                }
+            }
+
+            // at the same place and of the same kind as "Done" on Zones: the two swap in place (Max, 2026-11-24)
+            Button {
+                kind: BtnKind.primary;
+                text: "Edit zones";
+                icon: Icons.pencil;
+                enabled: root.running;
+                clicked => {
+                    root.edit-zones();
+                }
+            }
+        }
+    }
+
+    // the stage part: the frame, the picture (or the not-running line) and the note under it
+    FinishPart {
+        n: 0;
+        run: root.finish;
+        scale: true;
+        transform-origin: { x: root.frame-x + root.frame-w / 2, y: root.frame-y + root.frame-h / 2 };
+    // the letterbox frame (.frame): the only outline here (the stage in it has none, or a picture that nearly
+    // fills the frame showed a double frame, Max 2026-11-24); it lights up on hover while a click opens Zones
+    Rectangle {
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            border-radius: Radius.lg;
+            background: Palette.surface-1;
+        }
+
+        // the game picture (.stage)
+    if root.running: Rectangle {
+            x: root.frame-x + (root.frame-w - root.stage-w) / 2;
+            y: root.frame-y + (root.frame-h - root.stage-h) / 2;
+            width: root.stage-w;
+            height: root.stage-h;
+        // switch game: the old picture stays under the new one while it fades in
+        if root.pic-t < 1: Stage {
+                // a still picture: it neither follows the live view nor sets its size
+                follow-live: false;
+                settled: false;
+                source: root.old-shot;
+                src-w: root.old-w;
+                src-h: root.old-h;
+                contain: root.contain;
+                labels: false;
+                quiet: true;
+                radius: Radius.lg;
+                behind: Palette.surface-1;
+            }
+            Stage {
+                opacity: root.pic-t;
+                source: root.shot;
+                src-w: root.shot-w;
+                src-h: root.shot-h;
+                contain: root.contain;
+                zones: root.zones;
+                labels: false;
+                quiet: true;
+                live-zone: root.live-zone;
+                radius: Radius.lg;
+                behind: Palette.surface-1;
+            }
+
+        }
+
+        // a click on the picture or the band around it opens Zones, like "Edit zones"
+        stage-touch := TouchArea {
+            enabled: root.running;
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            mouse-cursor: root.running ? pointer : default;
+            clicked => {
+                root.edit-zones();
+            }
+        }
+
+        Rectangle {
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            border-radius: Radius.lg;
+            border-width: 1px;
+            border-color: root.running && stage-touch.has-hover ? Palette.line-2 : Palette.line;
+            animate border-color {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+        }
+
+        // not running: one line and one button in the middle of the frame (rule 4.1.7)
+    if !root.running: VerticalLayout {
+            opacity: root.text-o;
+            x: root.frame-x;
+            y: root.frame-y;
+            width: root.frame-w;
+            height: root.frame-h;
+            alignment: center;
+            spacing: Space.s3;
+            Text {
+                text: "Game not running.";
+                color: Palette.text-2;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                Button {
+                    text: "Switch game";
+                    clicked => {
+                        root.switch-game();
+                    }
+                }
+            }
+        }
+
+        // why the saved screenshot shows (not "Live": TEXT.md drops it here), never on the picture: in the frame under
+    // it, or, when the frame has no band under the picture (a wide window), at the end of the zone chip row
+    if root.running && root.contain && LiveView.note != "" && !LiveView.note-live: LiveNote {
+            opacity: root.text-o;
+            property <bool> in-band: (root.frame-h - root.stage-h) / 2 >= 30px;
+            x: self.in-band ? root.frame-x + (root.frame-w - root.stage-w) / 2 + Space.s1 : root.frame-x + root.frame-w - self.width;
+            y: self.in-band ? root.frame-y + (root.frame-h + root.stage-h) / 2 + Space.s2 : root.frame-y + root.frame-h + Space.s2 + (Size.row - self.height) / 2;
+        }
+    }
+
+    // the zone chips (.zs)
+    if root.chip-row: FinishPart {
+        n: 3;
+        run: root.finish;
+        also: root.text-o;
+        x: root.frame-x;
+        y: root.frame-y + root.frame-h + Space.s2;
+        width: root.frame-w;
+        height: Size.row;
+        HorizontalLayout {
+            spacing: Space.s1;
+            for k in root.kinds: VerticalLayout {
+                alignment: center;
+                ZoneChip {
+                    kind: k.kind;
+                    on: k.on;
+                    enabled: root.running;
+                    toggled(v) => {
+                        root.kind-toggle(k.kind, v);
+                    }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+        }
+    }
+
+    // the Now panel (.panel.now)
+    FinishPart {
+        n: 2;
+        run: root.finish;
+        also: root.text-o;
+        x: root.frame-x + root.frame-w + Space.s4;
+        y: root.frame-y;
+        width: root.panel-w;
+        // as tall as the frame: their tops and bottoms line up (Max, 2026-11-24); the zone chips are under the frame
+        height: root.frame-h;
+        Panel {
+            clip: true;
+        // nothing read at all: one grey line in the middle
+        if root.now-line == "" && root.recent.length == 0: Text {
+                text: "Nothing read yet.";
+                color: Palette.text-2;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if root.now-line != "" || root.recent.length > 0: VerticalLayout {
+                padding: 1px;
+            // the line being read (.np): the speaker, the line at 20 px, then the waveform, Replay and Stop
+            if root.now-line != "": VerticalLayout {
+                    padding-left: Space.s4 - 1px;
+                    padding-right: Space.s4 - 1px;
+                    padding-top: Space.s4 - 1px;
+                    padding-bottom: Space.s3;
+                    spacing: Space.s2;
+                    min-height: 186px - 1px;
+                    vertical-stretch: 0;
+                    if root.now-who != "": Text {
+                        text: root.now-who;
+                        font-size: Type.fs-small;
+                        color: Palette.text-2;
+                        height: Type.lh-small;
+                    }
+                    Text {
+                        text: root.now-line;
+                        font-size: Type.fs-hero;
+                        font-weight: Type.w-hero;
+                        line-height-factor: Type.lhf-140;
+                        letter-spacing: -0.1px;
+                        color: Palette.text;
+                        wrap: word-wrap;
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+
+                    HorizontalLayout {
+                        padding-top: Space.s2;
+                        spacing: Space.s1;
+                        height: 28px + Space.s2;
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            NowWave {
+                                played: root.paused ? 0 : 999;
+                            }
+                        }
+
+                        IconButton {
+                            small: true;
+                            icon: Icons.replay;
+                            tip: "Replay";
+                            clicked => {
+                                root.replay();
+                            }
+                        }
+
+                        IconButton {
+                            small: true;
+                            icon: Icons.stop;
+                            tip: "Stop";
+                            clicked => {
+                                root.stop();
+                            }
+                        }
+                    }
+                }
+                if root.now-line == "": Rectangle {
+                    height: 186px - 1px;
+                    Text {
+                        text: "Nothing read yet.";
+                        color: Palette.text-2;
+                    }
+                }
+            // the read list (.list): rows of one or two lines; the panel shows as many as fit
+            Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    // a Flickable that does not scroll: the rows do not make the panel taller. Only whole rows show.
+                list := Flickable {
+                        interactive: false;
+                        content-height: rows.preferred-height;
+                        rows := VerticalLayout {
+                            padding: Space.s1;
+                            padding-top: Space.s1 + 1px;
+                            alignment: start;
+                            for r[i] in root.recent: ListRow {
+                                icon: Kinds.icon(r.kind);
+                                speaker: r.who;
+                                line: r.line;
+                                off: r.skip != "";
+                                tag: r.skip;
+                                replay-label: r.skip == "" ? "Replay" : "";
+                                rest-bg: Palette.surface-1;
+                                arrive: i < root.fresh ? root.arrive : 1;
+                                // only whole rows show; a row pushed out by a new line fades out (140 ms)
+                                property <bool> fits: self.y + self.height <= list.height;
+                                opacity: self.fits ? 1 : 0;
+                                animate opacity {
+                                    duration: Motion.exit;
+                                    easing: cubic-bezier(0.4, 0, 1, 1);
+                                }
+                                visible: self.opacity > 0.01;
+                                replay => {
+                                    root.recent-replay(i);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Show all (.foot)
+            Rectangle {
+                    height: Size.row;
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Palette.line;
+                    }
+
+                    Button {
+                        kind: BtnKind.ghost;
+                        text: "Show all";
+                        trail: Icons.chev-right;
+                        fg: Palette.text-2;
+                        clicked => {
+                            root.show-all();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // the voice picker over the page; a click anywhere else on the page (or on the title strip, app.slint) closes it
+    if root.voice-open: TouchArea {
+        clicked => {
+            root.voice-open = false;
+        }
+    }
+    if root.voice-open: VoiceMenu {
+        x: Math.min(Size.page-x + voice-btn.x, root.width - Size.page-x - self.width);
+        y: 12px + Size.ctl + Space.s1;
+        voices: root.voices;
+        current: root.game-voice;
+        playing: root.voice-playing;
+        picked(i) => {
+            root.voice-open = false;
+            root.voice-picked(i);
+        }
+        preview(i) => {
+            root.voice-preview(i);
+        }
+        preview-stop => {
+            root.voice-preview-stop();
+        }
+    }
+}

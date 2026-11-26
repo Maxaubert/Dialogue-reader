@@ -1,0 +1,581 @@
+{
+  "suite": "smoke",
+  "seed": 1,
+  "truth_fingerprint": "0099daf8c452e4f8",
+  "reader": "a1",
+  "reader_options": {
+    "zones": "off"
+  },
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 8,
+    "items_should_read": 29,
+    "items_read": 21,
+    "recall": 0.7241379310344828,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 1,
+        "read": 1,
+        "recall": 1.0
+      },
+      {
+        "name": "1-2s",
+        "total": 5,
+        "read": 2,
+        "recall": 0.4
+      },
+      {
+        "name": "2-4s",
+        "total": 19,
+        "read": 15,
+        "recall": 0.7894736842105263
+      },
+      {
+        "name": ">4s",
+        "total": 4,
+        "read": 3,
+        "recall": 0.75
+      }
+    ],
+    "mean_cer": 0.05172557458719292,
+    "exact_match_rate": 0.47619047619047616,
+    "prompts_total": 5,
+    "prompts_read": 4,
+    "prompt_recall": 0.8,
+    "events_total": 68,
+    "duplicates": 3,
+    "noise_reads": 11,
+    "background_reads": 0,
+    "hallucinations": 29,
+    "latency_p50_ms": 159.11663333333354,
+    "latency_p95_ms": 1347.1931999999997,
+    "cpu_ms_p50": 0.7474,
+    "cpu_ms_p95": 10.8742,
+    "frames_total": 2903,
+    "frames_processed": 2899
+  },
+  "scenarios": [
+    {
+      "id": "smoke-000",
+      "genres": [
+        "rpg_dialogue"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 4,
+        "recall": 0.6666666666666666,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 1,
+            "recall": 0.5
+          }
+        ],
+        "mean_cer": 0.12389741715399609,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 7,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 88.26659999999993,
+        "latency_p95_ms": 881.7094999999999,
+        "cpu_ms_p50": 0.8141,
+        "cpu_ms_p95": 2.7369999999999997,
+        "frames_total": 394,
+        "frames_processed": 394
+      },
+      "missed": [
+        "spk001 (3324 ms readable): Juno",
+        "spk005 (4635 ms readable): Juno"
+      ],
+      "false_reads": [
+        "hallucination @1601: utnern tarm:",
+        "hallucination @5701: will"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-001",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 4,
+        "recall": 0.6666666666666666,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 1,
+            "recall": 0.3333333333333333
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.12878787878787878,
+        "exact_match_rate": 0.25,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 11,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 6,
+        "latency_p50_ms": 538.1232666666667,
+        "latency_p95_ms": 2658.7039000000004,
+        "cpu_ms_p50": 5.1836,
+        "cpu_ms_p95": 10.9815,
+        "frames_total": 308,
+        "frames_processed": 308
+      },
+      "missed": [
+        "toast003 (1869 ms readable): + 3 Rope",
+        "toast006 (1077 ms readable): + 20 Wolf Pelt"
+      ],
+      "false_reads": [
+        "hallucination @477: my 10/ azo\nSTA 53/120",
+        "hallucination @942: my 10/ azo\nSTA 53/120\n+ 9 Mana Crystal",
+        "hallucination @3007: Gla.",
+        "hallucination @3072: s Vial",
+        "hallucination @3876: +4 Glass V\n+ 3 Rope",
+        "hallucination @7334: + 8 wolf Pelt\n+ 8 Glass Via/"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-002",
+      "genres": [
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 5,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.5485000000000001,
+        "cpu_ms_p95": 0.8490000000000001,
+        "frames_total": 380,
+        "frames_processed": 380
+      },
+      "missed": [
+        "sub001 (3388 ms readable): Hold the line!",
+        "sub002 (3403 ms readable): I have seen that symbol before, in my grandmother's book.",
+        "sub003 (3429 ms readable): That sword belonged to my father. Treat it well."
+      ],
+      "false_reads": [
+        "hallucination @1334: HWdltCh¯e111Yéli",
+        "hallucination @5467: ra nd",
+        "hallucination @9601: fäth'e+.*TreaÜitiWéll:",
+        "hallucination @10034: sword",
+        "hallucination @10034: it Well."
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-003",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 9,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 79.05743333333339,
+        "latency_p95_ms": 159.11663333333354,
+        "cpu_ms_p50": 0.5445,
+        "cpu_ms_p95": 0.7990999999999999,
+        "frames_total": 374,
+        "frames_processed": 374
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3301: Main",
+        "hallucination @3301: )uest",
+        "hallucination @3301: Reach",
+        "hallucination @3301: ne north",
+        "hallucination @3334: Dwel",
+        "hallucination @11934: nightfall",
+        "hallucination @11967: :amp befor"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-004",
+      "genres": [
+        "tooltip"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.013469387755102041,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 266.95413333333454,
+        "latency_p95_ms": 270.59220000000005,
+        "cpu_ms_p50": 0.5454,
+        "cpu_ms_p95": 0.7874,
+        "frames_total": 387,
+        "frames_processed": 387
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @2934: :ores\n:kable"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-005",
+      "genres": [
+        "prompt_flicker",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 3,
+        "recall": 0.75,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.011695906432748537,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 5,
+        "prompts_read": 4,
+        "prompt_recall": 0.8,
+        "events_total": 10,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 270.3706333333339,
+        "latency_p95_ms": 288.5211333333327,
+        "cpu_ms_p50": 9.4038,
+        "cpu_ms_p95": 27.959600000000002,
+        "frames_total": 339,
+        "frames_processed": 335
+      },
+      "missed": [
+        "sub001 (1978 ms readable): The old road is safer, but it takes twice as long."
+      ],
+      "false_reads": [
+        "hallucination @625: T.he old road is safer, but Dit",
+        "hallucination @976: ta kes",
+        "hallucination @1212: twice as 'long8"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-006",
+      "genres": [
+        "damage_numbers",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 9,
+        "duplicates": 0,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 65.85800000000017,
+        "latency_p95_ms": 90.85080000000016,
+        "cpu_ms_p50": 0.8011999999999999,
+        "cpu_ms_p95": 5.2726,
+        "frames_total": 323,
+        "frames_processed": 323
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @4301: ack from the eastern ridge.",
+        "hallucination @4301: JUNO: My broth",
+        "hallucination @4301: er never ce",
+        "hallucination @8170: CRITßOO",
+        "noise @8905: CRIT118",
+        "noise @9535: CRIT 135"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-007",
+      "genres": [
+        "menu_overlay",
+        "objective_update"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 12,
+        "duplicates": 0,
+        "noise_reads": 9,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 140.48933333333343,
+        "latency_p95_ms": 158.65776666666534,
+        "cpu_ms_p50": 0.7739,
+        "cpu_ms_p95": 2.9742,
+        "frames_total": 398,
+        "frames_processed": 398
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @2006: Journal",
+        "noise @2006: Skills",
+        "hallucination @2006: Game",
+        "noise @2035: Controls",
+        "noise @5667: Journal",
+        "noise @5667: Skills",
+        "noise @5667: Controls",
+        "noise @9105: Save Game",
+        "noise @9105: Load Game",
+        "noise @9105: Controls"
+      ],
+      "background_read_texts": []
+    }
+  ]
+}

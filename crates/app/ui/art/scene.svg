@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg>

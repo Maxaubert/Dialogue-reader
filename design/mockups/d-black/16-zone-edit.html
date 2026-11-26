@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>16 Zone edit</title><link rel="stylesheet" href="tokens.css"><style>
+.ov-tb{position:absolute;left:24px;right:24px;top:52px;height:32px;display:flex;align-items:center;gap:8px}
+.frame{position:absolute;z-index:1;left:24px;top:100px;width:1056px;height:724px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid var(--line)}
+.stage{position:absolute;z-index:2;left:24px;top:165px;width:1056px;height:594px;border-radius:var(--r-lg);overflow:hidden;background:var(--surface-1);cursor:pointer}
+.stage::after{content:"";position:absolute;inset:0;border-radius:var(--r-lg);border:1px solid var(--line);pointer-events:none;transition:border-color var(--t-fast) var(--ease-out)}
+.stage:hover::after{border-color:var(--line-2)}
+.stage .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage .sc{position:absolute;inset:0}
+.deco{position:absolute;inset:0;z-index:2}
+.zz:not(.dim) .zoff{display:none}
+/* Every outline has a black keyline outside it, so it holds on bright games. Slint: a second Rectangle, 1 px larger
+   (2 px for the live outline), with a black border. One extra Rectangle per outline, no stacked shadows. */
+.zo{position:absolute;border:1px solid rgba(255,255,255,.38);border-radius:var(--r-sm);box-shadow:0 0 0 1px rgba(0,0,0,.6);transition:border-color var(--t-fast) var(--ease-out)}
+.zo.dim{border-color:rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zo.live{border:2px solid var(--live);box-shadow:0 0 0 2px rgba(0,0,0,.6)}
+.zo.live.dim{border:1px solid rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz{position:absolute;border:1px solid rgba(255,255,255,.7);border-radius:var(--r-sm);background:rgba(0,0,0,.18);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.dim{border-color:rgba(255,255,255,.3);background:rgba(0,0,0,.3);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz.sel{border:2px solid var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz i{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;background:var(--on);border:1px solid #000;border-radius:var(--r-pill)}
+.ztag{position:absolute;left:-1px;bottom:calc(100% + 4px);display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:var(--r-sm);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);font-size:var(--fs-small);color:var(--text);white-space:nowrap}
+/* no room above the box (top of the picture): the tag goes under it; no room under it either: inside, top left */
+.zz.tagb .ztag{bottom:auto;top:calc(100% + 4px)}
+.zz.tagi .ztag{bottom:auto;top:4px;left:4px}
+.ztag .ic{width:13px;height:13px;color:var(--text-2)}
+.ztag .tag{height:18px;padding:0 8px;margin-left:4px}
+.zz.dim .ztag{color:var(--text-2)}
+.zz.sel .ztag{background:var(--on);color:var(--on-ink);border-color:var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.sel .ztag .ic{color:var(--on-ink)}
+.zz.sel .ztag .tag{color:var(--on-ink);border-color:rgba(0,0,0,.35)}
+.stage .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-2);font-size:var(--fs-body)}
+.stage.not-running{cursor:default;background:transparent}
+.stage.not-running::after{border-color:transparent}
+.zs{position:absolute;left:24px;top:832px;width:1056px;height:44px;display:flex;align-items:center;gap:4px}
+#zs-items{display:flex;gap:4px}
+.zs.disabled .zi{color:var(--text-off);pointer-events:none}
+.zs.disabled .zi .ic{color:var(--text-off)}
+.panel.now{position:absolute;left:1096px;top:100px;width:320px;height:776px;display:flex;flex-direction:column;overflow:hidden}
+.np{padding:16px 16px 12px;display:flex;flex-direction:column;gap:8px;flex:none;min-height:186px}
+.np .who{font-size:var(--fs-small);color:var(--text-2)}
+.np .line{font:var(--fw-hero) var(--fs-hero)/1.4 var(--font);color:var(--text);letter-spacing:-.1px}
+.np .ctl{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:8px}
+.np .ctl .wave{flex:1}
+.np.empty{flex:1;align-items:center;justify-content:center}
+.np.empty .line{font:var(--fw-body) var(--fs-body)/1.43 var(--font);color:var(--text-2)}
+.list{position:relative;flex:1;border-top:1px solid var(--line);padding:4px;overflow:hidden;display:flex;flex-direction:column}
+.list .lrow{flex:none}
+.foot{height:44px;flex:none;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--line)}
+.foot .btn{height:32px;color:var(--text-2);font-weight:var(--fw-body)}
+.foot .btn .ic{width:14px;height:14px}
+
+.game{position:relative;width:1440px;height:900px;overflow:hidden;background:#000}
+.gpic{position:absolute;left:-80px;top:0;width:1600px;height:900px}
+.gpic .scene{width:100%;height:100%;display:block}
+.float{background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6)}
+
+.zn-tb{position:absolute;left:32px;right:32px;top:52px;height:32px;display:flex;align-items:center;gap:8px}
+.zn-tb .vsep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.zn-tb .time{color:var(--text-2);margin:0 8px 0 0}
+.zn-tb .btn.on{background:var(--surface-3);border-color:var(--on)}
+.seg.kinds span{gap:8px}
+.seg.kinds span .ic{width:14px;height:14px}
+.seg.kinds span.on .ic{color:var(--on-ink)}
+.zlayer.zedit{cursor:crosshair}
+.zlayer.zedit .zz{cursor:move}
+.zlayer.drawmode .zz{cursor:crosshair}
+.zz i[data-h=nw],.zz i[data-h=se]{cursor:nwse-resize}
+.zz i[data-h=ne],.zz i[data-h=sw]{cursor:nesw-resize}
+.zz i[data-h=n],.zz i[data-h=s]{cursor:ns-resize}
+.zz i[data-h=w],.zz i[data-h=e]{cursor:ew-resize}
+.zz.drawing{border:1px solid var(--on);background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+/* delete sits at the end of the selected box's tag, clear of the resize handles */
+.zdel{display:grid;place-items:center;width:18px;height:18px;margin:0 -4px 0 4px;border-radius:var(--r-sm);color:var(--on-ink);cursor:pointer;transition:background var(--t-fast) var(--ease-out)}
+.zdel .ic{width:12px;height:12px}
+.zdel:hover{background:rgba(0,0,0,.1)}
+.zhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 16px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);color:var(--text);pointer-events:none;z-index:3;white-space:nowrap}
+.zhint[hidden]{display:none}
+.zn-stage{cursor:default}
+.zn-stage:hover::after{border-color:var(--line)}
+.zpick{position:absolute;z-index:4;padding:4px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;cursor:default}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+
+.ze{position:absolute;inset:0;pointer-events:none}
+.ze-shade{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0}
+.ze-layer{position:absolute;left:-80px;top:0;width:1600px;height:900px;opacity:0}
+.ze-bar{position:absolute;top:24px;left:0;right:0;margin:0 auto;width:max-content;display:flex;align-items:center;gap:16px;height:48px;padding:0 8px 0 16px;border-radius:var(--r-lg);color:var(--text-2);opacity:0}
+.ze-bar.bc{top:auto;bottom:24px}
+.ze-bar.tr{left:auto;right:24px;margin:0}
+.ze-bar.tl{right:auto;left:24px;margin:0}
+/* over the shade, zones are lifted (white 8%), never darker than the game around them */
+.ze-layer .zz,.ze-layer .zz.dim{background:rgba(255,255,255,.08)}
+</style></head>
+<body class="">
+<div class="app game"><div class="gpic"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="ze" id="ze"><div class="ze-shade" id="ze-shade"></div><div class="ze-layer zlayer" id="zel"><div class="zpick" id="zpick"><span class="seg kinds"><span data-k="dialogue" title="Spoken lines"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dialogue</span><span data-k="speaker" title="Who is talking"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Speaker</span><span data-k="pickups" title="Item pop-ups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>Pickups</span><span data-k="prompts" title="Button hints"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>Prompts</span><span data-k="ignore" title="Never read"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>Ignore</span></span></div></div><div class="ze-bar float" id="ze-bar"><span>Drag to add · Esc to finish</span><span class="btn primary" id="ze-done">Done</span></div></div></div><div class="mock"><b>Try it</b><span class="btn" id="m-show">Edit zones (from the quick menu)</span><span>Drag on the game: new zone, the kind picker pops under it. Click a zone: select. Delete: remove.</span><label><input type="checkbox" id="m-slow"> Slow motion x4</label></div><script>const ICON={'k-dialogue':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>','k-speaker':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>','k-pickups':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>','k-prompts':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>','k-ignore':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>','replay':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>','x':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>','check':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>','play':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>','stop':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'};</script><script>const ZJ=[{"k": "speaker", "x1": 712, "y1": 754, "x2": 888, "y2": 798}, {"k": "dialogue", "x1": 360, "y1": 800, "x2": 1240, "y2": 850}, {"k": "pickups", "x1": 88, "y1": 48, "x2": 378, "y2": 132}, {"k": "prompts", "x1": 1228, "y1": 690, "x2": 1512, "y2": 758}, {"k": "ignore", "x1": 112, "y1": 682, "x2": 288, "y2": 858}];</script><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* Zone editor, shared by 11 Zones, setup step 2, 16 Zone edit and the Zones layer of 20 Motion.
+   Zones live in picture space, 1600 x 900, and render as percentages, so the same code works at any stage size
+   (and while the stage grows). Drag on empty picture: a new box (kind = the kind shown in the picker).
+   Click a box: select it. Drag it: move. Drag a handle: resize. Delete or Backspace: remove.
+   "Draw zone" (when there is a toolbar) lets a drag start on top of another box. */
+const KN={dialogue:'Dialogue',speaker:'Speaker',pickups:'Pickups',prompts:'Prompts',ignore:'Ignore'};
+const HANDLES=[['nw',0,0],['n',50,0],['ne',100,0],['w',0,50],['e',100,50],['sw',0,100],['s',50,100],['se',100,100]];
+function ZoneEd(o){
+  const L=o.layer, bar=o.bar||null, P=o.picker||null;
+  const seg=(bar&&bar.querySelector('.seg.kinds'))||(P&&P.querySelector('.seg.kinds'));
+  const trash=bar&&bar.querySelector('.zt-trash'), drawB=bar&&bar.querySelector('.zt-draw'), cam=bar&&bar.querySelector('.zt-cam');
+  const E={zones:o.zones.map(z=>({...z})),sel:o.sel??-1,kind:'dialogue',drawMode:false,enabled:o.enabled??true};
+  const pct=z=>`left:${z.x1/16}%;top:${z.y1/9}%;width:${(z.x2-z.x1)/16}%;height:${(z.y2-z.y1)/9}%`;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const node=i=>L.querySelector(`.zz[data-i="${i}"]`);
+  function render(){
+    L.querySelectorAll('.zz').forEach(n=>n.remove());
+    E.zones.forEach((z,i)=>{const d=document.createElement('span'); d.className='zz'+(i===E.sel?' sel':''); d.dataset.k=z.k; d.dataset.i=i; d.style.cssText=pct(z);
+      const del=i===E.sel&&o.del?`<span class="zdel" title="Delete zone">${ICON.x}</span>`:'';
+      d.innerHTML=`<span class="ztag">${ICON['k-'+z.k]}${KN[z.k]}<span class="tag zoff">off</span>${del}</span>`+
+        (i===E.sel?HANDLES.map(([h,x,y])=>`<i data-h="${h}" style="left:${x}%;top:${y}%"></i>`).join(''):'');
+      L.append(d); tagSide(d,z);});
+    if(P) L.append(P);
+    sync(); if(o.onRender) o.onRender();
+  }
+  /* The tag sits above its box. At the top of the picture there is no room, so it goes under the box;
+     if there is no room under it either, inside the box at the top left. Rust: the same test on the zone rect. */
+  const TAGH=28;
+  function tagSide(d,z){ const Hh=L.offsetHeight/900;
+    const below=z.y1*Hh<TAGH, inside=below&&(900-z.y2)*Hh<TAGH;
+    d.classList.toggle('tagb',below&&!inside); d.classList.toggle('tagi',inside); }
+  let pickFor=-1;
+  function placePicker(){
+    if(E.sel<0||!E.enabled){ if(pickFor>=0){pickFor=-1; tween(P,{opacity:[null,0],s:[null,.96]},M.exit,M.in); live(P,false);} if(o.onLayout) o.onLayout(); return; }
+    const z=E.zones[E.sel], W=L.offsetWidth/1600, Hh=L.offsetHeight/900, px=o.padX||0, n=node(E.sel), tb=n&&n.classList.contains('tagb');
+    /* under the box (and under its tag when the tag is there too); flips above the box at the bottom edge */
+    let left=clamp(z.x1*W, px+8, L.offsetWidth-px-P.offsetWidth-8), top=z.y2*Hh+8+(tb?TAGH:0), up=false;
+    if(top+P.offsetHeight>L.offsetHeight-8){ top=z.y1*Hh-(tb?0:TAGH)-8-P.offsetHeight; up=true; }
+    P.style.left=left+'px'; P.style.top=top+'px'; P.style.transformOrigin=up?'0 100%':'0 0';
+    if(pickFor!==E.sel){pickFor=E.sel; tween(P,{opacity:[0,1],s:[.96,1]},140,M.out); live(P,true);}
+    if(o.onLayout) o.onLayout();
+  }
+  function sync(){
+    const k=E.sel>=0?E.zones[E.sel].k:E.kind;
+    if(seg) [...seg.children].forEach(s=>s.classList.toggle('on',s.dataset.k===k));
+    if(trash) trash.classList.toggle('disabled',E.sel<0);
+    if(drawB) drawB.classList.toggle('on',E.drawMode);
+    L.classList.toggle('zedit',E.enabled); L.classList.toggle('drawmode',E.drawMode);
+    if(o.hint) o.hint.hidden=E.zones.length>0;
+    if(P) placePicker();
+  }
+  function pt(e){const r=L.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*1600, y:(e.clientY-r.top)/r.height*900};}
+  let drag=null;
+  L.addEventListener('mousedown',e=>{
+    if(!E.enabled||e.button!==0) return;
+    if(P&&P.contains(e.target)) return;
+    if(e.target.closest('.zdel')){ del(); e.preventDefault(); return; }
+    const zz=e.target.closest('.zz'), p=pt(e);
+    if(zz&&!E.drawMode){ const i=+zz.dataset.i, h=e.target.dataset&&e.target.dataset.h;
+      if(E.sel!==i){E.sel=i; render();}
+      drag={mode:h||'move',i,p0:p,z0:{...E.zones[i]}}; e.preventDefault(); return; }
+    const d=document.createElement('span'); d.className='zz drawing'; d.style.cssText=pct({x1:p.x,y1:p.y,x2:p.x,y2:p.y}); L.append(d);
+    drag={mode:'draw',p0:p,el:d}; e.preventDefault();
+  });
+  addEventListener('mousemove',e=>{ if(!drag) return; const p=pt(e);
+    if(drag.mode==='draw'){ const z={x1:clamp(Math.min(p.x,drag.p0.x),0,1600),y1:clamp(Math.min(p.y,drag.p0.y),0,900),x2:clamp(Math.max(p.x,drag.p0.x),0,1600),y2:clamp(Math.max(p.y,drag.p0.y),0,900)};
+      drag.el.style.cssText=pct(z); drag.z=z; return; }
+    const z=E.zones[drag.i], a=drag.z0, dx=p.x-drag.p0.x, dy=p.y-drag.p0.y, m=drag.mode;
+    if(m==='move'){ const w=a.x2-a.x1,h=a.y2-a.y1; z.x1=clamp(a.x1+dx,0,1600-w); z.y1=clamp(a.y1+dy,0,900-h); z.x2=z.x1+w; z.y2=z.y1+h; }
+    else { if(m.includes('w')) z.x1=clamp(a.x1+dx,0,a.x2-24); if(m.includes('e')) z.x2=clamp(a.x2+dx,a.x1+24,1600);
+           if(m.includes('n')) z.y1=clamp(a.y1+dy,0,a.y2-16); if(m.includes('s')) z.y2=clamp(a.y2+dy,a.y1+16,900); }
+    node(drag.i).style.cssText=pct(z); tagSide(node(drag.i),z); if(P) placePicker();
+  });
+  addEventListener('mouseup',()=>{ if(!drag) return; const d=drag; drag=null;
+    if(d.mode!=='draw') return;
+    d.el.remove(); const z=d.z;
+    if(z&&z.x2-z.x1>=24&&z.y2-z.y1>=16){ E.zones.push({k:E.sel>=0?E.zones[E.sel].k:E.kind,...z}); E.sel=E.zones.length-1; E.drawMode=false; render(); if(o.onAdd) o.onAdd(); }
+    else if(E.sel>=0){ E.sel=-1; render(); }
+  });
+  if(seg) seg.addEventListener('click',e=>{const s=e.target.closest('span[data-k]'); if(!s||!E.enabled) return;
+    if(E.sel>=0){E.zones[E.sel].k=s.dataset.k; render();} else {E.kind=s.dataset.k; sync();}});
+  if(trash) trash.addEventListener('click',()=>del());
+  if(drawB) drawB.addEventListener('click',()=>{E.drawMode=!E.drawMode; sync();});
+  if(cam) cam.addEventListener('click',()=>{ const pic=L.parentNode.querySelector('.sc,.ob-pic'); if(pic) tween(pic,{opacity:[.3,1]},M.base,M.out);
+    const t=bar.querySelector('.time'); if(t){const d=new Date(); t.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');} });
+  function del(){ if(E.sel<0) return; E.zones.splice(E.sel,1); E.sel=-1; render(); }
+  E.key=e=>{ if(!E.enabled) return false;
+    if((e.key==='Delete'||e.key==='Backspace')&&E.sel>=0){del(); return true;}
+    if(e.key==='Escape'&&E.drawMode){E.drawMode=false; sync(); return true;}
+    return false; };
+  E.set=z=>{E.zones=z.map(x=>({...x})); E.sel=-1; render();};
+  E.enable=b=>{E.enabled=b; if(!b) E.drawMode=false; sync();};
+  E.render=render; E.del=del; E.select=i=>{E.sel=i; render();};
+  render(); return E;
+}
+</script><script>
+/* Zone edit (transition 11): the shade fades in (180), the outlines and tags 60 ms later (180), all ease-out.
+   The kind picker pops under the selected box: opacity and scale .96 to 1, 140 ease-out. Done or Esc: everything out 140 ease-in. */
+/* The bar moves out of the way. Home is top centre. When the selected box, its tag or the kind picker would sit
+   under it, the bar fades out (140 ease-in) and comes back (180 ease-out, y 8 px) at the first place clear of every
+   zone, tag and the picker: bottom centre, top right, top left. When home is clear of every zone again, it goes home the same way. */
+let shown=false, barAt='tc', barBusy=false;
+const BAR_AT=['tc','bc','tr','tl'];
+const rectOf=e=>e.getBoundingClientRect();
+function selRects(){ const s=document.querySelector('#zel .zz.sel'); if(!s) return [];
+  const r=[rectOf(s),rectOf(s.querySelector('.ztag'))]; if($('zpick').style.pointerEvents==='auto') r.push(rectOf($('zpick'))); return r; }
+function allRects(){ const r=[]; document.querySelectorAll('#zel .zz').forEach(z=>{r.push(rectOf(z)); r.push(rectOf(z.querySelector('.ztag')));});
+  if($('zpick').style.pointerEvents==='auto') r.push(rectOf($('zpick'))); return r; }
+function barRect(at){ const g=rectOf(document.querySelector('.game')), w=$('ze-bar').offsetWidth, h=48;
+  const top=at[0]==='t'?g.top+24:g.bottom-24-h, left=at[1]==='c'?g.left+(g.width-w)/2:at[1]==='r'?g.right-24-w:g.left+24;
+  return {left:left-8,right:left+w+8,top:top-8,bottom:top+h+8}; }
+const hit=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+const clear=(at,rs)=>!rs.some(r=>hit(r,barRect(at)));
+function moveBar(to){ if(to===barAt) return; barBusy=true; const b=$('ze-bar');
+  tween(b,{opacity:[null,0]},M.exit,M.in).onfinish=()=>{ barAt=to; BAR_AT.forEach(c=>b.classList.toggle(c,c===to&&c!=='tc'));
+    tween(b,{opacity:[0,1],y:[to[0]==='b'?8:-8,0]},M.base,M.out); barBusy=false; }; }
+function keepBarClear(){ if(!shown||barBusy) return; const sel=selRects();
+  if(barAt!=='tc'&&clear('tc',allRects())){ moveBar('tc'); return; }
+  if(clear(barAt,sel)) return;
+  const all=allRects(), to=BAR_AT.find(at=>clear(at,all))||BAR_AT.find(at=>clear(at,sel)); if(to) moveBar(to); }
+const ZE=ZoneEd({layer:$('zel'),picker:$('zpick'),zones:ZJ,del:true,padX:80,enabled:false,onLayout:keepBarClear});
+function show(){ if(shown) return; shown=true; live($('ze'),true);
+  tween($('ze-shade'),{opacity:[0,1]},M.base,M.out);
+  tween($('zel'),{opacity:[0,1]},M.base,M.out,60);
+  tween($('ze-bar'),{opacity:[0,1],y:[-8,0]},M.base,M.out);
+  ZE.enable(true); }
+function hide(){ if(!shown) return; shown=false; live($('ze'),false); if(ZE.sel>=0) ZE.select(-1); ZE.enable(false);
+  for(const id of ['ze-shade','zel']) tween($(id),{opacity:[null,0]},M.exit,M.in);
+  tween($('ze-bar'),{opacity:[null,0],y:[null,-8]},M.exit,M.in); }
+$('ze-done').onclick=hide; $('m-show').onclick=show;
+addEventListener('keydown',e=>{ if(!shown) return; if(ZE.key(e)){e.preventDefault(); return;} if(e.key==='Escape') hide(); });
+bindSlow();
+const s=Q.get('s')||'shown';
+if(s==='shown'||s==='new'||s==='top'){ INSTANT=true; show();
+  if(s==='new'){ ZE.zones.push({k:'dialogue',x1:1010,y1:150,x2:1370,y2:262}); ZE.select(ZE.zones.length-1); }
+  /* ?s=top: a box drawn at the very top, under the bar: the tag goes under the box and the bar moves to the bottom */
+  if(s==='top'){ ZE.zones.push({k:'pickups',x1:640,y1:4,x2:980,y2:50}); ZE.select(ZE.zones.length-1); }
+  INSTANT=false; }
+if(s==='show-mid'){ show(); freeze(); }
+</script>
+</body></html>

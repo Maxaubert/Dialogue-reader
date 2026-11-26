@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Choose a mode</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+
+.nav-item.todo { color: var(--text-3); }
+.edit-hint { color: var(--text-3); display:grid; place-items:center; }
+
+.modes { display:grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); margin-bottom: var(--sp-5); }
+.mode { padding: var(--sp-5); display:flex; flex-direction:column; gap: var(--sp-3); }
+.mode .tile-lg { background: var(--surface-2); border-color: var(--surface-2); }
+.mode.sel .tile-lg { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.mode ul { list-style:none; display:flex; flex-direction:column; gap: var(--sp-2); }
+.mode li { display:flex; align-items:center; gap: var(--sp-2); font-size: var(--fs-2); color: var(--text-2); }
+.mode li .i { color: var(--text-3); }
+.example { margin-top: var(--sp-2); border-radius: var(--r-2); background: var(--surface-2); padding: var(--sp-4); display:flex; flex-direction:column; gap: var(--sp-3); }
+.ex-row { display:flex; align-items:center; gap: var(--sp-3); font-size: var(--fs-2); }
+.ex-row .txt { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ex-row .i { color: var(--text-3); }
+.sumhead { display:flex; align-items:baseline; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.summary { flex:none; }
+.summary .set-row:first-child { border-top: 0; }
+.summary .lbl { flex-direction:row; align-items:center; gap: var(--sp-4); }
+.summary .lbl .caption { width: 96px; }
+.summary .lbl .t3 { font-weight: 500; }
+
+</style>
+</head>
+<body>
+<div class="window">
+<aside class="sidebar">
+<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/></svg></span>DialogReader</div>
+<div class="side-label">Set up a game</div>
+<nav class="nav"><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Choose the game window</span><span class="nav-sub">Red Dead Redemption 2</span></span></a><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Draw zones</span><span class="nav-sub">4 zones</span></span></a><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Choose a read key</span><span class="nav-sub">Mouse 4</span></span></a><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Pick a voice</span><span class="nav-sub">Kokoro · Adam</span></span></a><a class="nav-item active"><span class="lead num now">5</span><span class="nav-text"><span class="nav-title">Choose a mode</span><span class="nav-sub">Automatic or on key press</span></span></a></nav>
+<div class="spacer"></div>
+<nav class="nav"><a class="nav-item"><span class="lead icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><span class="nav-text"><span class="nav-title">Exit setup</span><span class="nav-sub">Your choices so far are kept</span></span></a></nav>
+</aside>
+<main class="content">
+<div class="topbar"><div class="crumb"><span>Set up a game</span><span class="sl">/</span><b>Choose a mode</b></div><div class="winctl"><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span></div></div>
+<div class="page">
+<header class="phead"><div class="col"><h1 class="t5">When should DialogReader read?</h1><p class="body">You can switch between these at any time, even while you play.</p></div></header>
+<div class="modes">
+ <div class="card choice mode sel"><span class="tile-lg"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg></span><span class="t4">Automatic</span>
+  <span class="body">Reads new text as soon as it shows up.</span>
+  <ul><li><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Best for story games with lots of talking</li><li><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Mouse 4 replays the last line</li></ul>
+  <div class="example">
+   <div class="ex-row"><span class="chip k-speaker">Speaker</span><span class="txt">Arthur</span><span class="caption">read at once</span></div>
+   <div class="ex-row"><span class="chip k-dialogue">Dialogue</span><span class="txt">We need to get these horses moving before the snow…</span><span class="caption">read at once</span></div></div></div>
+ <div class="card choice mode"><span class="tile-lg"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h1M10.5 10h1M14.5 10h1M8 14h8"/></svg></span><span class="t4">On key press</span>
+  <span class="body">Reads every zone once when you press Mouse 4.</span>
+  <ul><li><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Best for menus, books and item text</li><li><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Stays quiet until you ask</li></ul>
+  <div class="example">
+   <div class="ex-row"><span class="kbd"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v3"/></svg>Mouse 4</span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="chip k-speaker">Speaker</span><span class="chip k-dialogue">Dialogue</span><span class="chip k-pickup">Pickups</span></div>
+   <div class="ex-row"><span class="txt muted">Text outside your zones is never read.</span></div></div></div>
+</div>
+<div class="sumhead"><span class="t3">Your setup</span><span class="caption">You can change any of this later on the game's page.</span></div>
+<div class="card summary">
+ <div class="set-row"><span class="thumb g-rdr"></span><div class="lbl"><span class="caption">Game</span><span class="t3">Red Dead Redemption 2</span></div><button class="btn btn-sm btn-ghost">Change</button></div><div class="set-row"><span class="tile"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16"/></svg></span><div class="lbl"><span class="caption">Zones</span><span class="t3">4 zones · Dialogue, Speaker, Pickups, Prompts</span></div><button class="btn btn-sm btn-ghost">Change</button></div><div class="set-row"><span class="tile"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v3"/></svg></span><div class="lbl"><span class="caption">Read key</span><span class="t3">Mouse 4</span></div><button class="btn btn-sm btn-ghost">Change</button></div><div class="set-row"><span class="tile"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6.5 9H3.5v6h3l4.5 4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.5 6a8.5 8.5 0 0 1 0 12"/></svg></span><div class="lbl"><span class="caption">Voice</span><span class="t3">Kokoro · Adam · 1.1×</span></div><button class="btn btn-sm btn-ghost">Change</button></div>
+</div>
+</div>
+<footer class="flow-foot"><span class="caption">Step 5 of 5</span><span class="spacer"></span><span class="small">Reading starts when you finish</span>
+<button class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6l-6 6 6 6"/></svg>Back</button><button class="btn btn-primary">Finish and start reading<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "source_width": 1920,
+  "source_height": 1080,
+  "clean_frames": [286, 499],
+  "regions": [
+    { "name": "menu_screens", "rect": { "x": 0, "y": 0, "w": 1920, "h": 1080 }, "frames": [0, 205],
+      "texts": ["Continue", "New Game", "Join Game", "Load", "Options", "Online Settings", "Server Manager", "Credits", "Exit", "Session Name", "Skip Intro", "Start Game", "Multiplayer Settings", "Creative Mode", "Game Modes", "SATISFACTORY", "hudOS", "FICSIT", "WELCOME BACK, MAX", "Version: 1.2.5.1 CL#520140"] },
+    { "name": "version", "rect": { "x": 165, "y": 6, "w": 175, "h": 34 }, "frames": [190, 599],
+      "texts": ["1.2.5.1 CL#520140"] },
+    { "name": "compass", "rect": { "x": 480, "y": 22, "w": 960, "h": 62 }, "frames": [190, 599],
+      "texts": ["N", "E", "S", "W", "NE", "NW", "SE", "SW"] },
+    { "name": "objective", "rect": { "x": 1400, "y": 55, "w": 470, "h": 95 }, "frames": [190, 599],
+      "texts": ["Objective: Build the HUB", "Build the HUB", "Objective:"] },
+    { "name": "bottom_hud", "rect": { "x": 40, "y": 950, "w": 1300, "h": 115 }, "frames": [190, 599],
+      "texts": ["1", "2", "3", "4", "1 2 3 4"] },
+    { "name": "key_hints", "rect": { "x": 1560, "y": 870, "w": 360, "h": 200 }, "frames": [190, 599],
+      "texts": ["Tab", "N", "O", "B", "H", "V", "F", "Q"] },
+    { "name": "pickup_toasts_1", "rect": { "x": 15, "y": 620, "w": 400, "h": 140 }, "frames": [273, 285],
+      "texts": ["+ 9 Leaves (9)", "+ 1 Wood (1)"] },
+    { "name": "pickup_toasts_2", "rect": { "x": 15, "y": 620, "w": 400, "h": 140 }, "frames": [523, 537],
+      "texts": ["+ 7 Leaves", "+ 1 Wood"] },
+    { "name": "pickup_prompt_1", "rect": { "x": 650, "y": 500, "w": 700, "h": 200 }, "frames": [265, 269],
+      "texts": ["Press E to pick up Leaves"] },
+    { "name": "pickup_prompt_2", "rect": { "x": 650, "y": 500, "w": 700, "h": 200 }, "frames": [519, 553],
+      "texts": ["Press E to pick up Leaves"] },
+    { "name": "emote_wheel", "rect": { "x": 520, "y": 90, "w": 850, "h": 980 }, "frames": [596, 599],
+      "texts": ["Cancel"] }
+  ]
+}

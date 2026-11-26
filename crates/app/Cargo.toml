@@ -1,0 +1,79 @@
+[package]
+name = "dr-app"
+version.workspace = true
+edition = "2024"
+description = "DialogReader Windows app: Slint UI"
+
+[lib]
+name = "dr_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "DialogReader"
+path = "src/main.rs"
+
+# Renders every screen to PNG with the software renderer. No window is opened.
+[[bin]]
+name = "render-screens"
+path = "src/bin/render-screens.rs"
+
+# Checks the real overlay windows on a hidden desktop (tests/overlay_win.rs runs it). Nothing shows on screen.
+[[bin]]
+name = "overlay-probe"
+path = "src/bin/overlay-probe.rs"
+
+[features]
+# The real window draws with Skia through OpenGL (Max, 2026-11-22): its text matches the mockups. Overlays need
+# OpenGL Skia, not Skia's default surface, which draws their see-through margins black (docs/overlay-spike.md).
+# main.rs asks for the "skia-opengl" renderer by name. The software renderer is always built in: render-screens
+# and the tests use it, and SLINT_BACKEND=winit-software makes the window use it when OpenGL fails.
+default = ["renderer-skia"]
+renderer-skia = ["slint/renderer-skia-opengl"]
+# Fallback, opt-in: `--no-default-features --features renderer-femtovg` (19 MB exe, lighter text).
+renderer-femtovg = ["slint/renderer-femtovg"]
+
+[dependencies]
+# No default features: the window renderer comes from the features above, not from slint's defaults.
+slint = { version = "=1.18.1", default-features = false, features = [
+    "std",
+    "backend-winit",
+    "renderer-software",
+    "accessibility",
+    "compat-1-2",
+    "system-tray",
+    "unstable-winit-030",
+] }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+dr-runtime = { path = "../runtime" }
+dr-tts = { path = "../tts" }
+# Line kinds and skip reasons of the activity log (src/vm/reading.rs).
+dr-core = { path = "../core" }
+
+# The in-game overlay windows (src/overlay): extra window styles through the HWND, a window subclass, placement.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_Security",
+    "Win32_Storage_Xps",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
+tempfile = "=3.27.0"
+
+[build-dependencies]
+slint-build = "=1.18.1"
+# The manifest, icon and version block of DialogReader.exe (app.rc, M5). Needs rc.exe from the Windows SDK.
+embed-resource = "=3.0.12"

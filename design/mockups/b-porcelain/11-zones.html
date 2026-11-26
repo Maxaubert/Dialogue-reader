@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Zones</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+
+.ed { flex:1; min-height:0; display:grid; grid-template-columns: minmax(0,1fr) 360px; gap: var(--sp-5); }
+.left { display:flex; flex-direction:column; gap: var(--sp-5); min-height:0; }
+.stage .shot { width: 680px; margin: 0 auto; }
+.test { flex:none; }
+.trow { display:grid; grid-template-columns: 88px 1fr 160px; gap: var(--sp-3); align-items:center; padding: 0 var(--sp-5); height: var(--row-compact); border-top: 1px solid var(--line); font-size: var(--fs-2); }
+.trow .txt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.st { display:flex; align-items:center; gap: var(--sp-2); font-size: var(--fs-1); color: var(--text-3); }
+.st.read { color: var(--text-2); font-weight: 600; }
+.st .i { color: inherit; }
+.panel { display:flex; flex-direction:column; min-height:0; }
+.zitem .lbl { flex-direction:row; align-items:center; gap: var(--sp-3); }
+.set-row.zitem .lbl > .chip { font-size: var(--fs-1); font-weight: 600; line-height: var(--lh-1); }
+.zitem.sel { background: var(--sel-fill); }
+.insp { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--line); display:flex; flex-direction:column; gap: var(--sp-3); background: var(--sel-fill); }
+.insp .row { gap: var(--sp-3); }
+.insp .lab { width: 64px; font-size: var(--fs-2); color: var(--text-2); flex:none; }
+.insp .input { flex:1; }
+.insp .val { font-size: var(--fs-2); color: var(--text-2); }
+
+</style>
+</head>
+<body>
+<div class="window">
+<aside class="sidebar">
+<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/></svg></span>DialogReader</div>
+<div class="side-label">Games</div>
+<nav class="nav"><a class="nav-item active"><span class="thumb g-rdr"></span><span class="nav-text"><span class="nav-title">Red Dead Redemption 2</span><span class="nav-sub"><span class="dot ok"></span>Reading now</span></span></a><a class="nav-item"><span class="thumb g-sat"></span><span class="nav-text"><span class="nav-title">Satisfactory</span><span class="nav-sub">Played yesterday</span></span></a><a class="nav-item"><span class="thumb g-p4g"></span><span class="nav-text"><span class="nav-title">Persona 4 Golden</span><span class="nav-sub">Played 3 days ago</span></span></a><a class="nav-item"><span class="thumb g-co"></span><span class="nav-text"><span class="nav-title">Clair Obscur: Expedition 33</span><span class="nav-sub">Played last week</span></span></a><a class="nav-item"><span class="thumb g-kcd"></span><span class="nav-text"><span class="nav-title">Kingdom Come: Deliverance II</span><span class="nav-sub">Zones not set up yet</span></span></a><a class="nav-item"><span class="lead icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><span class="nav-text"><span class="nav-title">Add a game</span><span class="nav-sub">Takes about 3 minutes</span></span></a></nav>
+<div class="spacer"></div>
+<nav class="nav"><a class="nav-item"><span class="lead icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><span class="nav-text"><span class="nav-title">Settings</span><span class="nav-sub">Startup, hotkeys, voices</span></span></a></nav>
+</aside>
+<main class="content">
+<div class="topbar"><div class="crumb"><span>Games</span><span class="sl">/</span><span>Red Dead Redemption 2</span><span class="sl">/</span><b>Zones</b></div><div class="winctl"><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span></div></div>
+<div class="page">
+<header class="phead"><span class="thumb lg g-rdr"></span><div class="col"><h1 class="t5">Red Dead Redemption 2</h1><div class="meta"><span class="dot ok"></span><span class="okt">Reading</span><span>·</span><span>RDR2.exe</span><span>·</span><span>3840 × 2160</span></div></div><div class="actions"><button class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Retake picture</button><button class="btn btn-primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg>Test read</button></div></header><nav class="tabs"><a class="">Overview</a><a class="on">Zones</a><a class="">History</a></nav>
+<div class="ed">
+ <div class="left">
+  <section class="stage">
+   <div class="toolbar"><div class="seg sm"><span class="on"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l5.5 15 2.2-6.3L19 10.5z"/></svg>Select</span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8.5v7M8.5 12h7"/></svg>Draw zone</span></div>
+    <span class="spacer"></span><span class="caption">Drag a corner to resize</span><button class="btn btn-sm"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M8.5 11h5M11 8.5v5"/></svg>Fit</button></div>
+   <div class="shot"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="skyz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#58697F"/><stop offset=".55" stop-color="#B7C0CA"/><stop offset="1" stop-color="#E4E0D8"/></linearGradient>
+<linearGradient id="snowz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F2F3"/><stop offset="1" stop-color="#BFC6CF"/></linearGradient>
+<linearGradient id="vigz" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#0E1216" stop-opacity="0"/><stop offset="1" stop-color="#0E1216" stop-opacity=".55"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#skyz)"/>
+<g transform="translate(0.0,0)">
+<polygon points="0,470 180,340 330,420 520,250 700,400 860,300 1040,430 1220,280 1400,390 1600,310 1600,580 0,580" fill="#9DA8B5"/>
+<polygon points="470,300 520,250 575,305 548,296 522,318 496,296" fill="#EEF1F4"/>
+<polygon points="815,335 860,300 905,338 880,330 860,345 838,330" fill="#EEF1F4"/>
+<polygon points="1170,325 1220,280 1270,322 1245,316 1222,336 1196,318" fill="#EEF1F4"/>
+<polygon points="0,540 160,470 360,520 560,430 760,500 980,440 1200,505 1420,450 1600,500 1600,620 0,620" fill="#7F8B98"/>
+<polygon points="0,600 260,520 560,575 840,505 1120,570 1380,515 1600,560 1600,900 0,900" fill="url(#snowz)"/>
+<polygon points="250,425 230.2,491.0 239.2,491.0 214.0,545 286.0,545 260.8,491.0 269.8,491.0" fill="#26302F"/><polygon points="300,410 275.25,492.5 286.5,492.5 255.0,560 345.0,560 313.5,492.5 324.75,492.5" fill="#26302F"/><polygon points="345,438 326.85,498.5 335.1,498.5 312.0,548 378.0,548 354.9,498.5 363.15,498.5" fill="#26302F"/><polygon points="395,395 366.95,488.5 379.7,488.5 344.0,565 446.0,565 410.3,488.5 423.05,488.5" fill="#26302F"/><polygon points="450,427 429.375,495.75 438.75,495.75 412.5,552 487.5,552 461.25,495.75 470.625,495.75" fill="#26302F"/><polygon points="500,475 484.325,527.25 491.45,527.25 471.5,570 528.5,570 508.55,527.25 515.675,527.25" fill="#26302F"/><polygon points="1130,430 1111.85,490.5 1120.1,490.5 1097.0,540 1163.0,540 1139.9,490.5 1148.15,490.5" fill="#26302F"/><polygon points="1180,405 1155.25,487.5 1166.5,487.5 1135.0,555 1225.0,555 1193.5,487.5 1204.75,487.5" fill="#26302F"/><polygon points="1230,425 1210.2,491.0 1219.2,491.0 1194.0,545 1266.0,545 1240.8,491.0 1249.8,491.0" fill="#26302F"/><polygon points="1290,385 1261.125,481.25 1274.25,481.25 1237.5,560 1342.5,560 1305.75,481.25 1318.875,481.25" fill="#26302F"/><polygon points="1345,418 1323.55,489.5 1333.3,489.5 1306.0,548 1384.0,548 1356.7,489.5 1366.45,489.5" fill="#26302F"/><polygon points="1400,457 1382.675,514.75 1390.55,514.75 1368.5,562 1431.5,562 1409.45,514.75 1417.325,514.75" fill="#26302F"/><polygon points="1450,410 1426.9,487.0 1437.4,487.0 1408.0,550 1492.0,550 1462.6,487.0 1473.1,487.0" fill="#26302F"/><polygon points="40,380 5.349999999999994,495.5 21.1,495.5 -23.0,590 103.0,590 58.9,495.5 74.65,495.5" fill="#26302F"/><polygon points="110,350 68.75,487.5 87.5,487.5 35.0,600 185.0,600 132.5,487.5 151.25,487.5" fill="#26302F"/><polygon points="1520,340 1477.1,483.0 1496.6,483.0 1442.0,600 1598.0,600 1543.4,483.0 1562.9,483.0" fill="#26302F"/><polygon points="1580,390 1547.0,500.0 1562.0,500.0 1520.0,590 1640.0,590 1598.0,500.0 1613.0,500.0" fill="#26302F"/>
+<path d="M520 900 C640 760 760 690 840 620" stroke="#A9B1BB" stroke-width="22" fill="none" stroke-opacity=".5"/>
+</g>
+<rect width="1600" height="900" fill="url(#vigz)"/>
+
+<g transform="translate(60,62)"><rect width="44" height="44" rx="6" fill="#000" fill-opacity=".45" stroke="#fff" stroke-opacity=".55"/>
+<path d="M22 34v-14M22 22c-6-2-8-8-6-12 4 1 7 5 6 12zM22 24c5-3 9-2 11 1-4 3-8 3-11-1z" fill="#C9D9A6" stroke="#C9D9A6" stroke-width="1"/></g>
+<g transform="translate(135,775)"><circle r="82" fill="#1A2023" fill-opacity=".55" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+<path d="M-60 20 C-20 0 10 30 60 -10" stroke="#C7B48A" stroke-opacity=".7" stroke-width="3" fill="none"/>
+<polygon points="0,-12 9,10 0,5 -9,10" fill="#fff"/></g>
+<g transform="translate(1320,690)"><rect width="40" height="40" rx="6" fill="#000" fill-opacity=".5" stroke="#fff" stroke-opacity=".7"/>
+<text x="20" y="28" text-anchor="middle" font-family="Georgia,serif" font-size="22" fill="#fff">E</text>
+<text x="54" y="28" font-family="Georgia,serif" font-size="23" fill="#fff">Hold E to talk</text></g>
+<text x="120" y="93" font-family="Georgia,serif" font-size="26" fill="#fff">+1 Ginseng</text>
+<text x="800.0" y="746" text-anchor="middle" font-family="Georgia,serif" font-size="26" font-weight="bold" fill="#E7C36A" stroke="#000" stroke-opacity=".45" stroke-width="3" paint-order="stroke">Arthur</text>
+<text x="800.0" y="796" text-anchor="middle" font-family="Georgia,serif" font-size="31" fill="#fff" stroke="#000" stroke-opacity=".5" stroke-width="3" paint-order="stroke">We need to get these horses moving before the snow buries us.</text>
+</svg><div class="zone k-pickup" style="left:2.750%;top:5.333%;width:17.750%;height:8.000%"><span class="zone-tag">Pickups</span></div><div class="zone k-speaker" style="left:44.875%;top:79.111%;width:10.250%;height:5.111%"><span class="zone-tag">Speaker</span></div><div class="zone k-dialogue sel" style="left:18.750%;top:84.889%;width:62.500%;height:5.111%"><span class="zone-tag below">Dialogue</span><i class="h tl"></i><i class="h tr"></i><i class="h bl"></i><i class="h br"></i></div><div class="zone k-prompt off" style="left:81.625%;top:75.111%;width:16.625%;height:7.556%"><span class="zone-tag">Prompts · off</span></div><div class="zone k-ignore" style="left:2.812%;top:76.111%;width:11.250%;height:20.000%"><span class="zone-tag">Ignore</span></div></div>
+  </section>
+  <section class="card test">
+   <div class="card-head"><span class="t3">Last test read</span><span class="caption">21:10:03 · from this picture</span></div>
+   <div class="trow"><span class="chip k-speaker">Speaker</span><span class="txt">Arthur</span><span class="st read"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Read</span></div>
+   <div class="trow"><span class="chip k-dialogue">Dialogue</span><span class="txt">We need to get these horses moving before the snow buries us.</span><span class="st read"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Read</span></div>
+   <div class="trow"><span class="chip k-pickup">Pickups</span><span class="txt">+1 Ginseng</span><span class="st read"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Read</span></div>
+   <div class="trow"><span class="chip k-prompt">Prompts</span><span class="txt muted">Hold E to talk</span><span class="st"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l8 6-8 6z"/><path d="M18 6v12"/></svg>Skipped · turned off</span></div>
+   <div class="trow"><span class="chip k-ignore">Ignore</span><span class="txt muted">Minimap</span><span class="st"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10"/></svg>Never read</span></div>
+  </section>
+ </div>
+ <section class="card panel">
+  <div class="card-head"><span class="t3">Zones</span><span class="caption">5 zones</span><span class="spacer"></span><button class="btn btn-sm"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Add zone</button></div>
+  <div class="set-row zitem sel"><div class="lbl"><span class="chip k-dialogue">Dialogue</span><span class="caption">Bottom center</span></div><span class="toggle on"></span></div><div class="insp">
+<div class="row"><span class="lab">Kind</span><div class="input select k-dialogue"><i class="dot kind"></i>Dialogue<svg class="i chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></div></div>
+<div class="row"><span class="lab">Size</span><span class="val">Bottom center · 1000 × 46 px</span></div>
+<div class="row"><button class="btn btn-sm btn-ghost btn-danger btn-flush"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></svg>Delete zone</button></div>
+</div><div class="set-row zitem"><div class="lbl"><span class="chip k-speaker">Speaker</span><span class="caption">Above the subtitles</span></div><span class="toggle on"></span></div><div class="set-row zitem"><div class="lbl"><span class="chip k-pickup">Pickups</span><span class="caption">Top left</span></div><span class="toggle on"></span></div><div class="set-row zitem"><div class="lbl"><span class="chip k-prompt off">Prompts</span><span class="caption">Right side · turned off</span></div><span class="toggle"></span></div><div class="set-row zitem"><div class="lbl"><span class="chip k-ignore">Ignore</span><span class="caption">Minimap · never read</span></div><span class="toggle on"></span></div>
+ </section>
+</div>
+</div>
+</main>
+</div>
+</body>
+</html>

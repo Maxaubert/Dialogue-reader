@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>01 Setup</title><link rel="stylesheet" href="tokens.css"><style>
+.ov-tb{position:absolute;left:24px;right:24px;top:52px;height:32px;display:flex;align-items:center;gap:8px}
+.frame{position:absolute;z-index:1;left:24px;top:100px;width:1056px;height:724px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid var(--line)}
+.stage{position:absolute;z-index:2;left:24px;top:165px;width:1056px;height:594px;border-radius:var(--r-lg);overflow:hidden;background:var(--surface-1);cursor:pointer}
+.stage::after{content:"";position:absolute;inset:0;border-radius:var(--r-lg);border:1px solid var(--line);pointer-events:none;transition:border-color var(--t-fast) var(--ease-out)}
+.stage:hover::after{border-color:var(--line-2)}
+.stage .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage .sc{position:absolute;inset:0}
+.deco{position:absolute;inset:0;z-index:2}
+.zz:not(.dim) .zoff{display:none}
+/* Every outline has a black keyline outside it, so it holds on bright games. Slint: a second Rectangle, 1 px larger
+   (2 px for the live outline), with a black border. One extra Rectangle per outline, no stacked shadows. */
+.zo{position:absolute;border:1px solid rgba(255,255,255,.38);border-radius:var(--r-sm);box-shadow:0 0 0 1px rgba(0,0,0,.6);transition:border-color var(--t-fast) var(--ease-out)}
+.zo.dim{border-color:rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zo.live{border:2px solid var(--live);box-shadow:0 0 0 2px rgba(0,0,0,.6)}
+.zo.live.dim{border:1px solid rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz{position:absolute;border:1px solid rgba(255,255,255,.7);border-radius:var(--r-sm);background:rgba(0,0,0,.18);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.dim{border-color:rgba(255,255,255,.3);background:rgba(0,0,0,.3);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz.sel{border:2px solid var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz i{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;background:var(--on);border:1px solid #000;border-radius:var(--r-pill)}
+.ztag{position:absolute;left:-1px;bottom:calc(100% + 4px);display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:var(--r-sm);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);font-size:var(--fs-small);color:var(--text);white-space:nowrap}
+/* no room above the box (top of the picture): the tag goes under it; no room under it either: inside, top left */
+.zz.tagb .ztag{bottom:auto;top:calc(100% + 4px)}
+.zz.tagi .ztag{bottom:auto;top:4px;left:4px}
+.ztag .ic{width:13px;height:13px;color:var(--text-2)}
+.ztag .tag{height:18px;padding:0 8px;margin-left:4px}
+.zz.dim .ztag{color:var(--text-2)}
+.zz.sel .ztag{background:var(--on);color:var(--on-ink);border-color:var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.sel .ztag .ic{color:var(--on-ink)}
+.zz.sel .ztag .tag{color:var(--on-ink);border-color:rgba(0,0,0,.35)}
+.stage .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-2);font-size:var(--fs-body)}
+.stage.not-running{cursor:default;background:transparent}
+.stage.not-running::after{border-color:transparent}
+.zs{position:absolute;left:24px;top:832px;width:1056px;height:44px;display:flex;align-items:center;gap:4px}
+#zs-items{display:flex;gap:4px}
+.zs.disabled .zi{color:var(--text-off);pointer-events:none}
+.zs.disabled .zi .ic{color:var(--text-off)}
+.panel.now{position:absolute;left:1096px;top:100px;width:320px;height:776px;display:flex;flex-direction:column;overflow:hidden}
+.np{padding:16px 16px 12px;display:flex;flex-direction:column;gap:8px;flex:none;min-height:186px}
+.np .who{font-size:var(--fs-small);color:var(--text-2)}
+.np .line{font:var(--fw-hero) var(--fs-hero)/1.4 var(--font);color:var(--text);letter-spacing:-.1px}
+.np .ctl{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:8px}
+.np .ctl .wave{flex:1}
+.np.empty{flex:1;align-items:center;justify-content:center}
+.np.empty .line{font:var(--fw-body) var(--fs-body)/1.43 var(--font);color:var(--text-2)}
+.list{position:relative;flex:1;border-top:1px solid var(--line);padding:4px;overflow:hidden;display:flex;flex-direction:column}
+.list .lrow{flex:none}
+.foot{height:44px;flex:none;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--line)}
+.foot .btn{height:32px;color:var(--text-2);font-weight:var(--fw-body)}
+.foot .btn .ic{width:14px;height:14px}
+
+.sw{position:absolute;inset:0;z-index:30;pointer-events:none}
+.sw.open{pointer-events:auto}
+.scrim{position:absolute;inset:40px 0 0 0;background:#000;opacity:0}
+.swp{position:absolute;left:12px;top:44px;width:480px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6);opacity:0;transform-origin:30% 0;overflow:hidden}
+.sws{display:flex;align-items:center;gap:12px;height:var(--h-media);padding:0 12px 0 16px;border-bottom:1px solid var(--line);color:var(--text-2)}
+.sws .ic{color:var(--text-2)}
+.sws input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:0;color:var(--text);font:inherit;caret-color:var(--text)}
+.sws input::placeholder{color:var(--text-2);opacity:1}
+.swl{position:relative;padding:4px}
+.sw-empty{height:var(--h-media);display:flex;align-items:center;padding:0 12px;color:var(--text-2)}
+.sw-empty[hidden],.gr[hidden]{display:none}
+.swf{padding:4px;border-top:1px solid var(--line)}
+.hl{position:absolute;left:4px;right:4px;top:4px;height:var(--h-media);border-radius:var(--r);background:var(--surface-3)}
+.gr{position:relative;display:flex;align-items:center;gap:12px;height:var(--h-media);padding:0 12px 0 8px;border-radius:var(--r);cursor:pointer;transition:transform var(--t-fast) var(--ease-out)}
+.gr .gn{flex:1}
+.gr .gm{color:var(--text-2);font-size:var(--fs-small)}
+.thumb{width:48px;height:27px;border-radius:var(--r-sm);overflow:hidden;flex:none;display:block;border:1px solid var(--line)}
+.thumb svg{display:block;width:100%;height:100%}
+.thumb.plus{display:grid;place-items:center;color:var(--text-2);background:var(--surface-2)}
+.add .gn{color:var(--text-2)}
+.add:hover{background:var(--surface-2)}
+.add:hover .gn{color:var(--text)}
+
+.zn-tb{position:absolute;left:32px;right:32px;top:52px;height:32px;display:flex;align-items:center;gap:8px}
+.zn-tb .vsep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.zn-tb .time{color:var(--text-2);margin:0 8px 0 0}
+.zn-tb .btn.on{background:var(--surface-3);border-color:var(--on)}
+.seg.kinds span{gap:8px}
+.seg.kinds span .ic{width:14px;height:14px}
+.seg.kinds span.on .ic{color:var(--on-ink)}
+.zlayer.zedit{cursor:crosshair}
+.zlayer.zedit .zz{cursor:move}
+.zlayer.drawmode .zz{cursor:crosshair}
+.zz i[data-h=nw],.zz i[data-h=se]{cursor:nwse-resize}
+.zz i[data-h=ne],.zz i[data-h=sw]{cursor:nesw-resize}
+.zz i[data-h=n],.zz i[data-h=s]{cursor:ns-resize}
+.zz i[data-h=w],.zz i[data-h=e]{cursor:ew-resize}
+.zz.drawing{border:1px solid var(--on);background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+/* delete sits at the end of the selected box's tag, clear of the resize handles */
+.zdel{display:grid;place-items:center;width:18px;height:18px;margin:0 -4px 0 4px;border-radius:var(--r-sm);color:var(--on-ink);cursor:pointer;transition:background var(--t-fast) var(--ease-out)}
+.zdel .ic{width:12px;height:12px}
+.zdel:hover{background:rgba(0,0,0,.1)}
+.zhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 16px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);color:var(--text);pointer-events:none;z-index:3;white-space:nowrap}
+.zhint[hidden]{display:none}
+.zn-stage{cursor:default}
+.zn-stage:hover::after{border-color:var(--line)}
+.zpick{position:absolute;z-index:4;padding:4px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;cursor:default}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+
+.ob{position:absolute;left:0;right:0;top:40px;bottom:72px}
+.step{position:absolute;inset:0;opacity:0;pointer-events:none}
+.col{position:absolute;left:240px;top:48px;width:960px}
+.col h1,.wl h1{font:var(--fw-title) var(--fs-title)/32px var(--font-display);letter-spacing:-.4px}
+.col .sub,.wl .sub{color:var(--text-2);margin-top:4px}
+.blk{margin-top:24px}
+.hh{font:var(--fw-small) var(--fs-small)/16px var(--font);color:var(--text-2);margin:0 0 8px 4px}
+/* footer: Back, the 5 dots, Continue. No bar, no line. */
+.obf{position:absolute;left:0;right:0;bottom:0;height:72px;opacity:0;pointer-events:none}
+.obf .btn{position:absolute;top:16px}
+#ob-back{left:228px}
+#ob-next{right:240px}
+#ob-next .ic{color:var(--on-ink)}
+.dots{position:absolute;left:0;right:0;top:28px;margin:0 auto;width:max-content;display:flex;gap:8px}
+.dots i{display:block;width:8px;height:8px;border-radius:var(--r-pill);background:var(--text-off);transition:background var(--t-fast) var(--ease-out)}
+.dots i.on{background:var(--on)}
+/* welcome */
+.wl{position:absolute;left:240px;width:960px;top:48px;display:flex;align-items:flex-start;gap:64px}
+.wl-l{width:400px;flex:none}
+.wl-steps{list-style:none;margin-top:32px;display:flex;flex-direction:column;gap:12px}
+.wl-steps li{display:flex;gap:12px;align-items:center}
+.wl-steps li span{width:24px;height:24px;border-radius:var(--r-pill);border:1px solid var(--line-2);display:grid;place-items:center;font-size:var(--fs-small);color:var(--text-2);flex:none}
+.wl-act{display:flex;gap:8px;margin-top:32px}
+.wl-r{flex:1;min-width:0}
+.wl-art{position:relative;aspect-ratio:16/9;border-radius:var(--r-lg);overflow:hidden;background:var(--surface-1)}
+.wl-art::after{content:"";position:absolute;inset:0;border-radius:var(--r-lg);border:1px solid var(--line);pointer-events:none}
+.wl-art .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wl-pill{position:absolute;right:12px;top:12px;display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 10px;border-radius:var(--r-pill);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 24px rgba(0,0,0,.6);font-size:var(--fs-small)}
+.wl-pill i{width:8px;height:8px;border-radius:50%;background:var(--live)}
+/* step 1: pick the game */
+.pk-s{display:flex;width:100%;cursor:text}
+.pk-s .ic{color:var(--text-2)}
+.pk-s input,.ob input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:0;color:var(--text);font:inherit;caret-color:var(--text)}
+.ob input::placeholder{color:var(--text-2);opacity:1}
+.pk-g{margin-top:24px}
+.pk-g[hidden],.pr[hidden]{display:none}
+.pk-l{position:relative;padding:4px}
+.pk-l .hl{top:0;opacity:0}
+.pr{position:relative;display:flex;align-items:center;gap:12px;height:var(--h-media);padding:0 12px 0 8px;border-radius:var(--r);cursor:pointer;transition:background var(--t-fast) var(--ease-out)}
+.pr:not(.sel):hover{background:var(--surface-2)}
+.pr.other{color:var(--text-2)}
+.pr .wi{width:48px;height:27px;display:grid;place-items:center;color:var(--text-2);flex:none}
+/* step 2: zones */
+.ob-tb{position:static;margin-top:24px}
+.ob-stage{position:relative;margin-top:12px;width:960px;height:540px;border-radius:var(--r-lg);overflow:hidden;background:var(--surface-1)}
+.ob-stage::after{content:"";position:absolute;inset:0;border-radius:var(--r-lg);border:1px solid var(--line);pointer-events:none;z-index:5}
+.ob-pic{position:absolute;inset:0}
+.ob-pic .scene{width:100%;height:100%;display:block}
+/* step 4: voice */
+.vx{display:flex;gap:24px;align-items:flex-start}
+.vcol{width:560px}
+.vcol2{flex:1}
+.vl{position:relative;padding:4px}
+.vl .hl{top:0;height:var(--h-list)}
+.vr{position:relative;display:flex;align-items:center;gap:12px;height:var(--h-list);padding:0 4px 0 12px;border-radius:var(--r);cursor:pointer;transition:background var(--t-fast) var(--ease-out)}
+.vr:not(.sel):hover{background:var(--surface-2)}
+.vr .meta{color:var(--text-2);font-size:var(--fs-small)}
+.vr .wave{height:16px;gap:2px;display:none}
+.vr .wave i{width:2px}
+.vr.playing .wave{display:flex}
+.vr .swapic .ic + .ic{opacity:0}
+.vempty{display:flex;align-items:center;justify-content:space-between;padding:12px 8px 12px 12px;color:var(--text-2)}
+.vempty[hidden],.vr[hidden]{display:none}
+.vcol2 .srow .slider .track{width:120px}
+/* step 5: mode */
+.mcs{display:flex;gap:16px}
+.mc{flex:1;padding:20px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid var(--line);display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:background var(--t-fast) var(--ease-out),border-color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.mc:active{transform:scale(.97)}
+.mc .ic{margin-bottom:12px;color:var(--text-2);transition:color var(--t-fast) var(--ease-out)}
+.mc b{font-weight:var(--fw-strong)}
+.mc span{color:var(--text-2)}
+.mc:hover{border-color:var(--line-2)}
+.mc.on{background:var(--surface-2);border-color:var(--on)}
+.mc.on .ic{color:var(--text)}
+.sum{margin-top:24px;color:var(--text-2)}
+#ovl{z-index:1}
+</style></head>
+<body class="">
+<div class="app"><header class="strip"><div class="lead"><div class="brand" id="lead-brand"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><rect width="24" height="24" rx="6" fill="#F2F2F2"/><rect x="6.5" y="9" width="2" height="6" rx="1" fill="#000"/><rect x="11" y="6" width="2" height="12" rx="1" fill="#000"/><rect x="15.5" y="8" width="2" height="8" rx="1" fill="#000"/></svg>DialogReader</div><div class="gname" style="opacity:0;pointer-events:none" id="lead-game" title="Switch game"><span class="roll"><span id="gname-t">Red Dead Redemption 2</span></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div><div class="tail"><span class="sdot " id="sdot" style="opacity:0;pointer-events:none"><i></i><span class="tip">Reading</span></span><span class="iconbtn gear" style="opacity:0;pointer-events:none" id="gear" title="Settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span><div class="winctl"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></span><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span><span class="close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div></header><div class="layer" id="ovl" style="position:absolute;inset:0;opacity:0;pointer-events:none"><div class="ov-tb" id="ov-tb"><span class="btn primary" id="read-now"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>Read now</span><span class="btn ghost" id="pause"><span class="swapic"><svg class="ic" id="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><svg class="ic fill" id="ic-resume" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></span><span id="pause-t">Pause</span></span><span class="spacer"></span><span class="opt" id="opt-mode" title="Mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span id="mode-t">Automatic</span></span><span class="opt" id="opt-voice" title="Voice"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>Adam</span><span class="opt" id="opt-key" title="Read key"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span id="key-t">Mouse 4</span></span></div><div class="frame" id="frame"></div><div class="stage" id="stage" title="Edit zones"><div class="sc" id="sc-a"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="deco" id="ov-deco"><div class="deco" id="ov-deco-c"><span class="zo" data-k="speaker" style="left:44.500%;top:83.778%;width:11.000%;height:4.889%"></span><span class="zo live" data-k="dialogue" style="left:22.500%;top:88.889%;width:55.000%;height:5.556%"></span><span class="zo" data-k="pickups" style="left:5.500%;top:5.333%;width:18.125%;height:9.333%"></span><span class="zo dim" data-k="prompts" style="left:76.750%;top:76.667%;width:17.750%;height:7.556%"></span><span class="zo dim" data-k="ignore" style="left:7.000%;top:75.778%;width:11.000%;height:19.556%"></span></div></div><div class="deco zlayer" id="zn-deco" style="opacity:0"></div></div><div class="zs" id="ov-zs"><span id="zs-items"><span class="zi" data-k="speaker" title="Speaker: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/><path class="strike" d="M3 3l18 18"/></svg>Speaker</span><span class="zi" data-k="dialogue" title="Dialogue: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path class="strike" d="M3 3l18 18"/></svg>Dialogue</span><span class="zi" data-k="pickups" title="Pickups: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path class="strike" d="M3 3l18 18"/></svg>Pickups</span><span class="zi off" data-k="prompts" title="Prompts: off"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/><path class="strike" d="M3 3l18 18"/></svg>Prompts</span></span><span class="spacer"></span><span class="iconbtn" id="pencil" title="Edit zones"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></div><div class="panel now" id="ov-panel"><div class="np" id="np"><div class="who" id="np-who">Arthur</div><div class="line" id="np-line">We need to get these horses moving before the snow buries us.</div><div class="ctl"><div class="wave" id="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i><i style="height:22px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:17px"></i><i style="height:11px"></i><i style="height:19px"></i><i style="height:9px"></i><i style="height:6px"></i><i style="height:13px"></i><i style="height:18px"></i><i style="height:10px"></i><i style="height:7px"></i><i style="height:14px"></i><i style="height:20px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:5px"></i><i style="height:11px"></i><i style="height:16px"></i><i style="height:9px"></i></div><span class="iconbtn sm" id="np-replay" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="iconbtn sm" id="np-stop" title="Stop"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></div></div><div class="list" id="list"><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Ginseng</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow off"><span class="k" title="Prompts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg></span><span class="tx">Hold E to talk</span><span class="tag">off</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Dutch:</b> We ride at first light. Nobody stays behind.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> I hear you.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Bourbon</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Hosea:</b> If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Sadie:</b> Keep your head down, Mr. Morgan.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+2 Arrows</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Easy, girl. Easy.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Javier:</b> The law is two miles back.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Oregano</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Then we go now.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Charles:</b> The horses need rest.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div></div><div class="foot"><span class="btn ghost" id="show-all">Show all<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></div></div></div><div class="ob" id="ob"><section class="step" id="step0"><div class="wl"><div class="wl-l"><h1 class="sx">Hear the text in your games.</h1><p class="sub sx">Reads game dialogue and pop-ups aloud. Runs on your PC.</p><ol class="wl-steps sx"><li><span>1</span>Pick your game</li><li><span>2</span>Mark where text shows up</li><li><span>3</span>Choose a key, a voice and a mode</li></ol><div class="wl-act sx"><span class="btn primary" id="ob-start">Get started</span><span class="btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Import settings</span></div></div><div class="wl-r sx"><div class="wl-art"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg><div class="deco"><span class="zo" data-k="speaker" style="left:44.500%;top:83.778%;width:11.000%;height:4.889%"></span><span class="zo live" data-k="dialogue" style="left:22.500%;top:88.889%;width:55.000%;height:5.556%"></span><span class="zo" data-k="pickups" style="left:5.500%;top:5.333%;width:18.125%;height:9.333%"></span><span class="zo" data-k="prompts" style="left:76.750%;top:76.667%;width:17.750%;height:7.556%"></span><span class="zo dim" data-k="ignore" style="left:7.000%;top:75.778%;width:11.000%;height:19.556%"></span></div><div class="wl-pill"><i></i>Arthur</div></div></div></div></section><section class="step" id="step1"><div class="col"><h1 class="sx">Pick your game</h1><p class="sub sx">Start your game, then pick it.</p><div class="pk blk sx" id="pk-l"><label class="field pk-s"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pk-in" placeholder="Search windows" spellcheck="false" autocomplete="off"></label><div class="pk-g" id="pk-run"><h2 class="hh">Running</h2><div class="panel pk-l"><div class="hl"></div><div class="pr" data-name="Red Dead Redemption 2"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-rdr2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#282828"/><stop offset="1" stop-color="#A8A8A6"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-rdr2)"/><polygon fill="#787876" points="0,52 22,36 38,44 60,26 82,42 104,30 128,46 160,34 160,90 0,90"/><polygon fill="#E4E4E2" points="0,66 50,61 100,66 160,60 160,90 0,90"/><g fill="#2A2A2A"><polygon points="24,68 30,50 36,68"/><polygon points="33,69 38,56 43,69"/><polygon points="118,66 124,46 130,66"/></g></svg></span><span>Red Dead Redemption 2</span></div><div class="pr" data-name="Satisfactory"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-satis" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9773A"/><stop offset="1" stop-color="#F4CF96"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-satis)"/><circle cx="118" cy="30" r="12" fill="#FBE7C2"/><polygon fill="#B7825A" points="0,62 40,54 90,60 160,50 160,90 0,90"/><g fill="#2C3740"><rect x="22" y="34" width="10" height="34"/><rect x="36" y="44" width="22" height="24"/><rect x="62" y="28" width="7" height="40"/><rect x="0" y="66" width="160" height="24"/></g></svg></span><span>Satisfactory</span></div><div class="pr" data-name="Persona 4 Golden"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-p4g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7E07A"/><stop offset="1" stop-color="#D9A900"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-p4g)"/><g fill="#3B3320"><rect x="10" y="40" width="26" height="50"/><rect x="40" y="52" width="20" height="38"/><rect x="104" y="36" width="22" height="54"/><rect x="130" y="48" width="30" height="42"/></g></svg></span><span>Persona 4 Golden</span></div></div></div><div class="pk-g" id="pk-other"><h2 class="hh">Other</h2><div class="panel pk-l"><div class="hl"></div><div class="pr other" data-name="Discord"><span class="wi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></span><span>Discord</span></div><div class="pr other" data-name="Spotify"><span class="wi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></span><span>Spotify</span></div><div class="pr other" data-name="Zen Browser"><span class="wi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></span><span>Zen Browser</span></div></div></div></div></div></section><section class="step" id="step2"><div class="col"><h1 class="sx">Mark where text shows up</h1><p class="sub sx">Drag to box text. Pick its kind.</p><div class="sx"><div class="zn-tb ob-tb" id="zn-tb"><span class="btn zt-draw" title="Draw a zone, also over another zone"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M12 9v6M9 12h6"/></svg>Draw zone</span><span class="vsep"></span><span class="seg kinds"><span data-k="dialogue" title="Spoken lines"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dialogue</span><span data-k="speaker" title="Who is talking"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Speaker</span><span data-k="pickups" title="Item pop-ups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>Pickups</span><span data-k="prompts" title="Button hints"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>Prompts</span><span data-k="ignore" title="Never read"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>Ignore</span></span><span class="iconbtn zt-trash" title="Delete zone"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="spacer"></span><span class="iconbtn zt-cam" title="Retake screenshot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg></span><span class="time">21:30</span></div></div><div class="ob-stage sx"><div class="ob-pic"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="deco zlayer" id="ob-zl"></div><div class="zhint" id="ob-hint" hidden>Drag to box text.</div></div></div></section><section class="step" id="step3"><div class="col"><h1 class="sx">Your keys</h1><p class="sub sx">Click a key to change it.</p><div class="panel blk sx" id="keys"><div class="srow"><div class="lbl">Read key</div><div class="row"><span class="kbd" data-key="read" id="k-read">Mouse 4</span></div></div><div class="srow"><div class="lbl">Menu key</div><div class="row"><span class="kbd" id="k-menu">F7</span></div></div></div></div></section><section class="step" id="step4"><div class="col"><h1 class="sx">Pick a voice</h1><p class="sub sx">Runs offline.</p><div class="vx blk sx"><div class="vcol"><h2 class="hh">Voices</h2><div class="panel vl" id="vl"><div class="hl" id="v-hl"></div><div class="vr" data-v="Adam"><span>Adam</span><span class="meta">US · Male</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vr" data-v="Bella"><span>Bella</span><span class="meta">US · Female</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vr" data-v="Michael"><span>Michael</span><span class="meta">US · Male</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vr" data-v="Emma"><span>Emma</span><span class="meta">UK · Female</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vr" data-v="George"><span>George</span><span class="meta">UK · Male</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vr" data-v="Sky"><span>Sky</span><span class="meta">US · Female</span><span class="spacer"></span><div class="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i></div><span class="iconbtn sm vplay" title="Play a sample"><span class="swapic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></span></div><div class="vempty" id="vempty" hidden><span>No voices found.</span><span class="btn">Add voices</span></div></div></div><div class="vcol2"><h2 class="hh">Sound</h2><div class="panel"><div class="srow"><div class="lbl">Speed</div><div class="row"><span class="slider"><span class="track"><span class="fill" style="width:40%"></span><span class="knob" style="left:40%"></span></span><span class="val">1.1x</span></span></div></div><div class="srow"><div class="lbl">Volume</div><div class="row"><span class="slider"><span class="track"><span class="fill" style="width:80%"></span><span class="knob" style="left:80%"></span></span><span class="val">80%</span></span></div></div></div></div></div></div></section><section class="step" id="step5"><div class="col"><h1 class="sx">How should it read?</h1><div class="mcs blk sx" id="mcs"><div class="mc on" data-m="auto"><svg class="ic lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><b>Automatic</b><span>Reads new text as it appears.</span></div><div class="mc" data-m="key"><svg class="ic lg" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><b>On key press</b><span>Reads when you press your key.</span></div></div><p class="sum sx" id="sum">5 zones · Mouse 4 · Adam 1.1x</p></div></section></div><footer class="obf" id="obf"><span class="btn ghost" id="ob-back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Back</span><span class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i></span><span class="btn primary" id="ob-next">Continue<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></footer></div><div class="mock"><b>Try it</b><span>Get started, Back, Continue, Enter</span><span class="btn" id="m-restart">Restart</span><span>Voices</span><span class="seg" id="m-voices"><span class="on" data-v="1">Found</span><span data-v="0">None</span></span><label><input type="checkbox" id="m-slow"> Slow motion x4</label></div><script>const ICON={'k-dialogue':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>','k-speaker':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>','k-pickups':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>','k-prompts':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>','k-ignore':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>','replay':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>','x':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>','check':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>','play':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>','stop':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'};</script><script>const ZJ=[{"k": "speaker", "x1": 712, "y1": 754, "x2": 888, "y2": 798}, {"k": "dialogue", "x1": 360, "y1": 800, "x2": 1240, "y2": 850}, {"k": "pickups", "x1": 88, "y1": 48, "x2": 378, "y2": 132}, {"k": "prompts", "x1": 1228, "y1": 690, "x2": 1512, "y2": 758}, {"k": "ignore", "x1": 112, "y1": 682, "x2": 288, "y2": 858}];ICON['arrow-right']='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';</script><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* Keycaps: click one, it pulses until a key is pressed (900 ms loop). Esc cancels. Mouse 4 and 5 count. */
+let capturing=null, capOld='';
+function keyName(e){const m={' ':'Space','Control':'Ctrl','Escape':'Esc','ArrowUp':'Up','ArrowDown':'Down','ArrowLeft':'Left','ArrowRight':'Right'}; return m[e.key]||(e.key.length===1?e.key.toUpperCase():e.key);}
+function endCapture(label){
+  const k=capturing; if(!k) return; capturing=null; k.classList.remove('capture'); k.textContent=label;
+  tween(k,{opacity:[0,1]},M.fast,M.out);
+  if(window.onKeySet) onKeySet(k,label);
+}
+function bindKeycaps(root){
+  root.addEventListener('click',e=>{const k=e.target.closest('.kbd'); if(k&&!k.classList.contains('sm')&&!capturing){capturing=k; capOld=k.textContent; k.textContent='Press a key'; k.classList.add('capture'); e.stopPropagation();}});
+}
+/* the capture swallows the key before the page shortcuts (Esc, Ctrl K, Enter) see it */
+addEventListener('keydown',e=>{ if(!capturing) return; e.preventDefault(); e.stopImmediatePropagation();
+  if(e.key==='Escape') endCapture(capOld); else if(!['Shift','Control','Alt','Meta'].includes(e.key)) endCapture(keyName(e)); },true);
+addEventListener('mousedown',e=>{ if(capturing&&(e.button===3||e.button===4)){e.preventDefault(); endCapture('Mouse '+(e.button+1));} },true);
+addEventListener('click',e=>{ if(capturing&&!e.target.closest('.kbd.capture')) endCapture(capOld); });
+</script><script>
+/* Zone editor, shared by 11 Zones, setup step 2, 16 Zone edit and the Zones layer of 20 Motion.
+   Zones live in picture space, 1600 x 900, and render as percentages, so the same code works at any stage size
+   (and while the stage grows). Drag on empty picture: a new box (kind = the kind shown in the picker).
+   Click a box: select it. Drag it: move. Drag a handle: resize. Delete or Backspace: remove.
+   "Draw zone" (when there is a toolbar) lets a drag start on top of another box. */
+const KN={dialogue:'Dialogue',speaker:'Speaker',pickups:'Pickups',prompts:'Prompts',ignore:'Ignore'};
+const HANDLES=[['nw',0,0],['n',50,0],['ne',100,0],['w',0,50],['e',100,50],['sw',0,100],['s',50,100],['se',100,100]];
+function ZoneEd(o){
+  const L=o.layer, bar=o.bar||null, P=o.picker||null;
+  const seg=(bar&&bar.querySelector('.seg.kinds'))||(P&&P.querySelector('.seg.kinds'));
+  const trash=bar&&bar.querySelector('.zt-trash'), drawB=bar&&bar.querySelector('.zt-draw'), cam=bar&&bar.querySelector('.zt-cam');
+  const E={zones:o.zones.map(z=>({...z})),sel:o.sel??-1,kind:'dialogue',drawMode:false,enabled:o.enabled??true};
+  const pct=z=>`left:${z.x1/16}%;top:${z.y1/9}%;width:${(z.x2-z.x1)/16}%;height:${(z.y2-z.y1)/9}%`;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const node=i=>L.querySelector(`.zz[data-i="${i}"]`);
+  function render(){
+    L.querySelectorAll('.zz').forEach(n=>n.remove());
+    E.zones.forEach((z,i)=>{const d=document.createElement('span'); d.className='zz'+(i===E.sel?' sel':''); d.dataset.k=z.k; d.dataset.i=i; d.style.cssText=pct(z);
+      const del=i===E.sel&&o.del?`<span class="zdel" title="Delete zone">${ICON.x}</span>`:'';
+      d.innerHTML=`<span class="ztag">${ICON['k-'+z.k]}${KN[z.k]}<span class="tag zoff">off</span>${del}</span>`+
+        (i===E.sel?HANDLES.map(([h,x,y])=>`<i data-h="${h}" style="left:${x}%;top:${y}%"></i>`).join(''):'');
+      L.append(d); tagSide(d,z);});
+    if(P) L.append(P);
+    sync(); if(o.onRender) o.onRender();
+  }
+  /* The tag sits above its box. At the top of the picture there is no room, so it goes under the box;
+     if there is no room under it either, inside the box at the top left. Rust: the same test on the zone rect. */
+  const TAGH=28;
+  function tagSide(d,z){ const Hh=L.offsetHeight/900;
+    const below=z.y1*Hh<TAGH, inside=below&&(900-z.y2)*Hh<TAGH;
+    d.classList.toggle('tagb',below&&!inside); d.classList.toggle('tagi',inside); }
+  let pickFor=-1;
+  function placePicker(){
+    if(E.sel<0||!E.enabled){ if(pickFor>=0){pickFor=-1; tween(P,{opacity:[null,0],s:[null,.96]},M.exit,M.in); live(P,false);} if(o.onLayout) o.onLayout(); return; }
+    const z=E.zones[E.sel], W=L.offsetWidth/1600, Hh=L.offsetHeight/900, px=o.padX||0, n=node(E.sel), tb=n&&n.classList.contains('tagb');
+    /* under the box (and under its tag when the tag is there too); flips above the box at the bottom edge */
+    let left=clamp(z.x1*W, px+8, L.offsetWidth-px-P.offsetWidth-8), top=z.y2*Hh+8+(tb?TAGH:0), up=false;
+    if(top+P.offsetHeight>L.offsetHeight-8){ top=z.y1*Hh-(tb?0:TAGH)-8-P.offsetHeight; up=true; }
+    P.style.left=left+'px'; P.style.top=top+'px'; P.style.transformOrigin=up?'0 100%':'0 0';
+    if(pickFor!==E.sel){pickFor=E.sel; tween(P,{opacity:[0,1],s:[.96,1]},140,M.out); live(P,true);}
+    if(o.onLayout) o.onLayout();
+  }
+  function sync(){
+    const k=E.sel>=0?E.zones[E.sel].k:E.kind;
+    if(seg) [...seg.children].forEach(s=>s.classList.toggle('on',s.dataset.k===k));
+    if(trash) trash.classList.toggle('disabled',E.sel<0);
+    if(drawB) drawB.classList.toggle('on',E.drawMode);
+    L.classList.toggle('zedit',E.enabled); L.classList.toggle('drawmode',E.drawMode);
+    if(o.hint) o.hint.hidden=E.zones.length>0;
+    if(P) placePicker();
+  }
+  function pt(e){const r=L.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*1600, y:(e.clientY-r.top)/r.height*900};}
+  let drag=null;
+  L.addEventListener('mousedown',e=>{
+    if(!E.enabled||e.button!==0) return;
+    if(P&&P.contains(e.target)) return;
+    if(e.target.closest('.zdel')){ del(); e.preventDefault(); return; }
+    const zz=e.target.closest('.zz'), p=pt(e);
+    if(zz&&!E.drawMode){ const i=+zz.dataset.i, h=e.target.dataset&&e.target.dataset.h;
+      if(E.sel!==i){E.sel=i; render();}
+      drag={mode:h||'move',i,p0:p,z0:{...E.zones[i]}}; e.preventDefault(); return; }
+    const d=document.createElement('span'); d.className='zz drawing'; d.style.cssText=pct({x1:p.x,y1:p.y,x2:p.x,y2:p.y}); L.append(d);
+    drag={mode:'draw',p0:p,el:d}; e.preventDefault();
+  });
+  addEventListener('mousemove',e=>{ if(!drag) return; const p=pt(e);
+    if(drag.mode==='draw'){ const z={x1:clamp(Math.min(p.x,drag.p0.x),0,1600),y1:clamp(Math.min(p.y,drag.p0.y),0,900),x2:clamp(Math.max(p.x,drag.p0.x),0,1600),y2:clamp(Math.max(p.y,drag.p0.y),0,900)};
+      drag.el.style.cssText=pct(z); drag.z=z; return; }
+    const z=E.zones[drag.i], a=drag.z0, dx=p.x-drag.p0.x, dy=p.y-drag.p0.y, m=drag.mode;
+    if(m==='move'){ const w=a.x2-a.x1,h=a.y2-a.y1; z.x1=clamp(a.x1+dx,0,1600-w); z.y1=clamp(a.y1+dy,0,900-h); z.x2=z.x1+w; z.y2=z.y1+h; }
+    else { if(m.includes('w')) z.x1=clamp(a.x1+dx,0,a.x2-24); if(m.includes('e')) z.x2=clamp(a.x2+dx,a.x1+24,1600);
+           if(m.includes('n')) z.y1=clamp(a.y1+dy,0,a.y2-16); if(m.includes('s')) z.y2=clamp(a.y2+dy,a.y1+16,900); }
+    node(drag.i).style.cssText=pct(z); tagSide(node(drag.i),z); if(P) placePicker();
+  });
+  addEventListener('mouseup',()=>{ if(!drag) return; const d=drag; drag=null;
+    if(d.mode!=='draw') return;
+    d.el.remove(); const z=d.z;
+    if(z&&z.x2-z.x1>=24&&z.y2-z.y1>=16){ E.zones.push({k:E.sel>=0?E.zones[E.sel].k:E.kind,...z}); E.sel=E.zones.length-1; E.drawMode=false; render(); if(o.onAdd) o.onAdd(); }
+    else if(E.sel>=0){ E.sel=-1; render(); }
+  });
+  if(seg) seg.addEventListener('click',e=>{const s=e.target.closest('span[data-k]'); if(!s||!E.enabled) return;
+    if(E.sel>=0){E.zones[E.sel].k=s.dataset.k; render();} else {E.kind=s.dataset.k; sync();}});
+  if(trash) trash.addEventListener('click',()=>del());
+  if(drawB) drawB.addEventListener('click',()=>{E.drawMode=!E.drawMode; sync();});
+  if(cam) cam.addEventListener('click',()=>{ const pic=L.parentNode.querySelector('.sc,.ob-pic'); if(pic) tween(pic,{opacity:[.3,1]},M.base,M.out);
+    const t=bar.querySelector('.time'); if(t){const d=new Date(); t.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');} });
+  function del(){ if(E.sel<0) return; E.zones.splice(E.sel,1); E.sel=-1; render(); }
+  E.key=e=>{ if(!E.enabled) return false;
+    if((e.key==='Delete'||e.key==='Backspace')&&E.sel>=0){del(); return true;}
+    if(e.key==='Escape'&&E.drawMode){E.drawMode=false; sync(); return true;}
+    return false; };
+  E.set=z=>{E.zones=z.map(x=>({...x})); E.sel=-1; render();};
+  E.enable=b=>{E.enabled=b; if(!b) E.drawMode=false; sync();};
+  E.render=render; E.del=del; E.select=i=>{E.sel=i; render();};
+  render(); return E;
+}
+</script><script>
+/* Setup flow (transitions 1, 2 and 3).
+   Step to step: the old step fades out (100 ease-in) and moves 16 px away, the new step slides in 80 ms later from 24 px
+   (260 ease-out-strong), its parts 40 ms apart (at most 6). Forward comes from the right, Back from the left.
+   Back uses the back push: out 120 ease-in, in 200 ease-out-strong 80 ms later.
+   The active dot widens 8 to 20 px (260 ease-out-strong). Finish: the setup fades out (140 ease-in), the Overview comes in
+   80 ms later: stage scale .98 to 1, then the top controls, the Now panel and the zone strip, 40 ms apart, 320 ease-out-strong. */
+const STEPS=[...document.querySelectorAll('.step')];
+const parts=sec=>[...sec.querySelectorAll('.sx')];
+let cur=-1;
+function setDots(n,instant){ [...$('dots').children].forEach((d,i)=>{const on=i===n-1; d.classList.toggle('on',on); tween(d,{width:[null,on?20:8]},instant?0:M.page,M.strong);}); }
+function setNext(n){ $('ob-next').innerHTML=(n===5?'Finish':'Continue')+ICON[n===5?'check':'arrow-right']; }
+function goStep(n){
+  if(n===cur||n<0||n>5) return; const dir=n>cur?1:-1, a=STEPS[cur], b=STEPS[n];
+  const fwd=dir>0, tOut=fwd?PUSH.out:PUSH.backOut, tIn=fwd?PUSH.in:PUSH.backIn, tDel=fwd?PUSH.inDelay:PUSH.backInDelay;
+  if(a){ tween(a,{opacity:[null,0],x:[null,-16*dir]},tOut,M.in); live(a,false); }
+  tween(b,{opacity:[1,1],x:[0,0]},0,M.out); live(b,true);
+  parts(b).forEach((c,i)=>tween(c,{opacity:[0,1],x:[24*dir,0]},tIn,M.strong,tDel+Math.min(i,5)*M.stagger));
+  const f=$('obf');
+  if(n>=1&&cur<1){ tween(f,{opacity:[null,1]},tIn,M.strong,tDel); live(f,true); }
+  if(n===0&&cur>=1){ tween(f,{opacity:[null,0]},tOut,M.in); live(f,false); }
+  if(n>=1) setDots(n,cur<1);
+  setNext(n); cur=n; if(n===5) updateSum();
+}
+function next(){ if(cur===5) finish(); else if(cur>=0&&cur<5) goStep(cur+1); }
+function back(){ if(cur>=1&&cur<=5) goStep(cur-1); }
+function finish(){
+  if(cur!==5) return; cur=6;
+  tween($('ob'),{opacity:[null,0]},M.exit,M.in); live($('ob'),false);
+  tween($('obf'),{opacity:[null,0]},M.exit,M.in); live($('obf'),false);
+  tween($('lead-brand'),{opacity:[null,0]},PUSH.stripOut,M.in);
+  for(const id of ['lead-game','sdot','gear']){ tween($(id),{opacity:[null,1]},PUSH.stripIn,M.strong,PUSH.stripDelay); live($(id),true); }
+  const o=$('ovl'); tween(o,{opacity:[1,1]},0,M.out); live(o,true);
+  tween($('frame'),{opacity:[0,1]},320,M.strong,80);
+  tween($('stage'),{opacity:[0,1],s:[.98,1]},320,M.strong,80);
+  ['ov-tb','ov-panel','ov-zs'].forEach((id,i)=>tween($(id),{opacity:[0,1],y:[8,0]},320,M.strong,80+(i+1)*M.stagger));
+}
+$('ob-start').onclick=()=>goStep(1);
+$('ob-next').onclick=next; $('ob-back').onclick=back;
+addEventListener('keydown',e=>{ if(cur===2&&ZE.key(e)){e.preventDefault(); return;}
+  if(e.key==='Enter'){ e.preventDefault(); if(cur===0) goStep(1); else next(); } });
+
+/* step 1: Running and Other are two panels, each with one highlight. Inside a panel the highlight glides to the
+   picked row (360 ms). Into the other panel: the old fill fades out and the new one fades in on the row (120 ms each).
+   Typing filters the rows; a group with no rows left hides with its label. */
+const PR=()=>[...$('pk-l').querySelectorAll('.pr')];
+const hlOf=r=>r.closest('.pk-l').querySelector('.hl');
+let picked=null;
+function pick(r,fast){ const old=picked; PR().forEach(x=>x.classList.toggle('sel',x===r)); picked=r; const h=hlOf(r); h.style.visibility='';
+  if(old&&hlOf(old)===h){ tween(h,{y:[null,r.offsetTop],opacity:[null,1]},fast===0?0:M.glide,M.strong); return; }
+  if(old) tween(hlOf(old),{opacity:[null,0]},fast===0?0:M.fast,M.in);
+  tween(h,{y:[r.offsetTop,r.offsetTop]},0,M.out); tween(h,{opacity:[null,1]},fast===0?0:M.fast,M.out); }
+PR().forEach(r=>r.onclick=()=>pick(r));
+$('pk-in').addEventListener('input',()=>{
+  const v=$('pk-in').value.trim().toLowerCase();
+  PR().forEach(r=>r.hidden=!!v&&!r.dataset.name.toLowerCase().includes(v));
+  document.querySelectorAll('.pk-g').forEach(g=>g.hidden=![...g.querySelectorAll('.pr')].some(r=>!r.hidden));
+  const h=hlOf(picked); if(picked.hidden) h.style.visibility='hidden'; else { h.style.visibility=''; tween(h,{y:[null,picked.offsetTop]},0,M.out); }
+});
+
+/* step 2: the same zone editor and toolbar as 11-zones */
+const ZE=ZoneEd({layer:$('ob-zl'),bar:$('zn-tb'),zones:ZJ,hint:$('ob-hint')});
+
+/* step 3: keycaps */
+bindKeycaps($('keys'));
+
+/* step 4: voices. The picked voice gets the glide fill. The play button previews: icon crossfade, a small live waveform for 2 s. */
+const VRS=()=>[...$('vl').querySelectorAll('.vr')];
+let voice=VRS()[0], playT=null, waveT=null;
+function pickV(r,fast){ VRS().forEach(x=>x.classList.toggle('sel',x===r)); voice=r; tween($('v-hl'),{y:[null,r.offsetTop]},fast===0?0:M.glide,M.strong); }
+function stopPlay(){ clearTimeout(playT); clearInterval(waveT); VRS().forEach(r=>{ if(r.classList.contains('playing')){ r.classList.remove('playing'); const [p,s]=r.querySelectorAll('.swapic .ic'); tween(p,{opacity:[null,1]},M.fast,M.out); tween(s,{opacity:[null,0]},M.fast,M.out);} }); }
+function play(r){ const was=r.classList.contains('playing'); stopPlay(); if(was) return;
+  r.classList.add('playing'); const [p,s]=r.querySelectorAll('.swapic .ic'); tween(p,{opacity:[null,0]},M.fast,M.out); tween(s,{opacity:[null,1]},M.fast,M.out);
+  const bars=[...r.querySelectorAll('.wave i')]; waveT=setInterval(()=>bars.forEach(b=>b.style.height=(3+Math.round(Math.random()*12))+'px'),120);
+  playT=setTimeout(stopPlay,2000*SLOW); }
+VRS().forEach(r=>r.onclick=e=>{ if(e.target.closest('.vplay')){ play(r); return; } pickV(r); });
+$('m-voices').onclick=e=>{const x=e.target.closest('span[data-v]'); if(!x) return; [...x.parentNode.children].forEach(y=>y.classList.toggle('on',y===x));
+  const none=x.dataset.v==='0'; VRS().forEach(r=>r.hidden=none); $('v-hl').style.visibility=none?'hidden':''; $('vempty').hidden=!none; updateSum();};
+
+/* step 5: mode cards. Selection is the white border plus surface-2 fill, nothing else. */
+$('mcs').onclick=e=>{const c=e.target.closest('.mc'); if(!c) return; $('mcs').querySelectorAll('.mc').forEach(x=>x.classList.toggle('on',x===c));};
+function updateSum(){
+  const none=!$('vempty').hidden;
+  $('sum').textContent=ZE.zones.length+' zones · '+$('k-read').textContent+' · '+(none?'No voice yet':voice.dataset.v+' 1.1x');
+  $('gname-t').textContent=picked&&!picked.classList.contains('other')?picked.dataset.name:'Red Dead Redemption 2';
+}
+$('m-restart').onclick=()=>{location.href=location.pathname};
+bindSlow();
+
+/* ?s=N: step N. ?s=N-mid&ms=T: frozen T ms into the step from N-1 to N. ?s=done, ?s=done-mid&ms=T: the Finish transition. */
+(function(){
+  INSTANT=true; pick(PR()[0],0); pickV(VRS()[0],0);
+  const s=Q.get('s')||'0', mid=s.endsWith('-mid'), b=s.replace('-mid','');
+  if(Q.get('voices')==='0') document.querySelector('#m-voices span[data-v="0"]').click();
+  if(b==='done'){ goStep(5); if(mid) INSTANT=false; finish(); }
+  else { const n=+b; goStep(mid?n-1:n); INSTANT=false; if(mid) goStep(n); }
+  INSTANT=false; if(mid) freeze();
+})();
+</script>
+</body></html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>14 Game switcher</title><link rel="stylesheet" href="tokens.css"><style>
+.ov-tb{position:absolute;left:24px;right:24px;top:52px;height:32px;display:flex;align-items:center;gap:8px}
+.frame{position:absolute;z-index:1;left:24px;top:100px;width:1056px;height:724px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid var(--line)}
+.stage{position:absolute;z-index:2;left:24px;top:165px;width:1056px;height:594px;border-radius:var(--r-lg);overflow:hidden;background:var(--surface-1);cursor:pointer}
+.stage::after{content:"";position:absolute;inset:0;border-radius:var(--r-lg);border:1px solid var(--line);pointer-events:none;transition:border-color var(--t-fast) var(--ease-out)}
+.stage:hover::after{border-color:var(--line-2)}
+.stage .scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage .sc{position:absolute;inset:0}
+.deco{position:absolute;inset:0;z-index:2}
+.zz:not(.dim) .zoff{display:none}
+/* Every outline has a black keyline outside it, so it holds on bright games. Slint: a second Rectangle, 1 px larger
+   (2 px for the live outline), with a black border. One extra Rectangle per outline, no stacked shadows. */
+.zo{position:absolute;border:1px solid rgba(255,255,255,.38);border-radius:var(--r-sm);box-shadow:0 0 0 1px rgba(0,0,0,.6);transition:border-color var(--t-fast) var(--ease-out)}
+.zo.dim{border-color:rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zo.live{border:2px solid var(--live);box-shadow:0 0 0 2px rgba(0,0,0,.6)}
+.zo.live.dim{border:1px solid rgba(255,255,255,.16);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz{position:absolute;border:1px solid rgba(255,255,255,.7);border-radius:var(--r-sm);background:rgba(0,0,0,.18);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.dim{border-color:rgba(255,255,255,.3);background:rgba(0,0,0,.3);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.zz.sel{border:2px solid var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz i{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;background:var(--on);border:1px solid #000;border-radius:var(--r-pill)}
+.ztag{position:absolute;left:-1px;bottom:calc(100% + 4px);display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:var(--r-sm);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);font-size:var(--fs-small);color:var(--text);white-space:nowrap}
+/* no room above the box (top of the picture): the tag goes under it; no room under it either: inside, top left */
+.zz.tagb .ztag{bottom:auto;top:calc(100% + 4px)}
+.zz.tagi .ztag{bottom:auto;top:4px;left:4px}
+.ztag .ic{width:13px;height:13px;color:var(--text-2)}
+.ztag .tag{height:18px;padding:0 8px;margin-left:4px}
+.zz.dim .ztag{color:var(--text-2)}
+.zz.sel .ztag{background:var(--on);color:var(--on-ink);border-color:var(--on);box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.zz.sel .ztag .ic{color:var(--on-ink)}
+.zz.sel .ztag .tag{color:var(--on-ink);border-color:rgba(0,0,0,.35)}
+.stage .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-2);font-size:var(--fs-body)}
+.stage.not-running{cursor:default;background:transparent}
+.stage.not-running::after{border-color:transparent}
+.zs{position:absolute;left:24px;top:832px;width:1056px;height:44px;display:flex;align-items:center;gap:4px}
+#zs-items{display:flex;gap:4px}
+.zs.disabled .zi{color:var(--text-off);pointer-events:none}
+.zs.disabled .zi .ic{color:var(--text-off)}
+.panel.now{position:absolute;left:1096px;top:100px;width:320px;height:776px;display:flex;flex-direction:column;overflow:hidden}
+.np{padding:16px 16px 12px;display:flex;flex-direction:column;gap:8px;flex:none;min-height:186px}
+.np .who{font-size:var(--fs-small);color:var(--text-2)}
+.np .line{font:var(--fw-hero) var(--fs-hero)/1.4 var(--font);color:var(--text);letter-spacing:-.1px}
+.np .ctl{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:8px}
+.np .ctl .wave{flex:1}
+.np.empty{flex:1;align-items:center;justify-content:center}
+.np.empty .line{font:var(--fw-body) var(--fs-body)/1.43 var(--font);color:var(--text-2)}
+.list{position:relative;flex:1;border-top:1px solid var(--line);padding:4px;overflow:hidden;display:flex;flex-direction:column}
+.list .lrow{flex:none}
+.foot{height:44px;flex:none;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--line)}
+.foot .btn{height:32px;color:var(--text-2);font-weight:var(--fw-body)}
+.foot .btn .ic{width:14px;height:14px}
+
+.sw{position:absolute;inset:0;z-index:30;pointer-events:none}
+.sw.open{pointer-events:auto}
+.scrim{position:absolute;inset:40px 0 0 0;background:#000;opacity:0}
+.swp{position:absolute;left:12px;top:44px;width:480px;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6);opacity:0;transform-origin:30% 0;overflow:hidden}
+.sws{display:flex;align-items:center;gap:12px;height:var(--h-media);padding:0 12px 0 16px;border-bottom:1px solid var(--line);color:var(--text-2)}
+.sws .ic{color:var(--text-2)}
+.sws input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:0;color:var(--text);font:inherit;caret-color:var(--text)}
+.sws input::placeholder{color:var(--text-2);opacity:1}
+.swl{position:relative;padding:4px}
+.sw-empty{height:var(--h-media);display:flex;align-items:center;padding:0 12px;color:var(--text-2)}
+.sw-empty[hidden],.gr[hidden]{display:none}
+.swf{padding:4px;border-top:1px solid var(--line)}
+.hl{position:absolute;left:4px;right:4px;top:4px;height:var(--h-media);border-radius:var(--r);background:var(--surface-3)}
+.gr{position:relative;display:flex;align-items:center;gap:12px;height:var(--h-media);padding:0 12px 0 8px;border-radius:var(--r);cursor:pointer;transition:transform var(--t-fast) var(--ease-out)}
+.gr .gn{flex:1}
+.gr .gm{color:var(--text-2);font-size:var(--fs-small)}
+.thumb{width:48px;height:27px;border-radius:var(--r-sm);overflow:hidden;flex:none;display:block;border:1px solid var(--line)}
+.thumb svg{display:block;width:100%;height:100%}
+.thumb.plus{display:grid;place-items:center;color:var(--text-2);background:var(--surface-2)}
+.add .gn{color:var(--text-2)}
+.add:hover{background:var(--surface-2)}
+.add:hover .gn{color:var(--text)}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+</style></head>
+<body class="">
+<div class="app"><header class="strip"><div class="lead"><div class="gname" id="lead-game" title="Switch game"><span class="roll"><span id="gname-t">Red Dead Redemption 2</span></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div><div class="tail"><span class="sdot " id="sdot"><i></i><span class="tip">Reading</span></span><span class="iconbtn gear" id="gear" title="Settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span><div class="winctl"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></span><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span><span class="close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div></header><div class="ov-tb" id="ov-tb"><span class="btn primary" id="read-now"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>Read now</span><span class="btn ghost" id="pause"><span class="swapic"><svg class="ic" id="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><svg class="ic fill" id="ic-resume" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></span><span id="pause-t">Pause</span></span><span class="spacer"></span><span class="opt" id="opt-mode" title="Mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span id="mode-t">Automatic</span></span><span class="opt" id="opt-voice" title="Voice"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>Adam</span><span class="opt" id="opt-key" title="Read key"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span id="key-t">Mouse 4</span></span></div><div class="frame" id="frame"></div><div class="stage" id="stage" title="Edit zones"><div class="sc" id="sc-a"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="deco" id="ov-deco"><div class="deco" id="ov-deco-c"><span class="zo" data-k="speaker" style="left:44.500%;top:83.778%;width:11.000%;height:4.889%"></span><span class="zo live" data-k="dialogue" style="left:22.500%;top:88.889%;width:55.000%;height:5.556%"></span><span class="zo" data-k="pickups" style="left:5.500%;top:5.333%;width:18.125%;height:9.333%"></span><span class="zo dim" data-k="prompts" style="left:76.750%;top:76.667%;width:17.750%;height:7.556%"></span><span class="zo dim" data-k="ignore" style="left:7.000%;top:75.778%;width:11.000%;height:19.556%"></span></div></div><div class="deco zlayer" id="zn-deco" style="opacity:0"></div></div><div class="zs" id="ov-zs"><span id="zs-items"><span class="zi" data-k="speaker" title="Speaker: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/><path class="strike" d="M3 3l18 18"/></svg>Speaker</span><span class="zi" data-k="dialogue" title="Dialogue: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path class="strike" d="M3 3l18 18"/></svg>Dialogue</span><span class="zi" data-k="pickups" title="Pickups: on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path class="strike" d="M3 3l18 18"/></svg>Pickups</span><span class="zi off" data-k="prompts" title="Prompts: off"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/><path class="strike" d="M3 3l18 18"/></svg>Prompts</span></span><span class="spacer"></span><span class="iconbtn" id="pencil" title="Edit zones"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></div><div class="panel now" id="ov-panel"><div class="np" id="np"><div class="who" id="np-who">Arthur</div><div class="line" id="np-line">We need to get these horses moving before the snow buries us.</div><div class="ctl"><div class="wave" id="wave"><i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:15px"></i><i style="height:22px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:17px"></i><i style="height:11px"></i><i style="height:19px"></i><i style="height:9px"></i><i style="height:6px"></i><i style="height:13px"></i><i style="height:18px"></i><i style="height:10px"></i><i style="height:7px"></i><i style="height:14px"></i><i style="height:20px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:5px"></i><i style="height:11px"></i><i style="height:16px"></i><i style="height:9px"></i></div><span class="iconbtn sm" id="np-replay" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="iconbtn sm" id="np-stop" title="Stop"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></span></div></div><div class="list" id="list"><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Ginseng</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow off"><span class="k" title="Prompts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg></span><span class="tx">Hold E to talk</span><span class="tag">off</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Dutch:</b> We ride at first light. Nobody stays behind.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> I hear you.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Bourbon</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Hosea:</b> If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Sadie:</b> Keep your head down, Mr. Morgan.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+2 Arrows</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Easy, girl. Easy.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Javier:</b> The law is two miles back.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Oregano</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Then we go now.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Charles:</b> The horses need rest.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span></div></div><div class="foot"><span class="btn ghost" id="show-all">Show all<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></div></div><div class="sw" id="sw"><div class="scrim" id="sw-scrim"></div><div class="swp" id="swp"><div class="sws"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="sw-in" placeholder="Search games" spellcheck="false" autocomplete="off"><span class="kbd sm">Ctrl K</span></div><div class="swl" id="swl"><div class="hl" id="hl"></div><div class="gr" data-g="rdr2" data-name="Red Dead Redemption 2" data-m="Just now"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-rdr2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#282828"/><stop offset="1" stop-color="#A8A8A6"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-rdr2)"/><polygon fill="#787876" points="0,52 22,36 38,44 60,26 82,42 104,30 128,46 160,34 160,90 0,90"/><polygon fill="#E4E4E2" points="0,66 50,61 100,66 160,60 160,90 0,90"/><g fill="#2A2A2A"><polygon points="24,68 30,50 36,68"/><polygon points="33,69 38,56 43,69"/><polygon points="118,66 124,46 130,66"/></g></svg></span><span class="gn">Red Dead Redemption 2</span><span class="gm">Reading</span></div><div class="gr" data-g="satis" data-name="Satisfactory" data-m="2 days ago"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-satis" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9773A"/><stop offset="1" stop-color="#F4CF96"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-satis)"/><circle cx="118" cy="30" r="12" fill="#FBE7C2"/><polygon fill="#B7825A" points="0,62 40,54 90,60 160,50 160,90 0,90"/><g fill="#2C3740"><rect x="22" y="34" width="10" height="34"/><rect x="36" y="44" width="22" height="24"/><rect x="62" y="28" width="7" height="40"/><rect x="0" y="66" width="160" height="24"/></g></svg></span><span class="gn">Satisfactory</span><span class="gm">2 days ago</span></div><div class="gr" data-g="p4g" data-name="Persona 4 Golden" data-m="Last week"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-p4g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7E07A"/><stop offset="1" stop-color="#D9A900"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-p4g)"/><g fill="#3B3320"><rect x="10" y="40" width="26" height="50"/><rect x="40" y="52" width="20" height="38"/><rect x="104" y="36" width="22" height="54"/><rect x="130" y="48" width="30" height="42"/></g></svg></span><span class="gn">Persona 4 Golden</span><span class="gm">Last week</span></div><div class="gr" data-g="kcd2" data-name="Kingdom Come: Deliverance II" data-m="In March"><span class="thumb"><svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="a-kcd2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FB6CC"/><stop offset="1" stop-color="#E6E0C6"/></linearGradient></defs><rect width="160" height="90" fill="url(#a-kcd2)"/><polygon fill="#5D7A49" points="0,58 40,46 80,54 120,42 160,50 160,90 0,90"/><polygon fill="#2F4527" points="0,72 60,64 120,72 160,66 160,90 0,90"/></svg></span><span class="gn">Kingdom Come: Deliverance II</span><span class="gm">In March</span></div><div class="sw-empty" id="sw-empty" hidden>No games found.</div></div><div class="swf"><div class="gr add" id="add-game" title="Opens setup"><span class="thumb plus"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span><span class="gn">Add game</span></div></div></div></div></div><div class="mock"><b>Try it</b><span>Game name or Ctrl K: open</span><span>Type to search. Up, Down, Enter. Esc closes.</span><span>State</span><span class="seg" id="m-state"><span data-s="open">Open</span><span data-s="filter">Search "sat"</span><span data-s="empty">No match</span><span data-s="closed">Closed</span></span><label><input type="checkbox" id="m-slow"> Slow motion x4</label></div><script>const ICON={'k-dialogue':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>','k-speaker':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>','k-pickups':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>','k-prompts':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>','k-ignore':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>','replay':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>','x':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>','check':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>','play':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>','stop':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'};</script><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* Game switcher (brief 3.1 row 7): scrim 0 to 0.6, panel opacity, y -8 to 0, scale .98 to 1. Open 180 ease-out, close 140 ease-in.
+   Typing filters the list. One highlight glides to the row: 360 ms for the mouse, 120 ms for the arrow keys. */
+const SW={open:false,hi:0,canOpen:()=>true,onPick:r=>{},cur:()=>0};
+const ROWH=48;
+function allRows(){return [...document.querySelectorAll('#swl .gr')]}
+function rows(){return allRows().filter(r=>!r.hidden)}
+function glide(i,fast){SW.hi=i; tween($('hl'),{y:[null,i*ROWH]},fast?M.fast:M.glide,M.strong);}
+function filterSw(){
+  const v=$('sw-in').value.trim().toLowerCase();
+  allRows().forEach(r=>r.hidden=!!v&&!r.dataset.name.toLowerCase().includes(v));
+  const n=rows().length; $('sw-empty').hidden=n>0; $('hl').style.visibility=n?'':'hidden';
+  if(v&&n){SW.hi=0; tween($('hl'),{y:[0,0]},0,M.out);}
+}
+function openSw(){
+  if(SW.open||!SW.canOpen()) return; SW.open=true; $('sw').classList.add('open'); $('sw-in').value=''; filterSw();
+  tween($('sw-scrim'),{opacity:[0,.6]},M.base,M.out);
+  tween($('swp'),{opacity:[0,1],y:[-8,0],s:[.98,1]},M.base,M.out);
+  const c=SW.cur(); SW.hi=c; tween($('hl'),{y:[c*ROWH,c*ROWH]},0,M.out);
+  setTimeout(()=>{ if(SW.open) $('sw-in').focus({preventScroll:true}); },0);
+}
+function closeSw(){
+  if(!SW.open) return; SW.open=false; $('sw').classList.remove('open'); $('sw-in').blur();
+  tween($('sw-scrim'),{opacity:[null,0]},M.exit,M.in);
+  tween($('swp'),{opacity:[null,0],y:[null,-8],s:[null,.98]},M.exit,M.in);
+}
+function pickSw(r){ if(!r) return; closeSw(); SW.onPick(r); }
+allRows().forEach(r=>{ r.onmouseenter=()=>{const i=rows().indexOf(r); if(i>=0&&i!==SW.hi) glide(i,false)}; r.onclick=()=>pickSw(r); });
+$('sw-in').addEventListener('input',filterSw);
+$('sw-scrim').onclick=()=>closeSw();
+$('add-game').onclick=()=>closeSw();
+/* returns true when the switcher used the key */
+function swKey(e){
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault(); SW.open?closeSw():openSw(); return true;}
+  if(!SW.open) return false;
+  if(e.key==='Escape'){closeSw(); return true;}
+  const n=rows().length;
+  if((e.key==='ArrowDown'||e.key==='ArrowUp')&&n){e.preventDefault(); glide((SW.hi+(e.key==='ArrowDown'?1:n-1))%n,true); return true;}
+  if(e.key==='Enter'){pickSw(rows()[SW.hi]); return true;}
+  return false;
+}
+/* the game name rolls: old text goes up 8 px and fades (100 in), new text comes from below (180 out, 60 later) */
+function rollName(name,d=0){
+  const roll=document.querySelector('.gname .roll'), old=$('gname-t');
+  const nu=old.cloneNode(); nu.id='gname-t'; nu.textContent=name; old.id='';
+  nu.style.position='absolute'; nu.style.left='0'; nu.style.top='0'; roll.append(nu);
+  roll.style.width=Math.max(old.offsetWidth,nu.offsetWidth)+'px';
+  tween(nu,{opacity:[0,0],y:[8,8]},0,M.out);
+  tween(old,{opacity:[1,0],y:[0,-8]},100,M.in,d).onfinish=()=>{old.remove(); nu.style.position=''; roll.style.width='';};
+  tween(nu,{opacity:[0,1],y:[8,0]},180,M.out,d+60);
+}
+</script><script>
+let cur='rdr2';
+SW.cur=()=>Math.max(0,rows().findIndex(r=>r.dataset.g===cur));
+SW.onPick=r=>{ if(r.dataset.g===cur) return; cur=r.dataset.g;
+  allRows().forEach(x=>x.querySelector('.gm').textContent=x.dataset.g===cur?'Reading':x.dataset.m); rollName(r.dataset.name,80); };
+$('lead-game').onclick=()=>SW.open?closeSw():openSw();
+addEventListener('keydown',e=>{swKey(e)});
+function state(s,instant){
+  document.querySelectorAll('#m-state span').forEach(x=>x.classList.toggle('on',x.dataset.s===s));
+  INSTANT=!!instant;
+  if(s==='closed'){closeSw();}
+  else { if(!SW.open) openSw();
+    $('sw-in').value=s==='filter'?'sat':s==='empty'?'zzz':''; filterSw();
+    if(s==='open') glide(1,true); }
+  INSTANT=false;
+}
+$('m-state').onclick=e=>{const x=e.target.closest('span[data-s]'); if(x) state(x.dataset.s);};
+bindSlow();
+const s0=(Q.get('s')||'open').replace('-mid','');
+if((Q.get('s')||'').endsWith('-mid')){ openSw(); freeze(); document.querySelectorAll('#m-state span').forEach(x=>x.classList.toggle('on',x.dataset.s==='open')); }
+else state(s0,true);
+</script>
+</body></html>

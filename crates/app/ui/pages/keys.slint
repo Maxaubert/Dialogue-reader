@@ -1,0 +1,98 @@
+// Setup step 3, Your keys (d-black 01-setup, #step3): one panel with the read key and the menu key. A click on a
+// keycap starts key capture ("Press a key"); the next key or mouse button becomes the key. Esc, a click on the
+// keycap again or the window losing the focus ends it, and Alt+Tab and Win are never taken (src/vm/reading.rs).
+// Settings shows the same KeysCard.
+import { SetupPart, SetupStage } from "setup_part.slint";
+import { Palette, Space, Size } from "../theme.slint";
+import { Keycap, Panel, SettingRow } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+export component KeysCard inherits VerticalLayout {
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    // the row waiting for a key: 0 read, 1 quick menu, -1 none
+    in property <int> capturing: -1;
+    // the keycap tooltip (Settings: "Click to change"); empty: none
+    in property <string> tip;
+    callback change(int);
+    Panel {
+        VerticalLayout {
+            padding: 1px;
+            SettingRow {
+                text: "Read key";
+                first: true;
+                VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: root.read-key;
+                        label: "Read key: " + root.read-key;
+                        tip: root.tip;
+                        capturing: root.capturing == 0;
+                        clicked => {
+                            root.change(0);
+                        }
+                    }
+                }
+            }
+
+            SettingRow {
+                text: "Menu key";
+                VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: root.menu-key;
+                        label: "Menu key: " + root.menu-key;
+                        tip: root.tip;
+                        capturing: root.capturing == 1;
+                        clicked => {
+                            root.change(1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component KeysPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
+    in property <string> read-key: "Mouse 4";
+    in property <string> menu-key: "F7";
+    in property <int> capturing: -1;
+    callback change(int);
+    stage := SetupStage {
+        zoom: root.zoom;
+        content-h: body.preferred-height;
+        body := VerticalLayout {
+            x: (stage.vw - Size.col) / 2;
+            y: stage.top;
+            width: Size.col;
+            height: self.preferred-height;
+            alignment: start;
+            SetupPart {
+                n: 0;
+                ObHead {
+                    title: "Your keys";
+                    lead: "Click a key to change it.";
+                }
+            }
+
+            Rectangle {
+                height: Space.s5;
+            }
+
+            SetupPart {
+                n: 1;
+                KeysCard {
+                    read-key: root.read-key;
+                    menu-key: root.menu-key;
+                    capturing: root.capturing;
+                    change(i) => {
+                        root.change(i);
+                    }
+                }
+            }
+        }
+    }
+}

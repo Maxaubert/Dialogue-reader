@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>17 Activity</title><link rel="stylesheet" href="tokens.css"><style>
+.ac-scroll{position:absolute;left:0;right:0;top:40px;bottom:0;overflow-y:auto}
+.ac-col{width:720px;margin:0 auto;padding:16px 0 48px}
+.ac-head{display:flex;align-items:center;justify-content:space-between;margin:8px 0 8px 4px}
+.ac-head h2{font:var(--fw-small) var(--fs-small)/16px var(--font);color:var(--text-2)}
+.ac-list{position:relative;padding:4px}
+.ac-list .lrow[hidden]{display:none}
+.ac-list .lrow .rp{top:4px}
+.ac-list .lrow:not(.off):hover .meta,.ac-list .lrow.is-hover:not(.off) .meta{opacity:0}
+.ac-list .lrow .meta{min-width:32px;text-align:right}
+.ac-empty{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:16px}
+.ac-empty p{color:var(--text-2)}
+.ac-empty[hidden]{display:none}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+</style></head>
+<body class="">
+<div class="app"><header class="strip"><div class="lead"><div class="back" id="lead-back" title="Back (Esc)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span id="back-t">Activity</span></div></div><div class="tail"><span class="sdot " id="sdot"><i></i><span class="tip">Reading</span></span><div class="winctl"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></span><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span><span class="close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div></header><div class="ac-scroll" id="ac-scroll"><div class="ac-col"><div class="ac-head" id="ac-head"><h2>Today</h2><span class="seg" id="ac-filter"><span class="on" data-f="all">All</span><span data-f="read">Read</span><span data-f="skip" title="Kinds that are off, and repeats">Skipped</span></span></div><div class="panel ac-list" id="ac-list"><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> We need to get these horses moving before the snow buries us.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:42</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Ginseng</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:42</span></div><div class="lrow off"><span class="k" title="Prompts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg></span><span class="tx">Hold E to talk</span><span class="tag">off</span><span class="meta">21:42</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Dutch:</b> We ride at first light. Nobody stays behind.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:41</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> I hear you.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:41</span></div><div class="lrow off"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> I hear you.</span><span class="tag">repeat</span><span class="meta">21:41</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Bourbon</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:41</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Hosea:</b> If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and I will not bury anyone else this winter.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:40</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Sadie:</b> Then stop talking and start digging.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:40</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">Donated to camp: $5.00</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:40</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Charles:</b> Tracks lead north. Two riders, maybe three.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:40</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+2 Arrows</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:39</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Keep your voice down.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:39</span></div><div class="lrow off"><span class="k" title="Prompts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg></span><span class="tx">Hold E to talk</span><span class="tag">off</span><span class="meta">21:39</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Javier:</b> The wagon wheel is cracked. It will not last the night, and the next town is a full day east of here, past the river and the old mill, so either we fix it with what we have tonight or we leave the wagon and carry the rest on the horses.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:39</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Venison</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:38</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Dutch:</b> Have a little faith, Arthur.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:38</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Arthur:</b> Easy, girl. Easy.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:37</span></div><div class="lrow"><span class="k" title="Pickups"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span><span class="tx">+1 Oregano</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:37</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Hosea:</b> We should keep moving.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:36</span></div><div class="lrow"><span class="k" title="Dialogue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="tx"><b>Charles:</b> The horses need rest.</span><span class="iconbtn sm rp" title="Replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span class="meta">21:36</span></div><div class="ac-empty" id="ac-empty" hidden><p>Nothing read yet.</p><span class="btn primary"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>Read now</span></div></div></div></div></div><div class="mock"><b>Try it</b><span>Hover a cut line: full text</span><span>All, Read, Skipped filter the list</span><span class="btn" id="m-enter">Play enter</span><span>State</span><span class="seg" id="m-state"><span class="on" data-s="lines">Lines</span><span data-s="empty">Empty</span></span><label><input type="checkbox" id="m-slow"> Slow motion x4</label><span>Back or Esc: return (opens 20-motion)</span></div><script>const ICON={'k-dialogue':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>','k-speaker':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>','k-pickups':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>','k-prompts':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>','k-ignore':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>','replay':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>','x':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>','check':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>','play':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>','stop':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'};</script><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* List rows: two lines, then cut (Max 2026-11-24). Hovering a cut row for 200 ms lays the full row over the rows below:
+   the same row, unclamped, on surface-2 with a hairline and a shadow, fading in 120 ms. It leaves when the pointer leaves it. */
+function bindList(list){
+  let t=null, card=null;
+  function hide(){ if(!card) return; const c=card; card=null; tween(c,{opacity:[null,0]},M.fast,M.in).onfinish=()=>c.remove(); }
+  function show(r){
+    hide(); const c=r.cloneNode(true); c.classList.add('lfull','is-hover'); c.classList.remove('gone');
+    c.style.left=r.offsetLeft+'px'; c.style.width=r.offsetWidth+'px'; c.style.top=r.offsetTop+'px'; c.style.transform='none';
+    list.append(c); card=c;
+    const room=list.clientHeight-4; if(getComputedStyle(list).overflowY==='hidden'&&r.offsetTop+c.offsetHeight>room) c.style.top=Math.max(4,room-c.offsetHeight)+'px';
+    tween(c,{opacity:[0,1]},M.fast,M.out);
+    c.addEventListener('mouseleave',hide);
+  }
+  list.addEventListener('mouseover',e=>{
+    const r=e.target.closest('.lrow'); if(!r||r.classList.contains('lfull')) return;
+    clearTimeout(t); const tx=r.querySelector('.tx');
+    if(card&&!card.contains(e.target)) hide();
+    if(!tx||tx.scrollHeight<=tx.clientHeight+1) return;
+    t=setTimeout(()=>show(r),INSTANT?0:200);
+  });
+  list.addEventListener('mouseleave',()=>{clearTimeout(t); hide();});
+  return {hide, show};
+}
+</script><script>
+/* Activity filter: All, Read, Skipped (rows with an off or repeat tag) */
+function bindActivity(){
+  $('ac-filter').onclick=e=>{const s=e.target.closest('span[data-f]'); if(!s) return;
+    [...s.parentNode.children].forEach(x=>x.classList.toggle('on',x===s));
+    const f=s.dataset.f; $('ac-list').querySelectorAll('.lrow:not(.lfull)').forEach(r=>{const sk=r.classList.contains('off'); r.hidden=f==='read'?sk:f==='skip'?!sk:false;});};
+}
+/* Activity enter (transition 6): the page comes from y +24 with a fade, the first 6 rows stagger 30 ms.
+   Rows after the 6th share the 6th row's delay, so no hole opens in the middle of the list.
+   The last row ends 80 + 5 x 30 + 260 = 490 ms after the click. */
+function activityIn(delay){
+  tween($('ac-head'),{opacity:[0,1]},M.page,M.strong,delay);
+  tween($('ac-list'),{opacity:[0,1],y:[24,0]},M.page,M.strong,delay);
+  [...$('ac-list').querySelectorAll('.lrow:not([hidden])')].forEach((r,i)=>tween(r,{opacity:[0,1],y:[8,0]},M.page,M.strong,delay+Math.min(i,5)*30));
+}
+</script><script>
+const LST=bindList($('ac-list')); bindActivity();
+function setState(s){
+  document.querySelectorAll('#m-state span').forEach(x=>x.classList.toggle('on',x.dataset.s===s));
+  const e=s==='empty'; $('ac-list').querySelectorAll('.lrow:not(.lfull)').forEach(r=>r.hidden=e); $('ac-empty').hidden=!e;
+  $('ac-filter').style.visibility=e?'hidden':'';
+}
+$('m-state').onclick=e=>{const x=e.target.closest('span[data-s]'); if(x) setState(x.dataset.s);};
+$('m-enter').onclick=()=>activityIn(0);
+const leave=()=>{location.href='20-motion.html?from=activity'};
+$('lead-back').onclick=leave;
+addEventListener('keydown',e=>{ if(e.key==='Escape') leave(); });
+bindSlow();
+if(Q.get('state')==='empty') setState('empty');
+if(Q.get('enter')){ activityIn(0); freeze(); }
+if(Q.get('hover')){ const r=[...$('ac-list').querySelectorAll('.lrow')].find(r=>{const t=r.querySelector('.tx');return t.scrollHeight>t.clientHeight+1}); if(r){INSTANT=true; LST.show(r); INSTANT=false;} }
+</script>
+</body></html>

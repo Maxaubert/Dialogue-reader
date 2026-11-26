@@ -1,0 +1,143 @@
+// Activity (d-black 17-activity), pushed from "Show all": every read and skipped line in the Overview list style,
+// in a 720 px column. "Today" and the filter (All, Read, Skipped) above one panel. A row has its kind icon (the kind
+// name is its tooltip), the line, an "off" or "repeat" tag for a skipped line and the time; replay covers the time
+// on hover. The rows fade in 30 ms apart; rows after the 6th share the 6th row's delay. Empty: "Nothing read yet."
+// and Read now.
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Kind,
+    Kinds,
+} from "../theme.slint";
+import { LineData } from "../data.slint";
+import {
+    Button,
+    BtnKind,
+    ListRow,
+    Panel,
+    Segmented,
+} from "../components/base.slint";
+
+export component ActivityTab inherits Rectangle {
+    in property <[LineData]> log;
+    in-out property <int> filter: 0;
+    // switch game (app.slint): the list fades out and in; "Today" and the filter stay
+    in property <float> text-o: 1;
+    // new lines (app.slint): the first `fresh` rows arrive (`arrive`, 0 to 1)
+    in property <int> fresh: 0;
+    in property <float> arrive: 1;
+    callback back();
+    // "Read now" on the empty list (app.slint: the same as Read now on the Overview)
+    callback read-now();
+    // the replay button of row i (the log, newest first)
+    callback replay(int);
+    // The row fade is worked out from the clock (`animation-tick`), as in setup_part.slint: the page is made in the
+    // frame that first draws it, so an `animate` flip in `init` would already be at its end.
+    property <duration> born;
+    property <bool> done: Motion.instant;
+    init => {
+        root.born = animation-tick();
+    }
+    Timer {
+        interval: Math.max(1ms, Motion.push-gap + 5 * Motion.row-stagger + Motion.page);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    property <length> col-w: 720px;
+
+    Flickable {
+        content-height: col.preferred-height;
+        col := VerticalLayout {
+            x: (parent.width - root.col-w) / 2;
+            width: root.col-w;
+            padding-top: Space.s4 + Space.s3;
+            padding-bottom: Space.s7;
+            alignment: start;
+            spacing: Space.s2;
+            // the filter is not there while nothing has been read (17-activity-empty)
+            HorizontalLayout {
+                padding-left: Space.s1;
+                height: 28px;
+                Text {
+                    text: "Today";
+                    font-size: Type.fs-small;
+                    color: Palette.text-2;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                if root.log.length > 0: Segmented {
+                    items: ["All", "Read", "Skipped"];
+                    tips: ["", "", "Kinds that are off, and repeats"];
+                    selected: root.filter;
+                    item-h: 22px;
+                    item-pad: 12px;
+                    select(i) => {
+                        root.filter = i;
+                    }
+                }
+            }
+
+            if root.log.length == 0: Panel {
+                opacity: root.text-o;
+                VerticalLayout {
+                    padding: Space.s4 + 4px;
+                    spacing: Space.s3;
+                    alignment: start;
+                    Text {
+                        text: "Nothing read yet.";
+                        color: Palette.text-2;
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            kind: BtnKind.primary;
+                            text: "Read now";
+                            icon: Icons.play-fill;
+                            icon-size: 14px;
+                            clicked => {
+                                root.read-now();
+                            }
+                        }
+                    }
+                }
+            }
+            if root.log.length > 0: Panel {
+                opacity: root.text-o;
+                VerticalLayout {
+                    padding: Space.s1 + 1px;
+                    // a plain `for` of rows, so a row's full-text card can lie over the rows below it
+                    for l[i] in root.log: ListRow {
+                        property <bool> shown: root.filter == 0 || (root.filter == 1) == (l.skip == "");
+                        icon: Kinds.icon(l.kind);
+                        icon-tip: Kinds.name(l.kind);
+                        speaker: l.who;
+                        line: l.line;
+                        off: l.skip != "";
+                        tag: l.skip;
+                        meta: l.time;
+                        replay-label: l.skip == "" ? "Replay" : "";
+                        rest-bg: Palette.surface-1;
+                        arrive: i < root.fresh ? root.arrive : 1;
+                        height: self.shown ? self.slot-h : 0px;
+                        visible: self.shown;
+                        // 0 to 1 over 260 ms, 80 ms after the push starts, 30 ms per row up to the 6th; eased out
+                        opacity: root.done ? 1 : 1 - Math.pow(1 - Math.clamp((animation-tick() - root.born - Motion.push-gap - min(i, 5) * Motion.row-stagger) / Math.max(1ms, Motion.page), 0, 1), 4);
+                        replay => {
+                            root.replay(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

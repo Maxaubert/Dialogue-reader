@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Pick a voice</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+
+.nav-item.todo { color: var(--text-3); }
+.edit-hint { color: var(--text-3); display:grid; place-items:center; }
+
+.vwrap { flex:1; min-height:0; display:grid; grid-template-columns: minmax(0,1fr) 368px; gap: var(--sp-5); }
+.vlist { display:flex; flex-direction:column; min-height:0; }
+.vrows { padding: 0 var(--sp-2) var(--sp-2); display:flex; flex-direction:column; gap: var(--sp-1); }
+.voice { display:flex; align-items:center; gap: var(--sp-4); height: var(--row-set); padding: 0 var(--sp-4); border-radius: var(--r-2); }
+.voice.sel { background: var(--sel-fill); }
+.voice .col { width: 240px; }
+.voice .progress { max-width: 320px; }
+.try { display:flex; flex-direction:column; }
+.ctl { display:flex; flex-direction:column; gap: var(--sp-2); padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--line); }
+.ctl .row { gap: var(--sp-3); }
+.val { width: 44px; text-align:right; font-size: var(--fs-2); font-weight:600; }
+.quote { margin: 0 var(--sp-5) var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-2); background: var(--surface-2); font-size: var(--fs-3); }
+.play-row { display:flex; gap: var(--sp-3); padding: 0 var(--sp-5) var(--sp-5); }
+.try .set-row:last-child { margin-top:auto; }
+
+</style>
+</head>
+<body>
+<div class="window">
+<aside class="sidebar">
+<div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/></svg></span>DialogReader</div>
+<div class="side-label">Set up a game</div>
+<nav class="nav"><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Choose the game window</span><span class="nav-sub">Red Dead Redemption 2</span></span></a><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Draw zones</span><span class="nav-sub">4 zones</span></span></a><a class="nav-item step-done"><span class="lead num done"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="nav-text"><span class="nav-title">Choose a read key</span><span class="nav-sub">Mouse 4</span></span></a><a class="nav-item active"><span class="lead num now">4</span><span class="nav-text"><span class="nav-title">Pick a voice</span><span class="nav-sub">Runs on this PC</span></span></a><a class="nav-item todo"><span class="lead num">5</span><span class="nav-text"><span class="nav-title">Choose a mode</span><span class="nav-sub">Automatic or on key press</span></span></a></nav>
+<div class="spacer"></div>
+<nav class="nav"><a class="nav-item"><span class="lead icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><span class="nav-text"><span class="nav-title">Exit setup</span><span class="nav-sub">Your choices so far are kept</span></span></a></nav>
+</aside>
+<main class="content">
+<div class="topbar"><div class="crumb"><span>Set up a game</span><span class="sl">/</span><b>Pick a voice</b></div><div class="winctl"><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h10"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></span><span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span></div></div>
+<div class="page">
+<header class="phead"><div class="col"><h1 class="t5">Pick a voice</h1><p class="body">All voices run on this PC, so nothing is sent online. Press play to hear one.</p></div></header>
+<div class="vwrap">
+ <section class="card vlist"><div class="card-head"><span class="t3">Voices</span><span class="caption">8 installed</span></div><div class="vrows"><div class="voice sel"><div class="col"><span class="t3">Kokoro · Adam</span><span class="caption">American English · Deep, calm</span></div><span class="spacer"></span><div class="progress"><i style="width:38%"></i></div><span class="caption">0:02</span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Bella</span><span class="caption">American English · Bright, warm</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Michael</span><span class="caption">American English · Clear, neutral</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Nicole</span><span class="caption">American English · Quiet, close</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Emma</span><span class="caption">British English · Soft, warm</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · George</span><span class="caption">British English · Low, steady</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Lewis</span><span class="caption">British English · Dry, even</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div><div class="voice"><div class="col"><span class="t3">Kokoro · Isabella</span><span class="caption">British English · Light, quick</span></div><span class="spacer"></span><button class="btn btn-sm btn-icon"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.5l11 6.5-11 6.5z"/></svg></button></div></div></section>
+ <section class="card try">
+  <div class="card-head"><span class="t3">Try it</span><span class="caption">Kokoro · Adam</span><span class="spacer"></span><span class="badge"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6.5 9H3.5v6h3l4.5 4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>Playing</span></div>
+  <div class="quote">Arthur: We need to get these horses moving before the snow buries us.</div>
+  <div class="play-row"><button class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>Stop</button><button class="btn btn-ghost"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14 5.3L4 15.5M4 20v-4.5h4.5M4 12a8 8 0 0 1 14-5.3L20 8.5M20 4v4.5h-4.5"/></svg>Another line</button></div>
+  <div class="ctl"><span class="small">Speed</span><div class="row"><div class="slider"><span class="fill" style="width:55%"></span><span class="knob" style="left:55%"></span></div><span class="val">1.1×</span></div></div>
+  <div class="ctl"><span class="small">Volume</span><div class="row"><div class="slider"><span class="fill" style="width:80%"></span><span class="knob" style="left:80%"></span></div><span class="val">80%</span></div></div>
+  <div class="set-row"><div class="lbl"><span>Use for new games</span><span class="caption">You can still pick a voice per game</span></div><span class="toggle"></span></div>
+ </section>
+</div>
+</div>
+<footer class="flow-foot"><span class="caption">Step 4 of 5</span><span class="spacer"></span><span class="small">Voice: Kokoro · Adam</span>
+<button class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6l-6 6 6 6"/></svg>Back</button><button class="btn btn-primary">Continue<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></footer>
+</main>
+</div>
+</body>
+</html>

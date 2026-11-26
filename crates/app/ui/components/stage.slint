@@ -1,0 +1,359 @@
+// The game picture with zones on top (.stage, .zone, .ztag, .handle) and the live note.
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
+import { ZoneData } from "../data.slint";
+import { Icon, CornerMask, Dot, ZoneOutline, ZoneHandle } from "base.slint";
+
+// The live view of the game (src/vm/live.rs). Rust sets it; every real stage (`contain`) shows it while `on`.
+// Zones stay in capture pixels: `w` x `h` is the capture size, `frame` is a smaller copy that fills the same box.
+export global LiveView {
+    in-out property <bool> on: false;
+    in-out property <image> frame;
+    in-out property <float> w: 1600;
+    in-out property <float> h: 900;
+    // "Live", or why the saved screenshot shows (plain words); empty: no chip
+    in-out property <string> note;
+    in-out property <bool> note-live: false;
+    // a real stage was shown or changed size (logical px): the frames are made this size
+    callback stage-size(length, length);
+    // a frame or the end of the session waits (called on the UI thread)
+    callback arrived();
+}
+
+// The tag of a zone (.ztag): kind icon and name, and the small "off" pill for an off zone. The selected zone's
+// tag is white with a black keyline. Stage places it (above the box, under it, or inside it).
+export component ZoneTag inherits Rectangle {
+    in property <Kind> kind;
+    in property <bool> on: true;
+    in property <bool> selected: false;
+    property <color> fg: root.selected ? Palette.on-ink : root.on ? Palette.text : Palette.text-2;
+    width: lay.preferred-width;
+    height: 24px;
+    border-radius: Radius.sm;
+    background: root.selected ? Palette.on : Palette.surface-1;
+    border-width: 1px;
+    border-color: root.selected ? Palette.on : Palette.float-line;
+    if root.selected: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+    lay := HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: root.on ? Space.s2 : 3px;
+        spacing: Space.s1;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Kinds.icon(root.kind);
+                width: 13px;
+                height: 13px;
+                color: root.selected ? Palette.on-ink : Palette.text-2;
+            }
+        }
+
+        Text {
+            text: Kinds.name(root.kind);
+            font-size: Type.fs-small;
+            color: root.fg;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        if !root.on: VerticalLayout {
+            alignment: center;
+            padding-left: Space.s1;
+            Rectangle {
+                height: 18px;
+                width: off.preferred-width + 2 * Space.s2;
+                border-radius: Radius.pill;
+                border-width: 1px;
+                border-color: root.selected ? #00000059 : Palette.line-2;
+                off := Text {
+                    text: "off";
+                    font-size: Type.fs-small;
+                    color: root.selected ? Palette.on-ink : Palette.text-2;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}
+
+// Where a zone's tag goes (README "Notes for the Slint port", tested in Rust as geom::tag_place): 0 above the box
+// (24 px tag, 4 px gap), 1 under it when there is no room above, 2 inside it at the top left when there is no
+// room under it either.
+export global TagPlace {
+    public pure function of(box-y: length, box-h: length, stage-h: length) -> int {
+        return box-y >= 28px ? 0 : box-y + box-h + 28px <= stage-h ? 1 : 2;
+    }
+}
+
+// Maps image pixels (src-w x src-h, shown with "cover", or "contain" for real screenshots) to view pixels.
+// Rust has the same math in geom.rs. With `interactive`, presses, drags and releases go to `pointer` in image
+// pixels (src/vm/zones.rs draws, selects, moves and resizes).
+export component Stage inherits Rectangle {
+    in property <image> source: Art.scene;
+    in property <float> src-w: 1600;
+    in property <float> src-h: 900;
+    // real screenshots are shown whole (contain); the fake 16:9 art fills the stage (cover)
+    in property <bool> contain: false;
+    in property <bool> interactive: false;
+    // the box being drawn (image px)
+    in property <bool> drafting: false;
+    in property <ZoneData> draft;
+    in property <[ZoneData]> zones;
+    in property <bool> labels: true;
+    // the Overview (.zo): thin outlines only (white 38 %, 1 px, no fill); a click goes to the page, not a zone
+    in property <bool> quiet: false;
+    in property <int> selected: -1;
+    // the zone of the line being spoken (its outline is lime and 2 px); -1: none
+    in property <int> live-zone: -1;
+    in property <length> radius: Radius.md;
+    in property <bool> round-top: true;
+    in property <bool> round-bottom: true;
+    in property <color> behind: Palette.bg;
+    // the tags fade with the Zones tools while the stage grows (0 to 1)
+    in property <float> tags-o: 1;
+    // false while the stage grows or shrinks: its size is told to the live view only once it is still
+    in property <bool> settled: true;
+    // the stage is drawn this many times bigger (a setup step in a big window, SetupStage): the live view makes its
+    // frames for the size on screen
+    in property <float> zoom: 1;
+    // false: the picture stays `source` while the game shows live (the old picture under a game switch)
+    in property <bool> follow-live: true;
+    // switch game: the zone boxes and tags of the old game fade out (0 to 1)
+    in property <float> marks-o: 1;
+    // real screenshots (contain) follow the live view when there is one
+    property <bool> live: root.contain && LiveView.on && root.follow-live;
+    property <float> pw: root.live ? LiveView.w : root.src-w;
+    property <float> ph: root.live ? LiveView.h : root.src-h;
+    out property <float> scale: root.contain ? min(root.width / 1px / root.pw, root.height / 1px / root.ph) : max(root.width / 1px / root.pw, root.height / 1px / root.ph);
+    out property <length> off-x: (root.width - root.pw * root.scale * 1px) / 2;
+    out property <length> off-y: (root.height - root.ph * root.scale * 1px) / 2;
+    callback zone-clicked(int);
+    // 0 press, 1 move, 2 release; x and y in image px; scale = view px per image px
+    callback pointer(int, float, float, float);
+    background: Palette.surface-1;
+    // The real window clips to these corners. Software renders cannot, so the CornerMask below paints them.
+    border-top-left-radius: root.round-top ? root.radius : 0px;
+    border-top-right-radius: root.round-top ? root.radius : 0px;
+    border-bottom-left-radius: root.round-bottom ? root.radius : 0px;
+    border-bottom-right-radius: root.round-bottom ? root.radius : 0px;
+    clip: true;
+    init => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed width => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed height => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed zoom => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    changed settled => {
+        if root.contain && root.settled {
+            LiveView.stage-size(root.width * root.zoom, root.height * root.zoom);
+        }
+    }
+    Image {
+        x: root.off-x;
+        y: root.off-y;
+        width: root.pw * root.scale * 1px;
+        height: root.ph * root.scale * 1px;
+        source: root.live ? LiveView.frame : root.source;
+        image-fit: fill;
+        // the game picture itself (the tests check that the live view note is never on it)
+        accessible-role: image;
+        accessible-label: "Game picture";
+    }
+
+    for z[i] in root.zones: ZoneOutline {
+        // Zone kinds carry no color (Max, 2026-11-22). d-black: a light outline with a black keyline, so it holds
+        // on bright games; the selected zone is white and 2 px; off zones are dimmed (45 %, keyline 30 %).
+        property <color> zf: Palette.zone-fill;
+        property <bool> sel: i == root.selected;
+        opacity: root.marks-o;
+        live: i == root.live-zone && z.on;
+        line: self.live ? Palette.live : root.quiet ? #FFFFFF61 : self.sel ? Palette.on : Palette.text;
+        x: root.off-x + z.x * root.scale * 1px;
+        y: root.off-y + z.y * root.scale * 1px;
+        width: z.w * root.scale * 1px;
+        height: z.h * root.scale * 1px;
+        selected: self.sel;
+        dim: !z.on;
+        line-w: self.live || self.sel ? 2px : root.quiet ? 1px : 1.5px;
+        background: root.quiet ? transparent : z.on ? self.zf : self.zf.with-alpha(0.063);
+        if self.sel: Rectangle {
+            for p in [
+                { x: 0, y: 0 },
+                { x: 0.5, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+                { x: 0, y: 1 },
+                { x: 0.5, y: 1 },
+                { x: 1, y: 1 }
+            ]: ZoneHandle {
+                x: parent.width * p.x - 4px;
+                y: parent.height * p.y - 4px;
+            }
+        }
+        if !root.interactive && !root.quiet: TouchArea {
+            clicked => {
+                root.zone-clicked(i);
+            }
+        }
+    }
+    // the box being drawn, with the same keyline
+    if root.drafting: ZoneOutline {
+        x: root.off-x + root.draft.x * root.scale * 1px;
+        y: root.off-y + root.draft.y * root.scale * 1px;
+        width: root.draft.w * root.scale * 1px;
+        height: root.draft.h * root.scale * 1px;
+        line: Palette.edit-draft-line;
+        background: Palette.edit-draft-fill;
+    }
+    // A left drag draws, moves or resizes. The release of ANY button ends a TouchArea's mouse grab, and its
+    // `moved` then stops while `pressed` stays true (Max, 2026-11-22: a right click froze the box, and the left
+    // release put it at the cursor). So the drag is tracked here and moves come from `pointer-event`, which
+    // fires with or without the grab. A right press cancels the drag (3), as does a lost pointer; other buttons
+    // are ignored. Esc cancels in app.slint.
+    if root.interactive: TouchArea {
+        property <bool> dragging: false;
+        mouse-cursor: crosshair;
+        accessible-role: image;
+        accessible-label: "Screenshot";
+        function send(kind: int) {
+            root.pointer(kind, (self.mouse-x - root.off-x) / 1px / root.scale, (self.mouse-y - root.off-y) / 1px / root.scale, root.scale);
+        }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                self.dragging = true;
+                self.send(0);
+            } else if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                if self.dragging {
+                    self.dragging = false;
+                    self.send(2);
+                }
+            } else if e.kind == PointerEventKind.move {
+                if self.dragging {
+                    self.send(1);
+                }
+            } else if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) || e.kind == PointerEventKind.cancel {
+                if self.dragging {
+                    self.dragging = false;
+                    self.send(3);
+                }
+            }
+        }
+        // the grab was lost (another button's release) and the mouse left the stage: the left release may
+        // never come here, so the drag is cancelled
+        changed has-hover => {
+            if !self.has-hover && self.dragging {
+                self.dragging = false;
+                self.send(3);
+            }
+        }
+    }
+    // Tags go above every zone box, so they are drawn after all boxes. A tag never takes the pointer.
+    if root.labels: Rectangle {
+        opacity: root.tags-o * root.marks-o;
+        for z[i] in root.zones: ZoneTag {
+            property <length> bx: root.off-x + z.x * root.scale * 1px;
+            property <length> by: root.off-y + z.y * root.scale * 1px;
+            property <length> bh: z.h * root.scale * 1px;
+            property <int> place: TagPlace.of(self.by, self.bh, root.height);
+            kind: z.kind;
+            on: z.on;
+            selected: i == root.selected;
+            x: self.bx + (self.place == 2 ? 4px : -1px);
+            y: self.place == 0 ? self.by - 28px : self.place == 1 ? self.by + self.bh + 4px : self.by + 4px;
+        }
+    }
+    if Render.software: CornerMask {
+        width: 100%;
+        height: 100%;
+        radius: root.radius;
+        color: root.behind;
+        top: root.round-top;
+        bottom: root.round-bottom;
+    }
+}
+
+// "Live" (with a green dot), or why the saved screenshot shows (LiveView.note). It sits in the line under a stage,
+// never on the game picture (Max, 2026-11-23: the chip covered the top right corner, where a zone may be).
+// Empty note: nothing.
+export component LiveNote inherits Rectangle {
+    width: row.preferred-width;
+    height: 22px;
+    horizontal-stretch: 0;
+    accessible-role: text;
+    accessible-label: "Live view";
+    accessible-value: LiveView.note;
+    row := HorizontalLayout {
+        spacing: 6px;
+        if LiveView.note-live: VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+                tint: Palette.live;
+            }
+        }
+        Text {
+            text: LiveView.note;
+            font-size: Type.fs-small;
+            font-weight: LiveView.note-live ? Type.w-medium : Type.w-regular;
+            color: LiveView.note-live ? Palette.text-2 : Palette.text-3;
+            vertical-alignment: center;
+        }
+    }
+}
+// The end of the Zones and step 2 toolbars: nothing while the game shows live (no "Live" note, Max 2026-11-24), else
+// the time of the saved screenshot ("21:30", TEXT.md), after the reason when there is one ("Saved screenshot · the
+// game is closed").
+export component ShotNote inherits HorizontalLayout {
+    // real screenshots: the live view and its note can show
+    in property <bool> contain;
+    // "21:30"; empty: none
+    in property <string> time;
+    property <bool> live: root.contain && LiveView.on;
+    spacing: Space.s3;
+    horizontal-stretch: 0;
+    if root.contain && LiveView.note != "" && !LiveView.note-live: VerticalLayout {
+        alignment: center;
+        LiveNote { }
+    }
+    if !root.live && root.time != "": Text {
+        text: root.time;
+        color: Palette.text-2;
+        vertical-alignment: center;
+        accessible-role: text;
+        accessible-label: "Screenshot time";
+        accessible-value: root.time;
+    }
+}

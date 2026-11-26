@@ -1,0 +1,326 @@
+// d-black design tokens (design/mockups/d-black/tokens.css) as Slint globals.
+// Colors with alpha use 8-digit hex (#RRGGBBAA). Neutral greys only (r = g = b). White means "on".
+// Lime (`live`) is only for live things: the status dot, the waveform, the live zone outline and the pill dot.
+
+export global Palette {
+    // d-black tokens
+    out property <color> bg: #000000;
+    out property <color> surface-1: #0A0A0A;
+    out property <color> surface-2: #121212;
+    out property <color> surface-3: #1A1A1A;
+    out property <color> line: #FFFFFF14;
+    out property <color> line-2: #FFFFFF24;
+    out property <color> text: #F2F2F2;
+    out property <color> text-2: #9A9A9A;
+    // off but readable rows ("Hold E to talk")
+    out property <color> text-3: #808080;
+    // disabled controls only
+    out property <color> text-off: #5C5C5C;
+    out property <color> on: #FFFFFF;
+    out property <color> on-ink: #000000;
+    // the primary pill on hover
+    out property <color> on-hover: #E6E6E6;
+    out property <color> live: #C5FA09;
+    out property <color> danger: #F0867E;
+    // window close button on hover (the Windows red)
+    out property <color> close-hover: #C42B1C;
+    // floating panels (switcher, quick menu, hover cards) are opaque, with a 1 px white 10% border
+    out property <color> float: #0A0A0A;
+    out property <color> float-line: #FFFFFF1A;
+    // the black keyline around zone outlines, so they hold on bright games (30% on dimmed zones)
+    out property <color> keyline: #00000099;
+    out property <color> keyline-dim: #0000004D;
+    out property <color> scrim: #00000099;
+    // focus ring
+    out property <color> focus: #FFFFFF99;
+
+    // the notice line under the title strip
+    out property <color> danger-soft: #F0867E1A;
+    // zone edit: shade (flat black 45%), outline, selection and the box being drawn
+    out property <color> edit-shade: #00000073;
+    out property <color> edit-line: #F2F2F29E;
+    out property <color> edit-sel-fill: #FFFFFF14;
+    out property <color> edit-sel-ring: #FFFFFF38;
+    out property <color> edit-draft-line: #FFFFFFB3;
+    out property <color> edit-draft-fill: #FFFFFF0D;
+    // text-2 as text, for colors inside @markdown strings (Slint cannot print a color)
+    out property <string> text-2-hex: "#9A9A9A";
+    out property <color> panel: #0A0A0A;
+    out property <color> canvas: #000000;
+    out property <color> zone-fill: #9A9A9A24;
+}
+
+// Spacing snaps to 4, 8, 12, 16, 24 (and 32, 48 for page margins).
+export global Space {
+    out property <length> s1: 4px;
+    out property <length> s2: 8px;
+    out property <length> s3: 12px;
+    out property <length> s4: 16px;
+    out property <length> s5: 24px;
+    out property <length> s6: 32px;
+    out property <length> s7: 48px;
+}
+
+// Radii are 6, 8, 10 or full only.
+export global Radius {
+    out property <length> sm: 6px;
+    out property <length> md: 8px;
+    out property <length> lg: 10px;
+    out property <length> pill: 999px;
+}
+
+export global Size {
+    // rows: settings rows 44, list rows 36, rows with a picture (switcher) 48
+    out property <length> row: 44px;
+    out property <length> list: 36px;
+    out property <length> media: 48px;
+    // buttons, fields, segmented controls
+    out property <length> ctl: 32px;
+    // the title strip
+    out property <length> strip: 40px;
+    out property <length> icon: 16px;
+    out property <length> icon-lg: 18px;
+    out property <length> icon-sm: 12px;
+    // keycaps (Keycap): 28, small 24
+    out property <length> keycap: 28px;
+    out property <length> keycap-sm: 24px;
+    // the setup column and the page margin
+    out property <length> col: 960px;
+    out property <length> page-x: 24px;
+    out property <length> page-max: 1376px;
+    // small keycaps (Kbd)
+    out property <length> kbd: 24px;
+    out property <length> kbd-sm: 20px;
+}
+
+// Type. The font is "Segoe UI Variable Text" (Windows 11). When it is missing, Rust sets Geist (src/fonts.rs).
+// Slint takes one family name, not a CSS list, and a missing family falls back to an Arial-like font.
+export global Type {
+    in-out property <string> font: "Segoe UI Variable Text";
+    // keycaps: Cascadia Mono, or Geist Mono when it is missing
+    in-out property <string> mono: "Cascadia Mono";
+    // the font's own line height in em (Segoe UI Variable about 1.35, Geist 1.3): the lhf-* factors use it
+    in-out property <float> natural: 1.35;
+    // the d-black scale (tokens.css, Slint weights)
+    out property <length> fs-title: 26px;
+    out property <length> fs-hero: 20px;
+    out property <length> fs-body: 14px;
+    out property <length> fs-small: 12.5px;
+    out property <int> w-title: 600;
+    out property <int> w-hero: 500;
+    out property <int> w-body: 500;
+    out property <int> w-small: 500;
+    // headings, buttons, the game name
+    out property <int> w-strong: 600;
+    out property <length> ls-title: -0.4px;
+    // CSS line boxes as Text heights: body 20, small 17, hero 27, title 35
+    out property <length> lh-body: 20px;
+    out property <length> lh-small: 17px;
+    out property <length> lh-hero: 27px;
+    out property <length> lh-title: 35px;
+    out property <int> w-regular: 400;
+    out property <int> w-medium: 500;
+    out property <int> w-semibold: 600;
+    // Text line-height-factor is relative to the font's natural line height. lhf-N gives CSS line-height N / 100.
+    out property <float> lhf-115: 1.15 / self.natural;
+    out property <float> lhf-140: 1.4 / self.natural;
+    out property <float> lhf-143: 1.43 / self.natural;
+    out property <float> lhf-145: 1.45 / self.natural;
+    out property <float> lhf-150: 1.5 / self.natural;
+}
+
+// One soft drop shadow for floating panels (no spread in Slint). The software renderer draws none.
+export global Shadow {
+    out property <length> low-y: 1px;
+    out property <length> low-blur: 2px;
+    out property <color> low-color: #00000066;
+    out property <length> pop-y: 8px;
+    out property <length> pop-blur: 24px;
+    out property <color> pop-color: #00000099;
+}
+
+// Motion tokens (tokens.css, brief section 3 and the decided page push). Every `animate` reads them.
+// Slint has no easing property type, so easings are written where they are used. Their names:
+//   ease-out        cubic-bezier(0.2, 0.7, 0.2, 1)
+//   ease-out-strong cubic-bezier(0.16, 1, 0.3, 1)
+//   ease-in         cubic-bezier(0.4, 0, 1, 1)
+export global Motion {
+    // true: every animation is instant (headless tests and screen renders, where time does not run)
+    in-out property <bool> instant: false;
+    // Windows "Show animations in Windows" is off (Rust reads SPI_GETCLIENTAREAANIMATION, src/fonts.rs): movement
+    // and scale jump, fades take 80 ms, delays and staggers are dropped. `instant` wins over it.
+    in-out property <bool> reduce: false;
+    // 1, or 0 under reduce motion: every moving offset and scale step is multiplied by it
+    out property <float> move: self.reduce ? 0 : 1;
+    // a fade or move of `ms`: 0 when instant, 80 ms under reduce motion
+    public pure function d(ms: duration) -> duration {
+        return self.instant ? 0ms : self.reduce ? 80ms : ms;
+    }
+    // a move or size change of `ms` (a knob, a highlight, a bar): it jumps when instant or under reduce motion
+    public pure function slide(ms: duration) -> duration {
+        return self.instant || self.reduce ? 0ms : ms;
+    }
+    // a wait (delay, stagger) of `ms`: 0 when instant or under reduce motion
+    public pure function wait(ms: duration) -> duration {
+        return self.instant || self.reduce ? 0ms : ms;
+    }
+    out property <duration> fast: self.d(120ms);
+    out property <duration> base: self.d(180ms);
+    out property <duration> page: self.d(260ms);
+    out property <duration> exit: self.d(140ms);
+    out property <duration> stagger: self.wait(40ms);
+    // a highlight that glides is a move: it jumps under reduce motion
+    out property <duration> glide: self.instant || self.reduce ? 0ms : 360ms;
+    // page push: forward out 100 then in 260 after 80; back out 120 then in 200 after 80
+    out property <duration> push-out: self.d(100ms);
+    out property <duration> push-in: self.d(260ms);
+    out property <duration> back-out: self.d(120ms);
+    out property <duration> back-in: self.d(200ms);
+    out property <duration> push-gap: self.wait(80ms);
+    // Finish: the Overview comes in over 320 ms (opacity and scale)
+    out property <duration> morph-in: self.d(320ms);
+    // switch game: 240 ms in all, out 100 then in 140
+    out property <duration> switch-out: self.d(100ms);
+    out property <duration> switch-in: self.d(140ms);
+    // title strip swap: out 80, in 160 after 80
+    out property <duration> swap-out: self.d(80ms);
+    out property <duration> swap-in: self.d(160ms);
+    // stage grow into Zones (300) and the toolbar and tags after it (180 after 120)
+    // (the grow is a move: it jumps under reduce motion)
+    out property <duration> grow: self.slide(300ms);
+    out property <duration> grow-tools: self.d(180ms);
+    out property <duration> grow-tools-wait: self.wait(120ms);
+    // Activity rows: 30 ms apart (rows after the 6th share its delay)
+    out property <duration> row-stagger: self.wait(30ms);
+    // hover delay of the tips and of the full-row hover card (not motion: reduce motion keeps it)
+    out property <duration> hover-delay: self.instant ? 0ms : 200ms;
+    // press scale of every pressable item
+    out property <float> press: 0.97;
+}
+
+// The app's speed range (dr_tts::SPEED_MIN, SPEED_MAX): every speed slider runs 0.5x to 2.0x, so 1.1x sits at 40%.
+// Rust maps the same way (vm::voices::speed_of_slider).
+export global Speeds {
+    out property <float> min: 0.5;
+    out property <float> max: 2.0;
+    // the speed of a slider place (0 to 1), in tenths
+    public pure function of(v: float) -> float {
+        return Math.round((self.min + Math.clamp(v, 0, 1) * (self.max - self.min)) * 10) / 10;
+    }
+    // "1.1x": one decimal, also for whole numbers ("1.0x")
+    public pure function text(s: float) -> string {
+        let t = Math.round(s * 10);
+        return Math.floor(t / 10) + "." + Math.mod(t, 10) + "x";
+    }
+}
+
+// How the window is drawn. `software` is set by the headless renderer (src/screens.rs): the software renderer
+// does not clip to rounded corners, so CornerMask paints them. The real window clips and needs no mask.
+export global Render {
+    in-out property <bool> software: false;
+}
+
+export enum Kind { dialogue, speaker, pickups, prompts, ignore }
+
+export global Kinds {
+    // tooltips of the kind buttons (TEXT.md)
+    public pure function tip(k: Kind) -> string {
+        if k == Kind.dialogue { return "Spoken lines"; }
+        if k == Kind.speaker { return "Who is talking"; }
+        if k == Kind.pickups { return "Item pop-ups"; }
+        if k == Kind.prompts { return "Button hints"; }
+        return "Never read";
+    }
+    public pure function name(k: Kind) -> string {
+        if k == Kind.dialogue { return "Dialogue"; }
+        if k == Kind.speaker { return "Speaker"; }
+        if k == Kind.pickups { return "Pickups"; }
+        if k == Kind.prompts { return "Prompts"; }
+        return "Ignore";
+    }
+    public pure function icon(k: Kind) -> image {
+        if k == Kind.dialogue { return Icons.k-dialogue; }
+        if k == Kind.speaker { return Icons.k-speaker; }
+        if k == Kind.pickups { return Icons.k-pickups; }
+        if k == Kind.prompts { return Icons.k-prompts; }
+        return Icons.k-ignore;
+    }
+}
+
+// Line icons exported from the mockups by tools/export_icons.py. All white: draw them with `colorize`.
+// No suffix: stroke for 16 px. -sm: for 12 px. -lg: for 22 px. -fill: filled shape.
+export global Icons {
+    out property <image> logo: @image-url("icons/logo.svg");
+    out property <image> chev-down: @image-url("icons/chev-down.svg");
+    out property <image> chev-down-sm: @image-url("icons/chev-down-sm.svg");
+    out property <image> chev-right: @image-url("icons/chev-right.svg");
+    out property <image> chev-left: @image-url("icons/r10-chev-left.svg");
+    out property <image> arrow-left: @image-url("icons/arrow-left.svg");
+    out property <image> arrow-right: @image-url("icons/arrow-right.svg");
+    out property <image> check: @image-url("icons/check.svg");
+    out property <image> check-sm: @image-url("icons/check-sm.svg");
+    out property <image> plus: @image-url("icons/plus.svg");
+    out property <image> search: @image-url("icons/search.svg");
+    out property <image> refresh: @image-url("icons/refresh.svg");
+    out property <image> play: @image-url("icons/play.svg");
+    out property <image> play-fill: @image-url("icons/r8-play-fill.svg");
+    out property <image> resume: @image-url("icons/r8-play.svg");
+    out property <image> pause: @image-url("icons/pause.svg");
+    out property <image> stop: @image-url("icons/stop.svg");
+    out property <image> replay: @image-url("icons/replay.svg");
+    out property <image> volume: @image-url("icons/volume.svg");
+    out property <image> volume-lg: @image-url("icons/volume-lg.svg");
+    out property <image> speaker: @image-url("icons/r11-spk.svg");
+    out property <image> mouse: @image-url("icons/mouse.svg");
+    out property <image> window: @image-url("icons/window.svg");
+    out property <image> zone: @image-url("icons/zone.svg");
+    out property <image> settings: @image-url("icons/settings.svg");
+    out property <image> x: @image-url("icons/x.svg");
+    out property <image> x-sm: @image-url("icons/x-sm.svg");
+    out property <image> minus: @image-url("icons/minus.svg");
+    out property <image> square: @image-url("icons/square.svg");
+    out property <image> grid: @image-url("icons/grid.svg");
+    out property <image> pointer: @image-url("icons/pointer.svg");
+    out property <image> camera: @image-url("icons/camera.svg");
+    out property <image> trash: @image-url("icons/trash.svg");
+    out property <image> zap: @image-url("icons/zap.svg");
+    out property <image> download: @image-url("icons/download.svg");
+    out property <image> upload: @image-url("icons/upload.svg");
+    out property <image> ban-sm: @image-url("icons/ban-sm.svg");
+    out property <image> pencil: @image-url("icons/pencil.svg");
+    out property <image> audio: @image-url("icons/audio.svg");
+    out property <image> mode: @image-url("icons/r8-mode.svg");
+    out property <image> open: @image-url("icons/r8-open.svg");
+    out property <image> speed: @image-url("icons/r10-speed.svg");
+    out property <image> power: @image-url("icons/r10-power.svg");
+    out property <image> cross: @image-url("icons/r10-cross.svg");
+    out property <image> panel: @image-url("icons/r9-panel.svg");
+    out property <image> panel-lg: @image-url("icons/r9-panel-lg.svg");
+    out property <image> k-dialogue: @image-url("icons/k-dialogue.svg");
+    out property <image> k-speaker: @image-url("icons/k-speaker.svg");
+    out property <image> k-pickups: @image-url("icons/k-pickups.svg");
+    out property <image> k-prompts: @image-url("icons/k-prompts.svg");
+    out property <image> k-ignore: @image-url("icons/k-ignore.svg");
+}
+
+// Fake game art for M1 (from the mockups). From M2 on, real screenshots take their place.
+export global Art {
+    out property <image> scene: @image-url("art/scene.svg");
+    // the same scene drawn by Chromium at 1440 x 900 (as in the mockups). Software renders of the full-window
+    // overlay previews use it: a 1:1 copy with no scaling, so they line up with the mockup shots. The real
+    // window keeps the SVG, which stays sharp at any window size.
+    out property <image> scene-full: @image-url("art/scene-1440.png");
+    out property <image> rdr2: @image-url("art/rdr2.svg");
+    out property <image> satis: @image-url("art/satis.svg");
+    out property <image> p4g: @image-url("art/p4g.svg");
+    out property <image> e33: @image-url("art/e33.svg");
+    out property <image> kcd2: @image-url("art/kcd2.svg");
+    public pure function get(key: string) -> image {
+        if key == "rdr2" { return self.rdr2; }
+        if key == "satis" { return self.satis; }
+        if key == "p4g" { return self.p4g; }
+        if key == "e33" { return self.e33; }
+        if key == "kcd2" { return self.kcd2; }
+        return self.scene;
+    }
+}

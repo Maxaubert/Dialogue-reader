@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>Quick menu A</title><link rel="stylesheet" href="tokens.css"><style>
+.q8-frame{position:absolute;inset:0}
+.q8-frame svg{width:100%;height:100%;display:block}
+.q9-stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.q9{background:#0A0D14;border:1px solid var(--line-2);box-shadow:var(--shadow-pop)}
+.q9k{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line-2);font:500 12px/1 var(--font);color:var(--text-2)}
+.q9k.ar{letter-spacing:2px;padding:0 5px 0 7px}
+.q9-st{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--text-2)}
+.q9-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.q9-pill{display:flex;align-items:center;gap:18px;height:38px;padding:0 16px;border-radius:19px;background:#0A0D14;border:1px solid var(--line-2);box-shadow:var(--shadow-pop);font-size:12px;font-weight:500;color:var(--text-3)}
+.q9-pill > span{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.q9 .slider .knob{width:14px;height:14px;margin:-7px 0 0 -7px}
+.q9 .seg{padding:2px}
+.q9 .seg > span{height:26px;padding:0 12px;font-size:13px}
+.q9 .seg > span.on{background:var(--accent);color:#FFFFFF;box-shadow:none}
+
+.qa9{width:440px;border-radius:14px;overflow:hidden}
+.qa9 .hd{display:flex;align-items:center;gap:12px;height:54px;padding:0 18px}
+.qa9 .hd .gn{flex:1;font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.qa9 .ln{height:1px;background:var(--line)}
+.qa9 .grp{padding:6px}
+.qa9 .r{position:relative;display:flex;align-items:center;gap:14px;height:42px;padding:0 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text)}
+.qa9 .r > .ic{width:16px;height:16px;color:var(--text-3)}
+.qa9 .r .nm{flex:1}
+.qa9 .r.hi{background:var(--surface-3)}
+.qa9 .r.hi > .ic{color:var(--text)}
+.qa9 .r.hi::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:2px;border-radius:1px;background:var(--accent)}
+.qa9 .ctl{width:214px;display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.qa9 .ctl .seg{display:flex;width:100%}
+.qa9 .ctl .seg > span{flex:1}
+.qa9 .v{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2)}
+.qa9 .v .ic{width:14px;height:14px;color:var(--text-3)}
+.qa9 .ctl .slider{flex:1}
+.qa9 .pct{width:34px;text-align:right;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
+
+.qa9 .r .nm.q{color:var(--text-3)}
+.qa9 .r .ch{width:16px;height:16px;color:var(--text-3)}
+.qa9 .v{gap:4px}
+.qa9 .stp{display:flex;align-items:center;gap:2px}
+.qa9 .stp .ic{width:14px;height:14px;color:var(--text-3)}
+.qa9 .stp .vv{width:44px;text-align:center;font-size:13px;font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
+.qa9 .toggle{width:34px;height:20px}
+.qa9 .hk{font-size:12px;color:var(--text-3)}
+
+.qa9 .r > svg.ic:last-child:not(:first-child){width:14px;height:14px;color:var(--text-3)}
+.qa9 .r.quit{color:var(--text-3)}
+.qa9 .r.quit > .ic{color:var(--text-3)}
+
+.q11w{position:relative}
+.qa9 .r .tx{font-size:12px;color:var(--text-3)}
+.qa9 .r.quit .tx{color:var(--text-3)}
+.q11s{position:absolute;left:calc(100% + 28px);top:0;width:260px;display:flex;flex-direction:column;gap:10px}
+.q11s .lb{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);padding-left:2px}
+.q11s .q9{border-radius:12px;overflow:hidden}
+.q11s .hd{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-bottom:1px solid var(--line)}
+.q11s .hd .gn{flex:1;font-size:13px;font-weight:600;color:var(--text-2)}
+.q11s .q9-dot.off{background:var(--text-3)}
+.q11s .grp{padding:5px}
+.q11s .r{position:relative;display:flex;align-items:center;gap:12px;height:38px;padding:0 10px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text)}
+.q11s .r > .ic{width:15px;height:15px;color:var(--text)}
+.q11s .r .nm{flex:1}
+.q11s .r.hi{background:var(--surface-3)}
+.q11s .r.hi::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:1px;background:var(--accent)}
+.q11s .r.arm{background:rgba(248,113,113,0.10);color:var(--danger)}
+.q11s .r.arm::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:1px;background:var(--danger)}
+.q11s .r.arm > .ic{color:var(--danger)}
+.q11s .r .tx{font-size:12px;color:var(--text-3)}
+.q11s .r.arm .tx{color:rgba(248,113,113,0.80)}
+</style></head>
+<body>
+<div class="q8-frame"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B2638"/><stop offset=".55" stop-color="#5A6F8C"/><stop offset="1" stop-color="#B4C2D2"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3E9F0"/><stop offset="1" stop-color="#AEBACA"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05070B" stop-opacity="0"/><stop offset="1" stop-color="#05070B" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#71849C" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#94A5B9" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#26303D"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0C10" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="100" font-family="Georgia, serif" font-size="26" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0C10" fill-opacity=".6"/>
+<text x="1370" y="732" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141820" fill-opacity=".7" stroke="#CFD6DE" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-family="Georgia, serif" font-size="26" font-style="italic" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</svg></div><div class="q9-stage">
+<div class="q11w"><div class="q9 qa9">
+<div class="hd"><span class="gn">Red Dead Redemption 2</span><span class="q9-st"><span class="q9-dot"></span>Reading</span></div>
+<div class="ln"></div>
+<div class="grp"><div class="r hi"><svg class="ic" viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg><span class="nm">Manage zones</span><svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div></div>
+<div class="ln"></div>
+<div class="grp"><div class="r "><svg class="ic" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span class="nm">Stop</span><span class="tx">Play / pause</span></div><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg><span class="nm">Mute</span><span class="toggle"></span></div></div>
+<div class="ln"></div>
+<div class="grp"><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/></svg><span class="nm">Voice</span><div class="ctl"><span class="v">Adam<svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span></div></div><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M3.5 18a9 9 0 1 1 17 0"/><path d="m12 14 4-5"/></svg><span class="nm">Speed</span><div class="ctl"><span class="stp"><svg class="ic" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg><span class="vv">1.1x</span><svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span></div></div><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><span class="nm">Volume</span><div class="ctl"><div class="slider"><div class="fill" style="width:70%"></div><span class="knob" style="left:70%"></span></div><span class="pct">70%</span></div></div><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span class="nm">Mode</span><div class="ctl"><div class="seg"><span class="on">Automatic</span><span>On key press</span></div></div></div></div>
+<div class="ln"></div>
+<div class="grp"><div class="r "><svg class="ic" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="nm">Settings</span><svg class="ic" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></div><div class="r quit"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/></svg><span class="nm">Quit</span><span class="tx">Press twice</span></div></div>
+</div><div class="q11s">
+<span class="lb">When stopped</span>
+<div class="q9"><div class="hd"><span class="gn">Red Dead Redemption 2</span><span class="q9-st"><span class="q9-dot off"></span>Stopped</span></div>
+<div class="grp"><div class="r hi"><svg class="ic" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></svg><span class="nm">Resume</span><span class="tx">Play / pause</span></div></div></div>
+<span class="lb" style="margin-top:8px">After one press on Quit</span>
+<div class="q9"><div class="grp"><div class="r arm"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/></svg><span class="nm">Quit</span><span class="tx">Press again to quit</span></div></div></div>
+</div></div>
+<div class="q9-pill"><span><span class="q9k ar">&uarr;&darr;</span>Move</span><span><span class="q9k ar">&larr;&rarr;</span>Change</span><span><span class="q9k">Enter</span>Select</span><span><span class="q9k">Esc</span>Close</span></div>
+</div>
+</body></html>

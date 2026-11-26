@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>Welcome</title><link rel="stylesheet" href="tokens.css"><style>
+.wrap{width:var(--col);margin:0 auto;height:100%;display:flex;align-items:center;gap:var(--s-7)}
+.left{width:400px;flex:none}
+.steplist{display:flex;flex-direction:column;gap:var(--s-4);margin:var(--s-6) 0}
+.steplist .row{align-items:flex-start;gap:var(--s-3)}
+.num{width:24px;height:24px;border-radius:50%;background:var(--surface-3);color:var(--text);font-size:var(--fs-1);font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+.right{flex:1;min-width:0;overflow:hidden}
+.right .stage{border-radius:var(--r-lg) var(--r-lg) 0 0}
+.nowline{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-4) var(--s-5);border-top:1px solid var(--line)}
+</style></head>
+<body>
+<header class="bar"><div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" style="flex:none;display:block"><rect width="24" height="24" rx="6" fill="#EDF0F6"/><rect x="6.5" y="9" width="2" height="6" rx="1" fill="#07090E"/><rect x="11" y="6" width="2" height="12" rx="1" fill="#07090E"/><rect x="15.5" y="8" width="2" height="8" rx="1" fill="#5B7CFF"/></svg>DialogReader</div><div class="bar-right"><div class="winctl"><span><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span><span><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span><span><svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div></header>
+<main class="page kgrey"><div class="wrap">
+<section class="left">
+<h1>Hear the text in your games.</h1>
+<p class="lead" style="margin-top:var(--s-3)">DialogReader watches your game and reads dialogue, item pickups and other on-screen text out loud, with a voice that runs on your PC.</p>
+<div class="steplist">
+ <div class="row"><span class="num">1</span><div><div style="font-weight:500">Pick your game</div><div class="muted">Start the game first. DialogReader finds it.</div></div></div>
+ <div class="row"><span class="num">2</span><div><div style="font-weight:500">Mark where text shows up</div><div class="muted">Draw boxes over subtitles, names and pop-ups.</div></div></div>
+ <div class="row"><span class="num">3</span><div><div style="font-weight:500">Choose a key, a voice and a mode</div><div class="muted">Then play. The window can stay closed.</div></div></div>
+</div>
+<div class="row g3"><span class="btn btn-primary btn-lg">Get started<svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span><span class="btn btn-lg"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Import settings</span></div>
+<p class="small faint" style="margin-top:var(--s-4)">Takes about two minutes. You can change everything later.</p>
+</section>
+<section class="right card">
+<div class="stage" style=""><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B2638"/><stop offset=".55" stop-color="#5A6F8C"/><stop offset="1" stop-color="#B4C2D2"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3E9F0"/><stop offset="1" stop-color="#AEBACA"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05070B" stop-opacity="0"/><stop offset="1" stop-color="#05070B" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#71849C" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#94A5B9" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#26303D"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0C10" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="100" font-family="Georgia, serif" font-size="26" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0C10" fill-opacity=".6"/>
+<text x="1370" y="732" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141820" fill-opacity=".7" stroke="#CFD6DE" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-family="Georgia, serif" font-size="26" font-style="italic" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</svg><div class="zone z-speaker" style="left:44.500%;top:83.778%;width:11.000%;height:4.889%"></div><div class="zone z-dialogue" style="left:22.500%;top:88.889%;width:55.000%;height:5.556%"></div><div class="zone z-pickups" style="left:5.500%;top:5.333%;width:18.125%;height:9.333%"></div><div class="zone z-prompts" style="left:76.750%;top:76.667%;width:17.750%;height:7.556%"></div><div class="zone z-ignore" style="left:7.000%;top:75.778%;width:11.000%;height:19.556%"></div><div style="position:absolute;top:12px;right:12px"><span class="overlay-pill"><span class="dot"></span><span>Arthur</span><span class="pill-wave"><i style="height:4px"></i><i style="height:13px"></i><i style="height:9px"></i><i style="height:10px"></i><i style="height:12px"></i><i style="height:6px"></i><i style="height:13px"></i><i style="height:7px"></i><i style="height:12px"></i><i style="height:11px"></i><i style="height:8px"></i><i style="height:13px"></i><i style="height:5px"></i><i style="height:13px"></i></span></span></div></div>
+<div class="nowline"><span class="btn btn-icon"><svg class="ic" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></span><div class="grow"><div class="trunc"><span class="muted" style="font-weight:500">Arthur:</span> We need to get these horses moving before the snow buries us.</div><div class="small faint">Read just now · Kokoro · Adam</div></div><span class="chip k-dialogue">Dialogue</span></div>
+</section>
+</div></main>
+</body></html>

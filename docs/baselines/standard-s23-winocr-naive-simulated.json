@@ -1,0 +1,3079 @@
+{
+  "suite": "standard",
+  "seed": 23,
+  "truth_fingerprint": "b29eff77e158e303",
+  "reader": "winocr-naive",
+  "reader_options": {},
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 40,
+    "items_should_read": 486,
+    "items_read": 311,
+    "recall": 0.6399176954732511,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 53,
+        "read": 34,
+        "recall": 0.6415094339622641
+      },
+      {
+        "name": "1-2s",
+        "total": 147,
+        "read": 84,
+        "recall": 0.5714285714285714
+      },
+      {
+        "name": "2-4s",
+        "total": 208,
+        "read": 127,
+        "recall": 0.6105769230769231
+      },
+      {
+        "name": ">4s",
+        "total": 78,
+        "read": 66,
+        "recall": 0.8461538461538461
+      }
+    ],
+    "mean_cer": 0.03344589269792223,
+    "exact_match_rate": 0.7813504823151125,
+    "prompts_total": 127,
+    "prompts_read": 91,
+    "prompt_recall": 0.7165354330708661,
+    "events_total": 1084,
+    "duplicates": 241,
+    "noise_reads": 94,
+    "background_reads": 0,
+    "hallucinations": 347,
+    "latency_p50_ms": 245.00800000000163,
+    "latency_p95_ms": 1625.1137999999992,
+    "cpu_ms_p50": 0.00009999999999999999,
+    "cpu_ms_p95": 2.1432,
+    "frames_total": 31199,
+    "frames_processed": 31199
+  },
+  "scenarios": [
+    {
+      "id": "standard-000",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 10,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.08934547814397627,
+        "exact_match_rate": 0.6,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 31,
+        "duplicates": 7,
+        "noise_reads": 9,
+        "background_reads": 0,
+        "hallucinations": 5,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 229.76449999999932,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 9.437600000000002,
+        "frames_total": 565,
+        "frames_processed": 565
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @13: STA 118/120",
+        "noise @13: AMMO 45/120",
+        "noise @13: GOLD 87/120",
+        "hallucination @510: The nort",
+        "noise @2513: AMMO 44/120",
+        "hallucination @3510: The reactor is un",
+        "noise @6509: GOLD 76/120",
+        "noise @8510: AMMO 31/120",
+        "hallucination @10012: So you are th",
+        "noise @12009: AMMO 25/120",
+        "noise @12009: GOLD 63/120",
+        "hallucination @13511: I only ask one thi",
+        "hallucination @15515: Take thi",
+        "noise @16010: AMMO 15/120"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-001",
+      "genres": [
+        "pickup_stack",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 15,
+        "items_read": 10,
+        "recall": 0.6666666666666666,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 1,
+            "recall": 0.5
+          },
+          {
+            "name": "1-2s",
+            "total": 7,
+            "read": 4,
+            "recall": 0.5714285714285714
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 4,
+            "recall": 0.8
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 11,
+        "prompts_read": 9,
+        "prompt_recall": 0.8181818181818182,
+        "events_total": 36,
+        "duplicates": 1,
+        "noise_reads": 7,
+        "background_reads": 0,
+        "hallucinations": 9,
+        "latency_p50_ms": 149.05589999999938,
+        "latency_p95_ms": 1865.2729,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 3.1676,
+        "frames_total": 750,
+        "frames_processed": 750
+      },
+      "missed": [
+        "toast002 (1112 ms readable): + 1 Steel Plate",
+        "toast004 (2006 ms readable): + 4 Ancient Relic",
+        "toast006 (1067 ms readable): + 7 Gunpowder",
+        "toast009 (1096 ms readable): + 4 Mana Crystal",
+        "toast014 (912 ms readable): + 5 Copper Ore"
+      ],
+      "false_reads": [
+        "noise @5: LV 94/120",
+        "noise @5: xp 75/120",
+        "noise @2503: xp 74/120",
+        "hallucination @3004: + 5 Steel Plate\n+ 1 Steel Plate",
+        "hallucination @6005: + 4 Ancient Relic\n+ 12 Steel Plate",
+        "hallucination @7504: + 4 Ancient Relic\n+ 12 Steel Plate\n+ 4 Silver Coin",
+        "noise @7504: xp 72/120",
+        "hallucination @8004: + 12 Steel Plate\n+ 4 Silver Coin",
+        "hallucination @10003: + 7 Gunpowder\n+ 4 Silver Coin",
+        "noise @10503: xp 57/120",
+        "hallucination @15005: + 15 oak Plank\n+ 4 Mana Crystal",
+        "hallucination @15504: + 4 Mana Crystal\n+ 2 Bandage",
+        "noise @15504: xp 55/120",
+        "noise @19004: xp 45/120",
+        "hallucination @20506: + 15 Mana Crystal\n2 Silver Coin",
+        "hallucination @22006: • 5 Copper Ore\n+ 2 Silver Coin"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-002",
+      "genres": [
+        "subtitles",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 12,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 17,
+        "duplicates": 5,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 221.26970000000074,
+        "latency_p95_ms": 408.1774000000005,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 5.2697,
+        "frames_total": 1183,
+        "frames_processed": 1183
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-003",
+      "genres": [
+        "objective_update"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.0924,
+        "frames_total": 868,
+        "frames_processed": 868
+      },
+      "missed": [
+        "obj001 (3355 ms readable): Clear the mine entrance",
+        "obj002 (4492 ms readable): Quest: Talk to the blacksmith",
+        "obj003 (5451 ms readable): Objective Updated: Escape the burning village",
+        "obj004 (4431 ms readable): Investigate the strange signal"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-004",
+      "genres": [
+        "tooltip",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.2436,
+        "frames_total": 816,
+        "frames_processed": 816
+      },
+      "missed": [
+        "tip001 (2573 ms readable): Spell Tome Restores 40 health Deals fire damage",
+        "tip002 (1468 ms readable): Spell Tome Damage 12-18",
+        "tip003 (2551 ms readable): Leather Boots Damage 12-18 Restores 40 health Weight 2.5",
+        "tip004 (2462 ms readable): Signal Flare Two-handed Move speed +15% for 30 s",
+        "tip005 (1446 ms readable): Field Kit Quest item",
+        "tip006 (1470 ms readable): Potion of Swiftness Damage 12-18",
+        "tip007 (2944 ms readable): Scrap Pistol Durability 37/50 Sell value 120"
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-005",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 10,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.14608036890645584,
+        "exact_match_rate": 0.4,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 37,
+        "duplicates": 20,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 9.695700000000215,
+        "latency_p95_ms": 912.5674999999992,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 7.9848,
+        "frames_total": 581,
+        "frames_processed": 581
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3008: GO",
+        "hallucination @5010: Co fee first: Then we c",
+        "hallucination @8009: We ave enough supplies f",
+        "hallucination @8009: Ilse",
+        "hallucination @11009: ou.",
+        "hallucination @11508: Th n you. „ITwi11 not forget what",
+        "hallucination @17508: couts"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-006",
+      "genres": [
+        "pickup_stack",
+        "objective_update",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 27,
+        "items_read": 13,
+        "recall": 0.48148148148148145,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 7,
+            "read": 5,
+            "recall": 0.7142857142857143
+          },
+          {
+            "name": "2-4s",
+            "total": 13,
+            "read": 5,
+            "recall": 0.38461538461538464
+          },
+          {
+            "name": ">4s",
+            "total": 6,
+            "read": 2,
+            "recall": 0.3333333333333333
+          }
+        ],
+        "mean_cer": 0.005742005742005742,
+        "exact_match_rate": 0.8461538461538461,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 41,
+        "duplicates": 7,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 21,
+        "latency_p50_ms": 203.31849999999986,
+        "latency_p95_ms": 1973.1987999999983,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 3.4507000000000003,
+        "frames_total": 927,
+        "frames_processed": 927
+      },
+      "missed": [
+        "toast003 (2247 ms readable): + 5 Quartz Shard",
+        "toast004 (4562 ms readable): + 24 Feather",
+        "toast005 (2955 ms readable): + 7 Quartz Shard",
+        "toast006 (4508 ms readable): + 17 Quartz Shard",
+        "toast007 (3523 ms readable): + 1 Gunpowder",
+        "toast008 (3404 ms readable): + 3 Silver Coin",
+        "toast009 (1699 ms readable): + 2 Arrow",
+        "toast014 (4208 ms readable): + 7 Wolf Pelt",
+        "toast015 (4544 ms readable): + 19 Rope",
+        "toast016 (2073 ms readable): + 8 Silver Coin",
+        "toast017 (3418 ms readable): + 1 Bread",
+        "toast018 (2099 ms readable): + 9 Rusty Gear",
+        "toast019 (2005 ms readable): + 8 Iron Ore",
+        "toast022 (1194 ms readable): + 4 Bandage"
+      ],
+      "false_reads": [
+        "hallucination @4007: + 13 Feather\n+ 5 Quartz Shard",
+        "hallucination @5006: + 24 Feather\n+ 5 Quartz Shard",
+        "hallucination @6005: + 24 Feather\n+ 17 Quartz Shard\n+ 7 Quartz Shard",
+        "hallucination @7007: + 24 Feather\n+ 17 Quartz Shard\n+ 7 Quartz Shard\n+ 1 Gunpowder",
+        "hallucination @8005: + 24 Feather\n+ 17 Quartz Shard\n+ 7 Quartz Shard\n+ 1 Gunpowder\n+ 3 Silver Coin",
+        "hallucination @9004: + 24 Feather\n+ 17 Quartz Shard\n+ 1 Gunpowder\n+ 3 Silver Coin\n+ 2 Arrow",
+        "hallucination @9503: + 17 Quartz Shard\n+ 1 Gunpowder\n+ 3 Silver Coin\n+ 2 Arrow",
+        "hallucination @10507: + 9 Quartz Shard\n+ 3 Silver Coin\n+ 2 Arrow",
+        "hallucination @11008: + 9 Quartz Shard\n+ 3 Silver coin",
+        "hallucination @14003: + 6 Silver Coin\n+ 7 Oak Plank",
+        "hallucination @15507: Rope\n7 oak Plank",
+        "hallucination @16007: + 9 Rope\n+ 7 oak Plank",
+        "hallucination @18506: + 9 Rope\n+ 7 Wolf Pelt",
+        "hallucination @19505: + 19 Rope\n+ 7 Wolf Pelt",
+        "hallucination @20005: + 19 Rope\n+ 7 wolf pelt\n+ 8 Silver Coin",
+        "hallucination @22003: + 19 Rope\n+ 1 Bread\n+ 8 Silver Coin",
+        "hallucination @22508: + 19 Rope\n+ 1 Bread\n• 9 Rusty Gear",
+        "hallucination @24008: 8 Iron Ore\n+ 1 Bread\n+ 9 Rusty Gear",
+        "hallucination @25006: + 8 Iron Ore\n+ 1 Bread",
+        "hallucination @28003: + 19 Iron Ore\n+ 2 Steel Plate",
+        "hallucination @30004: + 4 Bandage\n+ 2 Steel Plate"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-007",
+      "genres": [
+        "subtitles",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.007023569610768774,
+        "exact_match_rate": 0.625,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 29,
+        "duplicates": 20,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 345.77230000000054,
+        "latency_p95_ms": 743.193299999999,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 2.1933,
+        "frames_total": 940,
+        "frames_processed": 940
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @19002: v i Behind you!"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-008",
+      "genres": [
+        "objective_update",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.07830551989730423,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 17.191599999999994,
+        "latency_p95_ms": 43.47049999999945,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.62,
+        "frames_total": 529,
+        "frames_processed": 529
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-009",
+      "genres": [
+        "tooltip",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 16,
+        "prompts_read": 13,
+        "prompt_recall": 0.8125,
+        "events_total": 23,
+        "duplicates": 6,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.7707999999999999,
+        "frames_total": 1121,
+        "frames_processed": 1121
+      },
+      "missed": [
+        "tip001 (3231 ms readable): Hunter's Bow Requires level 6 Move speed +15% for 30 s",
+        "tip002 (3206 ms readable): Signal Flare Armor +4 Damage 12-18 Stackable",
+        "tip003 (1669 ms readable): Scrap Pistol Requires level 6",
+        "tip004 (2680 ms readable): Travel Cloak Durability 37/50 Move speed +15% for 30 s Requires level 6",
+        "tip005 (1631 ms readable): Potion of Swiftness Durability 37/50",
+        "tip006 (3364 ms readable): Leather Boots Armor +4 Move speed +15% for 30 s",
+        "tip007 (407 ms readable): Scrap Pistol Damage 12-18 Requires level 6 Sell value 120",
+        "tip008 (2216 ms readable): Cracked Shield Restores 40 health",
+        "tip009 (1062 ms readable): Hunter's Bow Damage 12-18",
+        "tip010 (1076 ms readable): Rusty Longsword Deals fire damage Armor +4"
+      ],
+      "false_reads": [
+        "hallucination @13502: to use",
+        "hallucination @27001: YEI Comb",
+        "hallucination @28501: Comb",
+        "hallucination @36501: IF i loot"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-010",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 11,
+        "recall": 0.9166666666666666,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 10,
+        "prompts_read": 7,
+        "prompt_recall": 0.7,
+        "events_total": 23,
+        "duplicates": 4,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 180.70350000000008,
+        "latency_p95_ms": 346.0105000000001,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 4.0285,
+        "frames_total": 629,
+        "frames_processed": 629
+      },
+      "missed": [
+        "spk011 (1026 ms readable): Lyra"
+      ],
+      "false_reads": [
+        "hallucination @20005: Lvra '4'"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-011",
+      "genres": [
+        "pickup_stack",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 20,
+        "items_read": 10,
+        "recall": 0.5,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 9,
+            "read": 4,
+            "recall": 0.4444444444444444
+          },
+          {
+            "name": "2-4s",
+            "total": 9,
+            "read": 4,
+            "recall": 0.4444444444444444
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.006666666666666666,
+        "exact_match_rate": 0.9,
+        "prompts_total": 13,
+        "prompts_read": 9,
+        "prompt_recall": 0.6923076923076923,
+        "events_total": 43,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 23,
+        "latency_p50_ms": 353.1503,
+        "latency_p95_ms": 1625.1137999999992,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 6.6376,
+        "frames_total": 851,
+        "frames_processed": 851
+      },
+      "missed": [
+        "toast002 (1326 ms readable): + 2 Rusty Gear (39)",
+        "toast004 (2066 ms readable): + 7 Iron Ore (25)",
+        "toast007 (3691 ms readable): + 4 Healing Herb (42)",
+        "toast008 (1581 ms readable): + 4 Spider Silk (13)",
+        "toast009 (3098 ms readable): + 2 Battery (33)",
+        "toast010 (3110 ms readable): + 6 Rusty Gear (25)",
+        "toast011 (2210 ms readable): + 9 Arrow (49)",
+        "toast015 (1591 ms readable): + 5 Spider Silk (23)",
+        "toast016 (1249 ms readable): + 1 Bread (31)",
+        "toast017 (1785 ms readable): + 19 Bread (24)"
+      ],
+      "false_reads": [
+        "hallucination @3506: + 4 Rope (34)\n+2 Rusty Gear (39)",
+        "hallucination @4508: +4 Rope (34)\nusty Gear (39)",
+        "hallucination @6508: + 2 Feather (11)\n+ 7 Iron ore (25)",
+        "hallucination @7008: +2 Feather (II)\n+ 7 Iron Ore (25)",
+        "hallucination @8012: + 2 Feather (11)\n+ 7 Iron Ore (25)\n+ 8 Battery (46)",
+        "hallucination @8507: + 7 Iron Ore (25)\n+ 8 Battery (46)",
+        "hallucination @10506: + 3 Spider Silk (12)\n+ 4 Healing Herb (42)",
+        "hallucination @11508: +4 Spider Silk (13)\n+4 Healing Herb (42)",
+        "hallucination @12507: +4 Spider Silk (13)\n+ 4 Healing Herb (42)\n+ 2 Battery (33)",
+        "hallucination @13006: +4 Healing Herb (42)\n+ 2 Battery (33)",
+        "hallucination @14006: +6 Rusty Gear (25)\n+ 4 Healing Herb (42)\n+ 2 Battery (33)",
+        "hallucination @14508: + 6 Rusty Gear (25)\n+ 9 ArroW (49)\n+ 2 Battery (33)",
+        "hallucination @15508: +6 Rusty Gear (25)\n+ 9 ArroW (49)",
+        "hallucination @16507: + 6 Rusty Gear (25)\n+ 9 ArroW (49)\n+9 Bread (14)",
+        "hallucination @20507: + 5 spider Silk (23)\n+ 18 Bread (23)",
+        "hallucination @21008: + 5 Spider Silk (23)\n+ 1 Bread (31)\n+ 18 Bread (23)",
+        "hallucination @21508: +5 Spider Silk (23)\n+1 Bread (31)\n+ 19 Bread (24)",
+        "hallucination @22007: +5 Spider Silk (23)\n+ I Bread (31)\n+ 19 Bread (24)",
+        "hallucination @22507: + 13 Bread (43)\n+ 19 Bread (24)",
+        "hallucination @24007: + I Cloth Scrap (8)\n+ 13 Bread (43)",
+        "hallucination @24508: comb",
+        "hallucination @26507: + I Cloth Scrap (8)\n+ 9 Fire Opal (26)",
+        "hallucination @27507: comb"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-012",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 7,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 7,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 245.59140000000025,
+        "latency_p95_ms": 302.2540000000008,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 1.8021,
+        "frames_total": 819,
+        "frames_processed": 819
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-013",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 211.61339999999996,
+        "latency_p95_ms": 440.58140000000003,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 1.8576000000000001,
+        "frames_total": 684,
+        "frames_processed": 684
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @5005: Quest Investigate"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-014",
+      "genres": [
+        "tooltip"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 9,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 31,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 31,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 6.5903,
+        "frames_total": 1137,
+        "frames_processed": 1137
+      },
+      "missed": [
+        "tip001 (3752 ms readable): Rusty Longsword Requires level 6 Armor +4 Quest item",
+        "tip002 (3195 ms readable): Spell Tome Restores 40 health",
+        "tip003 (3570 ms readable): Rusty Longsword Armor +4 Durability 37/50",
+        "tip004 (2998 ms readable): Scrap Pistol Move speed +15% for 30 s",
+        "tip005 (1851 ms readable): Iron Helm Deals fire damage Armor +4",
+        "tip006 (1535 ms readable): Hunter's Bow Move speed +15% for 30 s Quest item",
+        "tip007 (720 ms readable): Potion of Swiftness Weight 2.5",
+        "tip008 (1965 ms readable): Leather Boots Durability 37/50 Move speed +15% for 30 s Stackable",
+        "tip009 (1325 ms readable): Iron Helm Deals fire damage Quest item Stackable"
+      ],
+      "false_reads": [
+        "hallucination @1509: Rusty Longsword",
+        "hallucination @1509: Requires level 6",
+        "hallucination @1509: Armor +4",
+        "hallucination @1509: Quest item",
+        "hallucination @7507: Spell Tome",
+        "hallucination @7507: Restores 40 health",
+        "hallucination @12509: Rusty Longsword",
+        "hallucination @12509: Armor",
+        "hallucination @12509: Durability 37/50",
+        "hallucination @18007: Scrap Pistol",
+        "hallucination @18007: Move speed +15% for 30 s",
+        "hallucination @22007: Iron Helm",
+        "hallucination @22007: Deals fire damage",
+        "hallucination @22007: Armor",
+        "hallucination @22507: Armor 44",
+        "hallucination @23007: Armor",
+        "hallucination @23507: Armor 44",
+        "hallucination @26008: Hunter's Bow",
+        "hallucination @26008: Move speed +15% for 30 s",
+        "hallucination @26008: Quest item",
+        "hallucination @30007: Potion of Swiftness",
+        "hallucination @30007: weight 2.5",
+        "hallucination @30516: weight 2S",
+        "hallucination @33008: Leather Boots",
+        "hallucination @33008: Durability 37/50",
+        "hallucination @33008: Move speed +15% for 30 s",
+        "hallucination @33008: Stackable",
+        "hallucination @36508: Iron Helm",
+        "hallucination @36508: Deals fire damage",
+        "hallucination @36508: Quest item",
+        "hallucination @36508: Stackable"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-015",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 12,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 10,
+        "prompts_read": 10,
+        "prompt_recall": 1.0,
+        "events_total": 33,
+        "duplicates": 11,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 275.45440000000053,
+        "latency_p95_ms": 786.1869000000006,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 4.0147,
+        "frames_total": 638,
+        "frames_processed": 638
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-016",
+      "genres": [
+        "pickup_stack",
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 44,
+        "items_read": 33,
+        "recall": 0.75,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 14,
+            "read": 8,
+            "recall": 0.5714285714285714
+          },
+          {
+            "name": "2-4s",
+            "total": 21,
+            "read": 17,
+            "recall": 0.8095238095238095
+          },
+          {
+            "name": ">4s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          }
+        ],
+        "mean_cer": 0.06848958554355856,
+        "exact_match_rate": 0.696969696969697,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 114,
+        "duplicates": 44,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 35,
+        "latency_p50_ms": 151.9333000000006,
+        "latency_p95_ms": 1600.9792000000016,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 15.2418,
+        "frames_total": 1153,
+        "frames_processed": 1153
+      },
+      "missed": [
+        "toast023 (3266 ms readable): + 7 Iron Ore",
+        "toast024 (3828 ms readable): + 6 Arrow",
+        "toast025 (1455 ms readable): + 19 Copper Ore",
+        "toast026 (1068 ms readable): + 7 Steel Plate",
+        "toast034 (3862 ms readable): + 4 Iron Ore",
+        "toast035 (4505 ms readable): + 2 Gunpowder",
+        "toast036 (1502 ms readable): + 1 Oak Plank",
+        "toast038 (1932 ms readable): + 5 Ancient Relic",
+        "toast039 (1488 ms readable): + 16 Fire Opal",
+        "toast043 (2443 ms readable): + 1 Mana Crystal",
+        "toast044 (1398 ms readable): + 8 Mana Crystal"
+      ],
+      "false_reads": [
+        "noise @24: AMMO 98/120",
+        "noise @24: GOLD 55/120",
+        "hallucination @1013: The ow",
+        "hallucination @1516: The Old road is safer,",
+        "hallucination @4018: Quie",
+        "hallucination @4517: + 5 Glass Vial\n+ 5 Copper Ore",
+        "hallucination @7516: + 7 Iron Ore\n+ 12 Copper Ore",
+        "hallucination @8017: + 7 Iron Ore\n+ 12 Copper Ore \"\n• 6 Arrow",
+        "hallucination @10019: + 7 Iron Ore\n+ 19 Copper Ore\n+ 6 Arrow",
+        "hallucination @10518: * 19 Copper Ore\n+ 6 Arrow",
+        "hallucination @11020: Hand me that wre",
+        "hallucination @11020: t 1 Steel Plate\n+ 19 Copper Ore\n+ 6 Arrow",
+        "hallucination @11516: Fand me thaywrench, would you?",
+        "hallucination @11516: + 7 Steel Plate\n+ 6 Arrow",
+        "hallucination @18516: My $0",
+        "hallucination @19018: My brother never came",
+        "hallucination @23014: + 5 Copper Ore\n+ 4 Iron Ore",
+        "hallucination @23515: + 5 Copper Ore\n+ 4 Iron Ore\n+ 2 Gunpowder",
+        "hallucination @24017: + 4 Iron Ore\n+ 2 Gunpowder",
+        "hallucination @24516: can sell you.",
+        "hallucination @24516: + 41ron Ore\n+ 2 Gunpowder",
+        "hallucination @25019: I can sell youthe map, but i",
+        "hallucination @25019: + 4 Iron Ore\n+ 2 Gunpowder",
+        "hallucination @26018: + I Oak Plank\n+ 4 Iron Ore\n+ 2 Gunpowder",
+        "hallucination @26516: + 1 Oak Plank\n+ 4 Iron Ore\n+ 2 Gunpowder\nFire Opal",
+        "hallucination @27017: +1 oak Plank\n+ 2 Gunpowder\n+ 5 Fire Opal",
+        "hallucination @27518: + 2 Gunpowder\n+ 5 Fire Opal",
+        "hallucination @29016: + 5 Ancient Relic\n+ 5 Fire Opal",
+        "hallucination @29517: + 5 Ancient Relic\n+ 16 Fire Opal",
+        "hallucination @30521: Follow the rive",
+        "hallucination @31020: Follow the river until you rea",
+        "hallucination @31020: CRF94C\nSister Ilse",
+        "hallucination @34515: Coffee",
+        "hallucination @35014: Coffee first. Then we",
+        "hallucination @36015: + 23 Ancient Relic\n+1 Mana Crystal -",
+        "hallucination @37022: + 23 Ancient Relic\n+1 Mana Crystal\n+ 8 Mana Crystal",
+        "hallucination @37515: +1 Mana Crystal\n+ 8 Mana Crystal"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-017",
+      "genres": [
+        "subtitles",
+        "pickup_stack",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 35,
+        "items_read": 25,
+        "recall": 0.7142857142857143,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 8,
+            "read": 6,
+            "recall": 0.75
+          },
+          {
+            "name": "2-4s",
+            "total": 20,
+            "read": 12,
+            "recall": 0.6
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.030714457500171786,
+        "exact_match_rate": 0.64,
+        "prompts_total": 16,
+        "prompts_read": 4,
+        "prompt_recall": 0.25,
+        "events_total": 104,
+        "duplicates": 34,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 41,
+        "latency_p50_ms": 315.77450000000044,
+        "latency_p95_ms": 1385.8168000000005,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 14.1449,
+        "frames_total": 1046,
+        "frames_processed": 1046
+      },
+      "missed": [
+        "toast014 (3167 ms readable): + 4 Glass Vial (23)",
+        "toast015 (3340 ms readable): + 5 Bandage (32)",
+        "toast016 (3526 ms readable): + 5 Glass Vial (24)",
+        "toast017 (2616 ms readable): + 3 Arrow (37)",
+        "toast026 (1581 ms readable): + 1 Ancient Relic (5)",
+        "toast027 (2181 ms readable): + 10 Mana Crystal (28)",
+        "toast028 (2804 ms readable): + 3 Ancient Relic (7)",
+        "toast029 (2027 ms readable): + 1 Spider Silk (36)",
+        "toast032 (2636 ms readable): + 3 Bread (5)",
+        "toast033 (1444 ms readable): + 4 Healing Herb (41)"
+      ],
+      "false_reads": [
+        "hallucination @1518: The north ate .opens w",
+        "hallucination @1518: (Space!",
+        "hallucination @2012: _ only.for.those who car the seal.",
+        "hallucination @3016: onlv,for.those who carr the seal-",
+        "hallucination @3519: ODéAs only,for.those.who car\nthe_seal.",
+        "hallucination @4016: + 10 Silver Coin (38)\n+ 7 Oak Plank (31)",
+        "hallucination @5018: + 4 Glass Vial (23)\n+ 7 Oak Plank (31)",
+        "hallucination @6017: (Space!",
+        "hallucination @6516: + 4 Glass Vial (23)\n+ 5 Bandage (32)",
+        "hallucination @8514: + 5 Glass Vial (24)\n, + 5 Bandage (32)",
+        "hallucination @9516: + 5 Glass Vial (24)\nArrow (37)\n+ 5 Bandage (32) .$.",
+        "hallucination @10019: + 5 Glass Vial (24) s. .\n+ 3 Arrow (37)",
+        "hallucination @10019: Holci l\"tevact",
+        "hallucination @10515: + 5 Glass Vial (24)\n+ 3 Arrow (37)",
+        "hallucination @10515: Holci intevact",
+        "hallucination @12013: + 3 Arrow (37)\n+ 4 Bread (26)",
+        "hallucination @18015: + 19 Fire opal (43)\n+ 6 Steel Plate (31)",
+        "hallucination @19510: Press IRI to",
+        "hallucination @20510: Press IRI to",
+        "hallucination @21520: + 2 Mana Crystal (2e) V.'\n+ Ancient Relie (5)",
+        "hallucination @22019: + 2 Mana Crystal (20) .\n+ 1 Ancient Relic (5)",
+        "hallucination @22518: + 10 Mana Crystal (28)\n+ 1 Ancient Relic (5)",
+        "hallucination @23519: + 10 Mana Crystal (28)\n+ 3 Ancient Relic (7)",
+        "hallucination @24514: + 1 Spider Silk (36)\n+ 3 Ancient Relic (7)",
+        "hallucination @24514: Press IRI to",
+        "hallucination @25518: _ _ -H but it takes twice as Ion",
+        "hallucination @26018: + 1 Spider Silk (36)\n+ 8 Ancient Relic (12)",
+        "hallucination @28521: + 3 Bread (5)\n+ 10 Ancient Relic (14)",
+        "hallucination @29528: Siress IF) to 1 Ip",
+        "hallucination @30017: + 3 Bread (5)\n+ 10 Ancient Relic (14)\n+ 4 Healing Herb (41)",
+        "hallucination @30017: ShesslF) to pvrk 1 Ip",
+        "hallucination @30518: + 3 Bread (5)\n+ IO Ancient Relic (14)\n+ 4 Healing Herb (41)",
+        "hallucination @31019: 3 Bread (5)\n10 Ancient Relic (14)\n4 Healing Herb (41)\n5 Rusty Gear (5)",
+        "hallucination @31019: Shes,slF) to pvrk 1 Ip",
+        "hallucination @31515: + 10 Ancient Relic (14)\n' + 5 Rusty Gear (5)",
+        "hallucination @32022: ODéAs only,for.those.who car\nthe_seal.",
+        "hallucination @32517: The north gate carry the seal.",
+        "hallucination @32517: Feathe (12)\n• + 5 Rusty Gear (5)",
+        "hallucination @33015: + 2 Feather (12)\n+ 5 Rusty Gear (5)",
+        "hallucination @33015: Shes,sAF) to pvrk 1 Ip"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-018",
+      "genres": [
+        "objective_update",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 111.59540000000015,
+        "latency_p95_ms": 188.0678999999982,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 2.1860999999999997,
+        "frames_total": 658,
+        "frames_processed": 658
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @20006: Mai\""
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-019",
+      "genres": [
+        "tooltip",
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 40,
+        "items_read": 12,
+        "recall": 0.3,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 7,
+            "read": 1,
+            "recall": 0.14285714285714285
+          },
+          {
+            "name": "1-2s",
+            "total": 16,
+            "read": 5,
+            "recall": 0.3125
+          },
+          {
+            "name": "2-4s",
+            "total": 16,
+            "read": 5,
+            "recall": 0.3125
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.15014892514892514,
+        "exact_match_rate": 0.16666666666666666,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 61,
+        "duplicates": 6,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 43,
+        "latency_p50_ms": 619.4110000000001,
+        "latency_p95_ms": 2626.4758,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 5.4938,
+        "frames_total": 1104,
+        "frames_processed": 1104
+      },
+      "missed": [
+        "toast001 (1320 ms readable): + 9 Healing Herb",
+        "toast003 (2362 ms readable): + 3 Wolf Pelt",
+        "toast004 (1743 ms readable): + 20 Healing Herb",
+        "toast005 (857 ms readable): + 9 Wolf Pelt",
+        "toast007 (3467 ms readable): + 6 Cloth Scrap",
+        "toast008 (2224 ms readable): + 20 Feather",
+        "toast009 (2859 ms readable): + 4 Silver Coin",
+        "toast010 (2952 ms readable): + 7 Battery",
+        "toast012 (1969 ms readable): + 5 Ancient Relic",
+        "toast013 (2679 ms readable): + 9 Copper Ore",
+        "toast015 (719 ms readable): + 18 Copper Ore",
+        "toast018 (1237 ms readable): + 16 Gunpowder",
+        "toast020 (533 ms readable): + 11 Feather",
+        "toast026 (1746 ms readable): + 9 Gunpowder",
+        "toast027 (561 ms readable): + 1 Healing Herb",
+        "tip028 (977 ms readable): Ring of Embers Restores 40 health Stackable Stackable",
+        "tip029 (2899 ms readable): Potion of Swiftness Deals fire damage Weight 2.5 Durability 37/50",
+        "tip030 (1394 ms readable): Potion of Swiftness Damage 12-18 Quest item",
+        "tip031 (3335 ms readable): Leather Boots Quest item",
+        "tip032 (2676 ms readable): Travel Cloak Quest item",
+        "tip033 (2126 ms readable): Signal Flare Sell value 120 Deals fire damage Stackable",
+        "tip034 (1421 ms readable): Hunter's Bow Requires level 6 Sell value 120",
+        "tip035 (1326 ms readable): Iron Helm Armor +4 Quest item",
+        "tip036 (1013 ms readable): Rusty Longsword Quest item",
+        "tip037 (497 ms readable): Iron Helm Quest item",
+        "tip038 (2219 ms readable): Field Kit Weight 2.5 Quest item",
+        "tip039 (1504 ms readable): Field Kit Stackable",
+        "tip040 (1100 ms readable): Leather Boots Durability 37/50 Sell value 120 Move speed +15% for 30 s"
+      ],
+      "false_reads": [
+        "hallucination @1016: + 9 Hero",
+        "hallucination @1506: ling ÅerljN",
+        "hallucination @2007: ling",
+        "hallucination @3007: + 16 aling Herp\nwolf Pelt",
+        "hallucination @3508: aling Herb\nWolf Pelt",
+        "hallucination @4007: + 20 aling Her!)\nwolf Pelt",
+        "hallucination @4507: t 20 aling Herp\nwolf pelt",
+        "hallucination @5007: aling\nWolf pelt",
+        "hallucination @5509: + 20 aling Herp\nOwolf Pei",
+        "hallucination @7505: + 10th Scrap",
+        "hallucination @8007: 8 Fe ther\nCloth Scrap",
+        "hallucination @8506: +8 ther\n10th Scrap",
+        "hallucination @9010: + 8 Fp the\nCloth Scrap",
+        "hallucination @9507: + 8 Fe%ther\nCloth Scrap",
+        "hallucination @10008: + 20 Veathet\nCloth Scrap",
+        "hallucination @10508: + 20 athe\nCloth Scrap",
+        "hallucination @11006: + 20 athe/\nrap",
+        "hallucination @11510: + 20 athe\nt 4 Silver Coin",
+        "hallucination @12006: Battery\nt 4 Silver Coin",
+        "hallucination @12507: Battery\n+ 4 Silver Coin",
+        "hallucination @13007: Battery\nt 4 Silver Coin",
+        "hallucination @13505: attery\nt 4 Silver Coin",
+        "hallucination @14009: Ste late\nBattery\nt 4 Silver Coin",
+        "hallucination @14506: +9 SV I Plate\nBattery",
+        "hallucination @16008: +9 Steel p ate\nAncient Relic",
+        "hallucination @16505: +9 sv Plate\nAncient Relic\n+ 9 CoppeöOre",
+        "hallucination @17009: Plate\nAncient Relic\nt 9 Copper Ore",
+        "hallucination @17509: +9 sy Plate\nAncient Relic\nt 9 CoppeWOre\n2 Cloth Scrap",
+        "hallucination @18006: +9 sv Plate\nt 9 CoppeVOre\n+ 2 Cloth Scrap",
+        "hallucination @18506: t 9 CoppeVOre\n+ 2 Cloth Scrap",
+        "hallucination @19009: t 9 Coppei Ore\n+ 2 Cloth Scrap",
+        "hallucination @19506: t 18 Copper Ore\n+ 2 Cloth Scrap",
+        "hallucination @21006: er Cöip",
+        "hallucination @21505: poin",
+        "hallucination @22505: +4 • er oin\nGunpowder",
+        "hallucination @25008: + 5 ther\nunpowder",
+        "hallucination @26007: athe",
+        "hallucination @28505: ling Herb\\",
+        "hallucination @31005: + '19 aling",
+        "hallucination @35005: + 4 dage\nGunpowder"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-020",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 14,
+        "items_read": 13,
+        "recall": 0.9285714285714286,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 5,
+            "recall": 0.8333333333333334
+          },
+          {
+            "name": ">4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.11441233729855226,
+        "exact_match_rate": 0.38461538461538464,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 56,
+        "duplicates": 23,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 19,
+        "latency_p50_ms": 119.42069999999876,
+        "latency_p95_ms": 3922.5876000000007,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 8.540799999999999,
+        "frames_total": 739,
+        "frames_processed": 739
+      },
+      "missed": [
+        "spk003 (2173 ms readable): Brother Oskar"
+      ],
+      "false_reads": [
+        "hallucination @2510: Graphics\nCaptain\nReyes",
+        "hallucination @3010: orth gate opens only for Carr\nseal",
+        "noise @4516: Graphics",
+        "hallucination @5008: Graphics\nBrother Oskar",
+        "hallucination @6009: FO 10b' me.",
+        "hallucination @7012: rap •cs",
+        "hallucination @8508: 0 10b' me.",
+        "hallucination @10008: oes thefe?",
+        "hallucination @10508: oes ther•e?",
+        "hallucination @11013: goes ther•e?",
+        "hallucination @11510: oes there?",
+        "hallucination @11510: Tobin",
+        "hallucination @12012: oes ther•e?",
+        "hallucination @12508: oes thefe?",
+        "hallucination @13008: oes ther•e?",
+        "hallucination @14014: goes theöe?",
+        "hallucination @20009: storm\nyou",
+        "hallucination @22510: 11 r",
+        "hallucination @22510: ander- a",
+        "hallucination @23511: never came back from eastern"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-021",
+      "genres": [
+        "pickup_stack",
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 26,
+        "items_read": 10,
+        "recall": 0.38461538461538464,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 1,
+            "recall": 0.25
+          },
+          {
+            "name": "1-2s",
+            "total": 7,
+            "read": 5,
+            "recall": 0.7142857142857143
+          },
+          {
+            "name": "2-4s",
+            "total": 11,
+            "read": 3,
+            "recall": 0.2727272727272727
+          },
+          {
+            "name": ">4s",
+            "total": 4,
+            "read": 1,
+            "recall": 0.25
+          }
+        ],
+        "mean_cer": 0.030757575757575754,
+        "exact_match_rate": 0.7,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 35,
+        "duplicates": 3,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 22,
+        "latency_p50_ms": 322.08349999999973,
+        "latency_p95_ms": 2246.7893000000004,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 13.6691,
+        "frames_total": 704,
+        "frames_processed": 704
+      },
+      "missed": [
+        "spk001 (2138 ms readable): Elder Wynn",
+        "dlg002 (637 ms readable): So you are the one everyone keeps talking about.",
+        "spk003 (2369 ms readable): Juno",
+        "dlg004 (628 ms readable): That sword belonged to my father. Treat it well.",
+        "spk005 (4814 ms readable): Garrick",
+        "dlg006 (3008 ms readable): If you find the second key, bring it straight to me.",
+        "spk007 (4250 ms readable): Ash",
+        "dlg008 (1954 ms readable): You finally made it. I was starting to think the storm got you.",
+        "spk009 (4619 ms readable): Brother Oskar",
+        "dlg010 (3161 ms readable): Rest now. Tomorrow we march at first light.",
+        "toast015 (2846 ms readable): + 2 Spider Silk",
+        "toast016 (2260 ms readable): + 1 Fire Opal",
+        "toast018 (2624 ms readable): + 7 Healing Herb",
+        "toast020 (2702 ms readable): + 3 Oak Plank",
+        "toast024 (1432 ms readable): + 6 Bandage",
+        "toast026 (844 ms readable): + 1 Oak Plank"
+      ],
+      "false_reads": [
+        "hallucination @2018: Incientmc",
+        "hallucination @6511: +8 Bandage\n+ 2 somer",
+        "hallucination @7017: + 8 Bandage\ne Onal",
+        "hallucination @7520: +8 Bandage\n+ 2 somer\n+ 1 Fire Opal",
+        "hallucination @8014: + 2 smoer\n+ 1 Fire Onal",
+        "hallucination @8519: + 2 snøersilk\n+1 mont",
+        "hallucination @9021: +2 SJidCTSiIk\n+ 1 fire Opal",
+        "hallucination @9514: q yd0,",
+        "hallucination @10022: + 6 Rusty Gear\n+ 1 Healing Herb",
+        "hallucination @10521: + 6 Rusty Gear\n+ IHealingHerb",
+        "hallucination @11020: +11 RustvGear A..\n+ 1 RealingNerb",
+        "hallucination @11518: • 11 Rusty Gear\n+ BealinqHerb",
+        "hallucination @12015: + 17 Busty Gear\n+ IHealingHerb",
+        "hallucination @12515: + 11 Rusty Gear\n+ aonmanu",
+        "hallucination @14013: • 1 Gunpowder\n+30axmanu",
+        "hallucination @14512: + 11 Rusty Gear\n+ 1 Gunnowder",
+        "hallucination @15016: + a Pla*",
+        "hallucination @18515: Bandage\n+ 21 Gunnowder",
+        "hallucination @19017: + 6 Bandage\n+ 21 Gunnowder",
+        "hallucination @19517: +6Bandage '\n+ 21 Gunnowder",
+        "hallucination @20016: Bamnöa",
+        "hallucination @22511: +1 oaxnanx"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-022",
+      "genres": [
+        "subtitles",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 6,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 9,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 245.72359999999935,
+        "latency_p95_ms": 426.53489999999965,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 3.404,
+        "frames_total": 500,
+        "frames_processed": 500
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @8004: Runl"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-023",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 56.91189999999915,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 1.0129,
+        "frames_total": 1178,
+        "frames_processed": 1178
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-024",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 9,
+        "prompts_read": 7,
+        "prompt_recall": 0.7777777777777778,
+        "events_total": 20,
+        "duplicates": 1,
+        "noise_reads": 8,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 2.1348000000000003,
+        "frames_total": 684,
+        "frames_processed": 684
+      },
+      "missed": [
+        "tip001 (2057 ms readable): Cracked Shield Restores 40 health Durability 37/50 Two-handed",
+        "tip002 (1003 ms readable): Hunter's Bow Sell value 120 Two-handed",
+        "tip003 (728 ms readable): Rusty Longsword Damage 12-18 Armor +4 Sell value 120",
+        "tip004 (3013 ms readable): Spell Tome Weight 2.5 Durability 37/50 Durability 37/50",
+        "tip005 (740 ms readable): Cracked Shield Move speed +15% for 30 s",
+        "tip006 (1596 ms readable): Signal Flare Quest item Move speed +15% for 30 s",
+        "tip007 (3588 ms readable): Rusty Longsword Durability 37/50"
+      ],
+      "false_reads": [
+        "noise @3: xp 28/120",
+        "noise @3: SHIELD 94/120",
+        "noise @3: HP 66/120",
+        "hallucination @2003: 4\n[El Climb",
+        "hallucination @4503: 6\n[El Climb",
+        "hallucination @5003: CRIT 683\n[El Climb",
+        "hallucination @6003: 12-18",
+        "noise @7002: HP 52/120",
+        "noise @7503: 394",
+        "noise @10003: CRIT 961",
+        "noise @14502: HP 42/120",
+        "noise @20502: HP 27/120"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-025",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 12,
+        "items_read": 12,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 8,
+            "read": 8,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 39,
+        "duplicates": 3,
+        "noise_reads": 24,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 172.64310000000023,
+        "latency_p95_ms": 332.4533999999985,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 7.5835,
+        "frames_total": 1021,
+        "frames_processed": 1021
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @11: XP 89/120",
+        "noise @11: SHIELD 44/120",
+        "noise @11: HP 57/120",
+        "noise @4509: HP 51/120",
+        "noise @5508: SHIELD 41/120",
+        "noise @8008: SHIELD 29/120",
+        "noise @9007: HP 49/120",
+        "noise @11507: SHIELD 21/120",
+        "noise @12507: HP 43/120",
+        "noise @14008: SHIELD 16/120",
+        "noise @18510: HP 37/120",
+        "noise @20509: SHIELD 10/120",
+        "noise @23507: HP 35/120",
+        "noise @25508: SHIELD 0/120",
+        "noise @29008: SHIELD 9/120",
+        "noise @29509: SHIELD 0/120",
+        "noise @29509: HP 29/120",
+        "noise @31008: SHIELD 9/120",
+        "noise @31509: SHIELD 0/120",
+        "noise @32009: SHIELD 9/120",
+        "noise @32507: SHIELD 0/120",
+        "noise @33509: SHIELD 9/120",
+        "noise @33509: HP 26/120",
+        "noise @34011: SHIELD 0/120"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-026",
+      "genres": [
+        "pickup_stack",
+        "objective_update",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 17,
+        "items_read": 8,
+        "recall": 0.47058823529411764,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 4,
+            "read": 1,
+            "recall": 0.25
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 2,
+            "recall": 0.5
+          },
+          {
+            "name": "2-4s",
+            "total": 8,
+            "read": 5,
+            "recall": 0.625
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 20,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 12,
+        "latency_p50_ms": 247.63390000000004,
+        "latency_p95_ms": 2711.4474999999984,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 2.2292,
+        "frames_total": 526,
+        "frames_processed": 526
+      },
+      "missed": [
+        "toast002 (1604 ms readable): + 7 Copper Ore (14)",
+        "toast004 (2874 ms readable): + 4 Rusty Gear (42)",
+        "toast005 (1711 ms readable): + 8 Bandage (33)",
+        "toast006 (3459 ms readable): + 3 Feather (18)",
+        "toast007 (4104 ms readable): + 9 Spider Silk (40)",
+        "toast008 (2830 ms readable): + 5 Bread (36)",
+        "toast009 (743 ms readable): + 8 Cloth Scrap (21)",
+        "toast013 (973 ms readable): + 17 Feather (31)",
+        "toast014 (282 ms readable): + 2 Quartz Shard (34)"
+      ],
+      "false_reads": [
+        "hallucination @2002: + 3 Mana Crystal (14)\n+ 7 Copper Ore (14)",
+        "hallucination @2504: + 5 Mana Crystal (16)\n+ 7 Copper Ore (14)",
+        "hallucination @4503: + 5 Mana Crystal (16)\n+ 4 Rusty Gear (42)",
+        "hallucination @5502: + 4 Rusty Gear (42)\n+ 8 Bandage (33)",
+        "hallucination @6003: + 3 Feather (18)\n+ 4 Rusty Gear (42)\n+ 8 Bandage (33)",
+        "hallucination @6503: + 3 Feather (18)\n+ 4 Rusty Gear (42)\n+ 8 Bandage (33)\n+ 9 Spider Silk (40)",
+        "hallucination @7002: + 3 Feather (18)\n+ 4 Rusty Gear (42)\n+ 9 Spider Silk (40)",
+        "hallucination @7502: + 3 Feather (18)\n+ 5 Bread (36)\n+ 9 Spider Silk (40)",
+        "hallucination @9505: 8 Cloth Scrap (21)\n+ 5 Bread (36)\n+ 9 Spider Silk (40)",
+        "hallucination @14002: + 6 Feather (20)\n+ 5 Battery (22)",
+        "hallucination @15504: + 17 Feather (31)\n+ 5 Battery (22)",
+        "hallucination @17502: + 2 Quartz Shard (34)\n+ 5 Battery (22)"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-027",
+      "genres": [
+        "subtitles",
+        "objective_update",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 8,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.02564102564102564,
+        "exact_match_rate": 0.75,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 31,
+        "duplicates": 6,
+        "noise_reads": 14,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 338.54479999999967,
+        "latency_p95_ms": 2472.109199999999,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 8.5192,
+        "frames_total": 571,
+        "frames_processed": 571
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @9: GOLD 111/120",
+        "noise @9: LV 105/120",
+        "noise @9: xp 87/120",
+        "noise @6507: xp 76/120",
+        "noise @7013: LV 90/120",
+        "noise @8007: GOLD 101/120",
+        "noise @9511: LV 88/120",
+        "noise @13009: (GOLD 91/120",
+        "noise @13009: xp 71/120",
+        "noise @13507: LV 81/120",
+        "hallucination @15509: Load Game\nWho goes there?",
+        "noise @16007: Load Game",
+        "hallucination @16512: Load Game\n,Got (t.",
+        "hallucination @17007: Load Game\nGot it.",
+        "noise @18008: GOLD 88/120",
+        "noise @18509: Load Game",
+        "noise @19010: xp 57/120"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-028",
+      "genres": [
+        "objective_update",
+        "damage_numbers",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.027216102806189354,
+        "exact_match_rate": 0.0,
+        "prompts_total": 11,
+        "prompts_read": 6,
+        "prompt_recall": 0.5454545454545454,
+        "events_total": 22,
+        "duplicates": 9,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 229.10909999999967,
+        "latency_p95_ms": 433.2644999999993,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 1.1413,
+        "frames_total": 721,
+        "frames_processed": 721
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @1002: CRIT 445",
+        "hallucination @2504: to use",
+        "hallucination @21501: [El cumb",
+        "hallucination @23001: - 250 -"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-029",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "damage_numbers",
+        "menu_overlay",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 7,
+        "prompts_read": 7,
+        "prompt_recall": 1.0,
+        "events_total": 12,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 0.9366,
+        "frames_total": 841,
+        "frames_processed": 841
+      },
+      "missed": [
+        "tip001 (3796 ms readable): Spell Tome Durability 37/50 Durability 37/50 Damage 12-18",
+        "tip002 (3527 ms readable): Iron Helm Damage 12-18 Weight 2.5",
+        "tip003 (2445 ms readable): Field Kit Damage 12-18 Sell value 120",
+        "tip004 (2820 ms readable): Spell Tome Requires level 6 Two-handed Restores 40 health",
+        "tip005 (1762 ms readable): Signal Flare Armor +4 Two-handed Quest item",
+        "tip006 (1087 ms readable): Potion of Swiftness Deals fire damage Armor +4 Deals fire damage",
+        "tip007 (1627 ms readable): Rusty Longsword Durability 37/50"
+      ],
+      "false_reads": [
+        "hallucination @1002: mage 12-18",
+        "hallucination @7001: Weight",
+        "hallucination @10001: Weight",
+        "hallucination @16502: tores 40 health"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-030",
+      "genres": [
+        "rpg_dialogue",
+        "static_hud",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 9,
+        "recall": 0.9,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 3,
+            "recall": 0.75
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.03497942386831275,
+        "exact_match_rate": 0.7777777777777778,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 21,
+        "duplicates": 3,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 251.58810000000085,
+        "latency_p95_ms": 1201.0948000000008,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 6.2245,
+        "frames_total": 496,
+        "frames_processed": 496
+      },
+      "missed": [
+        "spk003 (1154 ms readable): Dr. Halvorsen"
+      ],
+      "false_reads": [
+        "hallucination @4008: Con trols\nGarrick",
+        "hallucination @4508: Controls\nGarrick",
+        "noise @5507: Controls",
+        "hallucination @6506: Controls\nDr. Halvorsen",
+        "noise @7512: Con trols",
+        "hallucination @8508: Lyra\nCon trols",
+        "hallucination @10007: ra",
+        "hallucination @11006: We have enough sup",
+        "hallucination @14505: You are not from aro"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-031",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 13,
+        "items_read": 9,
+        "recall": 0.6923076923076923,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 3,
+            "read": 2,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "1-2s",
+            "total": 4,
+            "read": 1,
+            "recall": 0.25
+          },
+          {
+            "name": "2-4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 25,
+        "duplicates": 0,
+        "noise_reads": 5,
+        "background_reads": 0,
+        "hallucinations": 11,
+        "latency_p50_ms": 436.47590000000037,
+        "latency_p95_ms": 2103.5139,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 4.475899999999999,
+        "frames_total": 579,
+        "frames_processed": 579
+      },
+      "missed": [
+        "toast006 (1865 ms readable): + 7 Copper Ore",
+        "toast007 (1895 ms readable): + 6 Fire Opal",
+        "toast008 (1032 ms readable): + 2 Bandage",
+        "toast013 (553 ms readable): + 1 Wolf Pelt"
+      ],
+      "false_reads": [
+        "noise @7: AMMO 109/120",
+        "noise @7: GOLD 117/120",
+        "noise @7: LV 62/120",
+        "hallucination @3007: + 2 Cloth Scrap\n+ 9 oak Plank",
+        "hallucination @4006: + 2 Cloth Scrap 7/\n+ 9 Oak Plank",
+        "hallucination @4506: + 2 Cloth Scrap\n+ 9 Oak Plank",
+        "noise @7504: GOLD 105/120",
+        "hallucination @10506: + 7 Copper Ore\n+ 24 p lank",
+        "hallucination @11006: + 7 Copper Ore\n+ 24 oak Plank",
+        "hallucination @11507: + 7 Copper Ore\n+ 24 p lank\n+ 6 Fire Opal",
+        "hallucination @12006: + 7 Copper Ore\n+ 24 Oak Plank\n+ 6 Fire Opal",
+        "hallucination @12504: + 6 Fire Opal\n+ 2 Bandage",
+        "hallucination @15006: + 2 Bandage\n+ 7 Fire Opal",
+        "noise @15006: GOLD 97/120",
+        "hallucination @17006: + 12 Bandage\n+ 2 Feather",
+        "hallucination @19005: + 1 Wolf Pelt\n+ 2 Feather"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-032",
+      "genres": [
+        "subtitles",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 4,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 8,
+        "prompts_read": 6,
+        "prompt_recall": 0.75,
+        "events_total": 12,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 163.11340000000018,
+        "latency_p95_ms": 447.5422000000001,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 3.1137,
+        "frames_total": 459,
+        "frames_processed": 459
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @5003: •.9 [El Climb"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-033",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 248.20900000000074,
+        "latency_p95_ms": 379.8563999999999,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 0.7323,
+        "frames_total": 1156,
+        "frames_processed": 1156
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-034",
+      "genres": [
+        "tooltip",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 7,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 22,
+        "duplicates": 0,
+        "noise_reads": 3,
+        "background_reads": 0,
+        "hallucinations": 19,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 6.2566999999999995,
+        "frames_total": 925,
+        "frames_processed": 925
+      },
+      "missed": [
+        "tip001 (3153 ms readable): Rusty Longsword Damage 12-18 Weight 2.5",
+        "tip002 (1677 ms readable): Potion of Swiftness Two-handed Two-handed",
+        "tip003 (2186 ms readable): Signal Flare Deals fire damage Weight 2.5",
+        "tip004 (1820 ms readable): Hunter's Bow Requires level 6 Weight 2.5",
+        "tip005 (2322 ms readable): Spell Tome Durability 37/50",
+        "tip006 (2800 ms readable): Ring of Embers Quest item",
+        "tip007 (2728 ms readable): Ring of Embers Deals fire damage Durability 37/50"
+      ],
+      "false_reads": [
+        "hallucination @1508: Rusty Longsword",
+        "hallucination @1508: Damage 12-18",
+        "hallucination @1508: Weight 2.5",
+        "hallucination @6008: Potion of Swiftness",
+        "hallucination @6008: Two-handed",
+        "hallucination @6008: Two-handed",
+        "hallucination @10008: Signal Flare",
+        "hallucination @10008: Deals fire damage",
+        "hallucination @10008: Weight 2.5",
+        "hallucination @14507: Hunter's Bow",
+        "hallucination @14507: Requires level 6",
+        "hallucination @14507: weight 2.5",
+        "noise @16008: Journal",
+        "noise @16008: Skills",
+        "noise @16008: Settings",
+        "hallucination @17508: Spell Tome",
+        "hallucination @17508: Durability 37/5e",
+        "hallucination @22007: Ring of Embers",
+        "hallucination @22007: Quest item",
+        "hallucination @26508: Ring of Embers",
+        "hallucination @26508: Deals fire damage",
+        "hallucination @26508: Durability 37/5Ø"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-035",
+      "genres": [
+        "rpg_dialogue",
+        "objective_update",
+        "menu_overlay"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 11,
+        "items_read": 10,
+        "recall": 0.9090909090909091,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 2,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 6,
+            "read": 6,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 14,
+        "duplicates": 2,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 174.71119999999974,
+        "latency_p95_ms": 3415.7479999999996,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 3.3641,
+        "frames_total": 494,
+        "frames_processed": 494
+      },
+      "missed": [
+        "spk007 (1597 ms readable): Lyra"
+      ],
+      "false_reads": [
+        "noise @2503: Journal",
+        "hallucination @3504: Juno\nJournal"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-036",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 17,
+        "items_read": 11,
+        "recall": 0.6470588235294118,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 3,
+            "read": 2,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "1-2s",
+            "total": 9,
+            "read": 6,
+            "recall": 0.6666666666666666
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 3,
+            "recall": 0.6
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 24,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 13,
+        "latency_p50_ms": 611.0331000000006,
+        "latency_p95_ms": 1228.9929999999986,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 2.3853,
+        "frames_total": 626,
+        "frames_processed": 626
+      },
+      "missed": [
+        "toast002 (3411 ms readable): + 8 Bread (11)",
+        "toast003 (2298 ms readable): + 7 Silver Coin (24)",
+        "toast004 (760 ms readable): + 4 Bread (10)",
+        "toast007 (1696 ms readable): + 6 Bandage (14)",
+        "toast008 (1349 ms readable): + 19 Iron Ore (23)",
+        "toast012 (1145 ms readable): + 7 Wolf Pelt (45)"
+      ],
+      "false_reads": [
+        "hallucination @2504: + 9 Mana Crystal (16)\n+ 8 Bread (11)",
+        "hallucination @3503: + 9 Mana Crystal (16)\n+ 8 Bread (11)\n+ 7 Silver coin (24)",
+        "hallucination @4003: + 8 Bread (11)\n+ 7 Silver coin (24)\n+ 4 Bread (10)",
+        "hallucination @5003: + 8 Bread (11)\n+ 7 Silver coin (24)",
+        "hallucination @5503: + 1 Iron ore (5)\n+ 8 Bread (11)\n+ 7 Silver coin (24)",
+        "hallucination @7503: + 11 Iron ore (15)\n+ 6 Bandage (14)",
+        "hallucination @8502: + 19 Iron ore (23)\n+ 6 Bandage (14)",
+        "hallucination @9004: + 19 Iron ore (23)\n+ 12 Bandage (20)",
+        "hallucination @10503: + 7 steel Plate (13)\n+ 12 Bandage (20)",
+        "hallucination @12003: + i steel Plate (13)\n+ 4 spider Silk (34)",
+        "hallucination @14004: + 7 Wolf Pelt (45)\n+ 4 spider Silk (34)",
+        "hallucination @16003: + 5 Rusty Gear (14)\n+ 5 spider Silk (35)",
+        "hallucination @19003: + 15 Rusty Gear (24)\n+ 5 Bread (27)"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-037",
+      "genres": [
+        "subtitles",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 5,
+        "items_read": 5,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 8,
+        "prompts_read": 6,
+        "prompt_recall": 0.75,
+        "events_total": 16,
+        "duplicates": 5,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 115.29830000000004,
+        "latency_p95_ms": 362.1704,
+        "cpu_ms_p50": 0.0,
+        "cpu_ms_p95": 2.5255,
+        "frames_total": 507,
+        "frames_processed": 507
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-038",
+      "genres": [
+        "objective_update",
+        "rpg_dialogue",
+        "static_hud",
+        "damage_numbers"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 10,
+        "items_read": 10,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 5,
+            "read": 5,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.023076923076923078,
+        "exact_match_rate": 0.8,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 20,
+        "duplicates": 10,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 330.7006000000001,
+        "latency_p95_ms": 2372.717700000001,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 10.2626,
+        "frames_total": 582,
+        "frames_processed": 582
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "standard-039",
+      "genres": [
+        "tooltip",
+        "static_hud",
+        "prompt_flicker"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 8,
+        "items_read": 1,
+        "recall": 0.125,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.15789473684210525,
+        "exact_match_rate": 0.0,
+        "prompts_total": 8,
+        "prompts_read": 7,
+        "prompt_recall": 0.875,
+        "events_total": 32,
+        "duplicates": 3,
+        "noise_reads": 17,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 38.89819999999963,
+        "latency_p95_ms": 38.89819999999963,
+        "cpu_ms_p50": 0.00009999999999999999,
+        "cpu_ms_p95": 3.3411999999999997,
+        "frames_total": 891,
+        "frames_processed": 891
+      },
+      "missed": [
+        "tip001 (3188 ms readable): Ring of Embers Restores 40 health Restores 40 health Restores 40 health",
+        "tip002 (1484 ms readable): Field Kit Sell value 120 Restores 40 health Two-handed",
+        "tip003 (1271 ms readable): Travel Cloak Move speed +15% for 30 s",
+        "tip004 (3406 ms readable): Leather Boots Restores 40 health",
+        "tip005 (1506 ms readable): Spell Tome Durability 37/50 Stackable Quest item",
+        "tip006 (2248 ms readable): Signal Flare Quest item Weight 2.5",
+        "tip007 (3349 ms readable): Scrap Pistol Restores 40 health Damage 12-18 Durability 37/50"
+      ],
+      "false_reads": [
+        "noise @5: LV 28/120",
+        "noise @5: xp 21/120",
+        "noise @5: SHIELD 76/120",
+        "hallucination @1504: ; 40 health\n40 health\n40 health",
+        "noise @4004: SHIELD 61/120",
+        "noise @5503: LV 18/120",
+        "noise @6504: xp 13/120",
+        "noise @9004: xp 9/120",
+        "noise @10503: SHIELD 46/120",
+        "noise @11005: LV 17/120",
+        "noise @11503: xp 2/120",
+        "hallucination @12005: 40 health",
+        "noise @15005: LV 9/120",
+        "noise @15503: xp 0/120",
+        "noise @17004: SHIELD 43/120",
+        "noise @19505: LV 5/120",
+        "noise @20003: SHIELD 31/120",
+        "hallucination @20503: (Fl 11)0t",
+        "hallucination @22503: [F] Inot i",
+        "noise @25004: LV 2/120",
+        "noise @27505: SHIELD 30/120"
+      ],
+      "background_read_texts": []
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+[package]
+name = "overlay-spike"
+version.workspace = true
+edition = "2024"
+description = "Spike: can Slint windows on winit be the in-game overlays (pill, quick menu, zone edit)?"
+publish = false
+
+[lib]
+name = "overlay_spike"
+path = "src/lib.rs"
+
+# One binary with three roles: `game` (dummy game window), `probe` (opens the overlays and checks them) and
+# `run` (makes a hidden desktop and runs game + probe on it). See README.md.
+[[bin]]
+name = "overlay-spike"
+path = "src/main.rs"
+
+[features]
+# Also offer the Skia renderer (`probe --renderer skia`) when this crate is built alone. In a workspace build,
+# dr-app (default feature renderer-skia) already turns on Slint's Skia with OpenGL for every crate; the probe
+# picks its renderer by name, so that changes nothing here.
+skia = ["slint/renderer-skia"]
+
+[dependencies]
+slint = { version = "=1.18.1", features = ["unstable-winit-030"] }
+serde_json = "=1.0.154"
+windows-capture = "=2.0.1"
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_Security",
+    "Win32_Storage_Xps",
+    "Win32_System_LibraryLoader",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
