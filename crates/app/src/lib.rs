@@ -55,6 +55,14 @@ fn wire(w: &MainWindow, vm: &vm::Shared) {
             w.window().set_maximized(!max);
         }
     });
+    // the window border hides while maximized (app.slint); every resize checks, so Win+Up and snap count too
+    let weak = w.as_weak();
+    chrome.on_resized(move || {
+        if let Some(w) = weak.upgrade() {
+            w.global::<Chrome>()
+                .set_maximized(w.window().is_maximized());
+        }
+    });
     // Close (the title bar button, Alt+F4) hides the window to the tray (M5); with no tray icon it quits
     let (v, weak) = (vm.clone(), w.as_weak());
     w.window().on_close_requested(move || {

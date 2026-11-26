@@ -5,7 +5,7 @@ members = ["spikes/recorder", "spikes/overlay", "crates/core", "crates/ocr", "cr
 # The one version of DialogReader (shipping skill): `--version`, Settings > Updates, the installer name and the
 # release tag all read it. Every crate takes it with `version.workspace = true`.
 [workspace.package]
-version = "0.3.2"
+version = "0.3.3"
 
 # The shipped DialogReader.exe (Max, 2026-11-22): Skia with fat LTO and panic = "abort", about 22 MB.
 # `cargo build --profile ship -p dr-app --bin DialogReader` writes target\ship\DialogReader.exe.

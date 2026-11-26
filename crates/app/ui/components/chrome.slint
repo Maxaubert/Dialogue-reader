@@ -21,6 +21,9 @@ export global Chrome {
     callback maximize();
     callback close();
     callback drag();
+    // the window is maximized: Rust sets it on every resize (the window border hides then)
+    in-out property <bool> maximized;
+    callback resized();
 }
 
 component WinButton inherits Rectangle {
