@@ -1176,24 +1176,6 @@ export component MainWindow inherits Window {
         }
     }
 
-    // a thin border round the window edge, over everything (Max, 2026-11-26); not when maximized
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: root.width;
-        height: root.height;
-        border-width: 1px;
-        border-color: Palette.line-2;
-        visible: !Chrome.maximized;
-    }
-
-    changed width => {
-        Chrome.resized();
-    }
-    changed height => {
-        Chrome.resized();
-    }
-
     init => {
         keys.focus();
     }

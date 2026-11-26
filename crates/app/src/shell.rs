@@ -29,6 +29,8 @@ pub fn show_main(w: &MainWindow) {
     let _ = w.show();
     w.window().set_minimized(false);
     set_taskbar(w, w.get_show_in_taskbar());
+    #[cfg(windows)]
+    crate::overlay::win::round_corners(w.window());
 }
 
 /// [`show_main`], then in front of the other windows (tray Open, a second start).
