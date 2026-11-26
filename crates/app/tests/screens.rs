@@ -207,20 +207,11 @@ fn screens_match_the_mockup_shots() {
             .iter()
             .find(|f| f.file_stem().is_some_and(|s| s == mk.name))
             .expect("render");
-        let mut ours = image::open(path).expect("png").to_rgba8();
+        let ours = image::open(path).expect("png").to_rgba8();
         // a few shots are taller than the window (a page scrolled in the mockup): compare the window part
         assert_eq!(mock.width(), ours.width(), "{}", mk.name);
         assert!(mock.height() >= ours.height(), "{}", mk.name);
         let mock = moved(&mock, ours.height(), mk.dy, mk.foot);
-        // the 1 px window border (2026-11-26) is newer than the mockups: compare without it
-        let (w, h) = ours.dimensions();
-        for y in 0..h {
-            for x in 0..w {
-                if x == 0 || y == 0 || x == w - 1 || y == h - 1 {
-                    ours.put_pixel(x, y, *mock.get_pixel(x, y));
-                }
-            }
-        }
         let region = (0, 0, ours.width(), ours.height());
         let (a, b) = (cells(&mock, region), cells(&ours, region));
         let diffs: Vec<f64> = a
@@ -247,26 +238,4 @@ fn screens_match_the_mockup_shots() {
         "screens differ from the mockups:\n{}",
         failures.join("\n")
     );
-}
-
-#[test]
-fn the_window_has_a_thin_border() {
-    // 1 px of white 14% (Palette.line-2) on black is about 36; the pixel inside it is the page (black)
-    for name in ["10-main-b", "01-welcome"] {
-        let f = rendered()
-            .iter()
-            .find(|f| f.file_stem().is_some_and(|s| s == name))
-            .expect("render");
-        let img = image::open(f).expect("png").to_rgba8();
-        let (w, h) = img.dimensions();
-        for (x, y) in [(w / 2, 0), (w / 2, h - 1), (0, h / 2), (w - 1, h / 2)] {
-            let p = img.get_pixel(x, y).0;
-            assert!(
-                (30..=42).contains(&p[0]) && p[0] == p[1] && p[1] == p[2],
-                "{name} edge ({x}, {y}): {p:?}"
-            );
-        }
-        let inside = img.get_pixel(1, h / 2).0;
-        assert!(inside[0] < 30, "{name} inside the border: {inside:?}");
-    }
 }

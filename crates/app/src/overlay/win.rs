@@ -282,3 +282,29 @@ pub fn bring_to_front(w: &slint::Window) {
         }
     }
 }
+
+/// Windows 11 round corners on the main window (Max, 2026-11-26), with DWM's own 1 px border in the app's line
+/// color (`Palette.line-2` on black, #242424), so the border follows the curve. DWM drops both while the window
+/// is maximized. Windows 10 has neither attribute: the calls fail there and nothing changes.
+pub fn round_corners(w: &slint::Window) {
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
+    };
+    let Some(h) = hwnd_of(w) else { return };
+    let pref = DWMWCP_ROUND;
+    let color = COLORREF(0x0024_2424);
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            h,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            std::ptr::from_ref(&pref).cast(),
+            std::mem::size_of_val(&pref) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            h,
+            DWMWA_BORDER_COLOR,
+            std::ptr::from_ref(&color).cast(),
+            std::mem::size_of_val(&color) as u32,
+        );
+    }
+}
