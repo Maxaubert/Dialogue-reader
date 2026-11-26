@@ -1,4 +1,4 @@
-# dialogue-reader-rs
+# Dialogue-reader
 
 Reads game dialogue and pop-up text (item pickups, tooltips) aloud on Windows.
 Rust rewrite of [DialogReader](https://github.com/Maxaubert/Dialogue-reader).

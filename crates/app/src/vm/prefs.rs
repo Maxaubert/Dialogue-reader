@@ -14,7 +14,7 @@ use crate::Page;
 
 /// Where DialogReader's releases are (Settings > Updates > Check now). The repo is private today; see
 /// docs/app-plan.md, M5 open questions.
-pub const RELEASES_URL: &str = "https://github.com/Maxaubert/dialogue-reader-rs/releases";
+pub const RELEASES_URL: &str = "https://github.com/Maxaubert/Dialogue-reader/releases";
 
 /// What follows the version in Settings > App ("0.2.0, up to date" in the mockup). Empty in the app: it cannot know
 /// yet whether it is the latest version (no update check is built in, spec 6 item 2). The Check now tooltip says

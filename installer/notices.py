@@ -41,7 +41,7 @@ def shipped() -> list[tuple[str, str]]:
     seen = set()
     for line in out.splitlines():
         line = line.replace(" (*)", "").strip()
-        if not line or "(proc-macro)" in line or "dialogue-reader-rs" in line.replace("\\", "/"):
+        if not line or "(proc-macro)" in line or REPO.as_posix().lower() in line.replace("\\", "/").lower():
             continue
         name, ver = line.split()[:2]
         seen.add((name, ver.lstrip("v")))
