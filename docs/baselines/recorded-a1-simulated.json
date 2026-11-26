@@ -1,0 +1,721 @@
+{
+  "suite": "recorded",
+  "seed": null,
+  "truth_fingerprint": "8ae4512d00954f50",
+  "reader": "a1",
+  "reader_options": {},
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 11,
+    "items_should_read": 15,
+    "items_read": 15,
+    "recall": 1.0,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "1-2s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "2-4s",
+        "total": 11,
+        "read": 11,
+        "recall": 1.0
+      },
+      {
+        "name": ">4s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "time unsure",
+        "total": 4,
+        "read": 4,
+        "recall": 1.0
+      }
+    ],
+    "mean_cer": 0.07838827838827839,
+    "exact_match_rate": 0.5333333333333333,
+    "prompts_total": 25,
+    "prompts_read": 11,
+    "prompt_recall": 0.44,
+    "events_total": 36,
+    "duplicates": 2,
+    "noise_reads": 2,
+    "background_reads": 0,
+    "hallucinations": 6,
+    "latency_p50_ms": 204.54370000000017,
+    "latency_p95_ms": 333.3056999999999,
+    "cpu_ms_p50": 9.4768,
+    "cpu_ms_p95": 17.7647,
+    "frames_total": 1114,
+    "frames_processed": 1114
+  },
+  "scenarios": [
+    {
+      "id": "satisfactory-m01",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.125,
+        "exact_match_rate": 0.5,
+        "prompts_total": 1,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 205.84919999999966,
+        "latency_p95_ms": 205.84919999999966,
+        "cpu_ms_p50": 14.8726,
+        "cpu_ms_p95": 21.4727,
+        "frames_total": 101,
+        "frames_processed": 101
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m02",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.125,
+        "exact_match_rate": 0.5,
+        "prompts_total": 2,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 204.54370000000017,
+        "latency_p95_ms": 204.54370000000017,
+        "cpu_ms_p50": 13.951500000000001,
+        "cpu_ms_p95": 21.4498,
+        "frames_total": 100,
+        "frames_processed": 100
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m03",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 0,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 0,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 7.5310999999999995,
+        "cpu_ms_p95": 14.700899999999999,
+        "frames_total": 110,
+        "frames_processed": 110
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m04",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 2,
+        "prompts_read": 1,
+        "prompt_recall": 0.5,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 198.20520000000033,
+        "latency_p95_ms": 198.20520000000033,
+        "cpu_ms_p50": 7.964,
+        "cpu_ms_p95": 12.874500000000001,
+        "frames_total": 102,
+        "frames_processed": 102
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m05",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 2,
+        "prompts_read": 1,
+        "prompt_recall": 0.5,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 199.13630000000012,
+        "latency_p95_ms": 199.13630000000012,
+        "cpu_ms_p50": 7.782500000000001,
+        "cpu_ms_p95": 12.7181,
+        "frames_total": 101,
+        "frames_processed": 101
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m06",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 1,
+        "prompts_read": 1,
+        "prompt_recall": 1.0,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 197.99970000000008,
+        "latency_p95_ms": 197.99970000000008,
+        "cpu_ms_p50": 6.4167,
+        "cpu_ms_p95": 12.0671,
+        "frames_total": 100,
+        "frames_processed": 100
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @8008: Exit to Desktop",
+        "hallucination @8008: Resæv",
+        "hallucination @9695: to start mining Iron Ore (Impure)"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m07",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 0,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 4,
+        "prompts_read": 3,
+        "prompt_recall": 0.75,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 7.6285,
+        "cpu_ms_p95": 11.351999999999999,
+        "frames_total": 97,
+        "frames_processed": 97
+      },
+      "missed": [],
+      "false_reads": [
+        "noise @3118: Exit to Desktop",
+        "hallucination @3118: Resæv"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m08",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 6,
+        "prompts_read": 2,
+        "prompt_recall": 0.3333333333333333,
+        "events_total": 3,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 333.3056999999999,
+        "latency_p95_ms": 333.3056999999999,
+        "cpu_ms_p50": 10.1505,
+        "cpu_ms_p95": 17.1566,
+        "frames_total": 107,
+        "frames_processed": 107
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m09",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.10073260073260075,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 4,
+        "prompts_read": 2,
+        "prompt_recall": 0.5,
+        "events_total": 5,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 113.97329999999965,
+        "latency_p95_ms": 332.1455000000001,
+        "cpu_ms_p50": 10.6607,
+        "cpu_ms_p95": 17.6068,
+        "frames_total": 105,
+        "frames_processed": 105
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m10",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.10073260073260075,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 3,
+        "prompts_read": 1,
+        "prompt_recall": 0.3333333333333333,
+        "events_total": 6,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 114.50810000000001,
+        "latency_p95_ms": 333.0757000000001,
+        "cpu_ms_p50": 10.3117,
+        "cpu_ms_p95": 17.0734,
+        "frames_total": 96,
+        "frames_processed": 96
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @807: • Press ato pick up Le.lves"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m11",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.07142857142857142,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 9.312100000000001,
+        "cpu_ms_p95": 14.7439,
+        "frames_total": 95,
+        "frames_processed": 95
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @405: to start mining Iron Ore",
+        "hallucination @7007: Biomass Burner\n7 Conveyor Belt Mk.l"
+      ],
+      "background_read_texts": []
+    }
+  ]
+}

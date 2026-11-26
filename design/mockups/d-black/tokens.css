@@ -1,0 +1,213 @@
+/* DialogReader d-black tokens. Source: research/dialogue-reader/2026-11-24-redesign-brief.md, section 1.2.
+   Mockup rule (brief section 6): text is drawn one weight lighter than the Slint target,
+   because Chromium draws text heavier than Slint. The Slint value is in each comment. */
+
+:root{
+  /* colour: neutral greys only, r = g = b */
+  --bg:#000000;
+  --surface-1:#0A0A0A;
+  --surface-2:#121212;
+  --surface-3:#1A1A1A;
+  --line:rgba(255,255,255,.08);      /* #FFFFFF14 */
+  --line-2:rgba(255,255,255,.14);    /* #FFFFFF24 */
+  --text:#F2F2F2;
+  --text-2:#9A9A9A;
+  --text-3:#808080;                  /* off but readable rows: 5.3:1 on bg, 5.0:1 on surface-1 */
+  --text-off:#5C5C5C;                /* disabled controls only (3.1:1, exempt) */
+  --on:#FFFFFF;
+  --on-ink:#000000;
+  --live:#C5FA09;                    /* lime, Max 2026-11-24. Status dot, waveform, active zone outline only */
+  --danger:#F0867E;
+  --close-hover:#C42B1C;
+
+  /* type */
+  --font:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --font-display:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --mono:"Cascadia Mono",Consolas,monospace;
+  --fs-title:26px;  --fw-title:500;  /* Slint 600, letter-spacing -0.4px */
+  --fs-hero:20px;   --fw-hero:400;   /* Slint 500 */
+  --fs-body:14px;   --fw-body:400;   /* Slint 500 */
+  --fs-small:12.5px;--fw-small:400;  /* Slint 500 */
+  --fw-strong:500;                   /* Slint 600: headings, buttons */
+
+  /* shape */
+  --r-sm:6px; --r:8px; --r-lg:10px; --r-pill:999px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
+  --h-row:44px; --h-list:36px; --h-media:48px; --h-ctl:32px; --h-strip:40px;  /* media row: switcher rows with a picture */
+
+  /* motion: brief section 1.2 and 3 */
+  --ease-out:cubic-bezier(0.2,0.7,0.2,1);
+  --ease-out-strong:cubic-bezier(0.16,1,0.3,1);
+  --ease-in:cubic-bezier(0.4,0,1,1);
+  --t-fast:120ms; --t-base:180ms; --t-page:260ms; --t-exit:140ms; --t-stagger:40ms; --t-glide:360ms;
+}
+
+/* reduce motion: durations to 0, fades to 80 ms (brief 3.2) */
+@media (prefers-reduced-motion: reduce){
+  :root{--t-fast:80ms; --t-base:80ms; --t-page:80ms; --t-exit:80ms; --t-stagger:0ms; --t-glide:0ms}
+  /* colour fades keep 80 ms; anything that moves or scales is instant */
+  .toggle::after{transition-duration:0ms}
+  .btn:active,.iconbtn:active,.opt:active,.kbd:active,.gname:active,.back:active,.gr:active,.zi:active{transform:none}
+  .kbd.capture{animation:none}
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text)}
+body{font:var(--fw-body) var(--fs-body)/1.43 var(--font);-webkit-font-smoothing:antialiased}  /* no tabular-nums: Slint 1.18 has no such switch */
+::selection{background:rgba(255,255,255,.22);color:var(--text)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border:3px solid var(--bg);border-radius:999px}
+*{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
+:focus-visible{outline:2px solid rgba(255,255,255,.6);outline-offset:2px}
+svg.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+svg.ic.lg{width:18px;height:18px}
+svg.ic.fill{fill:currentColor;stroke:none}
+
+/* ---------- app frame ---------- */
+.app{position:relative;width:1440px;height:900px;overflow:hidden;background:var(--bg)}
+.spacer{flex:1}
+
+/* ---------- title strip (not a nav bar) ---------- */
+.strip{position:absolute;left:0;top:0;right:0;height:var(--h-strip);display:flex;align-items:center;z-index:20;background:var(--bg)}
+.strip .lead{position:relative;height:100%;flex:1;min-width:0}
+.strip .lead > *{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center}
+.gname{gap:8px;padding:0 8px;margin-left:8px;font-weight:var(--fw-strong);color:var(--text);border-radius:var(--r);cursor:pointer;height:32px!important;top:4px!important;transition:background var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.gname .ic{color:var(--text-2);width:14px;height:14px}
+.gname:hover{background:var(--surface-2)}
+.gname .roll{position:relative;display:inline-block;overflow:hidden;height:20px}
+.gname .roll span{display:block;white-space:nowrap}
+.back{gap:4px;padding:0 8px 0 4px;margin-left:8px;font-weight:var(--fw-strong);height:32px!important;top:4px!important;border-radius:var(--r);cursor:pointer;transition:background var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.back .ic{color:var(--text-2)}
+.back:hover{background:var(--surface-2)}
+.brand{gap:8px;padding-left:16px;font-weight:var(--fw-strong)}
+.strip .tail{display:flex;align-items:center;height:100%}
+.sdot{width:40px;height:40px;display:grid;place-items:center;position:relative}
+.sdot i{width:8px;height:8px;border-radius:50%;background:var(--live);display:block}
+.sdot.paused i{background:var(--text-2)}
+.sdot.off i{background:var(--text-off)}
+.sdot .tip{display:none}
+.sdot:hover .tip,.sdot.showtip .tip{display:block}
+.tip{position:absolute;top:7px;right:34px;white-space:nowrap;padding:4px 8px;border-radius:var(--r);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);font-size:var(--fs-small);box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:40}
+.iconbtn{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--r);color:var(--text-2);cursor:pointer;transition:background var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.iconbtn:hover{background:var(--surface-2);color:var(--text)}
+.iconbtn:active{transform:scale(.97);background:var(--surface-3)}
+.iconbtn.sm{width:28px;height:28px}
+.iconbtn.disabled{color:var(--text-off);pointer-events:none}
+.strip .gear{margin:0 4px}
+.winctl{display:flex;height:100%}
+.winctl span{width:46px;height:40px;display:grid;place-items:center;color:var(--text-2);transition:background var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease-out)}
+.winctl span:hover{background:var(--surface-2);color:var(--text)}
+.winctl span.close:hover{background:var(--close-hover);color:#fff}
+.winctl .ic{width:15px;height:15px;stroke-width:1.25}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--h-ctl);padding:0 12px;border-radius:var(--r);font:var(--fw-strong) var(--fs-body)/1 var(--font);color:var(--text);background:var(--surface-2);border:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none;transition:background var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease-out),border-color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.btn .ic{color:var(--text-2)}
+.btn:hover{background:var(--surface-3);border-color:var(--line-2)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--on);color:var(--on-ink);border-color:var(--on);border-radius:var(--r-pill);padding:0 16px}
+.btn.primary .ic{color:var(--on-ink)}
+.btn.primary:hover{background:#E6E6E6;border-color:#E6E6E6}
+.btn.ghost{background:transparent;border-color:transparent;padding:0 12px}
+.btn.ghost.disabled{border-color:transparent}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn.danger{background:transparent;border-color:transparent;color:var(--danger)}
+.btn.danger .ic{color:var(--danger)}
+.btn.danger:hover{background:var(--surface-2)}
+.btn[disabled],.btn.disabled{color:var(--text-off);background:transparent;border-color:var(--line);pointer-events:none}
+.btn.primary[disabled],.btn.primary.disabled{background:var(--surface-2);border-color:var(--surface-2);color:var(--text-off)}
+.btn.disabled .ic,.btn[disabled] .ic{color:var(--text-off)}
+/* pressed and hover shown statically on the tokens sheet */
+.btn.is-hover{background:var(--surface-3);border-color:var(--line-2)}
+.btn.primary.is-hover{background:#E6E6E6;border-color:#E6E6E6}
+.btn.is-press{transform:scale(.97);background:var(--surface-3)}
+
+/* dropdown-ish option button on black */
+.opt{display:inline-flex;align-items:center;gap:8px;height:var(--h-ctl);padding:0 12px 0 8px;border-radius:var(--r);color:var(--text);cursor:pointer;white-space:nowrap;user-select:none;transition:background var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.opt:active{transform:scale(.97)}
+.opt > .ic{color:var(--text-2)}
+.opt .chev{width:14px;height:14px;color:var(--text-2)}
+.opt:hover{background:var(--surface-2)}
+.opt.disabled{color:var(--text-off);pointer-events:none}
+
+/* ---------- toggle 40 x 22 ---------- */
+.toggle{position:relative;display:inline-block;width:40px;height:22px;border-radius:var(--r-pill);background:var(--surface-3);border:1px solid var(--line-2);flex:none;cursor:pointer;transition:background var(--t-base) var(--ease-out),border-color var(--t-base) var(--ease-out)}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--text-2);transition:transform var(--t-base) var(--ease-out),background var(--t-base) var(--ease-out)}
+.toggle.on{background:var(--on);border-color:var(--on)}
+.toggle.on::after{transform:translateX(18px);background:var(--on-ink)}
+.toggle.disabled{opacity:.4;pointer-events:none}
+
+/* ---------- keycap ---------- */
+.kbd{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 12px;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line-2);font:400 12.5px/1 var(--mono);color:var(--text);white-space:nowrap;cursor:pointer;user-select:none;transition:background var(--t-fast) var(--ease-out),border-color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.kbd:hover{background:var(--surface-3)}
+.kbd:active,.gname:active,.back:active,.gr:active{transform:scale(.97)}
+.kbd.sm{height:24px;padding:0 8px}
+.kbd.capture{border-color:var(--on);color:var(--text-2);animation:capture 900ms var(--ease-out) infinite alternate}
+@keyframes capture{from{border-color:rgba(255,255,255,.4)}to{border-color:rgba(255,255,255,1)}}
+
+/* ---------- segmented ---------- */
+.seg{display:inline-flex;height:var(--h-ctl);padding:3px;border-radius:var(--r);background:var(--surface-2);border:1px solid var(--line)}
+.seg span{display:inline-flex;align-items:center;padding:0 12px;border-radius:var(--r-sm);color:var(--text-2);cursor:pointer;white-space:nowrap;transition:background var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease-out)}
+.seg span:hover{color:var(--text)}
+.seg span.on{background:var(--on);color:var(--on-ink);font-weight:var(--fw-strong)}
+
+/* ---------- field / select ---------- */
+.field{display:inline-flex;align-items:center;gap:8px;height:var(--h-ctl);padding:0 8px 0 12px;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);color:var(--text);cursor:pointer;transition:border-color var(--t-fast) var(--ease-out)}
+.field:hover{border-color:var(--line-2)}
+.field .chev{width:14px;height:14px;color:var(--text-2);margin-left:auto}
+
+/* ---------- slider ---------- */
+.slider{display:inline-flex;align-items:center;gap:12px}
+.slider .track{position:relative;width:160px;height:4px;border-radius:var(--r-pill);background:var(--surface-3)}
+.slider .fill{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill);background:var(--on)}
+.slider .knob{position:absolute;top:-6px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--on)}
+.slider .val{width:36px;text-align:right;color:var(--text-2)}
+
+/* ---------- panel and rows ---------- */
+.panel{background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-lg)}
+.srow{display:flex;align-items:center;gap:12px;min-height:var(--h-row);padding:4px 12px 4px 16px;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow .lbl{flex:1;min-width:0}
+.srow > .row{display:flex;align-items:center;gap:8px}
+.srow .lbl small{display:block;font-size:var(--fs-small);color:var(--text-2)}
+.lrow{position:relative;display:flex;align-items:flex-start;gap:8px;min-height:var(--h-list);padding:8px 8px 8px 12px;border-radius:var(--r);color:var(--text);transition:background var(--t-fast) var(--ease-out)}
+.lrow .k{color:var(--text-2);display:flex;margin-top:2px}
+.lrow.off .k{color:var(--text-3)}
+/* long lines: two lines, then cut (Max 2026-11-24). Full text on hover in .lfull. Slint: wrap word-wrap + overflow elide + a 2-line max height */
+.lrow .tx{flex:1;min-width:0;line-height:20px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.lrow .meta{flex:none;color:var(--text-2);font-size:var(--fs-small);line-height:20px}
+/* the hover card: the same row, unclamped, laid over the rows below. Fades in 120 ms after a 200 ms hover */
+.lrow.lfull{position:absolute;z-index:5;background:var(--surface-2);border:1px solid var(--line-2);padding:7px 7px 7px 11px;box-shadow:0 12px 24px rgba(0,0,0,.6)}
+.lrow.lfull .tx{display:block;-webkit-line-clamp:unset;overflow:visible}
+.lrow .tx b{font-weight:var(--fw-body);color:var(--text-2)}
+/* replay floats over the row end on hover, on an opaque surface-2 backing, so it reserves no text space */
+.lrow .rp{position:absolute;right:4px;top:4px;z-index:1;background:var(--surface-2);opacity:0;transition:opacity var(--t-fast) var(--ease-out),background var(--t-fast) var(--ease-out)}
+.lrow .rp:hover{background:var(--surface-3)}
+.lrow:hover,.lrow.is-hover{background:var(--surface-2)}
+.lrow:hover .rp,.lrow.is-hover .rp{opacity:1}
+.lrow.off .tx,.lrow.off .tx b{color:var(--text-3)}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-pill);border:1px solid var(--line-2);color:var(--text-2);font-size:var(--fs-small);flex:none}
+
+/* ---------- zone chip (Overview strip): on = text, off = text-2 with a struck icon. No switch here. ---------- */
+.zi{display:inline-flex;align-items:center;gap:8px;height:var(--h-ctl);padding:0 12px 0 8px;border-radius:var(--r);color:var(--text);white-space:nowrap;cursor:pointer;user-select:none;transition:background var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.zi .ic{color:var(--text);transition:color var(--t-fast) var(--ease-out)}
+.zi .ic .strike{display:none}
+.zi:hover{background:var(--surface-2)}
+.zi:active{transform:scale(.97)}
+.zi.off,.zi.off .ic{color:var(--text-2)}
+.zi.off .ic .strike{display:inline}
+
+/* two icons in one place, for the 120 ms Pause / Resume crossfade */
+.swapic{position:relative;width:16px;height:16px;flex:none}
+.swapic .ic{position:absolute;left:0;top:0}
+.swapic .ic + .ic{opacity:0}
+
+/* ---------- waveform ---------- */
+.wave{display:flex;align-items:center;gap:3px;height:24px}
+.wave i{display:block;width:2px;border-radius:1px;background:var(--live);height:4px;transition:height var(--t-fast) var(--ease-out)}
+.wave.flat i{background:var(--text-off);height:2px!important}
+
+/* ---------- mockup-only controls, below the 1440 x 900 frame ---------- */
+.mock{display:flex;align-items:center;gap:16px;width:1440px;padding:20px 24px;border-top:1px dashed #333;color:var(--text-2);font-size:var(--fs-small)}
+.mock b{color:var(--text);font-weight:500}

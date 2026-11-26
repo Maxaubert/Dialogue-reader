@@ -1,0 +1,110 @@
+# Release (shipping skill). Manual for now; meant to run on every push to main once the open questions are settled.
+# - The version is [workspace.package] version in the root Cargo.toml (the one version source).
+# - REFUSES to run when release v<version> exists already: bump the version in the PR.
+# - Builds the installer (installer/build.ps1 -Fetch: ONNX Runtime and the Kokoro files from their official releases,
+#   SHA-256 checked), signs it through SignPath when SIGNPATH_API_TOKEN is set, and publishes v<version> with
+#   GitHub-generated notes. Unsigned until a signer is chosen.
+# Docs-only pushes are skipped (paths). A manual run (workflow_dispatch) publishes only from main.
+name: release
+
+on:
+  # Manual only until Max picks the ONNX Runtime source, the release host and signing (docs/app-plan.md,
+  # Open questions (M5)). Then switch back to push on main.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # a manual run on another branch must not publish a release marked latest
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $in = $false; $v = $null
+          foreach ($l in Get-Content Cargo.toml) {
+            $t = $l.Trim()
+            if ($t.StartsWith('[')) { $in = ($t -eq '[workspace.package]'); continue }
+            if ($in -and $t -match '^version\s*=\s*"([^"]+)"') { $v = $Matches[1]; break }
+          }
+          if (-not $v) { Write-Error 'no [workspace.package] version in Cargo.toml'; exit 1 }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Refuse to overwrite an existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v${{ steps.ver.outputs.version }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Error "Release $tag already exists. Bump [workspace.package] version in Cargo.toml (patch for a fix, minor for a feature) and push again."
+            exit 1
+          }
+          exit 0
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build the installer
+        shell: pwsh
+        run: ./installer/build.ps1 -Fetch
+
+      # SignPath Foundation (free for open source) once a signer is chosen: add the SIGNPATH_API_TOKEN secret and the
+      # SIGNPATH_ORG_ID / SIGNPATH_PROJECT vars. Until then these steps do nothing.
+      - name: Upload unsigned installer
+        if: env.SIGNPATH_API_TOKEN != ''
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: target/installer/DialogReader-Setup-x64-*.exe
+      - name: Sign with SignPath
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT }}
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: target/installer
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v${{ steps.ver.outputs.version }}"
+          $asset = (Get-ChildItem target/installer/DialogReader-Setup-x64-*.exe | Select-Object -First 1).FullName
+          # the tag goes on the commit that was built, not on a newer one pushed meanwhile
+          gh release create $tag $asset --title $tag --generate-notes --latest --target "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if ($env:SIGNPATH_API_TOKEN -eq "") {
+            # gh prints the notes as lines; joined with newlines and passed as a file, they keep their layout
+            $body = (gh release view $tag --json body -q .body) -join "`n"
+            $notes = Join-Path $env:RUNNER_TEMP 'notes.md'
+            Set-Content -LiteralPath $notes -Encoding utf8 -Value "$body`n`nThis installer is unsigned; SmartScreen will warn on first run."
+            gh release edit $tag --notes-file $notes
+          }

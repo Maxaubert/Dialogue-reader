@@ -1,0 +1,292 @@
+// Setup step 4, Pick a voice (d-black 01-setup, #step4). Left: "Voices", one 36 px row per voice with a play button
+// ("Play a sample"); the picked voice has the surface-3 fill, which glides (360 ms). With no voice: "No voices
+// found." and Add voices. Right: "Sound" with Speed and Volume.
+import { SetupPart, SetupStage } from "setup_part.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Speeds,
+} from "../theme.slint";
+import { VoiceData } from "../data.slint";
+import {
+    Button,
+    IconButton,
+    Slider,
+    Wave,
+    GroupLabel,
+    Panel,
+    SettingRow,
+} from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+component VoiceRow inherits Rectangle {
+    in property <VoiceData> voice;
+    in property <bool> sel;
+    // this row's sample is playing: the button stops it
+    in property <bool> playing;
+    callback clicked();
+    callback play();
+    callback stop();
+    height: Size.list;
+    border-radius: Radius.md;
+    background: !root.sel && touch.has-hover ? Palette.surface-2 : transparent;
+    animate background {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: list-item;
+    accessible-label: root.voice.name;
+    accessible-item-selected: root.sel;
+    accessible-action-default => {
+        root.clicked();
+    }
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Space.s3;
+        padding-right: Space.s1;
+        spacing: Space.s3;
+        Text {
+            text: root.voice.name;
+            color: Palette.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.voice.short;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+
+        if root.playing: VerticalLayout {
+            alignment: center;
+            Wave {
+                height: 16px;
+                bars: [6, 11, 15, 9, 13, 7, 12, 8];
+                gap: 2px;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                small: true;
+                icon: root.playing ? Icons.stop : Icons.play;
+                tip: root.playing ? "Stop" : "Play a sample";
+                label: root.playing ? "Stop" : "Play a sample of " + root.voice.name;
+                clicked => {
+                    if root.playing {
+                        root.stop();
+                    } else {
+                        root.play();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component VoicePage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
+    in property <[VoiceData]> voices;
+    in-out property <int> selected: 0;
+    in-out property <float> speed: 0.4;
+    in-out property <float> volume: 0.8;
+    // kept for app.slint: the engine of the list, why it is empty (the page says "No voices found.")
+    in property <string> engine: "Kokoro";
+    in property <string> problem;
+    // a sample is playing (started on this page)
+    in property <bool> testing;
+    in property <int> test-played: 0;
+    in property <string> test-time: "0:00";
+    callback test();
+    callback stop-test();
+    callback add-voices();
+    // the play button of a voice row: picks that voice and plays a sample (app.slint)
+    callback sample(int);
+    // the Volume slider moved (a playing sample follows it)
+    callback volume-moved();
+    // the row whose sample plays (picking another row while it plays keeps the stop button on this one)
+    property <int> played: -1;
+    // the voice list scrolls when it is longer than the page has room for (16 px kept above and under the step)
+    property <length> list-y: 16px + head.preferred-height + Space.s5 + Type.lh-small + Space.s2;
+    property <length> list-max: Math.max(3 * Size.list, stage.vh - root.list-y - 16px - 2 * Space.s1 - 2px);
+    stage := SetupStage {
+        zoom: root.zoom;
+        content-h: body.preferred-height;
+        body := VerticalLayout {
+            x: (stage.vw - Size.col) / 2;
+            y: stage.top;
+            width: Size.col;
+            height: self.preferred-height;
+            alignment: start;
+            SetupPart {
+                n: 0;
+                head := ObHead {
+                    title: "Pick a voice";
+                    lead: "Runs offline.";
+                }
+            }
+
+            Rectangle {
+                height: Space.s5;
+            }
+
+            SetupPart {
+                n: 1;
+                HorizontalLayout {
+                    spacing: Space.s5;
+                    VerticalLayout {
+                        width: 560px;
+                        spacing: Space.s2;
+                        alignment: start;
+                        HorizontalLayout {
+                            padding-left: Space.s1;
+                            GroupLabel {
+                                text: "Voices";
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                if root.voices.length == 0: HorizontalLayout {
+                                    padding-left: Space.s4 + 1px;
+                                    padding-right: Space.s3 + 1px;
+                                    padding-top: Space.s4 + 1px;
+                                    padding-bottom: Space.s4 + 1px;
+                                    Text {
+                                        horizontal-stretch: 1;
+                                        text: "No voices found.";
+                                        color: Palette.text-2;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Button {
+                                        text: "Add voices";
+                                        clicked => {
+                                            root.add-voices();
+                                        }
+                                    }
+                                }
+                                if root.voices.length > 0: VerticalLayout {
+                                    padding: Space.s1 + 1px;
+                                // a long list scrolls
+                                Flickable {
+                                        height: Math.min(root.voices.length * Size.list, root.list-max);
+                                        content-height: root.voices.length * Size.list;
+                                        Rectangle {
+                                            y: Math.max(0, root.selected) * Size.list;
+                                            height: Size.list;
+                                            border-radius: Radius.md;
+                                            background: Palette.surface-3;
+                                            visible: root.selected >= 0 && root.selected < root.voices.length;
+                                            animate y {
+                                                duration: Motion.glide;
+                                                easing: cubic-bezier(0.16, 1, 0.3, 1);
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: start;
+                                            for v[i] in root.voices: VoiceRow {
+                                                voice: v;
+                                                sel: i == root.selected;
+                                                playing: root.testing && i == root.played;
+                                                clicked => {
+                                                    root.selected = i;
+                                                }
+                                                play => {
+                                                    root.played = i;
+                                                    root.sample(i);
+                                                }
+                                                stop => {
+                                                    root.stop-test();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: Space.s2;
+                        alignment: start;
+                        HorizontalLayout {
+                            padding-left: Space.s1;
+                            GroupLabel {
+                                text: "Sound";
+                            }
+                        }
+
+                        Panel {
+                            VerticalLayout {
+                                padding: 1px;
+                                SettingRow {
+                                    text: "Speed";
+                                    first: true;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Slider {
+                                            width: 120px;
+                                            label: "Speed";
+                                            value <=> root.speed;
+                                        }
+                                    }
+
+                                    // .slider .val: 36 px, 12 px after the track (the row spaces its controls 8 px, so the box is 4 px wider)
+                                Text {
+                                        width: 40px;
+                                        text: Speeds.text(Speeds.of(root.speed));
+                                        color: Palette.text-2;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                SettingRow {
+                                    text: "Volume";
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Slider {
+                                            width: 120px;
+                                            label: "Volume";
+                                            value <=> root.volume;
+                                            changed => {
+                                                root.volume-moved();
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        width: 40px;
+                                        text: Math.round(root.volume * 100) + "%";
+                                        color: Palette.text-2;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

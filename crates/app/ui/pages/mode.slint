@@ -1,0 +1,131 @@
+// Setup step 5, How should it read? (d-black 01-setup, #step5): two cards, the picked one with the white border and
+// the surface-2 fill. There is no summary line under them (Max, 2026-11-24).
+import { SetupPart, SetupStage } from "setup_part.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
+import { CIcon } from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+component ModeCard inherits Rectangle {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> line;
+    in property <bool> selected;
+    callback clicked();
+    height: lay.preferred-height;
+    border-radius: Radius.lg;
+    border-width: 1px;
+    background: root.selected ? Palette.surface-2 : Palette.surface-1;
+    border-color: root.selected ? Palette.on : touch.has-hover ? Palette.line-2 : Palette.line;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, border-color, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: radio-button;
+    accessible-label: root.title;
+    accessible-checked: root.selected;
+    accessible-action-default => {
+        root.clicked();
+    }
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    // .mc: 20 px padding inside the 1 px border, the icon 12 px over the title; 120 px tall
+    lay := VerticalLayout {
+        padding-left: 17px;
+        padding-right: 17px;
+        padding-top: 18px;
+        padding-bottom: 17px;
+        spacing: Space.s1;
+        HorizontalLayout {
+            padding-bottom: 11px;
+            alignment: start;
+            CIcon {
+                source: root.icon;
+                size: Size.icon-lg;
+                color: root.selected ? Palette.text : Palette.text-2;
+            }
+        }
+
+        Text {
+            text: root.title;
+            height: Type.lh-body;
+            font-weight: Type.w-strong;
+            color: Palette.text;
+            accessible-role: none;
+        }
+
+        Text {
+            text: root.line;
+            height: Type.lh-body;
+            color: Palette.text-2;
+            accessible-role: none;
+        }
+    }
+}
+
+export component ModePage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
+    in-out property <bool> automatic: true;
+    stage := SetupStage {
+        zoom: root.zoom;
+        content-h: body.preferred-height;
+        body := VerticalLayout {
+            x: (stage.vw - Size.col) / 2;
+            y: stage.top;
+            width: Size.col;
+            height: self.preferred-height;
+            alignment: start;
+            SetupPart {
+                n: 0;
+                ObHead {
+                    title: "How should it read?";
+                }
+            }
+
+            Rectangle {
+                height: Space.s5;
+            }
+
+            SetupPart {
+                n: 1;
+                HorizontalLayout {
+                    spacing: Space.s4;
+                    ModeCard {
+                        width: (Size.col - Space.s4) / 2;
+                        icon: Icons.zap;
+                        title: "Automatic";
+                        line: "Reads new text as it appears.";
+                        selected: root.automatic;
+                        clicked => {
+                            root.automatic = true;
+                        }
+                    }
+
+                    ModeCard {
+                        width: (Size.col - Space.s4) / 2;
+                        icon: @image-url("../icons/keyboard.svg");
+                        title: "On key press";
+                        line: "Reads when you press your key.";
+                        selected: !root.automatic;
+                        clicked => {
+                            root.automatic = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

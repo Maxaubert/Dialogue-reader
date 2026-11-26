@@ -1,0 +1,27 @@
+[package]
+name = "dr-tts"
+version.workspace = true
+edition = "2024"
+description = "DialogReader speech: the Tts trait, the Kokoro engine, the Windows built-in voices engine, WAV parsing and a fake engine for tests"
+
+[lib]
+name = "dr_tts"
+path = "src/lib.rs"
+
+[dependencies]
+# Kokoro (built 2026-11-23; ships with the app, docs/app-spec.md section 6).
+# The G2P is Sonara's vendored misaki (MIT), pinned to an exact commit; the Kokoro code around it is copied from Sonara into src/kokoro.
+misaki = { git = "https://github.com/Maxaubert/Sonara.git", rev = "8fd2af726869e1dfe49814ea21eb4aa7bd335c99" }
+regex = "=1.13.2"
+# The ort version the arena already pins (Sonara pins rc.13, which cannot sit next to it in one lock file).
+# `load-dynamic`: onnxruntime.dll is loaded from a full path at run time; nothing is downloaded at build time.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-24"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Media_Core",
+    "Media_SpeechSynthesis",
+    "Storage_Streams",
+] }

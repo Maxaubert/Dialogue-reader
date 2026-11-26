@@ -1,0 +1,564 @@
+// 16 zone edit (d-black 16-zone-edit): in-game zone editing from the quick menu, over a frozen screenshot.
+// Drag on the game draws a box; the kind picker pops under it and a kind adds it. A click selects a zone: its tag
+// turns white with a small x (Delete zone), and the picker under it changes its kind. Delete or Backspace removes
+// the selected zone, Esc drops a box being drawn, then finishes.
+// The bar (Done) sits top centre. When the selected box, its tag or the picker would sit under it, it moves to
+// the first place clear of every zone: bottom centre, top right, top left (Rust works out which are clear:
+// src/overlay/zone_edit.rs, bar_clear). It comes home when home is clear again, with some slack (`want-at`).
+// The selected zone has 8 resize handles, as on Zones: drag one to resize (Rust keeps the smallest size and the
+// edges of the picture, and saves on the release). Esc, a right press or a lost pointer puts the zone back.
+// Motion (README, 11): shade 180 ms; outlines and tags 180 ms after 60 ms; bar 180 ms, y -8 to 0; all ease-out.
+// Picker: opacity and scale 0.96 to 1, 140 ms. Bar moving: out 140 ms ease-in, in at the new place 180 ms
+// ease-out, y 8 px. Out: 140 ms ease-in.
+import {
+    Palette,
+    Render,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+    Art,
+    Kind,
+    Kinds,
+} from "../theme.slint";
+import { EditZone } from "../data.slint";
+import { Icon, CIcon, Button, BtnKind, Tip, ZoneHandle } from "../components/base.slint";
+
+// The tag of a zone (.ztag): kind icon and name. Selected: white with a black keyline and a small x at the end.
+component ZoneTag inherits Rectangle {
+    in property <Kind> kind;
+    in property <bool> selected: false;
+    callback remove();
+    width: lay.preferred-width;
+    height: 24px;
+    border-radius: Radius.sm;
+    background: root.selected ? Palette.on : Palette.surface-1;
+    border-width: 1px;
+    border-color: root.selected ? Palette.on : Palette.float-line;
+    if root.selected: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+    lay := HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: root.selected ? 3px : Space.s2;
+        spacing: Space.s1;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Kinds.icon(root.kind);
+                width: 13px;
+                height: 13px;
+                color: root.selected ? Palette.on-ink : Palette.text-2;
+            }
+        }
+
+        Text {
+            text: Kinds.name(root.kind);
+            font-size: Type.fs-small;
+            color: root.selected ? Palette.on-ink : Palette.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        if root.selected: VerticalLayout {
+            alignment: center;
+            padding-left: Space.s1;
+            del := Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: Radius.sm;
+                background: del-touch.has-hover ? #0000001A : transparent;
+                accessible-role: button;
+                accessible-label: "Delete zone";
+                accessible-action-default => {
+                    root.remove();
+                }
+                Icon {
+                    source: Icons.x;
+                    width: 12px;
+                    height: 12px;
+                    color: Palette.on-ink;
+                }
+
+                del-touch := TouchArea {
+                    clicked => {
+                        root.remove();
+                    }
+                }
+
+                Tip {
+                    x: (parent.width - self.width) / 2;
+                    y: -self.height - 6px;
+                    text: "Delete zone";
+                    shown: del-touch.has-hover;
+                }
+            }
+        }
+    }
+}
+
+// A zone box (.zz): white 70 % line with a black keyline outside, lifted white 8 % over the shade.
+// Selected (or the box just drawn): 2 px white.
+component ZoneBox inherits Rectangle {
+    in property <bool> selected: false;
+    in property <bool> drawing: false;
+    property <length> line: root.selected ? 2px : 1px;
+    background: #FFFFFF14;
+    border-radius: Radius.sm;
+    Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: Radius.sm + 1px;
+        border-width: 1px;
+        border-color: Palette.keyline;
+    }
+
+    Rectangle {
+        border-radius: Radius.sm;
+        border-width: root.line;
+        border-color: root.selected || root.drawing ? Palette.on : #FFFFFFB3;
+    }
+}
+
+// The kind picker (.zpick): the five kinds with icon and name; the box's kind is the white one. Each kind has its
+// tip ("Spoken lines" and so on) above it on hover.
+component KindPicker inherits Rectangle {
+    in property <Kind> kind;
+    callback picked(Kind);
+    width: seg.width + 2 * Space.s1 + 2px;
+    height: seg.height + 2 * Space.s1 + 2px;
+    border-radius: Radius.lg;
+    background: Palette.float;
+    border-width: 1px;
+    border-color: Palette.float-line;
+    drop-shadow-offset-y: 12px;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000099;
+    TouchArea { }
+
+    seg := Rectangle {
+        x: 1px + Space.s1;
+        y: 1px + Space.s1;
+        width: lay.preferred-width;
+        height: Size.ctl;
+        border-radius: Radius.md;
+        background: Palette.surface-2;
+        border-width: 1px;
+        border-color: Palette.line;
+        lay := HorizontalLayout {
+            padding: 3px;
+            for k in [Kind.dialogue, Kind.speaker, Kind.pickups, Kind.prompts, Kind.ignore]: Rectangle {
+                property <bool> on: k == root.kind;
+                border-radius: Radius.sm;
+                background: self.on ? Palette.on : transparent;
+                animate background {
+                    duration: Motion.fast;
+                    easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+                }
+                accessible-role: button;
+                accessible-label: Kinds.name(k);
+                accessible-description: Kinds.tip(k);
+                accessible-item-selected: self.on;
+                accessible-action-default => {
+                    root.picked(k);
+                }
+                HorizontalLayout {
+                    padding-left: Space.s3;
+                    padding-right: Space.s3;
+                    spacing: Space.s2;
+                    CIcon {
+                        source: Kinds.icon(k);
+                        size: 14px;
+                        color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                    }
+
+                    Text {
+                        text: Kinds.name(k);
+                        font-weight: on ? Type.w-strong : Type.w-body;
+                        color: on ? Palette.on-ink : kt.has-hover ? Palette.text : Palette.text-2;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+
+                kt := TouchArea {
+                    clicked => {
+                        root.picked(k);
+                    }
+                }
+
+                Tip {
+                    x: (parent.width - self.width) / 2;
+                    y: -self.height - Space.s1 - 6px;
+                    text: Kinds.tip(k);
+                    shown: kt.has-hover;
+                }
+            }
+        }
+    }
+}
+
+export component ZoneEdit inherits Rectangle {
+    in-out property <[EditZone]> zones;
+    in-out property <int> selected: -1;
+    // the bar's places clear of every zone and tag: top centre, bottom centre, top right, top left (from Rust)
+    in property <[bool]> bar-clear: [true, true, true, true];
+    // shown (true) or fading out (false)
+    in property <bool> open: true;
+    // the zone being drawn (frame px); shown with the kind picker until a kind is chosen
+    in-out property <bool> draft: false;
+    in-out property <length> draft-x;
+    in-out property <length> draft-y;
+    in-out property <length> draft-w;
+    in-out property <length> draft-h;
+    in-out property <Kind> draft-kind: Kind.dialogue;
+    property <length> press-x;
+    property <length> press-y;
+    property <bool> dragging: false;
+    // the overlay window (M4): the frozen screenshot of the game, stretched over the window
+    in property <bool> real-shot: false;
+    in property <image> shot;
+    callback done();
+    callback remove(int);
+    // the box drawn gets this kind (it becomes a zone)
+    callback commit(Kind);
+    // the selected zone gets this kind
+    callback set-kind(Kind);
+    callback pick(length, length) -> int;
+    // resizing the selected zone by a handle (0 top left, clockwise to 7 left): start (false: no zone to resize),
+    // the pointer moved, let go, cancelled
+    callback resize-start(int) -> bool;
+    callback resize-move(length, length);
+    callback resize-end(length, length);
+    callback resize-cancel();
+    // a handle is being dragged (Rust ends it when the hook's Esc cancels it)
+    in-out property <bool> resizing: false;
+    property <int> resize-h: -1;
+    function stop-resize() {
+        if root.resizing {
+            root.resizing = false;
+            root.resize-cancel();
+        }
+    }
+    public function key(k: string) -> bool {
+        if k == Key.Escape && root.resizing {
+            root.stop-resize();
+            return true;
+        }
+        if root.resizing {
+            return true;
+        }
+        if k == Key.Delete || k == Key.Backspace {
+            if root.selected >= 0 {
+                root.remove(root.selected);
+            }
+            return true;
+        }
+        if k == Key.Escape {
+            if root.draft {
+                root.draft = false;
+            } else {
+                root.done();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // the box the tag and the picker belong to: the box just drawn, else the selected zone
+    property <bool> has-sel: (root.draft && !root.dragging) || (root.selected >= 0 && root.selected < root.zones.length);
+    property <bool> sel-draft: root.draft;
+    property <length> sx: root.sel-draft ? root.draft-x : root.has-sel ? root.zones[root.selected].x : 0px;
+    property <length> sy: root.sel-draft ? root.draft-y : root.has-sel ? root.zones[root.selected].y : 0px;
+    property <length> sw: root.sel-draft ? root.draft-w : root.has-sel ? root.zones[root.selected].w : 0px;
+    property <length> sh: root.sel-draft ? root.draft-h : root.has-sel ? root.zones[root.selected].h : 0px;
+    property <Kind> sel-kind: root.sel-draft ? root.draft-kind : root.has-sel ? root.zones[root.selected].kind : Kind.dialogue;
+    // the selected zone (not a box being drawn) has resize handles
+    property <bool> handles: !root.draft && root.selected >= 0 && root.selected < root.zones.length;
+    // the handle within 6 px of (x, y), as geom::hit_handle: 0 top left, clockwise to 7 left; -1 none.
+    // The corners are tried first (on a small box the handles are close together).
+    pure function near(x: length, y: length, hx: length, hy: length) -> bool {
+        return abs(x - hx) <= 6px && abs(y - hy) <= 6px;
+    }
+    pure function handle-at(x: length, y: length) -> int {
+        if !root.handles {
+            return -1;
+        }
+        return root.near(x, y, root.sx, root.sy) ? 0 : root.near(x, y, root.sx + root.sw, root.sy) ? 2 : root.near(x, y, root.sx + root.sw, root.sy + root.sh) ? 4 : root.near(x, y, root.sx, root.sy + root.sh) ? 6 : root.near(x, y, root.sx + root.sw / 2, root.sy) ? 1 : root.near(x, y, root.sx + root.sw, root.sy + root.sh / 2) ? 3 : root.near(x, y, root.sx + root.sw / 2, root.sy + root.sh) ? 5 : root.near(x, y, root.sx, root.sy + root.sh / 2) ? 7 : -1;
+    }
+    pure function cursor-of(h: int) -> MouseCursor {
+        return h == 0 || h == 4 ? MouseCursor.nwse-resize : h == 2 || h == 6 ? MouseCursor.nesw-resize : h == 1 || h == 5 ? MouseCursor.ns-resize : h == 3 || h == 7 ? MouseCursor.ew-resize : MouseCursor.default;
+    }
+    // where a tag goes: 0 above the box, 1 under it (no room above), 2 inside at the top left (no room either)
+    pure function tag-place(by: length, bh: length) -> int {
+        return by >= 28px ? 0 : by + bh + 28px <= root.height ? 1 : 2;
+    }
+    property <int> sel-tag: root.tag-place(root.sy, root.sh);
+    // the picker: under the box (and under its tag when that is under it too); above it at the bottom edge
+    property <length> pick-top: root.sy + root.sh + Space.s2 + (root.sel-tag == 1 ? 28px : 0px);
+    property <bool> pick-up: root.pick-top + picker.height > root.height - Space.s2;
+    property <length> pick-x: Math.max(Space.s2, Math.min(root.sx, root.width - picker.width - Space.s2));
+    property <length> pick-y: root.pick-up ? root.sy - (root.sel-tag == 1 ? 0px : 28px) - Space.s2 - picker.height : root.pick-top;
+
+    // the bar: does the selection (box, tag, picker) sit under the bar at place p (8 px around it)?
+    pure function bar-x(p: int) -> length {
+        return p == 2 ? root.width - Space.s5 - bar.width : p == 3 ? Space.s5 : (root.width - bar.width) / 2;
+    }
+    pure function bar-y(p: int) -> length {
+        return p == 1 ? root.height - Space.s5 - bar.height : Space.s5;
+    }
+    // m: the room kept around the bar
+    pure function hits(p: int, m: length, x: length, y: length, w: length, h: length) -> bool {
+        return x < root.bar-x(p) + bar.width + m && x + w > root.bar-x(p) - m && y < root.bar-y(p) + bar.height + m && y + h > root.bar-y(p) - m;
+    }
+    pure function sel-hits(p: int, m: length) -> bool {
+        return root.has-sel && (root.hits(p, m, root.sx - 2px, root.sy - 2px, root.sw + 4px, root.sh + 4px) || root.hits(p, m, root.sx - 1px, root.sel-tag == 0 ? root.sy - 28px : root.sel-tag == 1 ? root.sy + root.sh + 4px : root.sy + 4px, 130px, 24px) || root.hits(p, m, root.pick-x, root.pick-y, picker.width, picker.height));
+    }
+    // Hysteresis (so the bar does not jump back and forth while a box is drawn or resized at the edge of a place):
+    // the bar stays where it is until the selection comes within 8 px of it, and it moves to a place (home too)
+    // only when the selection is 24 px clear of it. It goes home again once home is that clear of the selection
+    // and clear of every zone (mockup 16, keepBarClear). Else it takes the first place clear of every zone, else
+    // the first place clear of the selection.
+    property <length> stay-m: Space.s2;
+    property <length> go-m: Space.s5;
+    pure function free(p: int) -> bool {
+        return root.bar-clear[p] && !root.sel-hits(p, root.go-m);
+    }
+    property <int> want-at: root.bar-at != 0 && root.bar-clear[0] && !root.sel-hits(0, root.go-m) ? 0 : !root.sel-hits(root.bar-at, root.stay-m) ? root.bar-at : root.free(1) ? 1 : root.free(2) ? 2 : root.free(3) ? 3 : !root.sel-hits(1, root.go-m) ? 1 : !root.sel-hits(2, root.go-m) ? 2 : !root.sel-hits(3, root.go-m) ? 3 : !root.sel-hits(0, root.go-m) ? 0 : root.bar-at;
+    property <int> bar-at: 0;
+    property <bool> bar-moving: false;
+    changed want-at => {
+        if Motion.instant {
+            root.bar-at = root.want-at;
+        } else if root.want-at != root.bar-at {
+            root.bar-moving = true;
+            mover.running = true;
+        }
+    }
+    mover := Timer {
+        interval: 140ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.bar-at = root.want-at;
+            root.bar-moving = false;
+        }
+    }
+
+    // fades: the shade, then the zones 60 ms later, and the bar
+    property <float> t: root.open ? 1 : 0;
+    animate t {
+        duration: Motion.d(root.open ? 180ms : 140ms);
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> zt: root.open ? 1 : 0;
+    animate zt {
+        duration: Motion.d(root.open ? 180ms : 140ms);
+        delay: root.open ? Motion.wait(60ms) : 0ms;
+        easing: root.open ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> bt: root.open && !root.bar-moving ? 1 : 0;
+    animate bt {
+        duration: Motion.d(root.open && !root.bar-moving ? 180ms : 140ms);
+        easing: root.open && !root.bar-moving ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+    property <float> pt: root.open && root.has-sel ? 1 : 0;
+    animate pt {
+        duration: Motion.d(140ms);
+        easing: root.open && root.has-sel ? cubic-bezier(0.2, 0.7, 0.2, 1) : cubic-bezier(0.4, 0, 1, 1);
+    }
+
+    Image {
+        width: 100%;
+        height: 100%;
+        source: root.real-shot ? root.shot : Render.software ? Art.scene-full : Art.scene;
+        image-fit: root.real-shot ? fill : cover;
+    }
+
+    // a flat black 45 % shade; zones do not cut holes in it, they are lifted over it
+    Rectangle {
+        background: #00000073;
+        opacity: root.t;
+    }
+
+    // drawing, selecting and resizing. A resize follows the stage.slint pattern: moves come from `pointer-event`
+    // (also without the mouse grab); a right press, a cancel or the pointer leaving the window cancels it.
+    TouchArea {
+        mouse-cursor: root.cursor-of(root.resizing ? root.resize-h : root.handle-at(self.mouse-x, self.mouse-y));
+        pointer-event(e) => {
+            if root.resizing {
+                if e.kind == PointerEventKind.move {
+                    root.resize-move(self.mouse-x, self.mouse-y);
+                } else if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                    root.resizing = false;
+                    root.resize-end(self.mouse-x, self.mouse-y);
+                } else if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) || e.kind == PointerEventKind.cancel {
+                    root.stop-resize();
+                }
+                return;
+            }
+            if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                if root.handle-at(self.mouse-x, self.mouse-y) >= 0 && root.resize-start(root.handle-at(self.mouse-x, self.mouse-y)) {
+                    root.resize-h = root.handle-at(self.mouse-x, self.mouse-y);
+                    root.resizing = true;
+                    return;
+                }
+                root.press-x = self.mouse-x;
+                root.press-y = self.mouse-y;
+                root.dragging = false;
+            }
+            if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                if root.dragging {
+                    root.dragging = false;
+                    root.draft = root.draft-w >= 16px && root.draft-h >= 12px;
+                } else {
+                    root.draft = false;
+                    root.selected = root.pick(self.mouse-x, self.mouse-y);
+                }
+            }
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                root.stop-resize();
+            }
+        }
+        moved => {
+            if !root.resizing && self.pressed && (abs(self.mouse-x - root.press-x) > 4px || abs(self.mouse-y - root.press-y) > 4px) {
+                root.dragging = true;
+                root.draft = true;
+                root.selected = -1;
+                root.draft-x = min(root.press-x, self.mouse-x);
+                root.draft-y = min(root.press-y, self.mouse-y);
+                root.draft-w = abs(self.mouse-x - root.press-x);
+                root.draft-h = abs(self.mouse-y - root.press-y);
+            }
+        }
+    }
+
+    // the zones and their tags (tags over every box); a box never takes the pointer, the TouchArea above picks
+    Rectangle {
+        opacity: root.zt;
+        for z[i] in root.zones: ZoneBox {
+            x: z.x;
+            y: z.y;
+            width: z.w;
+            height: z.h;
+            selected: i == root.selected && !root.draft;
+        }
+        // the resize handles of the selected zone
+        if root.handles: Rectangle {
+            x: root.sx;
+            y: root.sy;
+            width: root.sw;
+            height: root.sh;
+            for p in [
+                { x: 0, y: 0 },
+                { x: 0.5, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+                { x: 0, y: 1 },
+                { x: 0.5, y: 1 },
+                { x: 1, y: 1 }
+            ]: ZoneHandle {
+                x: parent.width * p.x - 4px;
+                y: parent.height * p.y - 4px;
+            }
+        }
+        if root.draft: ZoneBox {
+            x: root.draft-x;
+            y: root.draft-y;
+            width: root.draft-w;
+            height: root.draft-h;
+            drawing: root.dragging;
+            selected: !root.dragging;
+        }
+        for z[i] in root.zones: ZoneTag {
+            property <int> place: root.tag-place(z.y, z.h);
+            kind: z.kind;
+            selected: i == root.selected && !root.draft;
+            x: z.x + (self.place == 2 ? 4px : -1px);
+            y: self.place == 0 ? z.y - 28px : self.place == 1 ? z.y + z.h + 4px : z.y + 4px;
+            remove => {
+                root.remove(i);
+            }
+        }
+        if root.draft && !root.dragging: ZoneTag {
+            kind: root.draft-kind;
+            selected: true;
+            x: root.draft-x + (root.sel-tag == 2 ? 4px : -1px);
+            y: root.sel-tag == 0 ? root.draft-y - 28px : root.sel-tag == 1 ? root.draft-y + root.draft-h + 4px : root.draft-y + 4px;
+            remove => {
+                root.draft = false;
+            }
+        }
+    }
+
+    picker := KindPicker {
+        x: root.pick-x;
+        y: root.pick-y;
+        kind: root.sel-kind;
+        opacity: root.pt;
+        visible: root.pt > 0.01;
+        transform-scale: 1 - 0.04 * (1 - root.pt) * Motion.move;
+        transform-origin: { x: 0px, y: root.pick-up ? self.height : 0px };
+        picked(k) => {
+            if root.draft {
+                root.draft-kind = k;
+                root.commit(k);
+            } else if root.selected >= 0 {
+                root.set-kind(k);
+            }
+        }
+    }
+
+    // the bar with Done
+    bar := Rectangle {
+        property <length> way: root.bar-at == 1 ? 8px : -8px;
+        x: root.bar-x(root.bar-at);
+        y: root.bar-y(root.bar-at) + (1 - root.bt) * self.way * Motion.move;
+        width: bar-lay.preferred-width;
+        height: 48px;
+        opacity: root.bt;
+        border-radius: Radius.lg;
+        background: Palette.float;
+        border-width: 1px;
+        border-color: Palette.float-line;
+        drop-shadow-offset-y: 12px;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000099;
+        TouchArea { }
+
+        bar-lay := HorizontalLayout {
+            padding-left: Space.s4;
+            padding-right: Space.s2;
+            spacing: Space.s4;
+            Text {
+                text: "Drag to add · Esc to finish";
+                color: Palette.text-2;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Button {
+                    text: "Done";
+                    kind: BtnKind.primary;
+                    clicked => {
+                        root.done();
+                    }
+                }
+            }
+        }
+    }
+}

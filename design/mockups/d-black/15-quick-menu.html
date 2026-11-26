@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440"><title>15 Quick menu</title><link rel="stylesheet" href="tokens.css"><style>
+.game{position:relative;width:1440px;height:900px;overflow:hidden;background:#000}
+.gpic{position:absolute;left:-80px;top:0;width:1600px;height:900px}
+.gpic .scene{width:100%;height:100%;display:block}
+.float{background:var(--surface-1);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 24px rgba(0,0,0,.6)}
+
+.mock .btn{height:28px;font-size:var(--fs-small)}
+.mock label{display:inline-flex;gap:8px;align-items:center}
+.mock .seg{height:28px}
+.mock .seg span{font-size:var(--fs-small)}
+
+.qm{position:absolute;left:520px;top:150px;width:400px;border-radius:var(--r-lg);transform-origin:50% 0;opacity:0;pointer-events:none}
+.qm-h{display:flex;align-items:center;gap:8px;height:48px;padding:0 16px;border-bottom:1px solid var(--line)}
+.qm-h .g{flex:1;font-weight:var(--fw-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qm-h .st{display:flex;align-items:center;gap:8px;color:var(--text-2);font-size:var(--fs-small)}
+.qm-h .st i{width:8px;height:8px;border-radius:50%;background:var(--live)}
+.qm-h .st.stopped i{background:var(--text-2)}
+.ql{position:relative;padding:4px}
+.ql .sep{height:1px;background:var(--line);margin:4px -4px}
+.qhl{position:absolute;left:4px;right:4px;top:0;height:var(--h-row);border-radius:var(--r);background:var(--surface-3)}
+.qr{position:relative;display:flex;align-items:center;gap:12px;height:var(--h-row);padding:0 8px 0 12px;border-radius:var(--r);cursor:pointer;user-select:none}
+.qr > .ic,.qr > .swapic{color:var(--text-2)}
+.qr .lb{flex:1;white-space:nowrap}
+.qr .v{display:flex;align-items:center;gap:4px;color:var(--text-2);white-space:nowrap}
+.qr .v > .ic{width:14px;height:14px}
+.qr .slider .track{width:112px}
+.qr .slider .val{color:var(--text)}
+.qr.armed > .ic,.qr.armed .lb,.qr.armed .v{color:var(--danger)}
+.qv{position:absolute;width:248px;border-radius:var(--r-lg);opacity:0;pointer-events:none}
+.qv .qr,.qv .qhl{height:var(--h-list)}
+.qv .ql .qr .meta{color:var(--text-2);font-size:var(--fs-small)}
+.qv .qr .ck{width:16px;height:16px;color:var(--text)}
+.qv .qr .ck .ic{width:16px;height:16px}
+</style></head>
+<body class="">
+<div class="app game"><div class="gpic"><svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232323"/><stop offset=".55" stop-color="#686866"/><stop offset="1" stop-color="#BCBCB9"/></linearGradient>
+<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E6E4"/><stop offset="1" stop-color="#B2B2AF"/></linearGradient>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050505" stop-opacity="0"/><stop offset="1" stop-color="#050505" stop-opacity=".62"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#sky)"/>
+<polygon fill="#7A7A78" points="0,520 170,370 310,450 470,300 640,430 790,330 960,470 1120,320 1300,440 1450,350 1600,430 1600,900 0,900"/>
+<polygon fill="#9C9C99" points="0,600 260,520 520,590 800,540 1100,600 1400,530 1600,580 1600,900 0,900"/>
+<polygon fill="url(#snow)" points="0,660 400,630 900,662 1300,636 1600,656 1600,900 0,900"/>
+<g fill="#2A2A2A"><polygon points="430,640 470,520 510,640"/><polygon points="480,646 512,560 544,646"/><polygon points="1050,650 1095,500 1140,650"/><polygon points="1110,654 1140,570 1170,654"/><polygon points="1350,640 1380,560 1410,640"/></g>
+<rect y="620" width="1600" height="280" fill="url(#shade)"/>
+<g font-family="Segoe UI, sans-serif">
+<rect x="100" y="60" width="266" height="60" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<rect x="116" y="74" width="32" height="32" rx="4" fill="#C9A35A"/>
+<text x="164" y="99" font-size="24" fill="#FFFFFF">+1 Ginseng</text>
+<rect x="1240" y="700" width="260" height="48" rx="6" fill="#0A0A0A" fill-opacity=".6"/>
+<text x="1370" y="731" text-anchor="middle" font-size="21" fill="#FFFFFF">Hold E to talk</text>
+<circle cx="200" cy="770" r="80" fill="#141414" fill-opacity=".7" stroke="#D4D4D4" stroke-width="3"/>
+<path d="M200 748 l10 24 h-20z" fill="#FFFFFF"/>
+<text x="800" y="786" text-anchor="middle" font-size="24" font-weight="600" fill="#E9C46A">Arthur</text>
+<text x="800" y="834" text-anchor="middle" font-size="27" fill="#FFFFFF">We need to get these horses moving before the snow buries us.</text>
+</g></svg></div><div class="qm float" id="qm"><div class="qm-h"><span class="g">Red Dead Redemption 2</span><span class="st" id="qm-st"><i></i><span id="qm-st-t">Reading</span></span></div><div class="ql" id="ql"><div class="qhl" id="qhl"></div><div class="qr " data-a="zones"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M12 9v6M9 12h6"/></svg><span class="lb">Edit zones</span><span class="v"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></div><div class="sep"></div><div class="qr " data-a="stop"><span class="swapic"><svg class="ic" id="ic-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><svg class="ic fill" id="ic-resume" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></span><span class="lb"><span id="stop-t">Stop</span></span><span class="v"></span></div><div class="qr " data-a="mute"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg><span class="lb">Mute</span><span class="v"><span class="toggle" id="mute-t"></span></span></div><div class="sep"></div><div class="qr " data-a="voice" id="voice-row"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg><span class="lb">Voice</span><span class="v"><span id="voice-v">Adam</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></div><div class="qr " data-a="speed"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span class="lb">Speed</span><span class="v"><span class="slider"><span class="track"><span class="fill" id="speed-f" style="width:40%"></span><span class="knob" id="speed-k" style="left:40%"></span></span><span class="val" id="speed-v">1.1x</span></span></span></div><div class="qr " data-a="vol"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><span class="lb">Volume</span><span class="v"><span class="slider"><span class="track"><span class="fill" id="vol-f" style="width:80%"></span><span class="knob" id="vol-k" style="left:80%"></span></span><span class="val" id="vol-v">80%</span></span></span></div><div class="qr " data-a="mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span class="lb">Mode</span><span class="v"><span class="seg" id="mode-s"><span class="on" data-m="0">Automatic</span><span data-m="1">On key press</span></span></span></div><div class="sep"></div><div class="qr " data-a="settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span class="lb">Settings</span><span class="v"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></span></div><div class="qr " data-a="quit" id="quit-row"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg><span class="lb">Quit</span><span class="v"><span id="quit-v"></span></span></div></div></div><div class="qv float" id="qv"><div class="ql" id="vl"><div class="qhl" id="vhl"></div><div class="qr" data-v="Adam"><span class="ck"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lb">Adam</span><span class="meta">US · Male</span></div><div class="qr" data-v="Bella"><span class="ck"></span><span class="lb">Bella</span><span class="meta">US · Female</span></div><div class="qr" data-v="Michael"><span class="ck"></span><span class="lb">Michael</span><span class="meta">US · Male</span></div><div class="qr" data-v="Emma"><span class="ck"></span><span class="lb">Emma</span><span class="meta">UK · Female</span></div><div class="qr" data-v="George"><span class="ck"></span><span class="lb">George</span><span class="meta">UK · Male</span></div><div class="qr" data-v="Sky"><span class="ck"></span><span class="lb">Sky</span><span class="meta">US · Female</span></div></div></div></div><div class="mock"><b>Try it</b><span class="btn" id="m-key">Menu key (F7)</span><span>Up, Down: move. Left, Right: change. Enter: choose. Esc: close.</span><span>State</span><span class="seg" id="m-state"><span data-s="open">Open</span><span data-s="voice">Voice list</span><span data-s="stopped">Stopped</span><span data-s="quit">Quit pressed once</span></span><label><input type="checkbox" id="m-slow"> Slow motion x4</label></div><script>const ICON={'k-dialogue':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>','k-speaker':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>','k-pickups':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>','k-prompts':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="7.5" width="10" height="6" rx="1.5"/></svg>','k-ignore':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="m2 2 20 20"/></svg>','replay':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>','x':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>','check':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>','play':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>','stop':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'};</script><script>
+/* Motion tokens: brief section 1.2 */
+const M={fast:120,base:180,page:260,exit:140,stagger:40,glide:360,
+  out:'cubic-bezier(0.2, 0.7, 0.2, 1)',strong:'cubic-bezier(0.16, 1, 0.3, 1)',in:'cubic-bezier(0.4, 0, 1, 1)'};
+/* Page push, Max 2026-11-24: slight overlap. The old page fades out and the new page slides in 80 ms later.
+   Forward: out 100 ease-in, in 260 strong after 80. Back: out 120 ease-in, in 200 strong after 80.
+   Title strip: old label out 80 ease-in, new label in 160 strong after 80. */
+const PUSH={out:100,inDelay:80,in:260,backOut:120,backInDelay:80,backIn:200,stripOut:80,stripIn:160,stripDelay:80};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+let SLOW=1, INSTANT=false;
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.onerror=(m,s,l)=>{($('selftest')||document.body).append('ERROR '+m+' line '+l+'\n')};
+
+/* tween(el,{prop:[from,to]},ms,ease,delay). transform parts: x,y,s. Rect parts: left,top,width,height.
+   Reduce motion: anything that moves jumps (0 ms), opacity fades over 80 ms. */
+function tween(el,p,ms,ease,delay=0){
+  if(REDUCE&&!INSTANT&&('opacity' in p)&&Object.keys(p).length>1){
+    const {opacity,...rest}=p; anim(el,rest,0,ease,0); return anim(el,{opacity},80,ease,0);
+  }
+  return anim(el,p,ms,ease,delay);
+}
+function anim(el,p,ms,ease,delay){
+  const cs=getComputedStyle(el), cur=readT(el), f={},t={};
+  const T=(o)=>`translate(${o.x}px,${o.y}px) scale(${o.s})`;
+  let hasT=false; const tf={...cur},tt={...cur};
+  for(const k in p){
+    let [a,b]=p[k];
+    if(k==='x'||k==='y'||k==='s'){hasT=true; tf[k]=a??cur[k]; tt[k]=b;}
+    else{ f[k]=a??cs[k]; t[k]=typeof b==='number'&&k!=='opacity'?b+'px':String(b); if(typeof f[k]==='number'&&k!=='opacity')f[k]+='px'; }
+  }
+  if(hasT){f.transform=T(tf);t.transform=T(tt);}
+  let d=ms*SLOW, dl=delay*SLOW;
+  if(REDUCE){ if('opacity' in p){d=80;dl=0;} else {d=0;dl=0;} }
+  if(INSTANT){d=0;dl=0;}
+  return el.animate([f,t],{duration:d,delay:dl,easing:ease,fill:'both'});
+}
+function readT(el){const t=getComputedStyle(el).transform; if(!t||t==='none') return {x:0,y:0,s:1}; const m=new DOMMatrixReadOnly(t); return {x:m.e,y:m.f,s:m.a};}
+function live(el,on){el.style.pointerEvents=on?'auto':'none'}
+function bez(x1,y1,x2,y2){const A=(a,b)=>1-3*b+3*a,B=(a,b)=>3*b-6*a,C=a=>3*a,f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t,d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{let t=x;for(let i=0;i<8;i++){const e=f(t,x1,x2)-x;const s=d(t,x1,x2);if(Math.abs(e)<1e-5||!s)break;t-=e/s;}return f(t,y1,y2);};}
+const EOS=bez(0.16,1,0.3,1);
+/* ?ms=N freezes every running animation at N ms (for mid-transition screenshots) */
+function freeze(){const ms=Q.get('ms'); if(ms==null) return; document.getAnimations().forEach(a=>{a.pause(); a.currentTime=+ms;});}
+function bindSlow(){const s=$('m-slow'); if(s) s.onchange=e=>{SLOW=e.target.checked?4:1};}
+</script><script>
+/* Quick menu (transition 10): open 160 ease-out, opacity and scale .97 to 1 from the top centre. Close 120 ease-in.
+   The voice list opens beside the Voice row: opacity and x -8 to 0. One highlight glides: 360 ms mouse, 120 ms keys. */
+let open=false, sub=false, hi=0, vhi=0, stopped=false, armed=false, speed=1.1, vol=80, mode=0, voice='Adam';
+const qm=$('qm'), qv=$('qv');
+const QR=()=>[...$('ql').querySelectorAll('.qr')], VR=()=>[...$('vl').querySelectorAll('.qr')];
+function hlTo(el,row,fast){ tween(el,{y:[null,row.offsetTop]},fast===0?0:fast?M.fast:M.glide,M.strong); }
+function setHi(i,fast){ if(i!==hi) disarm(); hi=i; hlTo($('qhl'),QR()[i],fast); }
+function setVhi(i,fast){ vhi=i; hlTo($('vhl'),VR()[i],fast); }
+function openMenu(){ if(open) return; open=true; live(qm,true); tween(qm,{opacity:[0,1],s:[.97,1]},160,M.out); setHi(0,0); }
+function closeMenu(){ if(!open) return; if(sub) closeSub(); open=false; live(qm,false); tween(qm,{opacity:[null,0],s:[null,.97]},120,M.in); disarm(); }
+function openSub(){
+  if(sub) return; sub=true; const r=$('voice-row');
+  qv.style.left=(qm.offsetLeft+qm.offsetWidth+8)+'px'; qv.style.top=(qm.offsetTop+r.offsetTop+$('ql').offsetTop-4)+'px';
+  live(qv,true); tween(qv,{opacity:[0,1],x:[-8,0]},160,M.out);
+  setVhi(Math.max(0,VR().findIndex(x=>x.dataset.v===voice)),0);
+}
+function closeSub(){ if(!sub) return; sub=false; live(qv,false); tween(qv,{opacity:[null,0],x:[null,-8]},120,M.in); }
+function disarm(){ if(!armed) return; armed=false; $('quit-row').classList.remove('armed'); $('quit-v').textContent=''; }
+function pickVoice(i){ const r=VR()[i]; voice=r.dataset.v; $('voice-v').textContent=voice;
+  VR().forEach(x=>x.querySelector('.ck').innerHTML=x===r?ICON.check:''); const ck=r.querySelector('.ck .ic'); if(ck) tween(ck,{s:[.6,1]},M.base,M.out); closeSub(); }
+function setVol(v){ vol=Math.max(0,Math.min(100,v)); $('vol-f').style.width=vol+'%'; $('vol-k').style.left=vol+'%'; $('vol-v').textContent=vol+'%'; }
+/* Speed: the same slider as Settings. The app's range, 0.5x to 2.0x in steps of 0.1 (SPEED_MIN, SPEED_MAX in quick_menu.rs) */
+function setSpeed(v){ speed=Math.max(.5,Math.min(2,Math.round(v*10)/10)); const f=Math.round((speed-.5)/1.5*100);
+  $('speed-f').style.width=f+'%'; $('speed-k').style.left=f+'%'; $('speed-v').textContent=speed.toFixed(1)+'x'; }
+function setMode(m){ mode=m; $('mode-s').querySelectorAll('span').forEach(s=>s.classList.toggle('on',+s.dataset.m===m)); }
+function act(a,dir){
+  switch(a){
+    case 'zones': closeMenu(); break;
+    case 'stop': stopped=!stopped; $('stop-t').textContent=stopped?'Resume':'Stop';
+      tween($('ic-stop'),{opacity:[null,stopped?0:1]},M.fast,M.out); tween($('ic-resume'),{opacity:[null,stopped?1:0]},M.fast,M.out);
+      $('qm-st').classList.toggle('stopped',stopped); $('qm-st-t').textContent=stopped?'Stopped':'Reading'; break;
+    case 'mute': $('mute-t').classList.toggle('on'); break;
+    case 'voice': openSub(); break;
+    case 'speed': setSpeed(speed+(dir||0)*.1); break;
+    case 'vol': setVol(vol+(dir||0)*10); break;
+    case 'mode': setMode(dir?(dir>0?1:0):1-mode); break;
+    case 'settings': closeMenu(); break;
+    case 'quit': if(armed){closeMenu();} else {armed=true; $('quit-row').classList.add('armed'); $('quit-v').textContent='Press again to quit'; tween($('quit-v'),{opacity:[0,1]},M.fast,M.out);} break;
+  }
+}
+QR().forEach((r,i)=>{ r.onmouseenter=()=>{ if(i!==hi) setHi(i,false); if(sub&&r.dataset.a!=='voice') closeSub(); };
+  r.onclick=e=>{ const m=e.target.closest('#mode-s span'); if(m){setMode(+m.dataset.m); return;}
+    const t=e.target.closest('.track'); if(t){const b=t.getBoundingClientRect(), f=Math.max(0,Math.min(1,(e.clientX-b.left)/b.width));
+      if(r.dataset.a==='vol') setVol(Math.round(f*10)*10); else setSpeed(.5+f*1.5); return;}
+    act(r.dataset.a); }; });
+VR().forEach((r,i)=>{ r.onmouseenter=()=>{ if(i!==vhi) setVhi(i,false); }; r.onclick=()=>pickVoice(i); });
+addEventListener('keydown',e=>{
+  if(e.key==='F7'){e.preventDefault(); open?closeMenu():openMenu(); return;}
+  if(!open) return;
+  const ADJ=['speed','vol','mode'];
+  if(e.key==='Escape'){ sub?closeSub():closeMenu(); return; }
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); const d=e.key==='ArrowDown'?1:-1;
+    if(sub){const n=VR().length; setVhi((vhi+d+n)%n,true);} else {const n=QR().length; setHi((hi+d+n)%n,true);} return; }
+  const a=QR()[hi].dataset.a;
+  if(e.key==='ArrowLeft'){ e.preventDefault(); if(sub) closeSub(); else if(ADJ.includes(a)) act(a,-1); return; }
+  if(e.key==='ArrowRight'){ e.preventDefault(); if(!sub&&a==='voice') openSub(); else if(!sub&&ADJ.includes(a)) act(a,1); return; }
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); if(sub) pickVoice(vhi); else act(a); }
+});
+$('m-key').onclick=()=>open?closeMenu():openMenu();
+function state(s){
+  document.querySelectorAll('#m-state span').forEach(x=>x.classList.toggle('on',x.dataset.s===s));
+  INSTANT=true; openMenu(); closeSub(); if(stopped) act('stop'); disarm();
+  if(s==='voice'){ setHi(QR().findIndex(r=>r.dataset.a==='voice'),0); openSub(); }
+  if(s==='stopped'){ act('stop'); setHi(QR().findIndex(r=>r.dataset.a==='stop'),0); }
+  if(s==='quit'){ const i=QR().findIndex(r=>r.dataset.a==='quit'); setHi(i,0); act('quit'); }
+  INSTANT=false;
+}
+$('m-state').onclick=e=>{const x=e.target.closest('span[data-s]'); if(x) state(x.dataset.s);};
+bindSlow();
+const s=Q.get('s')||'open';
+if(s.endsWith('-mid')){ if(s==='voice-mid'){INSTANT=true; openMenu(); setHi(QR().findIndex(r=>r.dataset.a==='voice'),0); INSTANT=false; openSub();} else openMenu(); freeze(); }
+else if(s!=='closed') state(s);
+</script>
+</body></html>

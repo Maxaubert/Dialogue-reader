@@ -1,0 +1,814 @@
+{
+  "suite": "recorded",
+  "seed": null,
+  "truth_fingerprint": "8ae4512d00954f50",
+  "reader": "a1",
+  "reader_options": {
+    "zones": "off"
+  },
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 11,
+    "items_should_read": 15,
+    "items_read": 3,
+    "recall": 0.2,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "1-2s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "2-4s",
+        "total": 11,
+        "read": 3,
+        "recall": 0.2727272727272727
+      },
+      {
+        "name": ">4s",
+        "total": 0,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "time unsure",
+        "total": 4,
+        "read": 0,
+        "recall": 0.0
+      }
+    ],
+    "mean_cer": 0.2727272727272727,
+    "exact_match_rate": 0.0,
+    "prompts_total": 25,
+    "prompts_read": 0,
+    "prompt_recall": 0.0,
+    "events_total": 75,
+    "duplicates": 0,
+    "noise_reads": 19,
+    "background_reads": 0,
+    "hallucinations": 53,
+    "latency_p50_ms": 1333.7506000000003,
+    "latency_p95_ms": 1334.1028000000001,
+    "cpu_ms_p50": 7.0484,
+    "cpu_ms_p95": 21.2994,
+    "frames_total": 1114,
+    "frames_processed": 1114
+  },
+  "scenarios": [
+    {
+      "id": "satisfactory-m01",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 1,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 7,
+        "duplicates": 0,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 5,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 5.5207,
+        "cpu_ms_p95": 14.8687,
+        "frames_total": 101,
+        "frames_processed": 101
+      },
+      "missed": [
+        "m01-p1-0 (2791 ms readable): + 9 Leaves (9)",
+        "m01-p1-1 (2791 ms readable): + 1 Wood (1)"
+      ],
+      "false_reads": [
+        "noise @2503: Objective: Build the HUB",
+        "noise @3208: -1,2.5.1 CL#520140-",
+        "hallucination @4528: the HUB",
+        "hallucination @4528: Build the H",
+        "hallucination @4710: Obje",
+        "hallucination @4710: luild the",
+        "hallucination @8015: + 9 Leaves (9)\n+ 1 wood"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m02",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 2,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 1,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 6.1456,
+        "cpu_ms_p95": 11.1075,
+        "frames_total": 100,
+        "frames_processed": 100
+      },
+      "missed": [
+        "m02-p1-0 (3104 ms readable): + 7 Leaves (16)",
+        "m02-p1-1 (3104 ms readable): + 1 Wood (2)"
+      ],
+      "false_reads": [
+        "noise @9708: 1.2.5.1 CL#520140"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m03",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 0,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 7,
+        "duplicates": 0,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 5,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 5.6441,
+        "cpu_ms_p95": 12.8097,
+        "frames_total": 110,
+        "frames_processed": 110
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @1110: jective:",
+        "hallucination @5697: Objec",
+        "noise @5799: Cancel",
+        "hallucination @5904: - 1.iS1fCL#5Z01",
+        "hallucination @6008: e HUB",
+        "hallucination @6107: Aaøu",
+        "noise @10214: Objective: Build the HUB"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m04",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 2,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 8,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 7.390899999999999,
+        "cpu_ms_p95": 22.7161,
+        "frames_total": 102,
+        "frames_processed": 102
+      },
+      "missed": [
+        "m04-p2 (2992 ms readable): + 1 Iron Ore (21)"
+      ],
+      "false_reads": [
+        "hallucination @2020: Build",
+        "hallucination @8610: e HUB",
+        "hallucination @8811: Iron C",
+        "hallucination @8811: :ive: Build",
+        "hallucination @8891: %.2.5.7 cß2cm-:-'",
+        "hallucination @9002: ild the H",
+        "noise @9002: Objective: Build the HUB",
+        "hallucination @9195: to start"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m05",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 2,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 8,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 7,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 7.5832,
+        "cpu_ms_p95": 26.702199999999998,
+        "frames_total": 101,
+        "frames_processed": 101
+      },
+      "missed": [
+        "m05-p2 (2993 ms readable): + 1 Iron Ore (21)"
+      ],
+      "false_reads": [
+        "hallucination @1415: Build",
+        "hallucination @8007: e HUB",
+        "hallucination @8207: Iron C",
+        "hallucination @8207: :ive: Build",
+        "hallucination @8286: %.2.5.7 cß2cm-:-'",
+        "hallucination @8397: ild the H",
+        "noise @8397: Objective: Build the HUB",
+        "hallucination @8591: to start"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m06",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 1,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 12,
+        "duplicates": 0,
+        "noise_reads": 4,
+        "background_reads": 0,
+        "hallucinations": 8,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 6.9717,
+        "cpu_ms_p95": 25.7432,
+        "frames_total": 100,
+        "frames_processed": 100
+      },
+      "missed": [
+        "m06-p0 (2993 ms readable): + 1 Iron Ore (21)"
+      ],
+      "false_reads": [
+        "hallucination @3302: Iron C",
+        "hallucination @3409: ild the H",
+        "hallucination @3509: to start n-",
+        "noise @8010: Load Game",
+        "hallucination @8010: Manage Session\nGo to feedback site\nOptions\nServer Manager",
+        "hallucination @8010: Exit to Main Menu\nExit to Desktop",
+        "noise @8010: Respawn",
+        "hallucination @8092: Current Session: testt\nShow Seed",
+        "noise @8092: Max\n.2.5,1 CL#5201",
+        "hallucination @8198: 1.2.5.1 CL#520140\nme Game\nGame\nGame",
+        "hallucination @8198: Resume Game\nSave Game",
+        "noise @8301: 1.2.5.1 CL#520140"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m07",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 0,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 4,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 12,
+        "duplicates": 0,
+        "noise_reads": 4,
+        "background_reads": 0,
+        "hallucinations": 8,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 7.9065,
+        "cpu_ms_p95": 42.528499999999994,
+        "frames_total": 97,
+        "frames_processed": 97
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @3120: Manage Session\nGo to feedback site\nOptions\nServer Manager",
+        "hallucination @3120: Exit to Main Menu\nExit to Desktop",
+        "noise @3120: Respawn",
+        "hallucination @3204: Current Session: testt\nShow Seed",
+        "noise @3204: Max\n.2.5,1 CL#5201",
+        "hallucination @3309: Resume Game\nSave Game",
+        "noise @3309: Load Game",
+        "hallucination @3412: 1.2.5.1 CL#520140\nme Game\nGame\nGame",
+        "noise @3412: 1.2.5.1 CL#520140",
+        "hallucination @8555: Build the H",
+        "hallucination @8555: the HUB",
+        "hallucination @9368: to start minin"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m08",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 1,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.2727272727272727,
+        "exact_match_rate": 0.0,
+        "prompts_total": 6,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 6,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 1329.3089999999993,
+        "latency_p95_ms": 1329.3089999999993,
+        "cpu_ms_p50": 7.7427,
+        "cpu_ms_p95": 21.5746,
+        "frames_total": 107,
+        "frames_processed": 107
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @5201: ild the H",
+        "noise @5698: Objective: Build the HUB",
+        "hallucination @6603: Objective: Buil",
+        "hallucination @7507: n..ild",
+        "hallucination @7507: the HUB"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m09",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 1,
+        "recall": 0.3333333333333333,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 2,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.2727272727272727,
+        "exact_match_rate": 0.0,
+        "prompts_total": 4,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 6,
+        "duplicates": 0,
+        "noise_reads": 1,
+        "background_reads": 0,
+        "hallucinations": 4,
+        "latency_p50_ms": 1333.7506000000003,
+        "latency_p95_ms": 1333.7506000000003,
+        "cpu_ms_p50": 7.5071,
+        "cpu_ms_p95": 18.4523,
+        "frames_total": 105,
+        "frames_processed": 105
+      },
+      "missed": [
+        "m09-p5 (1104 ms readable): + 6 Iron Ore (27)",
+        "m09-p6 (1104 ms readable): + 12 Iron Ore (33)"
+      ],
+      "false_reads": [
+        "noise @1320: Objective: Build the HUB",
+        "hallucination @2106: n..ild",
+        "hallucination @2807: Objective: Buil",
+        "hallucination @3920: the HUB",
+        "hallucination @5029: i'd the HUB"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m10",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 1,
+        "recall": 0.3333333333333333,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 1,
+            "recall": 0.5
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.2727272727272727,
+        "exact_match_rate": 0.0,
+        "prompts_total": 3,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 3,
+        "latency_p50_ms": 1334.1028000000001,
+        "latency_p95_ms": 1334.1028000000001,
+        "cpu_ms_p50": 7.3084,
+        "cpu_ms_p95": 19.4858,
+        "frames_total": 96,
+        "frames_processed": 96
+      },
+      "missed": [
+        "m10-p3 (1104 ms readable): + 6 Iron Ore   (27)",
+        "m10-p4 (2993 ms readable): + 12 Iron Ore   (33)"
+      ],
+      "false_reads": [
+        "hallucination @606: Objective: Buil",
+        "hallucination @1719: the HUB",
+        "hallucination @2827: i'd the HUB"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "satisfactory-m11",
+      "genres": [
+        "recorded"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 1,
+        "items_read": 0,
+        "recall": 0.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "time unsure",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 0.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 4,
+        "duplicates": 0,
+        "noise_reads": 2,
+        "background_reads": 0,
+        "hallucinations": 2,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "cpu_ms_p50": 6.9541,
+        "cpu_ms_p95": 26.6497,
+        "frames_total": 95,
+        "frames_processed": 95
+      },
+      "missed": [
+        "m11-p0 (2285 ms readable): + 12 Iron Ore   (33)"
+      ],
+      "false_reads": [
+        "hallucination @5298: ild the",
+        "noise @5595: e: Build the HUB",
+        "hallucination @7513: Objective: Buil",
+        "noise @7590: 1.2.5.1 CL#520140"
+      ],
+      "background_read_texts": []
+    }
+  ]
+}

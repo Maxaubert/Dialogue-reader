@@ -1,0 +1,51 @@
+# CI gate (shipping skill): lint + unit on every PR and every push to main, plus "the installer builds".
+# Not run before M5 was merged: the first run on GitHub is its first test (some tests capture windows and use a
+# hidden desktop, which a CI runner may not allow; see CLAUDE.md, "Known failures").
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Unit and integration tests
+        run: cargo test --workspace
+      - name: Third-party notices are up to date
+        run: python installer/notices.py --check
+
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build the installer (downloads ONNX Runtime and the Kokoro files, SHA-256 checked)
+        shell: pwsh
+        run: ./installer/build.ps1 -Fetch

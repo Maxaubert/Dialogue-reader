@@ -1,0 +1,89 @@
+// One part of a setup step (.sx in d-black 01-setup): it fades in with the step slide, 80 ms after the old step
+// starts to go, the parts 40 ms apart (at most 6). The page slot moves the step sideways; the part only fades.
+// With instant motion (tests, renders), and for the page Rust shows at launch, it shows at once.
+//
+// The fade is worked out from the clock (`animation-tick`), not with `animate`: the part is made in the frame
+// that first draws it, so a property flipped after it is made is already at its end when it is drawn.
+import { Motion } from "../theme.slint";
+
+export global SetupParts {
+    // true after the first page move in the UI (app.slint `go`, `go-back`)
+    in-out property <bool> armed: false;
+    // the direction of the last move: forward parts fade in over 260 ms, back parts over 200 ms (the back push)
+    in-out property <bool> fwd: true;
+}
+
+export component SetupPart inherits Rectangle {
+    // the place of the part in its step, from 0
+    in property <int> n: 0;
+    property <duration> wait: Motion.push-gap + Math.min(root.n, 5) * Motion.stagger;
+    property <duration> born;
+    // the fade time, fixed when the part is made (the direction of the move that made it)
+    property <duration> len: Motion.push-in;
+    // the fade is over (or there is none): the clock is no longer read, so nothing redraws for it
+    property <bool> done: Motion.instant || !SetupParts.armed;
+    init => {
+        root.born = animation-tick();
+        root.len = SetupParts.fwd ? Motion.push-in : Motion.back-in;
+    }
+    Timer {
+        interval: Math.max(1ms, root.wait + root.len);
+        running: !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+
+    // 0 to 1 over the fade, eased out (close to the mockup's ease-out-strong)
+    property <float> p: root.done ? 1 : Math.clamp((animation-tick() - root.born - root.wait) / Math.max(1ms, root.len), 0, 1);
+    opacity: 1 - Math.pow(1 - root.p, 4);
+    @children
+}
+
+// How much setup grows in a big window (Max, 2026-11-24: "make these cards bigger and center them"). It is 1 up to
+// a 1440 px wide window (the d-black size), then grows fast with the width: 1.4 from a 1707 px wide window (Max's
+// maximized window at 150%). It is never more than lets content `fit-h` px tall fit in the height `h`, with 16 px
+// above and under it (page px, so they grow too). Steps 1 to 5 and the footer share one k (app.slint `setup-k`),
+// worked out from the page area (under the title strip, above the 72 px footer room), so nothing changes size from
+// step to step. They fit `fit`:
+// Mark where text shows up makes its picture smaller to fit, the window list and the voice list scroll. Welcome
+// fits its own content.
+export global SetupZoom {
+    // the height steps 1 to 5 must fit (page px), and the room of the setup footer (window px)
+    out property <length> fit: 512px;
+    out property <length> foot: 72px;
+    // the height of the tallest step at full size (Mark where text shows up with its 960 x 540 picture)
+    out property <length> tallest: 664px;
+    public pure function k(w: length, h: length, fit-h: length) -> float {
+        return Math.clamp(Math.min(1 + (w - 1440px) / 667px, h / Math.max(1px, fit-h + 32px)), 1, 1.4);
+    }
+}
+
+// A setup step in a big window: its children are laid out in a page of `vw` x `vh` (the size / k), and that page
+// is drawn k times bigger, so it fills the area again. `top` puts content of height `content-h` in the middle.
+// `zoom` is k when the step shares it (steps 1 to 5); 0 lets the stage work it out for content `fit-h` tall.
+// `below` is room under the area that counts for the middle (Welcome has no footer: it centres in the window).
+// The children use `vw`, `vh` and `top` (not `parent`: in a page, `parent` is the SetupStage, not the scaled page).
+// The software renderer (render-screens) cannot scale: there k only changes where things sit, never their size.
+export component SetupStage inherits Rectangle {
+    in property <length> content-h;
+    in property <float> zoom: 0;
+    // the height the zoom must leave room for, when it is not given (Welcome: its own content)
+    in property <length> fit-h: SetupZoom.fit;
+    in property <length> below: 0px;
+    out property <float> k: root.zoom > 0 ? root.zoom : SetupZoom.k(root.width, root.height + root.below, root.fit-h);
+    // the size of the page the children see
+    out property <length> vw: root.width / root.k;
+    out property <length> vh: (root.height + root.below) / root.k;
+    // the y of the content in that page: centred, at least 16 px down
+    out property <length> top: Math.max(16px, (root.vh - root.content-h) / 2);
+    Rectangle {
+        x: (root.width - root.vw) / 2;
+        y: (root.height + root.below - root.vh) / 2;
+        width: root.vw;
+        height: root.vh;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-scale: root.k;
+        @children
+    }
+}

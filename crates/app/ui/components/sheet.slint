@@ -1,0 +1,471 @@
+// The component sheet: every shared part of base.slint and chrome.slint in its states, as on the d-black token
+// sheet (design/mockups/d-black/00-tokens.html). render-screens draws it as 00-components and
+// tests/components.rs presses it. It is not part of the app's pages.
+import { Palette, Space, Radius, Size, Type, Motion, Icons, Kind } from "../theme.slint";
+import { Icon, Button, BtnKind, IconButton, OptButton, Toggle, Segmented, Slider, TextField, Keycap, Panel,
+    GroupLabel, SettingRow, ListRow, ZoneChip, ZoneOutline, StatusDot, Status, Tip, Tag, Wave } from "base.slint";
+
+// A row of the right-hand panels: a grey name, then the parts.
+component SheetRow inherits Rectangle {
+    in property <string> text;
+    in property <bool> first: false;
+    height: 52px;
+    if !root.first: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.line;
+    }
+    HorizontalLayout {
+        padding-left: Space.s4;
+        padding-right: Space.s4;
+        spacing: Space.s3;
+        Text {
+            width: 120px;
+            text: root.text;
+            font-size: Type.fs-small;
+            color: Palette.text-2;
+            vertical-alignment: center;
+        }
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: Space.s2;
+            @children
+        }
+    }
+}
+
+component Centre inherits VerticalLayout {
+    alignment: center;
+    @children
+}
+
+export component ComponentSheet inherits Rectangle {
+    background: Palette.bg;
+    property <bool> prompts-on: false;
+    property <bool> dialogue-on: true;
+    property <bool> f7-capture: false;
+    property <bool> start-on: true;
+    property <int> pill: 0;
+    property <float> speed: 0.4;
+    // the column at x 48 and the one at x 744, 648 px each, as on the token sheet
+    VerticalLayout {
+        x: 48px;
+        y: 24px;
+        width: 648px;
+        spacing: Space.s2;
+        Text {
+            text: "DialogReader components";
+            color: Palette.text;
+            font-size: Type.fs-title;
+            font-weight: Type.w-title;
+            letter-spacing: Type.ls-title;
+            height: Type.lh-title;
+        }
+
+        Text {
+            text: "Black, neutral greys, white for on, one live hue.";
+            color: Palette.text-2;
+            height: Type.lh-body;
+        }
+
+        GroupLabel {
+            text: "Rows and panel";
+        }
+
+        Panel {
+            VerticalLayout {
+                SettingRow {
+                    first: true;
+                    text: "Start with Windows";
+                    Centre {
+                        Toggle {
+                            label: "Start with Windows";
+                            on: root.start-on;
+                            toggled(v) => {
+                                root.start-on = v;
+                            }
+                        }
+                    }
+                }
+
+                SettingRow {
+                    text: "Read key";
+                    Centre {
+                        Keycap {
+                            text: "Mouse 4";
+                            tip: "Click to change";
+                        }
+                    }
+                }
+
+                SettingRow {
+                    text: "Game profile";
+                    Centre {
+                        Button {
+                            text: "Export";
+                        }
+                    }
+
+                    Centre {
+                        Button {
+                            text: "Import";
+                        }
+                    }
+                }
+            }
+        }
+
+        Panel {
+            VerticalLayout {
+                padding: Space.s1;
+                ListRow {
+                    icon: Icons.k-dialogue;
+                    speaker: "Dutch:";
+                    line: "We ride at first light. Nobody stays behind.";
+                    rest-bg: Palette.surface-1;
+                    replay-label: "Replay";
+                    meta: "21:41";
+                }
+
+                ListRow {
+                    icon: Icons.k-pickups;
+                    line: "+1 Ginseng";
+                    rest-bg: Palette.surface-1;
+                    meta: "21:42";
+                }
+
+                ListRow {
+                    icon: Icons.k-prompts;
+                    line: "Hold E to talk";
+                    off: true;
+                    tag: "off";
+                    rest-bg: Palette.surface-1;
+                    meta: "21:42";
+                }
+
+                ListRow {
+                    icon: Icons.k-dialogue;
+                    speaker: "Hosea:";
+                    line: "If we do not get the wagons through the pass before dark, we lose the whole camp to the cold, and the wolves that follow it down from the ridge will be at the horses before morning.";
+                    rest-bg: Palette.surface-1;
+                }
+            }
+        }
+
+        GroupLabel {
+            text: "Zone outlines";
+        }
+
+        Rectangle {
+            height: 120px;
+            border-radius: Radius.lg;
+            background: #B8B8B8;
+            ZoneOutline {
+                x: 24px;
+                y: 24px;
+                width: 160px;
+                height: 64px;
+            }
+
+            ZoneOutline {
+                x: 224px;
+                y: 24px;
+                width: 160px;
+                height: 64px;
+                live: true;
+            }
+
+            ZoneOutline {
+                x: 424px;
+                y: 24px;
+                width: 160px;
+                height: 64px;
+                dim: true;
+            }
+        }
+    }
+
+    VerticalLayout {
+        x: 744px;
+        y: 24px + Type.lh-title + Type.lh-body + 2 * Space.s2;
+        width: 648px;
+        spacing: Space.s2;
+        GroupLabel {
+            text: "Buttons";
+        }
+
+        Panel {
+            VerticalLayout {
+                SheetRow {
+                    first: true;
+                    text: "Primary";
+                    Centre {
+                        Button {
+                            text: "Read now";
+                            icon: Icons.play-fill;
+                            kind: BtnKind.primary;
+                        }
+                    }
+
+                    Centre {
+                        Button {
+                            text: "Off";
+                            label: "Primary disabled";
+                            kind: BtnKind.primary;
+                            enabled: false;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Secondary";
+                    Centre {
+                        Button {
+                            text: "Check now";
+                        }
+                    }
+
+                    Centre {
+                        Button {
+                            text: "Off";
+                            label: "Secondary disabled";
+                            enabled: false;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Ghost, danger";
+                    Centre {
+                        Button {
+                            text: "Pause";
+                            icon: Icons.pause;
+                            kind: BtnKind.ghost;
+                        }
+                    }
+
+                    Centre {
+                        Button {
+                            text: "Show all";
+                            trail: Icons.chev-right;
+                            kind: BtnKind.ghost;
+                        }
+                    }
+
+                    Centre {
+                        Button {
+                            text: "Delete zone";
+                            icon: Icons.trash;
+                            kind: BtnKind.danger;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Icon, option";
+                    Centre {
+                        IconButton {
+                            icon: Icons.settings;
+                            tip: "Settings (sheet)";
+                        }
+                    }
+
+                    Centre {
+                        IconButton {
+                            icon: Icons.replay;
+                            tip: "Replay (sheet)";
+                            on: true;
+                        }
+                    }
+
+                    Centre {
+                        OptButton {
+                            icon: Icons.zap;
+                            text: "Automatic";
+                        }
+                    }
+
+                    Centre {
+                        OptButton {
+                            icon: Icons.mouse;
+                            text: "Mouse 4";
+                            label: "Read key (sheet)";
+                        }
+                    }
+                }
+            }
+        }
+
+        GroupLabel {
+            text: "Controls";
+        }
+
+        Panel {
+            VerticalLayout {
+                SheetRow {
+                    first: true;
+                    text: "Toggle";
+                    Centre {
+                        Toggle {
+                            label: "Toggle on";
+                            on: true;
+                        }
+                    }
+
+                    Centre {
+                        Toggle {
+                            label: "Toggle off";
+                            on: false;
+                        }
+                    }
+
+                    Centre {
+                        Toggle {
+                            label: "Toggle disabled";
+                            on: true;
+                            enabled: false;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Zone chip";
+                    Centre {
+                        ZoneChip {
+                            kind: Kind.dialogue;
+                            on: root.dialogue-on;
+                            toggled(v) => {
+                                root.dialogue-on = v;
+                            }
+                        }
+                    }
+
+                    Centre {
+                        ZoneChip {
+                            kind: Kind.prompts;
+                            on: root.prompts-on;
+                            toggled(v) => {
+                                root.prompts-on = v;
+                            }
+                        }
+                    }
+
+                    Centre {
+                        Tag {
+                            text: "off";
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Keycap";
+                    Centre {
+                        Keycap {
+                            text: "Mouse 4";
+                            label: "Mouse 4 (sheet)";
+                        }
+                    }
+
+                    Centre {
+                        Keycap {
+                            text: "F7";
+                            capturing: root.f7-capture;
+                            clicked => {
+                                root.f7-capture = !root.f7-capture;
+                            }
+                        }
+                    }
+
+                    Centre {
+                        Keycap {
+                            text: "Ctrl K";
+                            small: true;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Segmented";
+                    Centre {
+                        Segmented {
+                            items: ["Top right", "Bottom", "Off"];
+                            selected: root.pill;
+                            select(i) => {
+                                root.pill = i;
+                            }
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Field, slider";
+                    Centre {
+                        TextField {
+                            width: 200px;
+                            icon: Icons.search;
+                            placeholder: "Search games";
+                        }
+                    }
+
+                    Centre {
+                        Slider {
+                            width: 160px;
+                            label: "Speed";
+                            value <=> root.speed;
+                        }
+                    }
+
+                    Centre {
+                        Text {
+                            text: "1.1x";
+                            color: Palette.text-2;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Status dot";
+                    Centre {
+                        StatusDot {
+                            status: Status.reading;
+                            tip: "Reading";
+                        }
+                    }
+
+                    Centre {
+                        StatusDot {
+                            status: Status.paused;
+                            tip: "Paused";
+                        }
+                    }
+
+                    Centre {
+                        StatusDot {
+                            status: Status.off;
+                            tip: "Game not running";
+                        }
+                    }
+
+                    Centre {
+                        Tip {
+                            text: "A tip, shown";
+                            shown: true;
+                        }
+                    }
+                }
+
+                SheetRow {
+                    text: "Waveform";
+                    Centre {
+                        Wave {
+                            height: 24px;
+                            bars: [4, 13, 9, 10, 12, 6, 13, 7, 12, 11, 8, 13, 5, 13, 9, 11];
+                            played: 12;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

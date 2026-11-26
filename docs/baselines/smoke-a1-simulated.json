@@ -1,0 +1,523 @@
+{
+  "suite": "smoke",
+  "seed": 1,
+  "truth_fingerprint": "0099daf8c452e4f8",
+  "reader": "a1",
+  "reader_options": {},
+  "clock": "simulated",
+  "totals": {
+    "scenarios": 8,
+    "items_should_read": 29,
+    "items_read": 28,
+    "recall": 0.9655172413793104,
+    "recall_by_duration": [
+      {
+        "name": "<1s",
+        "total": 1,
+        "read": 0,
+        "recall": 0.0
+      },
+      {
+        "name": "1-2s",
+        "total": 5,
+        "read": 5,
+        "recall": 1.0
+      },
+      {
+        "name": "2-4s",
+        "total": 19,
+        "read": 19,
+        "recall": 1.0
+      },
+      {
+        "name": ">4s",
+        "total": 4,
+        "read": 4,
+        "recall": 1.0
+      }
+    ],
+    "mean_cer": 0.00792018614334497,
+    "exact_match_rate": 0.8214285714285714,
+    "prompts_total": 5,
+    "prompts_read": 5,
+    "prompt_recall": 1.0,
+    "events_total": 37,
+    "duplicates": 3,
+    "noise_reads": 0,
+    "background_reads": 0,
+    "hallucinations": 1,
+    "latency_p50_ms": 154.1608,
+    "latency_p95_ms": 439.16229999999996,
+    "cpu_ms_p50": 0.176,
+    "cpu_ms_p95": 14.9511,
+    "frames_total": 2903,
+    "frames_processed": 2893
+  },
+  "scenarios": [
+    {
+      "id": "smoke-000",
+      "genres": [
+        "rpg_dialogue"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 6,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 4,
+            "read": 4,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 6,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 147.91776666666738,
+        "latency_p95_ms": 288.27469999999994,
+        "cpu_ms_p50": 3.7525000000000004,
+        "cpu_ms_p95": 8.9701,
+        "frames_total": 394,
+        "frames_processed": 394
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-001",
+      "genres": [
+        "pickup_stack",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 6,
+        "items_read": 6,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 6,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 50.29313333333357,
+        "latency_p95_ms": 162.59739999999965,
+        "cpu_ms_p50": 0.1885,
+        "cpu_ms_p95": 12.883000000000001,
+        "frames_total": 308,
+        "frames_processed": 308
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-002",
+      "genres": [
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.03267457180500658,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 2,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 439.16229999999996,
+        "latency_p95_ms": 449.15959999999995,
+        "cpu_ms_p50": 0.15339999999999998,
+        "cpu_ms_p95": 2.8576,
+        "frames_total": 380,
+        "frames_processed": 380
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-003",
+      "genres": [
+        "objective_update",
+        "static_hud"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 46.806000000000495,
+        "latency_p95_ms": 159.6302333333333,
+        "cpu_ms_p50": 0.0593,
+        "cpu_ms_p95": 0.0706,
+        "frames_total": 374,
+        "frames_processed": 374
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-004",
+      "genres": [
+        "tooltip"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.013469387755102041,
+        "exact_match_rate": 0.3333333333333333,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 5,
+        "duplicates": 1,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 1,
+        "latency_p50_ms": 266.8700333333345,
+        "latency_p95_ms": 270.60040000000026,
+        "cpu_ms_p50": 0.526,
+        "cpu_ms_p95": 0.6003999999999999,
+        "frames_total": 387,
+        "frames_processed": 387
+      },
+      "missed": [],
+      "false_reads": [
+        "hallucination @2934: :ores\n:kable"
+      ],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-005",
+      "genres": [
+        "prompt_flicker",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 4,
+        "items_read": 3,
+        "recall": 0.75,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 1,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": "2-4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 1,
+            "read": 1,
+            "recall": 1.0
+          }
+        ],
+        "mean_cer": 0.027777777777777776,
+        "exact_match_rate": 0.6666666666666666,
+        "prompts_total": 5,
+        "prompts_read": 5,
+        "prompt_recall": 1.0,
+        "events_total": 8,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 243.93516666666665,
+        "latency_p95_ms": 281.73313333333317,
+        "cpu_ms_p50": 12.2606,
+        "cpu_ms_p95": 30.7079,
+        "frames_total": 339,
+        "frames_processed": 329
+      },
+      "missed": [
+        "sub004 (335 ms readable): Keep your voice down. The guards change shifts at midnight."
+      ],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-006",
+      "genres": [
+        "damage_numbers",
+        "subtitles"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 3,
+        "items_read": 3,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 3,
+            "read": 3,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 3,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 165.16610000000037,
+        "latency_p95_ms": 188.1563000000001,
+        "cpu_ms_p50": 0.1545,
+        "cpu_ms_p95": 2.4323,
+        "frames_total": 323,
+        "frames_processed": 323
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    },
+    {
+      "id": "smoke-007",
+      "genres": [
+        "menu_overlay",
+        "objective_update"
+      ],
+      "metrics": {
+        "scenarios": 1,
+        "items_should_read": 2,
+        "items_read": 2,
+        "recall": 1.0,
+        "recall_by_duration": [
+          {
+            "name": "<1s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "1-2s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          },
+          {
+            "name": "2-4s",
+            "total": 2,
+            "read": 2,
+            "recall": 1.0
+          },
+          {
+            "name": ">4s",
+            "total": 0,
+            "read": 0,
+            "recall": 0.0
+          }
+        ],
+        "mean_cer": 0.0,
+        "exact_match_rate": 1.0,
+        "prompts_total": 0,
+        "prompts_read": 0,
+        "prompt_recall": 0.0,
+        "events_total": 2,
+        "duplicates": 0,
+        "noise_reads": 0,
+        "background_reads": 0,
+        "hallucinations": 0,
+        "latency_p50_ms": 72.90386666666654,
+        "latency_p95_ms": 90.17809999999918,
+        "cpu_ms_p50": 0.0855,
+        "cpu_ms_p95": 0.754,
+        "frames_total": 398,
+        "frames_processed": 398
+      },
+      "missed": [],
+      "false_reads": [],
+      "background_read_texts": []
+    }
+  ]
+}

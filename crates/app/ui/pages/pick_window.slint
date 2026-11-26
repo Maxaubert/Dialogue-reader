@@ -1,0 +1,222 @@
+// Setup step 1, Pick your game (d-black 01-setup, #step1). The search field, then two panels with the label above
+// each: "Running" (games) and "Other" (other windows), each row with its window's own icon. The picked row has the
+// surface-3 fill; it glides to a new row in the same panel (360 ms) and fades between the panels (120 ms). A panel with no rows left
+// hides with its label. There is no Refresh: the list refreshes by itself while this page shows (src/vm).
+import { SetupPart, SetupStage, SetupZoom } from "setup_part.slint";
+import {
+    Palette,
+    Space,
+    Radius,
+    Size,
+    Type,
+    Motion,
+    Icons,
+} from "../theme.slint";
+import { WindowData } from "../data.slint";
+import {
+    TextField,
+    GroupLabel,
+    Panel,
+} from "../components/base.slint";
+import { ObHead } from "../components/chrome.slint";
+
+// The icon of a row: the exe icon of a real window, 24 px, with no frame around it (Max, 2026-11-24: "no need for
+// boxes, apps have icons already"). A window with no icon (the fake data, a protected game) keeps the room empty,
+// so the names line up.
+component RowIcon inherits Rectangle {
+    in property <WindowData> win;
+    width: 24px;
+    height: 24px;
+    if root.win.icon.width > 0: Image {
+        width: 100%;
+        height: 100%;
+        source: root.win.icon;
+        image-fit: contain;
+        accessible-role: none;
+    }
+}
+
+component WinRow inherits Rectangle {
+    in property <WindowData> win;
+    in property <bool> game;
+    in property <bool> sel;
+    callback clicked();
+    height: Size.media;
+    border-radius: Radius.md;
+    background: !root.sel && touch.has-hover ? Palette.surface-2 : transparent;
+    transform-scale: touch.pressed ? Motion.press : 1;
+    animate background, transform-scale {
+        duration: Motion.fast;
+        easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    accessible-role: button;
+    accessible-label: root.win.name;
+    accessible-item-selected: root.sel;
+    accessible-action-default => {
+        root.clicked();
+    }
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Space.s2;
+        padding-right: Space.s3;
+        spacing: Space.s3;
+        VerticalLayout {
+            alignment: center;
+            RowIcon {
+                win: root.win;
+            }
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.win.name;
+            color: root.game || root.sel ? Palette.text : Palette.text-2;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+}
+
+// One group: the label above a panel of rows. `first` is the index of its first row in the page's pick.
+component Group inherits VerticalLayout {
+    in property <string> label;
+    in property <[WindowData]> rows;
+    in property <bool> game;
+    in property <int> first;
+    in-out property <int> selected;
+    property <int> here: root.selected - root.first;
+    property <bool> has: root.here >= 0 && root.here < root.rows.length;
+    padding-top: Space.s5;
+    spacing: Space.s2;
+    HorizontalLayout {
+        padding-left: Space.s1;
+        GroupLabel {
+            text: root.label;
+        }
+    }
+
+    Panel {
+        height: root.rows.length * Size.media + 2 * Space.s1 + 2px;
+        // the fill of the picked row
+        Rectangle {
+            x: Space.s1 + 1px;
+            y: Space.s1 + 1px + Math.clamp(root.here, 0, Math.max(0, root.rows.length - 1)) * Size.media;
+            width: parent.width - 2 * Space.s1 - 2px;
+            height: Size.media;
+            border-radius: Radius.md;
+            background: Palette.surface-3;
+            opacity: root.has ? 1 : 0;
+            animate y {
+                duration: Motion.glide;
+                easing: cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            animate opacity {
+                duration: Motion.fast;
+                easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+            }
+        }
+
+        VerticalLayout {
+            padding: Space.s1 + 1px;
+            for w[i] in root.rows: WinRow {
+                win: w;
+                game: root.game;
+                sel: root.first + i == root.selected;
+                clicked => {
+                    root.selected = root.first + i;
+                }
+            }
+        }
+    }
+}
+
+export component PickWindowPage inherits Rectangle {
+    // how much the step is drawn bigger (app.slint `setup-k`)
+    in property <float> zoom: 0;
+    in property <[WindowData]> games;
+    in property <[WindowData]> others;
+    // games are 0 .. games.length - 1, other windows follow
+    in-out property <int> selected: 0;
+    in-out property <string> search;
+    // called once a second while the page shows: the view model looks for new or closed windows
+    callback refresh();
+    callback search-changed(string);
+    changed search => {
+        root.search-changed(root.search);
+    }
+    Timer {
+        interval: 1s;
+        running: true;
+        triggered => {
+            root.refresh();
+        }
+    }
+
+    // The title and the search field stay put while the lists change (search, refresh): the column is placed as
+    // if it were as tall as the tallest step, so the title sits where it sits on Mark where text shows up, and only
+    // the lists grow down. The page scrolls when they are longer than the window.
+    stage := SetupStage {
+        zoom: root.zoom;
+        content-h: SetupZoom.tallest;
+        flick := Flickable {
+            width: stage.vw;
+            height: stage.vh;
+            content-height: stage.top + col.preferred-height + Space.s7;
+            col := VerticalLayout {
+                x: (flick.width - Size.col) / 2;
+                y: stage.top;
+                width: Size.col;
+                height: self.preferred-height;
+                alignment: start;
+                SetupPart {
+                    n: 0;
+                    ObHead {
+                        title: "Pick your game";
+                        lead: "Start your game, then pick it.";
+                    }
+                }
+
+                Rectangle {
+                    height: Space.s5;
+                }
+
+                SetupPart {
+                    n: 1;
+                    height: Size.ctl;
+                    TextField {
+                        icon: Icons.search;
+                        placeholder: "Search windows";
+                        text <=> root.search;
+                    }
+                }
+
+                if root.games.length > 0: SetupPart {
+                    n: 2;
+                    Group {
+                        label: "Running";
+                        rows: root.games;
+                        game: true;
+                        first: 0;
+                        selected <=> root.selected;
+                    }
+                }
+                if root.others.length > 0: SetupPart {
+                    n: 3;
+                    Group {
+                        label: "Other";
+                        rows: root.others;
+                        game: false;
+                        first: root.games.length;
+                        selected <=> root.selected;
+                    }
+                }
+            }
+        }
+    }
+}

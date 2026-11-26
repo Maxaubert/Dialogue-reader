@@ -1,0 +1,110 @@
+// Overlay spike: the real M1 overlay components inside real windows.
+// Every overlay window is frameless, always on top and has a transparent background. Win32 styles that
+// Slint cannot express (no activate, tool window, click-through) are added from Rust (src/overlay.rs).
+import "../../../crates/app/ui/fonts/Geist-Variable.ttf";
+import "../../../crates/app/ui/fonts/GeistMono-Variable.ttf";
+
+import { OverlayPill } from "../../../crates/app/ui/overlays/pill.slint";
+import { QuickMenu } from "../../../crates/app/ui/overlays/quick_menu.slint";
+
+// Room around a card for its drop shadow. These pixels must stay fully transparent.
+global Margin {
+    out property <length> m: 24px;
+}
+
+// 13: the status pill. Click-through, never active.
+export component PillWindow inherits Window {
+    in property <string> speaker: "Arthur";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "DR pill";
+    width: pill.width + 2 * Margin.m;
+    height: pill.height + 2 * Margin.m;
+    pill := OverlayPill {
+        x: Margin.m;
+        y: Margin.m;
+        speaker: root.speaker;
+    }
+}
+
+// 15: the quick menu. Opaque rounded card on a transparent window. Keys come from the low-level hook.
+export component MenuWindow inherits Window {
+    in-out property <int> highlight: 0;
+    in-out property <int> activated: -1;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "DR quick menu";
+    width: menu.width + 2 * Margin.m;
+    height: menu.height + 2 * Margin.m;
+    menu := QuickMenu {
+        x: Margin.m;
+        y: Margin.m;
+        highlight: root.highlight;
+        activate(i) => {
+            root.activated = i;
+        }
+    }
+}
+
+// 16: zone edit. Covers the game and takes the mouse (drag to draw) without ever being active.
+// A stand-in, not the real crates/app/ui/overlays/zone_edit.slint: a veil and a drag box are enough to test
+// the window. Like every overlay window it uses no popups (they would get default window attributes).
+export component ZoneWindow inherits Window {
+    in-out property <int> zones-drawn: 0;
+    in-out property <length> last-x;
+    in-out property <length> last-y;
+    in-out property <length> last-w;
+    in-out property <length> last-h;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "DR zone edit";
+    // A light veil so the window is visible over the game. The real editor draws the frozen screenshot.
+    Rectangle {
+        background: #0000004D;
+    }
+
+    drawn := Rectangle {
+        x: root.last-x;
+        y: root.last-y;
+        width: root.last-w;
+        height: root.last-h;
+        visible: root.zones-drawn > 0;
+        border-width: 2px;
+        border-color: #5B7CFF;
+        background: #5B7CFF2E;
+    }
+
+    live := Rectangle {
+        visible: touch.pressed;
+        x: min(touch.pressed-x, touch.mouse-x);
+        y: min(touch.pressed-y, touch.mouse-y);
+        width: abs(touch.mouse-x - touch.pressed-x);
+        height: abs(touch.mouse-y - touch.pressed-y);
+        border-width: 2px;
+        border-color: #FFFFFF;
+    }
+
+    touch := TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                root.last-x = min(self.pressed-x, self.mouse-x);
+                root.last-y = min(self.pressed-y, self.mouse-y);
+                root.last-w = abs(self.mouse-x - self.pressed-x);
+                root.last-h = abs(self.mouse-y - self.pressed-y);
+                root.zones-drawn += 1;
+            }
+        }
+    }
+}
+
+// Positive control: a plain window with default Slint settings. It is shown last; it should activate
+// (WM_ACTIVATE, and it becomes the UI thread's active window), which proves that the focus checks can fail.
+export component PlainWindow inherits Window {
+    title: "DR plain control";
+    width: 240px;
+    height: 120px;
+    background: #C03030;
+}
